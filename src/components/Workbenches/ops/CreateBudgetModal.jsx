@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { BsX, BsCurrencyDollar } from 'react-icons/bs';
 import { backendService } from '../../../services/backendService';
-import { supabase } from '../../../lib/supabase';
+import { useWorkbench } from '../../../context/WorkbenchContext';
 
 export default function CreateBudgetModal({ isOpen, onClose, workbenchId, onSuccess }) {
+  const { coa } = useWorkbench();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [availableCategories, setAvailableCategories] = useState([]);
@@ -15,29 +16,16 @@ export default function CreateBudgetModal({ isOpen, onClose, workbenchId, onSucc
   });
 
   useEffect(() => {
-    if (isOpen && workbenchId) {
-      fetchCategories();
-    }
-  }, [isOpen, workbenchId]);
-
-  const fetchCategories = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('coa_accounts')
-        .select('id, name, level, parent_id')
-        .eq('workbench_id', workbenchId);
-      
-      if (error) throw error;
-      
+    if (isOpen && workbenchId && coa.length > 0) {
       // Find IDs for LIABILITIES and EXPENSES
-      const targetParents = data.filter(d => 
+      const targetParents = coa.filter(d => 
         d.level === 1 && 
         (d.name.toUpperCase() === 'LIABILITIES' || d.name.toUpperCase() === 'EXPENSES')
       );
       const parentIds = targetParents.map(p => p.id);
       
       // Filter Level 2 accounts that belong to these parents
-      const subAccounts = data.filter(d => 
+      const subAccounts = coa.filter(d => 
         d.level === 2 && parentIds.includes(d.parent_id)
       );
 
@@ -52,10 +40,8 @@ export default function CreateBudgetModal({ isOpen, onClose, workbenchId, onSucc
       if (grouped.length > 0 && grouped[0].items.length > 0 && !formData.name) {
         setFormData(prev => ({ ...prev, name: grouped[0].items[0] }));
       }
-    } catch (err) {
-      console.error("Failed to fetch COA sub-accounts:", err);
     }
-  };
+  }, [isOpen, workbenchId, coa]);
 
   if (!isOpen) return null;
 
