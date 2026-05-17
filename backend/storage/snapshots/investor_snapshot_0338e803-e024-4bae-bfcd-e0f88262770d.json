@@ -1,0 +1,57 @@
+{
+  "meta": {
+    "workbench_id": "0338e803-e024-4bae-bfcd-e0f88262770d",
+    "timestamp": "2026-05-16T16:46:01.216346",
+    "snapshot_id": "snap_1778930161"
+  },
+  "summary": {
+    "headline": "Financial operations stabilized.",
+    "subtext": "Current runway is 27.6 months with 42.9% data verification completeness.",
+    "growth_signal": "neutral"
+  },
+  "kpis": [
+    {
+      "label": "REVENUE",
+      "value": 185300.0,
+      "trend": 0,
+      "type": "currency"
+    },
+    {
+      "label": "BURN RATE",
+      "value": 34999.996666666666,
+      "trend": 0,
+      "type": "currency"
+    },
+    {
+      "label": "CASH POSITION",
+      "value": 965300.02,
+      "trend": 0,
+      "type": "currency"
+    },
+    {
+      "label": "RUNWAY",
+      "value": 27.580003198095543,
+      "trend": 0,
+      "type": "months"
+    },
+    {
+      "label": "RECEIVABLES",
+      "value": 0,
+      "trend": 0,
+      "type": "currency"
+    }
+  ],
+  "trust": {
+    "confidence_score": 60.0,
+    "data_completeness": 42.857142857142854,
+    "is_ledger_verified": true,
+    "last_updated": "2026-05-16T16:46:01.216346"
+  },
+  "trends": [
+    {
+      "month": "2026-05",
+      "revenue": 185300.0,
+      "expense": 209999.98
+    }
+  ]
+}

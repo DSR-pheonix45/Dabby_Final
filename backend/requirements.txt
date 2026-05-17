@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+python-dotenv
+supabase==2.11.0
+pydantic
+httpx==0.27.2
+groq

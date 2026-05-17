@@ -1,0 +1,42 @@
+﻿node.exe : 
+Initialising login 
+role...
+At line:1 char:1
++ & "C:\Program Files\
+nodejs/node.exe" 
+"C:\Users\Medhansh 
+Pc\AppData\Ro ...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (Initialisi   
+ ng login role...:    
+String) [], Remot    
+eException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+Connecting to remote 
+database...
+Do you want to push 
+these migrations to 
+the remote database?
+ ΓÇó 20260303233500_ch
+at_insert_policies.sql
+ ΓÇó 20260303234400_fi
+x_column_name_mismatch
+.sql
+ ΓÇó 20260307000000_fi
+x_missing_new_user_tri
+gger.sql
+ ΓÇó 20260314000000_fi
+nancial_ingestion_sche
+ma.sql
+ ΓÇó 20260314191307_ad
+d_workbench_id_to_data
+sets.sql
+
