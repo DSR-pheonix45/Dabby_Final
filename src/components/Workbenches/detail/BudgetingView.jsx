@@ -11,8 +11,6 @@ export default function BudgetingView({ workbenchId }) {
     { label: "VARIANCE", value: "0%", color: "text-gray-500" },
   ]);
 
-  ]);
-
   const [accounts, setAccounts] = useState([]);
   const [expandedRow, setExpandedRow] = useState(null);
   const [rowTransactions, setRowTransactions] = useState({});
