@@ -586,5 +586,19 @@ export const backendService = {
     const response = await fetch(`http://localhost:8000/api/ops/entities/workbench/${workbenchId}`);
     if (!response.ok) throw new Error('Failed to fetch entities');
     return await response.json();
+  },
+
+  // --- Budgets ---
+
+  async getBudgetPerformance(workbenchId) {
+    const response = await fetch(`http://localhost:8000/api/budgets/${workbenchId}/performance`);
+    if (!response.ok) throw new Error('Failed to fetch budget performance');
+    return await response.json();
+  },
+
+  async getBudgetTransactions(workbenchId, category) {
+    const response = await fetch(`http://localhost:8000/api/budgets/${workbenchId}/transactions/${encodeURIComponent(category)}`);
+    if (!response.ok) throw new Error('Failed to fetch clubbed transactions');
+    return await response.json();
   }
 };

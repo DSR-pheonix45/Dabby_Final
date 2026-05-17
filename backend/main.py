@@ -13,7 +13,7 @@ print(f"[DEBUG] Loading environment from: {os.path.abspath(env_path)}")
 print(f"[DEBUG] File exists: {os.path.exists(env_path)}")
 load_dotenv(env_path)
 
-from routers import workbenches, ai, coa, ledger, ops, context, inventory, investor, tasks
+from routers import workbenches, ai, coa, ledger, ops, context, inventory, investor, tasks, budgets
 
 app = FastAPI(title="Datalis API", description="FastAPI Backend for Datalis", version="1.0.0")
 
@@ -40,6 +40,7 @@ app.include_router(context.router, prefix="/api/context", tags=["Context"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(investor.router, prefix="/api/investor", tags=["Investor"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["Tasks"])
+app.include_router(budgets.router, prefix="/api/budgets", tags=["Budgets"])
 
 @app.get("/health")
 def health_check():
