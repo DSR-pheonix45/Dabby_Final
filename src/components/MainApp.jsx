@@ -569,6 +569,7 @@ export default function MainApp() {
                     <WelcomeSection />
                     <ActionCards
                       onQuestionCardClick={handleQuestionCardClick}
+                      activeWorkbench={activeWorkbench}
                     />
                   </>
                 )
@@ -581,6 +582,7 @@ export default function MainApp() {
                   <WelcomeSection />
                   <ActionCards
                     onQuestionCardClick={handleQuestionCardClick}
+                    activeWorkbench={activeWorkbench}
                   />
                 </>
               }

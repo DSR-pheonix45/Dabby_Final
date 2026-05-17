@@ -15,42 +15,56 @@ import {
 
 export default function ActionCards({
   onQuestionCardClick,
+  activeWorkbench
 }) {
+  if (!activeWorkbench || !activeWorkbench.active) {
+    return null;
+  }
+
   const subCards = [
+    // Top 3 - Exceptions/Warnings
     {
-      title: "Revenue Analysis",
-      description: "What are our top revenue streams?",
-      category: "FINANCE",
+      title: "Expense Spikes",
+      description: "Identify any unusual expense spikes this month",
+      category: "WARNINGS",
+      icon: BsLightning,
+      onClick: () => onQuestionCardClick?.("Identify any unusual expense spikes this month"),
+    },
+    {
+      title: "Overdue Payments",
+      description: "Are there any overdue invoices or bills?",
+      category: "EXCEPTIONS",
+      icon: BsShield,
+      onClick: () => onQuestionCardClick?.("Are there any overdue invoices or bills?"),
+    },
+    {
+      title: "Budget Limits",
+      description: "Highlight budget categories nearing their limits",
+      category: "WARNINGS",
+      icon: BsGrid3X3Gap,
+      onClick: () => onQuestionCardClick?.("Highlight any budget categories nearing their limits"),
+    },
+    // Bottom 3 - Growth/Clarity
+    {
+      title: "Top Revenue",
+      description: "What are our most profitable revenue streams?",
+      category: "GROWTH",
       icon: BsGraphUp,
-      onClick: () => onQuestionCardClick?.("What are our top revenue streams?"),
+      onClick: () => onQuestionCardClick?.("What are our most profitable revenue streams?"),
     },
     {
-      title: "Market Research",
-      description: "Analyze our market position",
-      category: "STRATEGY",
-      icon: BsSearch,
-      onClick: () => onQuestionCardClick?.("Analyze our market position"),
+      title: "Performance Summary",
+      description: "Summarize financial performance for the last quarter",
+      category: "CLARITY",
+      icon: BsTrophy,
+      onClick: () => onQuestionCardClick?.("Summarize our financial performance for the last quarter"),
     },
     {
-      title: "Financial Planning",
-      description: "Create a financial forecast",
-      category: "PLANNING",
-      icon: BsCalculator,
-      onClick: () => onQuestionCardClick?.("Create a financial forecast"),
-    },
-    {
-      title: "Performance Analytics",
-      description: "Compare quarterly performance",
-      category: "ANALYTICS",
+      title: "Operating Expenses",
+      description: "Provide a breakdown of our operating expenses",
+      category: "CLARITY",
       icon: BsBarChart,
-      onClick: () => onQuestionCardClick?.("Compare quarterly performance"),
-    },
-    {
-      title: "Customer Analysis",
-      description: "Break down our customer segments",
-      category: "INSIGHTS",
-      icon: BsPeople,
-      onClick: () => onQuestionCardClick?.("Break down our customer segments"),
+      onClick: () => onQuestionCardClick?.("Provide a breakdown of our operating expenses"),
     },
   ];
 
