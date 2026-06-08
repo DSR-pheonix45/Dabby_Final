@@ -50,7 +50,7 @@ export default function WorkbenchWelcome({ onAction, workbenchId }) {
         "Real-time anomaly detection in cash flow patterns",
         "Predictive budget forecasting based on historical data"
     ]);
-    const [loadingAI, setLoadingAI] = useState(true);
+    const [_loadingAI, setLoadingAI] = useState(true);
 
     // Fetch AI Capabilities on Mount
     useEffect(() => {
@@ -71,7 +71,7 @@ export default function WorkbenchWelcome({ onAction, workbenchId }) {
                 if (content) {
                     const lines = content.split('\n').filter(line => line.trim().length > 0).slice(0, 3);
                     // Clean up numbering or bullets if present
-                    const cleanLines = lines.map(l => l.replace(/^[-*1-3\.]+\s*/, ''));
+                    const cleanLines = lines.map(l => l.replace(/^[-*1-3.]+\s*/, ''));
                     setAiCapabilities(cleanLines);
                 }
             } catch (error) {

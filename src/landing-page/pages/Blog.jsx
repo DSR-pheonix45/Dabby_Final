@@ -76,12 +76,19 @@ export default function Blog() {
                 {post.title}
               </h2>
               <p className={isDark ? "text-gray-400" : "text-gray-600"}>{post.summary}</p>
-              <button className="mt-5 inline-flex items-center gap-2 text-[#81E6D9] text-sm font-semibold">
-                Read story
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                </svg>
-              </button>
+              {post.link ? (
+                <a href={post.link} target="_blank" rel="noopener noreferrer"
+                   className="mt-5 inline-flex items-center gap-2 text-[#81E6D9] text-sm font-semibold hover:gap-3 transition-all">
+                  Read story
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </a>
+              ) : (
+                <span className={`mt-5 inline-flex items-center gap-2 text-sm font-medium ${isDark ? "text-gray-600" : "text-gray-400"}`}>
+                  Full story coming soon
+                </span>
+              )}
             </motion.article>
           ))}
         </div>

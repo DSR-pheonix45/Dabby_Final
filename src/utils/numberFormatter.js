@@ -442,8 +442,20 @@ export function parseFormattedNumber(str) {
   return parseFloat(cleaned);
 }
 
+/**
+ * Round a user-entered monetary value to 2 decimal places, guarding against
+ * float artifacts (e.g. 0.1 + 0.2) and NaN. Returns a clean Number.
+ * Use this at every point a raw input is turned into an amount sent to the ledger.
+ */
+export function roundMoney(value) {
+  const num = typeof value === 'string' ? parseFloat(value.replace(/,/g, '')) : Number(value);
+  if (!isFinite(num)) return 0;
+  return Math.round((num + Number.EPSILON) * 100) / 100;
+}
+
 // Default export
 export default {
+  roundMoney,
   formatNumber,
   formatIndianNumber,
   formatInternationalNumber,

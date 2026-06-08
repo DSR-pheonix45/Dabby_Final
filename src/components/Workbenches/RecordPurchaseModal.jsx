@@ -14,7 +14,7 @@ import { toast } from "react-hot-toast";
 import ProofUploader from "./shared/ProofUploader";
 
 export default function RecordPurchaseModal({ isOpen, onClose, workbenchId, item, onSuccess }) {
-  const { labels } = useWorkbench();
+  const { _labels } = useWorkbench();
   const [loading, setLoading] = useState(false);
   const [proofFile, setProofFile] = useState(null);
   const [entities, setEntities] = useState([]);

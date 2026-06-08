@@ -3,7 +3,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { BsSun, BsMoon } from 'react-icons/bs';
 
 const ThemeToggle = ({ className = '' }) => {
-  const { theme, toggleTheme, isDark } = useTheme();
+  const { _theme, toggleTheme, isDark } = useTheme();
 
   return (
     <button

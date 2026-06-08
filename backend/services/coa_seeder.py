@@ -52,7 +52,7 @@ def seed_coa(supabase_client, workbench_id: str, business_type: str = "services"
             }
         },
         "REVENUE": {
-            "type": "income",
+            "type": "revenue",
             "sub_accounts": {
                 "Operating Revenue": [],
                 "Other Income": [],

@@ -6,6 +6,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { API_BASE_URL } from '../lib/api';
 
 const MODEL = "llama-3.3-70b-versatile";
 const FALLBACK_MODEL = "llama-3.1-8b-instant";
@@ -339,13 +340,13 @@ Rules:
 
 function extractJSON(text) {
   // 1. Try direct parse
-  try { return JSON.parse(text.trim()); } catch (_) { }
+  try { return JSON.parse(text.trim()); } catch (_) { /* try next strategy */ }
   // 2. Strip markdown fences
   const fenceStripped = text.replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
-  try { return JSON.parse(fenceStripped); } catch (_) { }
+  try { return JSON.parse(fenceStripped); } catch (_) { /* try next strategy */ }
   // 3. Extract first {...}
   const match = fenceStripped.match(/\{[\s\S]*\}/);
-  if (match) { try { return JSON.parse(match[0]); } catch (_) { } }
+  if (match) { try { return JSON.parse(match[0]); } catch (_) { /* try next strategy */ } }
   throw new Error("Could not extract valid JSON from AI response");
 }
 
@@ -354,7 +355,7 @@ function extractJSON(text) {
 async function callGroq(systemPrompt, userPrompt, model = MODEL) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
-  const endpoint = "http://localhost:8000/api/ai/generate-template";
+  const endpoint = `${API_BASE_URL}/api/ai/generate-template`;
 
   const res = await fetch(endpoint, {
     method: "POST",
@@ -375,7 +376,7 @@ async function callGroq(systemPrompt, userPrompt, model = MODEL) {
     try {
       const txt = await res.text();
       errorText = txt;
-    } catch {}
+    } catch { /* ignore */ }
 
     // Friendly error mapping
     if (res.status === 429 || /Free limit reached/i.test(errorText)) {

@@ -77,7 +77,7 @@ const TABS = [
 ];
 
 export default function LogsView({ workbenchId }) {
-  const { user } = useAuth();
+  const { _user } = useAuth();
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [records, setRecords] = useState([]);

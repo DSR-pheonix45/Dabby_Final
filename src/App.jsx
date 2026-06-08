@@ -37,6 +37,7 @@ const Footer = lazy(() => import("./landing-page/components/Footer"));
 const Login = lazy(() => import("./Auth/Login"));
 const Signup = lazy(() => import("./Auth/Signup"));
 const OAuthCallback = lazy(() => import("./Auth/OAuthCallback"));
+const ResetPassword = lazy(() => import("./Auth/ResetPassword"));
 
 // Protected Components
 const MainApp = lazy(() => import("./components/MainApp"));
@@ -44,6 +45,7 @@ const Settings = lazy(() => import("./components/Settings/Settings"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
 const DataIngestionPage = lazy(() => import("./pages/DataIngestion"));
+const ImportWizard = lazy(() => import("./components/Workbenches/ImportWizard"));
 const SharedSnapshot = lazy(() => import("./pages/SharedSnapshot"));
 
 
@@ -108,6 +110,7 @@ function App() {
                   <Route path="/" element={<Home />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/signup" element={<Signup />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/maintenance" element={<Maintenance />} />
                   <Route path="/onboarding" element={
                     <ProtectedRoute>
@@ -141,6 +144,13 @@ function App() {
                   <Route path="/ingest" element={
                     <ProtectedRoute>
                       <DataIngestionPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/import" element={
+                    <ProtectedRoute>
+                      <div className="min-h-screen bg-[#0a0a0a] py-16 px-4">
+                        <ImportWizard />
+                      </div>
                     </ProtectedRoute>
                   } />
                 </Route>

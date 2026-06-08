@@ -6,7 +6,6 @@ import FileUploader from '../components/FileUploader';
 import ColumnMapper from '../components/ColumnMapper';
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../lib/supabase';
-import { toast } from 'react-hot-toast';
 
 export default function DataIngestionPage() {
   const { theme } = useTheme();
@@ -139,6 +138,22 @@ export default function DataIngestionPage() {
           <p className={`text-lg max-w-xl mx-auto ${isDark ? "text-gray-400" : "text-gray-600"}`}>
             Seamlessly import your accounting exports, clean data, and trigger dynamic insights instantly.
           </p>
+        </div>
+
+        <div className="max-w-2xl mx-auto mb-8">
+          <button
+            onClick={() => navigate('/import')}
+            className={`w-full flex items-center justify-between gap-3 px-5 py-4 rounded-2xl border transition-all ${
+              isDark
+                ? "bg-teal-500/5 border-teal-500/20 hover:bg-teal-500/10 text-teal-300"
+                : "bg-teal-50 border-teal-200 hover:bg-teal-100 text-teal-700"
+            }`}
+          >
+            <span className="text-sm font-semibold text-left">
+              Coming from Tally or Zoho Books? Import your existing data in a few clicks →
+            </span>
+            <ChevronRight className="w-5 h-5 flex-shrink-0" />
+          </button>
         </div>
 
         <PipelineSteps />

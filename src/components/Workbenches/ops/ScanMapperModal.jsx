@@ -20,7 +20,7 @@ export default function ScanMapperModal({ isOpen, onClose, extractedData, doc, m
     items: []
   });
 
-  const [entities, setEntities] = useState([]);
+  const [_entities, setEntities] = useState([]);
 
   useEffect(() => {
     if (isOpen && doc?.file_path) {

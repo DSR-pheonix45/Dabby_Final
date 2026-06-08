@@ -102,8 +102,12 @@ export default function DeliveryChallanGenerator() {
       doc.addImage(challanData.logo, 'PNG', 20, 10, 20, 20);
     }
 
-    // Document Info
-    doc.setTextColor(challanData.letterhead ? [33, 33, 33] : [255, 255, 255]);
+    // Document Info (jsPDF expects separate r,g,b args — passing an array sets an invalid color)
+    if (challanData.letterhead) {
+      doc.setTextColor(33, 33, 33);
+    } else {
+      doc.setTextColor(255, 255, 255);
+    }
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.text(`Challan #: ${challanData.challanNumber}`, pageWidth - 20, 20, { align: "right" });

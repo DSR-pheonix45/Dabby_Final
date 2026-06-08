@@ -28,17 +28,17 @@ import {
   Cell
 } from "recharts";
 import Card from "../shared/Card";
-import { supabase } from "../../lib/supabase";
 import toast from "react-hot-toast";
 import FinancialDataRoomModal from "./FinancialDataRoomModal";
 import ShareSnapshotModal from "./ShareSnapshotModal";
+import { API_BASE_URL } from '../../lib/api';
 
 
 
 export default function InvestorView({ workbenchId, workbenchName, shareId, sharePassword }) {
   const [loading, setLoading] = useState(true);
   const [intelligence, setIntelligence] = useState(null);
-  const [activeTab, setActiveTab] = useState("intelligence");
+  const [_activeTab, _setActiveTab] = useState("intelligence");
   const [isDataRoomOpen, setIsDataRoomOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
@@ -53,11 +53,11 @@ export default function InvestorView({ workbenchId, workbenchName, shareId, shar
   const fetchIntelligence = async () => {
     try {
       setLoading(true);
-      let url = `http://localhost:8000/api/investor/intelligence/${workbenchId}`;
+      let url = `${API_BASE_URL}/api/investor/intelligence/${workbenchId}`;
       let options = {};
 
       if (shareId && sharePassword) {
-        url = `http://localhost:8000/api/investor/shared/${shareId}`;
+        url = `${API_BASE_URL}/api/investor/shared/${shareId}`;
         options = {
           method: "POST",
           headers: { "Content-Type": "application/json" },

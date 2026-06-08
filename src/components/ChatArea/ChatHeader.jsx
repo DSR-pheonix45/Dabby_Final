@@ -3,7 +3,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { BsSearch } from 'react-icons/bs';
 
 const ChatHeader = ({ searchTerm, onSearchChange }) => {
-  const { darkMode } = useTheme();
+  const { _darkMode } = useTheme();
 
   return (
     <div className="flex-shrink-0 px-4 py-3 border-b border-white/5 bg-[#0a0a0a]/95 backdrop-blur-sm sticky top-0 z-10">

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { BsX, BsLink45Deg, BsShieldLock, BsClipboard, BsCheck2 } from "react-icons/bs";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
+import { API_BASE_URL } from '../../lib/api';
 
 export default function ShareSnapshotModal({ isOpen, onClose, workbenchId }) {
   const [password, setPassword] = useState("");
@@ -17,7 +18,7 @@ export default function ShareSnapshotModal({ isOpen, onClose, workbenchId }) {
 
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:8000/api/investor/share/${workbenchId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/investor/share/${workbenchId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password })

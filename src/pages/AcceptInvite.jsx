@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { supabase } from "../lib/supabase";
 import { BsCheckCircleFill, BsExclamationTriangleFill, BsBuilding } from "react-icons/bs";
 import Button from "../components/shared/Button";
 import Card from "../components/shared/Card";
+import { API_BASE_URL } from '../lib/api';
 
 export default function AcceptInvite() {
     const { token } = useParams();
     const navigate = useNavigate();
-    const location = useLocation();
+    const _location = useLocation();
     const { user, loading: authLoading } = useAuth();
     const [processing, setProcessing] = useState(false);
     const [error, setError] = useState(null);
@@ -39,7 +39,7 @@ export default function AcceptInvite() {
         setError(null);
 
         try {
-            const response = await fetch(`http://localhost:8000/api/investor/invite/accept/${token}`, {
+            const response = await fetch(`${API_BASE_URL}/api/investor/invite/accept/${token}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ user_id: user.id })

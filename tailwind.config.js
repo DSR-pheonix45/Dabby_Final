@@ -4,6 +4,13 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  // Some components build color classes dynamically (e.g. `bg-${color}-500/10`).
+  // Tailwind cannot see those at build time, so safelist the families/shades used
+  // to guarantee they're generated and the UI isn't silently unstyled in prod.
+  safelist: [
+    { pattern: /(bg|text|border|from|to|ring)-(teal|emerald|amber|red|blue|purple|orange|rose|green|cyan|primary|gray)-(400|500)/ },
+    { pattern: /(bg|border|from|to|ring)-(teal|emerald|amber|red|blue|purple|orange|rose|green|cyan|primary|gray)-500\/(5|10|20)/ },
+  ],
   darkMode: 'class',
   theme: {
     screens: {

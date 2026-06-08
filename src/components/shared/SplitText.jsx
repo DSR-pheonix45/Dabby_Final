@@ -23,12 +23,12 @@ export default function SplitText({
 }) {
     const ref = useRef(null);
     const isInView = useInView(ref, { once: true, margin: "-100px", amount: threshold });
-    const { theme } = useTheme();
+    const { _theme } = useTheme();
 
     // Split text into characters or words
     const splitText = () => {
         if (splitType === "words") {
-            return text.split(" ").map((word, i) => ({
+            return text.split(" ").map((word, _i) => ({
                 content: word,
                 isHighlight: highlightWords.includes(word) || highlightWords.some(hw => word.includes(hw)),
             }));
@@ -119,7 +119,7 @@ export function AnimatedHeading({
     delay = 0.02,
     ...props
 }) {
-    const { theme } = useTheme();
+    const { _theme } = useTheme();
 
     return (
         <SplitText

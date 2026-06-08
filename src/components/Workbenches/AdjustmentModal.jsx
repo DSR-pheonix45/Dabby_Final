@@ -21,7 +21,7 @@ const ADJUSTMENT_TYPES = [
 ];
 
 export default function AdjustmentModal({ isOpen, onClose, record, workbenchId, onSuccess }) {
-  const { user } = useAuth();
+  const { _user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [parties, setParties] = useState([]);
   const [formData, setFormData] = useState({

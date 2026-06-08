@@ -11,7 +11,10 @@ import {
   BsArrowUpRight,
   BsBoxSeam,
   BsGear,
-  BsPlusLg
+  BsPlusLg,
+  BsJournalText,
+  BsArrowRepeat,
+  BsBank
 } from "react-icons/bs";
 import { useAuth } from "../hooks/useAuth";
 import { supabase } from "../lib/supabase";
@@ -19,6 +22,9 @@ import { supabase } from "../lib/supabase";
 // Sub-components
 import LiquidityCenter from "../components/Workbenches/detail/LiquidityCenter";
 import COAView from "../components/Workbenches/detail/COAView";
+import RecurringView from "../components/Workbenches/detail/RecurringView";
+import BankReconcileView from "../components/Workbenches/detail/BankReconcileView";
+import CashFlowView from "../components/Workbenches/detail/CashFlowView";
 import OpsOverview from "../components/Workbenches/detail/OpsOverview";
 import InvestorView from "../components/Workbenches/InvestorView";
 import LogsView from "../components/Workbenches/LogsView";
@@ -81,6 +87,10 @@ export default function WorkbenchDetail() {
     { id: "Ops", label: "Ops", icon: BsLightningCharge },
     { id: "Investor", label: "Investor View", icon: BsArrowUpRight },
     { id: "Inventory", label: "Inventory & Stock", icon: BsBoxSeam },
+    { id: "Recurring", label: "Recurring", icon: BsArrowRepeat },
+    { id: "Bank", label: "Bank Reconcile", icon: BsBank },
+    { id: "CashFlow", label: "Cash Flow", icon: BsArrowUpRight },
+    { id: "Logs", label: "Audit Trail", icon: BsJournalText },
     { id: "Settings", label: "Settings", icon: BsGear },
   ];
 
@@ -174,6 +184,10 @@ export default function WorkbenchDetail() {
             {activeTab === "Investor" && <div className="p-8"><InvestorView workbenchId={id} workbenchName={workbench?.name} /></div>}
             {activeTab === "DocVault" && <DocVault workbenchId={id} />}
             {activeTab === "Inventory" && <InventoryView workbenchId={id} />}
+            {activeTab === "Recurring" && <div className="p-8"><RecurringView workbenchId={id} /></div>}
+            {activeTab === "Bank" && <div className="p-8"><BankReconcileView workbenchId={id} /></div>}
+            {activeTab === "CashFlow" && <div className="p-8"><CashFlowView workbenchId={id} /></div>}
+            {activeTab === "Logs" && <div className="p-8"><LogsView workbenchId={id} /></div>}
             {activeTab === "Settings" && <WorkbenchSettings workbench={workbench} workbenchId={id} />}
           </main>
         </div>

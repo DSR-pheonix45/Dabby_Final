@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BsX, BsTag, BsGrid } from "react-icons/bs";
 import { toast } from "react-hot-toast";
+import { API_BASE_URL } from '../../../lib/api';
 
 export default function LabelModal({ isOpen, onClose, workbenchId, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -21,7 +22,7 @@ export default function LabelModal({ isOpen, onClose, workbenchId, onSuccess }) 
 
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:8000/api/ledger/labels", {
+      const response = await fetch(`${API_BASE_URL}/api/ledger/labels`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

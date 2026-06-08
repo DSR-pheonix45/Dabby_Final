@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { BsArrowRight, BsChevronDown, BsChevronUp } from "react-icons/bs";
+import { BsArrowRight, BsChevronDown, BsChevronUp, BsPlusLg } from "react-icons/bs";
 import Card from "../../shared/Card";
 import { backendService } from "../../../services/backendService";
+import CreateBudgetModal from "../ops/CreateBudgetModal";
 
 export default function BudgetingView({ workbenchId }) {
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
   const [summary, setSummary] = useState([
     { label: "TOTAL BUDGET", value: "₹0" },
     { label: "TOTAL ACTUAL", value: "₹0" },
@@ -25,8 +27,10 @@ export default function BudgetingView({ workbenchId }) {
       fetchBudgetData();
     };
 
-    window.addEventListener('refresh-workbench-data', handleRefresh);
-    return () => window.removeEventListener('refresh-workbench-data', handleRefresh);
+    // The app dispatches 'refresh-ledger-data' after writes (see WorkbenchDetail
+    // / WorkbenchContext); listen for that so budgets refresh after a transaction.
+    window.addEventListener('refresh-ledger-data', handleRefresh);
+    return () => window.removeEventListener('refresh-ledger-data', handleRefresh);
   }, [workbenchId]);
 
   const fetchBudgetData = async () => {
@@ -38,7 +42,7 @@ export default function BudgetingView({ workbenchId }) {
       if (data && data.length > 0) {
         const totalBudgeted = data.reduce((sum, item) => sum + parseFloat(item.budgeted_amount || 0), 0);
         const totalActual = data.reduce((sum, item) => sum + parseFloat(item.actual_amount || 0), 0);
-        const variance = totalBudgeted > 0
+        const _variance = totalBudgeted > 0
           ? ((totalBudgeted - totalActual) / totalBudgeted * 100).toFixed(1)
           : 0;
 
@@ -104,8 +108,18 @@ export default function BudgetingView({ workbenchId }) {
   return (
     <div className="space-y-8">
       <div>
-        <h3 className="text-lg font-bold text-white mb-1">Budget vs Actual</h3>
-        <p className="text-gray-500 text-xs mb-6">Q3 FY26 — Period-wise budget tracking by account</p>
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-bold text-white mb-1">Budget vs Actual</h3>
+            <p className="text-gray-500 text-xs">Period-wise budget tracking by account</p>
+          </div>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-primary-500 text-black hover:bg-primary-400 transition-all"
+          >
+            <BsPlusLg size={12} /> Create Budget
+          </button>
+        </div>
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -201,6 +215,13 @@ export default function BudgetingView({ workbenchId }) {
           </div>
         </Card>
       </div>
+
+      <CreateBudgetModal
+        isOpen={showCreate}
+        onClose={() => setShowCreate(false)}
+        workbenchId={workbenchId}
+        onSuccess={fetchBudgetData}
+      />
     </div>
   );
 }

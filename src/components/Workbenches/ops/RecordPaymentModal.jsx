@@ -12,10 +12,11 @@ import { useWorkbench } from "../../../context/WorkbenchContext";
 import { backendService } from "../../../services/backendService";
 import { toast } from "react-hot-toast";
 import { supabase } from "../../../lib/supabase";
+import { roundMoney } from "../../../utils/numberFormatter";
 
 
 export default function RecordPaymentModal({ isOpen, onClose, invoice, onSuccess }) {
-  const { labels } = useWorkbench();
+  const { _labels } = useWorkbench();
   const [loading, setLoading] = useState(false);
   const [entities, setEntities] = useState([]);
   const [formData, setFormData] = useState({
@@ -55,10 +56,22 @@ export default function RecordPaymentModal({ isOpen, onClose, invoice, onSuccess
       return;
     }
 
+    const amount = roundMoney(formData.amount);
+    const balanceDue = roundMoney(invoice.balance_due);
+    if (!(amount > 0)) {
+      toast.error("Enter a valid payment amount");
+      return;
+    }
+    if (amount > balanceDue) {
+      toast.error(`Amount cannot exceed the balance due (₹${balanceDue.toLocaleString()})`);
+      return;
+    }
+
     try {
       setLoading(true);
       await backendService.recordPayment(invoice.id, {
         ...formData,
+        amount,
         ar_label_id: invoice.ar_label_id
       });
       toast.success("Payment recorded!");

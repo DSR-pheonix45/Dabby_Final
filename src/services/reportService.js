@@ -1,6 +1,7 @@
 import { supabase } from "../lib/supabase";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { API_BASE_URL } from '../lib/api';
 
 /**
  * Report Service - Professional Edition
@@ -113,7 +114,7 @@ export const reportService = {
     },
 
     async fetchDataRoomData(workbenchId) {
-        const response = await fetch(`http://localhost:8000/api/investor/statements/${workbenchId}`);
+        const response = await fetch(`${API_BASE_URL}/api/investor/statements/${workbenchId}`);
         if (!response.ok) throw new Error("Failed to fetch data room content");
         return await response.json();
     },
@@ -370,7 +371,7 @@ export const reportService = {
         let y = this.setupPage(doc, "Compliance Scorecard", workbenchName, timestamp, "", config);
         y = this.drawNotes(doc, config.notes, y);
 
-        const pending = data.filter(c => (c.status || c.metadata?.status) === 'pending').length;
+        const _pending = data.filter(c => (c.status || c.metadata?.status) === 'pending').length;
         const overdue = data.filter(c => {
             const status = c.status || c.metadata?.status;
             const deadline = c.deadline || c.metadata?.deadline;
@@ -512,12 +513,12 @@ export const reportService = {
 
         autoTable(doc, {
             startY: y,
-            head: [['EXPENSE CATEGORY', 'TXN COUNT', 'TOTAL SPENT (INR)', '% OF TOTAL']],
+            head: [['VENDOR', 'EXPENSE CATEGORY', 'TXN COUNT', 'TOTAL SPENT (INR)', '% OF TOTAL']],
             body: tableRows,
             theme: 'grid',
             headStyles: { fillColor: this.colors.dark },
-            columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' } },
-            foot: [['TOTAL SPEND', '-', `INR ${totalExpense.toLocaleString()}`, '100%']],
+            columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } },
+            foot: [['TOTAL SPEND', '-', '-', `INR ${totalExpense.toLocaleString()}`, '100%']],
             footStyles: { fillColor: this.colors.light, textColor: this.colors.dark, fontStyle: 'bold' }
         });
 

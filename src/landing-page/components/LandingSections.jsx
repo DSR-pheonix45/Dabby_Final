@@ -290,7 +290,7 @@ function WorkspaceMock({ isDark }) {
 
             {/* COA Hierarchy grid */}
             <div className="p-4 space-y-3">
-                {coa_structure.map((item, i) => (
+                {coa_structure.map((item, _i) => (
                     <div key={item.pillar} className={`p-3 rounded-xl border transition-all ${isDark ? "bg-white/[0.02] border-white/5" : "bg-gray-50 border-gray-100"}`}>
                         <div className="flex justify-between items-center mb-2">
                             <span className={`text-[11px] font-bold ${isDark ? "text-[#81E6D9]" : "text-[#0D9488]"}`}>{item.pillar}</span>

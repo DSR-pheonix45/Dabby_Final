@@ -5,6 +5,14 @@ import { AlertCircle, Loader, Eye, EyeOff } from 'lucide-react';
 import { FcGoogle } from 'react-icons/fc';
 import { supabase } from '../lib/supabase';
 import BrandLogo from '../components/common/BrandLogo';
+import ReCAPTCHA from 'react-google-recaptcha';
+
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_APP_RECAPTCHA_SITE_KEY;
+
+// Resolve the post-login destination from either redirect convention:
+// ProtectedRoute sets state.from (a location), AcceptInvite sets state.returnUrl.
+const resolveReturnUrl = (state) =>
+  state?.from?.pathname || state?.returnUrl || '/dashboard';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -15,6 +23,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
 
   // Redirect if already logged in
   useEffect(() => {
@@ -22,8 +31,7 @@ export default function Login() {
       if (profile?.status === 'partial') {
         navigate('/onboarding');
       } else {
-        const returnUrl = location.state?.from?.pathname || '/dashboard';
-        navigate(returnUrl);
+        navigate(resolveReturnUrl(location.state));
       }
     }
   }, [user, profile, authLoading, navigate, location]);
@@ -34,6 +42,10 @@ export default function Login() {
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
       setError("Please enter both email and password.");
+      return;
+    }
+    if (RECAPTCHA_SITE_KEY && !captchaToken) {
+      setError("Please complete the captcha to continue.");
       return;
     }
 
@@ -64,8 +76,7 @@ export default function Login() {
       }
 
       if (data?.user) {
-        const returnUrl = location.state?.returnUrl || '/dashboard';
-        navigate(returnUrl);
+        navigate(resolveReturnUrl(location.state));
       }
     } catch (err) {
       console.error('Login implementation error:', err);
@@ -207,6 +218,17 @@ export default function Login() {
               </button>
             </div>
           </div>
+
+          {RECAPTCHA_SITE_KEY && (
+            <div className="flex justify-center pt-1">
+              <ReCAPTCHA
+                sitekey={RECAPTCHA_SITE_KEY}
+                theme="dark"
+                onChange={(token) => setCaptchaToken(token || '')}
+                onExpired={() => setCaptchaToken('')}
+              />
+            </div>
+          )}
 
           <button
             type="submit"

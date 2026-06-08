@@ -5,10 +5,38 @@ from datetime import date
 from supabase_client import supabase
 from services.ledger_service import LedgerService
 from services.ai_service import ai_service
+from services import tax_service
 import uuid
 
 router = APIRouter()
 ledger_service = LedgerService(supabase)
+
+
+def _supplier_state(workbench_id: str):
+    """Resolve the workbench's GST state code (explicit, else from its GSTIN)."""
+    try:
+        wb = supabase.table("workbenches").select("state_code, gstin").eq("id", workbench_id).single().execute().data or {}
+        return wb.get("state_code") or tax_service.state_code_from_gstin(wb.get("gstin"))
+    except Exception:
+        return None
+
+
+def _ensure_label(workbench_id: str, name: str, ltype: str, sub_account: str = "Duties & Taxes"):
+    """Find a label by name+type within a workbench, creating it if absent.
+    Used to lazily seed the GST Payable / GST Input Credit accounts."""
+    try:
+        res = supabase.table("labels").select("id").eq("workbench_id", workbench_id) \
+            .eq("name", name).eq("type", ltype).eq("is_deleted", False).limit(1).execute()
+        if res.data:
+            return res.data[0]["id"]
+        created = supabase.table("labels").insert({
+            "workbench_id": workbench_id, "name": name, "type": ltype,
+            "sub_account": sub_account, "is_system": True,
+        }).execute()
+        return created.data[0]["id"] if created.data else None
+    except Exception as e:
+        print(f"[GST] Could not ensure label {name}: {e}")
+        return None
 
 class PartyCreate(BaseModel):
     workbench_id: str
@@ -36,6 +64,11 @@ class InvoiceCreate(BaseModel):
     revenue_label_id: str # The Credit side (Revenue)
     ar_label_id: str      # The Debit side (AR Asset)
     doc_id: Optional[str] = None
+    # GST (output tax). If taxable_amount + gst_rate are supplied the server
+    # computes CGST/SGST/IGST and sets amount = taxable + tax.
+    taxable_amount: Optional[float] = None
+    gst_rate: Optional[float] = None
+    place_of_supply: Optional[str] = None   # 2-digit GST state code of the customer
 
 class PaymentRequest(BaseModel):
     amount: float
@@ -59,6 +92,11 @@ class BillCreate(BaseModel):
     expense_label_id: str # The Debit side (Expense)
     ap_label_id: str      # The Credit side (AP Liability)
     doc_id: Optional[str] = None
+    # GST (input tax) + optional TDS on the vendor payment.
+    taxable_amount: Optional[float] = None
+    gst_rate: Optional[float] = None
+    tds_section: Optional[str] = None
+    tds_rate: Optional[float] = None
 
 class BillPaymentRequest(BaseModel):
     amount: float
@@ -202,28 +240,65 @@ async def create_invoice(invoice: InvoiceCreate):
     try:
         # 1. Create Invoice Record
         invoice_data = invoice.dict()
-        invoice_data["balance_due"] = invoice.amount
         invoice_data["status"] = "sent"
-        
+
+        # --- GST output tax ---
+        # When taxable_amount + gst_rate are supplied, compute the CGST/SGST/IGST
+        # split and treat `amount` as the tax-inclusive total.
+        if invoice.taxable_amount and invoice.gst_rate:
+            gst = tax_service.compute_gst(
+                invoice.taxable_amount, invoice.gst_rate,
+                supplier_state=_supplier_state(invoice.workbench_id),
+                place_of_supply=invoice.place_of_supply,
+            )
+            invoice_data.update({
+                "taxable_amount": gst["taxable_amount"],
+                "cgst": gst["cgst"], "sgst": gst["sgst"], "igst": gst["igst"],
+                "total_tax": gst["total_tax"], "is_interstate": gst["interstate"],
+                "amount": gst["total_amount"],
+            })
+        invoice_data["balance_due"] = invoice_data["amount"]
+
         # Convert date objects to strings for supabase
         invoice_data["issue_date"] = str(invoice.issue_date)
         if invoice.due_date:
             invoice_data["due_date"] = str(invoice.due_date)
-            
+
         res = supabase.table("invoices").insert(invoice_data).execute()
         new_invoice = res.data[0]
         
-        # 2. Record Financial Transaction (Dr AR, Cr Revenue)
-        tx_res = await ledger_service.record_transaction(
-            workbench_id=invoice.workbench_id,
-            from_label_id=invoice.revenue_label_id,
-            to_label_id=invoice.ar_label_id,
-            amount=invoice.amount,
-            description=f"Invoice Issued: {invoice.invoice_number}",
-            transaction_date=invoice.issue_date,
-            destination_party_id=invoice.party_id,
-            invoice_id=new_invoice["id"]
-        )
+        # 2. Record Financial Transaction
+        tax = float(invoice_data.get("total_tax") or 0)
+        if tax > 0:
+            # 3-leg split so GST does not inflate revenue:
+            #   Dr AR (gross) / Cr Revenue (taxable) / Cr GST Output Payable (tax)
+            gst_payable = _ensure_label(invoice.workbench_id, "GST Output Payable", "liability")
+            taxable = float(invoice_data.get("taxable_amount") or (invoice_data["amount"] - tax))
+            legs = [
+                {"label_id": invoice.ar_label_id, "amount": invoice_data["amount"]},  # +gross
+                {"label_id": invoice.revenue_label_id, "amount": -taxable},           # -taxable
+            ]
+            if gst_payable:
+                legs.append({"label_id": gst_payable, "amount": -tax})                # -tax
+            else:
+                legs[1]["amount"] = -invoice_data["amount"]  # fallback: no GST account, keep balanced
+            tx_res = await ledger_service.record_multi_entry(
+                workbench_id=invoice.workbench_id, legs=legs,
+                description=f"Invoice Issued: {invoice.invoice_number}",
+                transaction_date=invoice.issue_date,
+                destination_party_id=invoice.party_id, invoice_id=new_invoice["id"],
+            )
+        else:
+            tx_res = await ledger_service.record_transaction(
+                workbench_id=invoice.workbench_id,
+                from_label_id=invoice.revenue_label_id,
+                to_label_id=invoice.ar_label_id,
+                amount=invoice_data["amount"],   # gross (no tax)
+                description=f"Invoice Issued: {invoice.invoice_number}",
+                transaction_date=invoice.issue_date,
+                destination_party_id=invoice.party_id,
+                invoice_id=new_invoice["id"]
+            )
         
         # 3. Record Inventory Impact for each item
         if invoice.items_json:
@@ -267,6 +342,45 @@ async def list_invoices(workbench_id: str):
     try:
         res = supabase.table("invoices").select("*, parties(name), labels!revenue_label_id(name), ar_label:labels!ar_label_id(name)").eq("workbench_id", workbench_id).order("created_at", desc=True).execute()
         return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/gst/summary/{workbench_id}")
+async def gst_summary(workbench_id: str):
+    """
+    GSTR-style summary: output GST (from invoices) vs input GST (from bills),
+    net GST payable, and TDS deducted. Aggregated from the stored tax breakdown.
+    """
+    try:
+        inv = supabase.table("invoices").select(
+            "cgst, sgst, igst, total_tax, taxable_amount, issue_date"
+        ).eq("workbench_id", workbench_id).execute().data or []
+        bills = supabase.table("bills").select(
+            "cgst, sgst, igst, total_tax, taxable_amount, tds_amount, issue_date"
+        ).eq("workbench_id", workbench_id).execute().data or []
+
+        def _sum(rows, key):
+            return round(sum(float(r.get(key) or 0) for r in rows), 2)
+
+        output_gst = _sum(inv, "total_tax")
+        input_gst = _sum(bills, "total_tax")      # input tax credit
+        tds_deducted = _sum(bills, "tds_amount")
+
+        return {
+            "output_gst": output_gst,
+            "output_cgst": _sum(inv, "cgst"),
+            "output_sgst": _sum(inv, "sgst"),
+            "output_igst": _sum(inv, "igst"),
+            "taxable_sales": _sum(inv, "taxable_amount"),
+            "input_gst": input_gst,
+            "input_cgst": _sum(bills, "cgst"),
+            "input_sgst": _sum(bills, "sgst"),
+            "input_igst": _sum(bills, "igst"),
+            "taxable_purchases": _sum(bills, "taxable_amount"),
+            "net_gst_payable": round(output_gst - input_gst, 2),
+            "tds_deducted": tds_deducted,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -413,39 +527,133 @@ async def create_bill(bill: BillCreate):
     try:
         # 1. Create Bill Record
         bill_data = bill.dict()
-        bill_data["balance_due"] = bill.amount
         bill_data["status"] = "unpaid"
-        
+
+        # --- GST input tax ---
+        if bill.taxable_amount and bill.gst_rate:
+            gst = tax_service.compute_gst(
+                bill.taxable_amount, bill.gst_rate,
+                supplier_state=_supplier_state(bill.workbench_id),
+                place_of_supply=None,  # purchases: ITC eligibility aside, store the split
+            )
+            bill_data.update({
+                "taxable_amount": gst["taxable_amount"],
+                "cgst": gst["cgst"], "sgst": gst["sgst"], "igst": gst["igst"],
+                "total_tax": gst["total_tax"], "is_interstate": gst["interstate"],
+                "amount": gst["total_amount"],
+            })
+
+        # --- TDS on the vendor bill (reduces net payable) ---
+        if bill.tds_section or bill.tds_rate:
+            base = bill.taxable_amount if bill.taxable_amount else bill.amount
+            tds = tax_service.compute_tds(base, section=bill.tds_section, rate=bill.tds_rate)
+            bill_data["tds_section"] = tds["section"]
+            bill_data["tds_rate"] = tds["tds_rate"]
+            bill_data["tds_amount"] = tds["tds_amount"]
+
+        bill_data["balance_due"] = bill_data["amount"]
+
         bill_data["issue_date"] = str(bill.issue_date)
         if bill.due_date:
             bill_data["due_date"] = str(bill.due_date)
-            
+
         res = supabase.table("bills").insert(bill_data).execute()
         new_bill = res.data[0]
-        
-        # 2. Record Financial Transaction (Dr Expense, Cr AP)
-        await ledger_service.record_transaction(
-            workbench_id=bill.workbench_id,
-            from_label_id=bill.ap_label_id,     # Source of obligation (Liability)
-            to_label_id=bill.expense_label_id, # Destination of value (Expense)
-            amount=bill.amount,
-            description=f"Bill Recorded: {bill.bill_number}",
-            transaction_date=bill.issue_date,
-            source_party_id=bill.party_id,
-            bill_id=new_bill["id"]
-        )
-        
-        # 3. Link Document if provided
-        if bill.doc_id:
-            try:
-                transaction_id = tx_res["transaction"]["id"]
-                supabase.table("workbench_documents").update({
-                    "transaction_id": transaction_id
-                }).eq("id", bill.doc_id).execute()
-            except Exception as doc_err:
-                print(f"[ERROR] Failed to link document {bill.doc_id} to transaction: {doc_err}")
-        
+
+        # 2. Approval gate — if the workbench requires sign-off (and this bill is
+        #    over the threshold), leave it 'pending' and DO NOT post to the ledger
+        #    until someone approves it.
+        policy = _wb_approval_policy(bill.workbench_id)
+        if policy["enabled"] and float(bill_data["amount"]) >= policy["threshold"]:
+            supabase.table("bills").update({"approval_status": "pending"}).eq("id", new_bill["id"]).execute()
+            new_bill["approval_status"] = "pending"
+            return new_bill
+
+        # 3. Auto-approved -> post to the ledger now.
+        await _post_bill_to_ledger(new_bill)
         return new_bill
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _wb_approval_policy(workbench_id: str):
+    try:
+        wb = supabase.table("workbenches").select("approvals_enabled, approval_threshold").eq("id", workbench_id).single().execute().data or {}
+        return {"enabled": bool(wb.get("approvals_enabled")), "threshold": float(wb.get("approval_threshold") or 0)}
+    except Exception:
+        return {"enabled": False, "threshold": 0.0}
+
+
+async def _post_bill_to_ledger(bill: dict):
+    """Post a bill's double-entry (3-leg if it carries GST). Reused by create and approve."""
+    amount = float(bill.get("amount") or 0)
+    bill_tax = float(bill.get("total_tax") or 0)
+    if bill_tax > 0:
+        gst_input = _ensure_label(bill["workbench_id"], "GST Input Credit", "asset")
+        taxable = float(bill.get("taxable_amount") or (amount - bill_tax))
+        legs = [
+            {"label_id": bill["expense_label_id"], "amount": taxable},
+            {"label_id": bill["ap_label_id"], "amount": -amount},
+        ]
+        if gst_input:
+            legs.append({"label_id": gst_input, "amount": bill_tax})
+        else:
+            legs[0]["amount"] = amount
+        tx_res = await ledger_service.record_multi_entry(
+            workbench_id=bill["workbench_id"], legs=legs,
+            description=f"Bill Recorded: {bill['bill_number']}",
+            transaction_date=bill.get("issue_date"),
+            source_party_id=bill.get("party_id"), bill_id=bill["id"],
+        )
+    else:
+        tx_res = await ledger_service.record_transaction(
+            workbench_id=bill["workbench_id"],
+            from_label_id=bill["ap_label_id"], to_label_id=bill["expense_label_id"],
+            amount=amount, description=f"Bill Recorded: {bill['bill_number']}",
+            transaction_date=bill.get("issue_date"),
+            source_party_id=bill.get("party_id"), bill_id=bill["id"],
+        )
+    if bill.get("doc_id"):
+        try:
+            supabase.table("workbench_documents").update({
+                "transaction_id": tx_res["transaction"]["id"]
+            }).eq("id", bill["doc_id"]).execute()
+        except Exception as doc_err:
+            print(f"[ERROR] Failed to link document to transaction: {doc_err}")
+    return tx_res
+
+
+@router.post("/bills/{bill_id}/approve")
+async def approve_bill(bill_id: str, approver_id: str = None):
+    """Approve a pending bill and post it to the ledger."""
+    try:
+        from datetime import datetime
+        bill = supabase.table("bills").select("*").eq("id", bill_id).single().execute().data
+        if not bill:
+            raise HTTPException(status_code=404, detail="Bill not found")
+        if bill.get("approval_status") == "approved":
+            return {"status": "already_approved"}
+        if bill.get("approval_status") == "rejected":
+            raise HTTPException(status_code=400, detail="Bill was rejected")
+        await _post_bill_to_ledger(bill)
+        supabase.table("bills").update({
+            "approval_status": "approved",
+            "approved_by": approver_id,
+            "approved_at": datetime.utcnow().isoformat(),
+        }).eq("id", bill_id).execute()
+        return {"status": "approved"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/bills/{bill_id}/reject")
+async def reject_bill(bill_id: str):
+    """Reject a pending bill (it never posts to the ledger)."""
+    try:
+        supabase.table("bills").update({"approval_status": "rejected"}).eq("id", bill_id).execute()
+        return {"status": "rejected"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

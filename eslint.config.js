@@ -5,7 +5,9 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig } from 'eslint/config'
 
 export default defineConfig([
-  { ignores: ['dist'] },
+  // dist = build output; scratch = one-off Node maintenance scripts (Node
+  // globals, not part of the browser app).
+  { ignores: ['dist', 'scratch/**', '**/scratch/**'] },
   {
     files: ['**/*.{js,jsx}'],
     extends: [js.configs.recommended],
@@ -24,9 +26,10 @@ export default defineConfig([
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'no-unused-vars': ['error', { 
+      'no-unused-vars': ['error', {
         varsIgnorePattern: '^[A-Z_]|motion',
         argsIgnorePattern: '^[A-Z_]',
+        caughtErrors: 'none',
       }],
       'react-refresh/only-export-components': [
         'warn',

@@ -112,7 +112,7 @@ export default function DocVault({ workbenchId }) {
       
       if (result.label_id) {
         toast.success(
-          (t) => (
+          (_t) => (
             <div className="flex flex-col">
               <span className="font-bold text-xs uppercase tracking-widest mb-1">AI Suggestion</span>
               <span className="text-sm">This looks like <span className="text-teal-500 font-bold">{result.label_name}</span></span>
@@ -375,7 +375,23 @@ export default function DocVault({ workbenchId }) {
                                   <BsArrowRight size={14} />
                                </button>
                              )}
-                             <button 
+                             <button
+                               onClick={async (e) => {
+                                 e.stopPropagation();
+                                 try {
+                                   toast.loading("Running OCR…", { id: `ocr-${doc.id}` });
+                                   const res = await backendService.ocrExtract(workbenchId, doc.file_path, doc.id);
+                                   toast.success(`Extracted ${res.chars} chars${res.indexed ? `, indexed ${res.indexed} chunks` : ""}`, { id: `ocr-${doc.id}` });
+                                 } catch (err) {
+                                   toast.error(err.message || "OCR failed", { id: `ocr-${doc.id}` });
+                                 }
+                               }}
+                               title="OCR & Index (scanned PDFs/images)"
+                               className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white hover:bg-white/10"
+                             >
+                                <BsMagic size={14} />
+                             </button>
+                             <button
                                onClick={async (e) => {
                                  e.stopPropagation();
                                  try {

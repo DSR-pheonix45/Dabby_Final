@@ -17,6 +17,8 @@ import { backendService } from "../services/backendService";
 import { contextService } from "../services/contextService";
 import { supabase } from "../lib/supabase";
 import { BsRocketTakeoff, BsChevronRight } from "react-icons/bs";
+import toast from "react-hot-toast";
+import { API_BASE_URL } from '../lib/api';
 
 export default function MainApp() {
   useTheme(); // Theme context is used for side effects
@@ -171,7 +173,7 @@ export default function MainApp() {
       const workbenchId = activeWorkbench?.active ? activeWorkbench.id : (workbenchMatch ? workbenchMatch[1] : null);
 
       let sessionIdToUse = currentSessionId;
-      let isNewSession = false;
+      let _isNewSession = false;
 
       // 1. Create session if it doesn't exist
       if (!sessionIdToUse) {
@@ -180,7 +182,7 @@ export default function MainApp() {
         if (session && session.id) {
           sessionIdToUse = session.id;
           setCurrentSessionId(sessionIdToUse);
-          isNewSession = true;
+          _isNewSession = true;
           console.log("[DEBUG] New session ID created:", sessionIdToUse);
         } else {
           throw new Error("Failed to create chat session - no ID returned.");
@@ -307,7 +309,7 @@ export default function MainApp() {
             if (!error && data) {
               setActiveWorkbench({ ...data, active: true });
               // Initialize Self party for this workbench
-              fetch(`http://localhost:8000/api/ops/parties/initialize-self/${id}`, { method: "POST" })
+              fetch(`${API_BASE_URL}/api/ops/parties/initialize-self/${id}`, { method: "POST" })
                 .catch(err => console.error("Error initializing self party:", err));
             }
           } catch (err) {
@@ -369,31 +371,23 @@ export default function MainApp() {
     setMessages((prev) => [...prev, newMessage]);
     setIsInConversation(true); // Switch to conversation mode
 
-    // If there are uploaded files, show loading message
-    let loadingId = null;
-
     if (hasFiles) {
-      // We set this for display in ChatArea, but we don't want it re-syncing to ChatInput as "pending"
+      // Display the attached files in ChatArea.
       setUploadedFiles(prev => [...prev, ...options.uploadedFiles]);
-      const fileNames = options.uploadedFiles.map((f) => f.name).join(", ");
-      const loadingMsg = message.trim()
-        ? `Analyzing files: ${fileNames}...`
-        : `Uploading files: ${fileNames}...`;
-
-      const loading = {
-        id: Date.now() + 2,
-        content: loadingMsg,
-        role: "assistant",
-        sender: "Dabby Consultant",
-        timestamp: new Date().toISOString(),
-        isLoading: true,
-      };
-      setMessages((prev) => [...prev, loading]);
-      setIsLoading(true);
-      loadingId = loading.id;
     }
 
-    // Always call AI function (ChatInput handles this now)
+    // Add a streaming assistant placeholder that fills in as tokens arrive.
+    const streamId = Date.now() + 2;
+    setMessages((prev) => [...prev, {
+      id: streamId,
+      content: "",
+      role: "assistant",
+      sender: "Dabby Consultant",
+      timestamp: new Date().toISOString(),
+      isLoading: true,
+    }]);
+    setIsLoading(true);
+
     try {
       const { callLLMWithFallback } = await import("../services/llmService.js");
 
@@ -401,23 +395,38 @@ export default function MainApp() {
       let workbenchContextStr = "";
       if (options.workbenchId) {
         try {
-          console.log(`[DEBUG] Building real-time intelligence for workbench: ${options.workbenchId}`);
           const intel = await contextService.getWorkbenchIntelligence(options.workbenchId);
           workbenchContextStr = contextService.formatForLLM(intel);
-          console.log("[DEBUG] Real-time context built successfully.");
         } catch (ctxError) {
           console.error("[DEBUG] Error building workbench intelligence:", ctxError);
           workbenchContextStr = "Error: Failed to fetch real-time workbench data.";
         }
+
+        // Best-effort semantic document retrieval (pgvector RAG). Silently
+        // skipped if embeddings are disabled or the backend is unavailable.
+        try {
+          const rag = await backendService.ragSearch(options.workbenchId, llmQuery, 6);
+          if (rag?.results?.length) {
+            const snippets = rag.results.map((r, i) => `[Doc ${i + 1}] ${r.content}`).join("\n\n");
+            workbenchContextStr += `\n\n=== RELEVANT DOCUMENT EXCERPTS (semantic search) ===\n${snippets}`;
+          }
+        } catch (ragErr) {
+          console.debug("[RAG] semantic search skipped:", ragErr?.message);
+        }
       }
 
       const llmResponse = await callLLMWithFallback({
-        query: llmQuery, 
+        query: llmQuery,
         context: workbenchContextStr + (currentContext ? `\n\n=== ADDITIONAL HISTORY CONTEXT ===\n${currentContext}` : ""),
         web_search: options.web || false,
-        uploaded_files: options.uploadedFiles || [], 
+        uploaded_files: options.uploadedFiles || [],
         history: messages,
-        workbench_id: options.workbenchId
+        workbench_id: options.workbenchId,
+        // Incrementally render tokens into the placeholder as they stream in.
+        onToken: (delta) => {
+          setMessages((prev) => prev.map((m) =>
+            m.id === streamId ? { ...m, content: m.content + delta, isLoading: false } : m));
+        },
       });
 
       if (llmResponse.error) {
@@ -429,23 +438,14 @@ export default function MainApp() {
         setCurrentContext(llmResponse.context);
       }
 
-      // Remove loading message and add AI response
-      setMessages((prev) =>
-        prev
-          .filter((m) => m.id !== loadingId)
-          .concat({
-            id: Date.now() + 1,
-            content: llmResponse.response,
-            role: "assistant",
-            sender: "Dabby Consultant",
-            timestamp: new Date().toISOString(),
-          })
-      );
+      // Finalize the streamed message with the authoritative full text.
+      setMessages((prev) => prev.map((m) =>
+        m.id === streamId ? { ...m, content: llmResponse.response, isLoading: false } : m));
       setIsLoading(false);
 
       // Auto-save chat session after AI responds
       const updatedMessages = messages.concat(newMessage, {
-        id: Date.now() + 1,
+        id: streamId,
         content: llmResponse.response,
         role: "assistant",
         sender: "Dabby Consultant",
@@ -454,18 +454,10 @@ export default function MainApp() {
       await saveChatSession(updatedMessages);
     } catch (error) {
       console.error("Error sending message:", error);
-      // Remove loading and add error response
-      setMessages((prev) =>
-        prev
-          .filter((m) => m.id !== loadingId)
-          .concat({
-            id: Date.now() + 1,
-            content: "Sorry, I encountered an error. Please try again.",
-            role: "assistant",
-            sender: "Dabby Consultant",
-            timestamp: new Date().toISOString(),
-          })
-      );
+      setMessages((prev) => prev.map((m) =>
+        m.id === streamId
+          ? { ...m, content: "Sorry, I encountered an error. Please try again.", isLoading: false }
+          : m));
       setIsLoading(false);
     }
   };
