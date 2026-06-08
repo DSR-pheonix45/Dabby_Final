@@ -41,7 +41,7 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
         return formData.name.trim() !== '' && formData.industry !== '' && formData.sector !== '' && formData.business_type !== '';
       case 2:
         return formData.location.trim() !== '' && formData.currency.trim() !== '';
-      case 3:
+      case 3: {
         const vPan = formData.pan.trim().toUpperCase();
         const vGstin = formData.gstin.trim().toUpperCase();
         return (
@@ -50,6 +50,7 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
           (!vGstin || gstinRegex.test(vGstin)) &&
           formData.incorporation_date !== ''
         );
+      }
       case 4:
         return formData.books_start_date !== '';
       default:

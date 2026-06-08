@@ -6,7 +6,7 @@ export default function ChatSearch({
   onClose, 
   chatHistory = [], 
   onSelectChat,
-  onSearchMessages 
+  _onSearchMessages 
 }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);

@@ -59,6 +59,19 @@ export default function ColumnMapper({ detectedColumns, previewRows, onSaveMappi
     return initial;
   });
 
+  // Update a single field -> source column mapping (used by the dropdowns).
+  const handleSelect = (fieldId, value) => {
+    setMapping(prev => {
+      const next = { ...prev };
+      if (value) {
+        next[fieldId] = value;
+      } else {
+        delete next[fieldId];
+      }
+      return next;
+    });
+  };
+
   const isSplitAmount = useMemo(() => {
     return !!mapping.debit || !!mapping.credit || (!mapping.amount && detectedColumns.some(c => c.name.toLowerCase().includes('debit') || c.name.toLowerCase().includes('credit')));
   }, [mapping.debit, mapping.credit, mapping.amount, detectedColumns]);

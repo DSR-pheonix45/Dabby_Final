@@ -1,5 +1,4 @@
 import React from "react";
-import { useTheme } from "../../context/ThemeContext";
 import { format } from "date-fns";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -170,7 +169,7 @@ const Message = ({ message, searchTerm }) => {
                                                 p: ({ children }) => <p><HighlightedText text={children} highlight={searchTerm} /></p>,
                                                 li: ({ children }) => <li><HighlightedText text={children} highlight={searchTerm} /></li>,
                                                 // Custom Code Block Styling
-                                                code({ node, inline, className, children, ...props }) {
+                                                code({ _node, inline, className, children, ...props }) {
                                                     return inline ? (
                                                         <code className="bg-[#1C2128] text-teal-300 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
                                                             <HighlightedText text={children} highlight={searchTerm} />

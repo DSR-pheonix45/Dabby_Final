@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
 import { 
   BsClockHistory,
   BsBoxSeam, 
@@ -45,6 +45,10 @@ export default function InventoryView({ workbenchId }) {
 
   const stats = {
     totalItems: items.length,
+    // NOTE: valued at selling/reference price, NOT cost basis. True cost
+    // valuation (FIFO/Average per item.cost_method) requires aggregating the
+    // stock_ledger lots on the backend — labelled "Sale Price" below so the
+    // figure is not mistaken for a cost-basis asset value.
     totalValue: items.reduce((acc, item) => acc + (item.price * (item.stock_level || 0)), 0),
     lowStock: items.filter(item => item.type === 'goods' && item.stock_level <= item.min_stock_level && item.stock_level > 0).length,
     outOfStock: items.filter(item => item.type === 'goods' && item.stock_level <= 0).length,
@@ -94,7 +98,7 @@ export default function InventoryView({ workbenchId }) {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {[
           { label: "Total Items", value: stats.totalItems, icon: BsBoxSeam, color: "teal" },
-          { label: "Stock Value", value: `₹${stats.totalValue.toLocaleString()}`, icon: BsGraphUp, color: "emerald" },
+          { label: "Stock Value (Sale Price)", value: `₹${stats.totalValue.toLocaleString()}`, icon: BsGraphUp, color: "emerald" },
           { label: "Low Stock", value: stats.lowStock, icon: BsLayers, color: "amber" },
           { label: "Out of Stock", value: stats.outOfStock, icon: BsExclamationTriangle, color: "red" },
         ].map((stat, i) => (

@@ -47,14 +47,15 @@ export function AuthProvider({ children }) {
         const { user, error } = await getCurrentUser();
 
         if (error && error !== 'Auth session missing!') {
+          console.warn('Auth init error:', error);
         }
 
         if (user) {
           setUser(user);
           await fetchUserProfile(user.id);
-        } else {
         }
       } catch (err) {
+        console.warn('Auth init failed:', err?.message);
       } finally {
         setLoading(false);
       }

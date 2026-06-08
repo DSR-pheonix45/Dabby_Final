@@ -13,6 +13,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import { reportService } from "../../services/reportService";
+import { API_BASE_URL } from '../../lib/api';
 
 export default function FinancialDataRoomModal({ isOpen, onClose, workbenchId, workbenchName }) {
 
@@ -29,7 +30,7 @@ export default function FinancialDataRoomModal({ isOpen, onClose, workbenchId, w
   const fetchStatements = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:8000/api/investor/statements/${workbenchId}`);
+      const response = await fetch(`${API_BASE_URL}/api/investor/statements/${workbenchId}`);
       if (!response.ok) throw new Error("Failed to fetch financial statements");
       const result = await response.json();
       setData(result);

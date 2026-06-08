@@ -11,6 +11,7 @@ import { useWorkbench } from "../../../context/WorkbenchContext";
 import { backendService } from "../../../services/backendService";
 import { toast } from "react-hot-toast";
 import { supabase } from "../../../lib/supabase";
+import { roundMoney } from "../../../utils/numberFormatter";
 
 
 export default function RecordVendorPaymentModal({ isOpen, onClose, bill, onSuccess }) {
@@ -39,10 +40,22 @@ export default function RecordVendorPaymentModal({ isOpen, onClose, bill, onSucc
       return;
     }
 
+    const amount = roundMoney(formData.amount);
+    const balanceDue = roundMoney(bill.balance_due);
+    if (!(amount > 0)) {
+      toast.error("Enter a valid payment amount");
+      return;
+    }
+    if (amount > balanceDue) {
+      toast.error(`Amount cannot exceed the balance due (₹${balanceDue.toLocaleString()})`);
+      return;
+    }
+
     try {
       setLoading(true);
       await backendService.recordBillPayment(bill.id, {
         ...formData,
+        amount,
         ap_label_id: bill.ap_label_id
       });
       toast.success("Vendor payment recorded!");

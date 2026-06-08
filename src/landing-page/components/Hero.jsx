@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../hooks/useAuth";
@@ -225,7 +225,7 @@ const TRANSFORMERS = {
     }, { revenue: 0, cogs: 0, gross: 0, sal: 0, mkt: 0, ga: 0 });
     const fy_net = totals.gross - totals.sal - totals.mkt - totals.ga;
 
-    const build = (label, fn) => [label, ...quarters.map(fn), fmt(quarters.reduce((a, q) => a + (fn(q) ? Number(fn(q).replace(/[₹,]/g, "")) : 0), 0))];
+    const _build = (label, fn) => [label, ...quarters.map(fn), fmt(quarters.reduce((a, q) => a + (fn(q) ? Number(fn(q).replace(/[₹,]/g, "")) : 0), 0))];
 
     const rows = [
       ["Gross Revenue", ...quarters.map(q => fmt(q.revenue)), fmt(totals.revenue)],
@@ -653,7 +653,7 @@ export default function Hero() {
       return;
     }
     if (!result) return;
-    const { template, key } = result;
+    const { template, _key } = result;
     const dataRows = template.rows.filter((row) => row.some((c) => c !== ""));
     const wsData = [template.headers, ...dataRows];
     const metaRows = [];

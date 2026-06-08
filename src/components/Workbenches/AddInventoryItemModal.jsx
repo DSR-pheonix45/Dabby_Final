@@ -10,7 +10,6 @@ import {
   BsGear,
   BsArrowRepeat
 } from "react-icons/bs";
-import { supabase } from "../../lib/supabase";
 import { backendService } from "../../services/backendService";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { toast } from "react-hot-toast";

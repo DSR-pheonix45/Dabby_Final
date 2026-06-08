@@ -21,8 +21,8 @@ import { toast } from "react-hot-toast";
 import PulseDetailModal from "../ops/PulseDetailModal";
 
 export default function OpsOverview({ workbenchId }) {
-  const { labels, balances, loading: contextLoading } = useWorkbench();
-  const [loading, setLoading] = useState(true);
+  const { labels, balances, loading: _contextLoading } = useWorkbench();
+  const [_loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState([]);
   const [members, setMembers] = useState([]);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -70,7 +70,7 @@ export default function OpsOverview({ workbenchId }) {
     },
   ]);
 
-  const [exceptions, setExceptions] = useState([]);
+  const [_exceptions, _setExceptions] = useState([]);
   const [expenses, setExpenses] = useState([]);
 
   useEffect(() => {

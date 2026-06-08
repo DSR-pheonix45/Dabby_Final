@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import { API_BASE_URL } from '../lib/api';
 
 /**
  * Backend Service
@@ -115,12 +116,12 @@ export const backendService = {
   /**
    * Creates a new workbench and assigns the current user as founder
    */
-  async createWorkbench(name, booksStartDate, description = null, extraData = {}) {
+  async createWorkbench(name, booksStartDate, _description = null, extraData = {}) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const response = await fetch('http://localhost:8000/api/workbenches', {
+      const response = await fetch(`${API_BASE_URL}/api/workbenches`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -177,7 +178,7 @@ export const backendService = {
   },
 
   async aiCategorize(description, labels) {
-    const response = await fetch('http://localhost:8000/api/ai/categorize-transaction', {
+    const response = await fetch(`${API_BASE_URL}/api/ai/categorize-transaction`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ description, labels })
@@ -271,7 +272,7 @@ export const backendService = {
    * Lists all transactions for a workbench
    */
   async listTransactions(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/ledger/transactions/${workbenchId}`);
+    const response = await fetch(`${API_BASE_URL}/api/ledger/transactions/${workbenchId}`);
     if (!response.ok) throw new Error('Failed to fetch transactions');
     return await response.json();
   },
@@ -315,20 +316,12 @@ export const backendService = {
    * Runs the reconciliation engine for a workbench
    */
   async runReconciliation(workbenchId) {
-    try {
-      const { data, error } = await supabase.functions.invoke('run-reconciliation', {
-        body: { workbench_id: workbenchId }
-      });
-
-      if (error) {
-        console.error('Edge Function Error (run-reconciliation):', error);
-        throw error;
-      }
-      return data;
-    } catch (err) {
-      console.error('Failed to call run-reconciliation:', err);
-      throw err;
+    const response = await fetch(`${API_BASE_URL}/api/reconciliation/${workbenchId}`);
+    if (!response.ok) {
+      const e = await response.json().catch(() => ({}));
+      throw new Error(e.detail || 'Failed to run reconciliation');
     }
+    return await response.json();
   },
 
   /**
@@ -375,7 +368,7 @@ export const backendService = {
   // --- Inventory System ---
 
   async createInventoryItem(itemData) {
-    const response = await fetch('http://localhost:8000/api/inventory/items', {
+    const response = await fetch(`${API_BASE_URL}/api/inventory/items`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(itemData)
@@ -388,7 +381,7 @@ export const backendService = {
   },
 
   async recordStockPurchase(purchaseData) {
-    const response = await fetch('http://localhost:8000/api/inventory/purchase', {
+    const response = await fetch(`${API_BASE_URL}/api/inventory/purchase`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(purchaseData)
@@ -401,7 +394,7 @@ export const backendService = {
   },
 
   async recordStockSale(saleData) {
-    const response = await fetch('http://localhost:8000/api/inventory/sale', {
+    const response = await fetch(`${API_BASE_URL}/api/inventory/sale`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(saleData)
@@ -416,13 +409,13 @@ export const backendService = {
   // --- AR System ---
 
   async listInvoices(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/ops/invoices/${workbenchId}`);
+    const response = await fetch(`${API_BASE_URL}/api/ops/invoices/${workbenchId}`);
     if (!response.ok) throw new Error('Failed to fetch invoices');
     return await response.json();
   },
 
   async createInvoice(invoiceData) {
-    const response = await fetch('http://localhost:8000/api/ops/invoices', {
+    const response = await fetch(`${API_BASE_URL}/api/ops/invoices`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(invoiceData)
@@ -435,7 +428,7 @@ export const backendService = {
   },
 
   async scanInvoice(docId) {
-    const response = await fetch(`http://localhost:8000/api/ops/invoices/scan/${docId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/ops/invoices/scan/${docId}`, {
       method: 'POST'
     });
     if (!response.ok) throw new Error('AI scanning failed');
@@ -443,7 +436,7 @@ export const backendService = {
   },
 
   async recordPayment(invoiceId, paymentData) {
-    const response = await fetch(`http://localhost:8000/api/ops/invoices/${invoiceId}/payment`, {
+    const response = await fetch(`${API_BASE_URL}/api/ops/invoices/${invoiceId}/payment`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(paymentData)
@@ -453,7 +446,7 @@ export const backendService = {
   },
 
   async getARMetrics(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/ops/metrics/ar/${workbenchId}`);
+    const response = await fetch(`${API_BASE_URL}/api/ops/metrics/ar/${workbenchId}`);
     if (!response.ok) throw new Error('Failed to fetch AR metrics');
     return await response.json();
   },
@@ -461,13 +454,13 @@ export const backendService = {
   // --- AP System ---
 
   async listBills(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/ops/bills/${workbenchId}`);
+    const response = await fetch(`${API_BASE_URL}/api/ops/bills/${workbenchId}`);
     if (!response.ok) throw new Error('Failed to fetch bills');
     return await response.json();
   },
 
   async createBill(billData) {
-    const response = await fetch('http://localhost:8000/api/ops/bills', {
+    const response = await fetch(`${API_BASE_URL}/api/ops/bills`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(billData)
@@ -480,7 +473,7 @@ export const backendService = {
   },
 
   async recordBillPayment(billId, paymentData) {
-    const response = await fetch(`http://localhost:8000/api/ops/bills/${billId}/payment`, {
+    const response = await fetch(`${API_BASE_URL}/api/ops/bills/${billId}/payment`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(paymentData)
@@ -490,7 +483,7 @@ export const backendService = {
   },
 
   async getAPMetrics(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/ops/metrics/ap/${workbenchId}`);
+    const response = await fetch(`${API_BASE_URL}/api/ops/metrics/ap/${workbenchId}`);
     if (!response.ok) throw new Error('Failed to fetch AP metrics');
     return await response.json();
   },
@@ -543,13 +536,13 @@ export const backendService = {
   // --- Task Management ---
 
   async listTasks(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/tasks/${workbenchId}`);
+    const response = await fetch(`${API_BASE_URL}/api/tasks/${workbenchId}`);
     if (!response.ok) throw new Error('Failed to fetch tasks');
     return await response.json();
   },
 
   async createTask(taskData) {
-    const response = await fetch('http://localhost:8000/api/tasks/', {
+    const response = await fetch(`${API_BASE_URL}/api/tasks/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(taskData)
@@ -559,7 +552,7 @@ export const backendService = {
   },
 
   async updateTask(taskId, updateData) {
-    const response = await fetch(`http://localhost:8000/api/tasks/${taskId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updateData)
@@ -569,7 +562,7 @@ export const backendService = {
   },
 
   async deleteTask(taskId) {
-    const response = await fetch(`http://localhost:8000/api/tasks/${taskId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}`, {
       method: 'DELETE'
     });
     if (!response.ok) throw new Error('Failed to delete task');
@@ -577,13 +570,13 @@ export const backendService = {
   },
 
   async listWorkbenchMembers(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/tasks/${workbenchId}/members`);
+    const response = await fetch(`${API_BASE_URL}/api/tasks/${workbenchId}/members`);
     if (!response.ok) throw new Error('Failed to fetch members');
     return await response.json();
   },
 
   async listWorkbenchEntities(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/ops/entities/workbench/${workbenchId}`);
+    const response = await fetch(`${API_BASE_URL}/api/ops/entities/workbench/${workbenchId}`);
     if (!response.ok) throw new Error('Failed to fetch entities');
     return await response.json();
   },
@@ -591,14 +584,176 @@ export const backendService = {
   // --- Budgets ---
 
   async getBudgetPerformance(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/budgets/${workbenchId}/performance`);
+    const response = await fetch(`${API_BASE_URL}/api/budgets/${workbenchId}/performance`);
     if (!response.ok) throw new Error('Failed to fetch budget performance');
     return await response.json();
   },
 
   async getBudgetTransactions(workbenchId, category) {
-    const response = await fetch(`http://localhost:8000/api/budgets/${workbenchId}/transactions/${encodeURIComponent(category)}`);
+    const response = await fetch(`${API_BASE_URL}/api/budgets/${workbenchId}/transactions/${encodeURIComponent(category)}`);
     if (!response.ok) throw new Error('Failed to fetch clubbed transactions');
+    return await response.json();
+  },
+
+  async getGstSummary(workbenchId) {
+    const response = await fetch(`${API_BASE_URL}/api/ops/gst/summary/${workbenchId}`);
+    if (!response.ok) throw new Error('Failed to fetch GST summary');
+    return await response.json();
+  },
+
+  // --- Bill approvals ---
+  async approveBill(billId, approverId = null) {
+    const url = `${API_BASE_URL}/api/ops/bills/${billId}/approve` + (approverId ? `?approver_id=${approverId}` : "");
+    const r = await fetch(url, { method: 'POST' });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || 'Approve failed'); }
+    return await r.json();
+  },
+  async rejectBill(billId) {
+    const r = await fetch(`${API_BASE_URL}/api/ops/bills/${billId}/reject`, { method: 'POST' });
+    if (!r.ok) throw new Error('Reject failed');
+    return await r.json();
+  },
+
+  // --- Cash flow, reminders, scheduler, recurring invoices ---
+  async getCashFlowForecast(workbenchId, months = 6) {
+    const r = await fetch(`${API_BASE_URL}/api/forecast/${workbenchId}?months=${months}`);
+    if (!r.ok) throw new Error('Failed to build forecast');
+    return await r.json();
+  },
+  async sendPaymentReminders(workbenchId) {
+    const r = await fetch(`${API_BASE_URL}/api/scheduler/reminders/${workbenchId}`, { method: 'POST' });
+    if (!r.ok) throw new Error('Failed to send reminders');
+    return await r.json();
+  },
+  async schedulerTick(workbenchId) {
+    const r = await fetch(`${API_BASE_URL}/api/scheduler/tick/${workbenchId}`, { method: 'POST' });
+    if (!r.ok) throw new Error('Scheduler run failed');
+    return await r.json();
+  },
+  async createRecurringInvoice(payload) {
+    const r = await fetch(`${API_BASE_URL}/api/recurring/invoices`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || 'Failed to create recurring invoice'); }
+    return await r.json();
+  },
+  async listRecurringInvoices(workbenchId) {
+    const r = await fetch(`${API_BASE_URL}/api/recurring/invoices/${workbenchId}`);
+    if (!r.ok) throw new Error('Failed to fetch recurring invoices');
+    return await r.json();
+  },
+
+  // --- Bank statement reconciliation ---
+  async reconcileBankStatement(workbenchId, lines, opts = {}) {
+    const r = await fetch(`${API_BASE_URL}/api/bank/reconcile/${workbenchId}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lines, date_window: opts.dateWindow ?? 4, amount_tol: opts.amountTol ?? 1.0 }),
+    });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || 'Reconciliation failed'); }
+    return await r.json();
+  },
+
+  // --- Compliance filing (GSTR / TDS / e-invoice) ---
+  async getGstr1(workbenchId, period) {
+    const r = await fetch(`${API_BASE_URL}/api/filing/gstr1/${workbenchId}?period=${period}`);
+    if (!r.ok) throw new Error('Failed to build GSTR-1');
+    return await r.json();
+  },
+  async getGstr3b(workbenchId, period) {
+    const r = await fetch(`${API_BASE_URL}/api/filing/gstr3b/${workbenchId}?period=${period}`);
+    if (!r.ok) throw new Error('Failed to build GSTR-3B');
+    return await r.json();
+  },
+  async getTds26q(workbenchId, quarter, fy) {
+    const r = await fetch(`${API_BASE_URL}/api/filing/tds26q/${workbenchId}?quarter=${quarter}&fy=${encodeURIComponent(fy)}`);
+    if (!r.ok) throw new Error('Failed to build 26Q');
+    return await r.json();
+  },
+  async generateEInvoice(invoiceId) {
+    const r = await fetch(`${API_BASE_URL}/api/filing/einvoice/${invoiceId}`, { method: 'POST' });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || 'Failed to build e-invoice'); }
+    return await r.json();
+  },
+
+  // --- OCR (scanned PDFs / images) ---
+  async ocrExtract(workbenchId, filePath, documentId = null, index = true) {
+    const response = await fetch(`${API_BASE_URL}/api/ocr/extract/${workbenchId}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file_path: filePath, document_id: documentId, index }),
+    });
+    if (!response.ok) { const e = await response.json().catch(() => ({})); throw new Error(e.detail || 'OCR failed'); }
+    return await response.json();
+  },
+
+  // --- Semantic RAG (pgvector) ---
+  async ragIndex(workbenchId, text, documentId = null) {
+    const response = await fetch(`${API_BASE_URL}/api/rag/index/${workbenchId}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, document_id: documentId }),
+    });
+    if (!response.ok) throw new Error('Failed to index document');
+    return await response.json();
+  },
+  async ragSearch(workbenchId, query, matchCount = 6) {
+    const response = await fetch(`${API_BASE_URL}/api/rag/search/${workbenchId}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, match_count: matchCount }),
+    });
+    if (!response.ok) throw new Error('Failed to search documents');
+    return await response.json();
+  },
+
+  // --- Compliance calendar ---
+  async generateComplianceCalendar(workbenchId, months = 6) {
+    const response = await fetch(`${API_BASE_URL}/api/compliance/generate/${workbenchId}?months=${months}`, { method: 'POST' });
+    if (!response.ok) throw new Error('Failed to generate compliance calendar');
+    return await response.json();
+  },
+  async markComplianceFiled(complianceId) {
+    const response = await fetch(`${API_BASE_URL}/api/compliance/${complianceId}/file`, { method: 'POST' });
+    if (!response.ok) throw new Error('Failed to mark filed');
+    return await response.json();
+  },
+
+  // --- Recurring transactions ---
+  async listRecurring(workbenchId) {
+    const response = await fetch(`${API_BASE_URL}/api/recurring/${workbenchId}`);
+    if (!response.ok) throw new Error('Failed to fetch recurring transactions');
+    return await response.json();
+  },
+  async createRecurring(payload) {
+    const response = await fetch(`${API_BASE_URL}/api/recurring/`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    if (!response.ok) { const e = await response.json().catch(() => ({})); throw new Error(e.detail || 'Failed to create recurring transaction'); }
+    return await response.json();
+  },
+  async toggleRecurring(id, active) {
+    const response = await fetch(`${API_BASE_URL}/api/recurring/${id}/toggle?active=${active}`, { method: 'PATCH' });
+    if (!response.ok) throw new Error('Failed to toggle recurring');
+    return await response.json();
+  },
+  async deleteRecurring(id) {
+    const response = await fetch(`${API_BASE_URL}/api/recurring/${id}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error('Failed to delete recurring');
+    return await response.json();
+  },
+  async runRecurringDue(workbenchId) {
+    const response = await fetch(`${API_BASE_URL}/api/recurring/run-due/${workbenchId}`, { method: 'POST' });
+    if (!response.ok) throw new Error('Failed to run recurring transactions');
+    return await response.json();
+  },
+
+  async createBudget(payload) {
+    const response = await fetch(`${API_BASE_URL}/api/budgets/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to create budget');
+    }
     return await response.json();
   }
 };

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { 
+import { supabase } from "../../../lib/supabase";
+import {
   BsPlusLg, 
   BsWallet2, 
   BsBank, 
@@ -17,7 +18,7 @@ import { useWorkbench } from "../../../context/WorkbenchContext";
 import Card from "../../shared/Card";
 
 export default function LiquidityCenter({ workbenchId }) {
-  const { coa: accounts, loading, refreshContext } = useWorkbench();
+  const { coa: accounts, _loading, refreshContext } = useWorkbench();
   const [selectedPillar, setSelectedPillar] = useState(null);
   const [selectedSubAccount, setSelectedSubAccount] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -48,7 +49,7 @@ export default function LiquidityCenter({ workbenchId }) {
     if (!activeParent || !newNodeName) return;
 
     try {
-      const { data, error } = await supabase
+      const { _data, error } = await supabase
         .from('coa_accounts')
         .insert({
           workbench_id: workbenchId,

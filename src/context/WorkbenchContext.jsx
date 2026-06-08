@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
+import { API_BASE_URL } from '../lib/api';
 
 const WorkbenchContext = createContext();
 
@@ -30,7 +31,7 @@ export const WorkbenchProvider = ({ children, workbenchId }) => {
         try {
             if (showLoading) setData(prev => ({ ...prev, loading: true }));
             
-            const response = await fetch(`http://localhost:8000/api/context/${workbenchId}`);
+            const response = await fetch(`${API_BASE_URL}/api/context/${workbenchId}`);
             if (!response.ok) {
                 const errData = await response.json();
                 throw new Error(errData.detail || 'Failed to fetch workbench context');

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   BsShieldCheck, 
@@ -13,13 +13,12 @@ import {
   BsJournalText,
   BsArrowRight
 } from "react-icons/bs";
-import { toast } from "react-hot-toast";
 import TransactionModal from "../ledger/TransactionModal";
 import LabelModal from "../ledger/LabelModal";
 import { useWorkbench } from "../../../context/WorkbenchContext";
 
 export default function COAView({ workbenchId }) {
-  const { labels, balances, transactions, loading, refreshContext } = useWorkbench();
+  const { labels, balances, _transactions, loading, refreshContext } = useWorkbench();
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
@@ -70,23 +69,15 @@ export default function COAView({ workbenchId }) {
     const gross = items.reduce((sum, l) => sum + (balances[l.id]?.gross || 0), 0);
     const rawNet = items.reduce((sum, l) => sum + (balances[l.id]?.net || 0), 0);
     
+    // Natural-balance sign convention (must match getLabelBalance so that a
+    // pillar total equals the sum of its label nets):
+    //   asset/expense              -> debit-natural  (net = rawNet)
+    //   liability/equity/revenue   -> credit-natural (net = -rawNet)
     let net = rawNet;
-    if (["equity", "revenue", "income"].includes(type)) {
+    if (["liability", "equity", "revenue", "income"].includes(type)) {
       net = -rawNet;
     }
-    
-    if (type === "liability") {
-      net = Math.max(0, -rawNet);
-    }
 
-    // Advanced Business Intelligence (User-Defined Model):
-    // 1. Revenue "Left" = The unspent surplus currently in Assets.
-    // 2. If Assets are 0 or negative, Revenue "Left" is 0 (it was used to cover debt).
-    if (type === "revenue") {
-      const assetData = getPillarBalance("asset");
-      net = Math.max(0, assetData.net); 
-    }
-    
     // Ensure 0 is always clean
     if (Math.abs(net) < 0.01) net = 0;
 

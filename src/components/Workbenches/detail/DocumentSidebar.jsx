@@ -41,8 +41,8 @@ const STATUS_CONFIG = {
 };
 
 export default function DocumentSidebar({ isOpen, onClose, workbenchId, isStandalone = false }) {
-  const { user } = useAuth();
-  const navigate = useNavigate();
+  const { _user } = useAuth();
+  const _navigate = useNavigate();
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedType, setSelectedType] = useState('invoice');
@@ -55,7 +55,7 @@ export default function DocumentSidebar({ isOpen, onClose, workbenchId, isStanda
   }, [isOpen, isStandalone]);
 
   const fileInputRef = useRef(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [_isUploading, setIsUploading] = useState(false);
 
   const fetchDocuments = async () => {
     try {

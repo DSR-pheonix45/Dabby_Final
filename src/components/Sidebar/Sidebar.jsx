@@ -136,7 +136,7 @@ const ExpandableSection = ({
 
 export default function Sidebar({
   isCollapsed = false,
-  onNavigate,
+  _onNavigate,
 }) {
   const { user } = useAuth();
   const navigate = useNavigate();

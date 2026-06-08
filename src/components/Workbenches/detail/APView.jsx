@@ -26,7 +26,7 @@ import { CheckCircle } from "lucide-react";
 import ScanMapperModal from "../ops/ScanMapperModal";
 
 export default function APView({ workbenchId }) {
-  const navigate = useNavigate();
+  const _navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("payables");
   const [bills, setBills] = useState([]);
   const [vaultBills, setVaultBills] = useState([]);
@@ -92,7 +92,19 @@ export default function APView({ workbenchId }) {
     }
   };
 
-  const handleConfirmBill = async () => {
+  // Find the most appropriate label of a given type, preferring one whose
+  // sub-account/name matches a keyword (e.g. the real "Accounts Payable"
+  // account), falling back to the first label of that type.
+  const pickLabel = (type, keywords = []) => {
+    const pool = (labels || []).filter(l => l.type === type);
+    const match = pool.find(l => {
+      const hay = `${l.sub_account || ''} ${l.name || ''}`.toLowerCase();
+      return keywords.some(k => hay.includes(k));
+    });
+    return (match || pool[0])?.id || '';
+  };
+
+  const _handleConfirmBill = async () => {
     if (!extractedBill) return;
     
     try {
@@ -104,8 +116,11 @@ export default function APView({ workbenchId }) {
         amount: extractedBill.totalAmount || extractedBill.amount || 0,
         issue_date: extractedBill.date || new Date().toISOString().split('T')[0],
         category: "expense",
-        expense_label_id: labels.find(l => l.type === 'expense')?.id || '',
-        ap_label_id: labels.find(l => l.type === 'liability')?.id || '',
+        // Prefer the specific Accounts Payable / expense sub-account rather than
+        // blindly grabbing the first label of a type (which could be a loan,
+        // GST-payable, COGS, etc.). Fall back to the first of the type if none match.
+        expense_label_id: pickLabel('expense', ['cost of goods', 'cogs', 'purchase', 'expense']),
+        ap_label_id: pickLabel('liability', ['accounts payable', 'payable', 'creditor', 'a/p', 'ap']),
         description: `Scanned Bill: ${extractedBill.vendorName || 'Vendor'}`,
         doc_id: extractedBill.doc_id
       };
@@ -134,6 +149,28 @@ export default function APView({ workbenchId }) {
     }
   };
 
+  const pendingBills = (bills || []).filter(b => b.approval_status === "pending");
+
+  const handleApprove = async (billId) => {
+    try {
+      await backendService.approveBill(billId);
+      toast.success("Bill approved & posted to ledger");
+      fetchData();
+      window.dispatchEvent(new Event("refresh-ledger-data"));
+    } catch (err) {
+      toast.error(err.message || "Approve failed");
+    }
+  };
+  const handleReject = async (billId) => {
+    try {
+      await backendService.rejectBill(billId);
+      toast.success("Bill rejected");
+      fetchData();
+    } catch (err) {
+      toast.error(err.message || "Reject failed");
+    }
+  };
+
   const agingColors = {
     "0-30": "bg-emerald-500",
     "31-60": "bg-blue-500",
@@ -143,6 +180,27 @@ export default function APView({ workbenchId }) {
 
   return (
     <div className="space-y-8 pb-12">
+      {/* Pending approvals */}
+      {pendingBills.length > 0 && (
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-5">
+          <h3 className="text-sm font-bold text-amber-300 mb-3">Pending Approval ({pendingBills.length})</h3>
+          <div className="space-y-2">
+            {pendingBills.map((b) => (
+              <div key={b.id} className="flex items-center justify-between gap-3 bg-black/20 rounded-xl px-4 py-3">
+                <div className="text-sm text-gray-300">
+                  <span className="font-semibold text-white">{b.bill_number}</span>
+                  <span className="text-gray-500"> · {b.parties?.name || "Vendor"} · ₹{Number(b.amount || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleApprove(b.id)} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-black hover:bg-emerald-400">Approve</button>
+                  <button onClick={() => handleReject(b.id)} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10">Reject</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Metrics Bar */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div 

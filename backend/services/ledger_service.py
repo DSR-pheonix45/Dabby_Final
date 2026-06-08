@@ -1,7 +1,22 @@
 import uuid
 from typing import List, Optional, Dict
 from datetime import date
+from decimal import Decimal, ROUND_HALF_UP
 from supabase import Client
+
+
+def q2(x) -> Decimal:
+    """Quantize any numeric/string to a 2dp Decimal (banker-safe HALF_UP)."""
+    try:
+        return Decimal(str(x if x is not None else 0)).quantize(Decimal("0.01"), ROUND_HALF_UP)
+    except Exception:
+        return Decimal("0.00")
+
+
+def money(x) -> float:
+    """2dp float for storage/JSON — drift is removed by quantizing first."""
+    return float(q2(x))
+
 
 class LedgerService:
     def __init__(self, supabase: Client):
@@ -57,7 +72,7 @@ class LedgerService:
     async def record_transaction(self, workbench_id: str, from_label_id: str, to_label_id: str, amount: float, description: str, transaction_date: Optional[date] = None, 
                                  source_party_id: Optional[str] = None, source_entity_id: Optional[str] = None, 
                                  destination_party_id: Optional[str] = None, destination_entity_id: Optional[str] = None,
-                                 invoice_id: Optional[str] = None):
+                                 invoice_id: Optional[str] = None, bill_id: Optional[str] = None):
         """
         Records a strict double-entry transaction.
         Entry 1: to_label_id   +amount
@@ -68,6 +83,10 @@ class LedgerService:
         if amount <= 0:
             print(f"[VALIDATION ERROR] Amount must be positive. Received: {amount}")
             raise ValueError("Amount must be positive. Use labels to indicate direction.")
+
+        # Quantize to 2dp once so the two entries are exactly equal-and-opposite
+        # and never drift (e.g. 0.1 + 0.2). Both legs derive from this value.
+        amount_q = money(amount)
 
         # Check if both labels exist and fetch their types
         labels_res = self.supabase.table("labels").select("id, name, type").in_("id", [from_label_id, to_label_id]).execute()
@@ -102,7 +121,8 @@ class LedgerService:
             "source_entity_id": source_entity_id,
             "destination_party_id": destination_party_id,
             "destination_entity_id": destination_entity_id,
-            "invoice_id": invoice_id
+            "invoice_id": invoice_id,
+            "bill_id": bill_id
         }
         
         print(f"[DEBUG] Recording transaction for workbench: {workbench_id}")
@@ -123,12 +143,12 @@ class LedgerService:
             {
                 "transaction_id": transaction_id,
                 "label_id": to_label_id,
-                "amount": amount # Positive (Destination)
+                "amount": amount_q  # Positive (Destination)
             },
             {
                 "transaction_id": transaction_id,
                 "label_id": from_label_id,
-                "amount": -amount # Negative (Source)
+                "amount": money(-amount_q)  # Negative (Source), exact opposite
             }
         ]
         
@@ -140,13 +160,79 @@ class LedgerService:
                 raise Exception("Failed to create transaction entries (no data returned)")
         except Exception as e:
             print(f"[ERROR] Transaction entries creation failed: {str(e)}")
-            # Optional: Rollback transaction header here if needed (not easy in REST without RPC)
+            # Compensating rollback: if the entries couldn't be written, delete the
+            # orphaned header so we never leave a transaction with unbalanced/zero
+            # entries. (A true atomic insert needs a Postgres RPC — see
+            # migrations/record_transaction_atomic.sql for the deployable version.)
+            try:
+                self.supabase.table("transaction_entries").delete().eq("transaction_id", transaction_id).execute()
+                self.supabase.table("transactions").delete().eq("id", transaction_id).execute()
+                print(f"[ROLLBACK] Removed orphaned transaction header {transaction_id}")
+            except Exception as rb_err:
+                print(f"[ROLLBACK FAILED] Could not clean up transaction {transaction_id}: {rb_err}")
             raise Exception(f"Database error creating entries: {str(e)}")
         
         return {
             "transaction": tx_resp.data[0],
             "entries": entries_resp.data
         }
+
+    async def record_multi_entry(self, workbench_id: str, legs: List[Dict], description: str,
+                                 transaction_date: Optional[date] = None,
+                                 source_party_id: Optional[str] = None,
+                                 destination_party_id: Optional[str] = None,
+                                 invoice_id: Optional[str] = None, bill_id: Optional[str] = None):
+        """
+        Record an N-leg balanced transaction. `legs` = list of
+        {"label_id": str, "amount": float} with the engine's sign convention
+        (+ = destination/debit-into, - = source/credit-out-of). The signed
+        amounts MUST sum to zero. Used for GST splits (e.g. Dr AR / Cr Revenue /
+        Cr GST Payable).
+        """
+        if not legs or len(legs) < 2:
+            raise ValueError("A transaction needs at least two legs.")
+
+        q_legs = [{"label_id": l["label_id"], "amount": money(l["amount"])} for l in legs]
+        total = money(sum(l["amount"] for l in q_legs))
+        if abs(total) > 0.01:
+            raise ValueError(f"Unbalanced transaction: legs sum to {total}, must be 0.")
+
+        label_ids = [l["label_id"] for l in q_legs]
+        labels_res = self.supabase.table("labels").select("id").in_("id", label_ids).execute()
+        existing = {l["id"] for l in labels_res.data}
+        for lid in label_ids:
+            if lid not in existing:
+                raise ValueError(f"Label {lid} not found or deleted.")
+
+        header = {
+            "workbench_id": workbench_id,
+            "description": description,
+            "transaction_date": str(transaction_date) if transaction_date else str(date.today()),
+            "source_party_id": source_party_id,
+            "destination_party_id": destination_party_id,
+            "invoice_id": invoice_id,
+            "bill_id": bill_id,
+        }
+        tx_resp = self.supabase.table("transactions").insert(header).execute()
+        if not tx_resp.data:
+            raise Exception("Failed to create transaction header")
+        transaction_id = tx_resp.data[0]["id"]
+
+        entries = [{"transaction_id": transaction_id, "label_id": l["label_id"], "amount": l["amount"]}
+                   for l in q_legs if l["amount"] != 0]
+        try:
+            entries_resp = self.supabase.table("transaction_entries").insert(entries).execute()
+            if not entries_resp.data:
+                raise Exception("No entries created")
+        except Exception as e:
+            try:
+                self.supabase.table("transaction_entries").delete().eq("transaction_id", transaction_id).execute()
+                self.supabase.table("transactions").delete().eq("id", transaction_id).execute()
+            except Exception:
+                pass
+            raise Exception(f"Database error creating entries: {str(e)}")
+
+        return {"transaction": tx_resp.data[0], "entries": entries_resp.data}
 
     # --- Analytics & Lists ---
 
@@ -206,7 +292,11 @@ class LedgerService:
                 # Natural side is negative. Marked is total increases (credits).
                 # But if they only have payments (positives), show that as volume.
                 balances[lid]["gross"] = max(positives[lid], negatives[lid])
-            
+
+            # Round aggregates to 2dp to strip any accumulated float drift.
+            balances[lid]["gross"] = money(balances[lid]["gross"])
+            balances[lid]["net"] = money(balances[lid]["net"])
+
         return balances
 
     async def get_transactions_list(self, workbench_id: str):

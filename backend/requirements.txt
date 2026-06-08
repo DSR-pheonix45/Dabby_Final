@@ -5,3 +5,14 @@ supabase==2.11.0
 pydantic
 httpx==0.27.2
 groq
+google-generativeai
+
+# Local document text extraction (no API key needed)
+pypdf
+pdfplumber
+
+# Optional: OCR for scanned/image PDFs. Needs the Tesseract + Poppler system
+# binaries installed; the code degrades gracefully if they're absent.
+pytesseract
+pdf2image
+Pillow

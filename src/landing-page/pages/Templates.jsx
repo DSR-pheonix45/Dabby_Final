@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../hooks/useAuth";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { saveRedirectIntent } from "../../utils/redirectUtility";
 import {
   FileText,
   ShoppingCart,
@@ -125,7 +124,7 @@ const TEMPLATES = [
 
 export default function Templates() {
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { _user } = useAuth();
   const navigate = useNavigate();
   const isDark = theme === "dark";
 
@@ -157,6 +156,19 @@ export default function Templates() {
       "budget-planner": "Generate a departmental budget planner",
       "financial-model": "Build a 5-year financial model for a SaaS business"
     };
+
+    // Honour an explicit dedicated-generator route when the card defines one,
+    // and route the doc-style templates to their real generator pages instead
+    // of always falling through to the AI spreadsheet generator.
+    const TEMPLATE_ROUTES = {
+      invoice: "/templates/invoice",
+      quotation: "/templates/quotation",
+    };
+    const route = template.path || TEMPLATE_ROUTES[template.id];
+    if (route) {
+      navigate(route);
+      return;
+    }
 
     const prompt = PROMPT_MAP[template.id] || `Generate a ${template.title} template`;
     navigate(`/?prompt=${encodeURIComponent(prompt)}`);

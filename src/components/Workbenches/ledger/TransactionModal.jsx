@@ -4,6 +4,8 @@ import { BsX, BsArrowRight, BsJournalText, BsCashStack, BsArrowRepeat } from "re
 import { toast } from "react-hot-toast";
 import ProofUploader from "../shared/ProofUploader";
 import { backendService } from "../../../services/backendService";
+import { API_BASE_URL } from '../../../lib/api';
+import { roundMoney } from "../../../utils/numberFormatter";
 
 export default function TransactionModal({ isOpen, onClose, workbenchId, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -31,7 +33,7 @@ export default function TransactionModal({ isOpen, onClose, workbenchId, onSucce
 
   const fetchLabels = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/ledger/labels/${workbenchId}`);
+      const response = await fetch(`${API_BASE_URL}/api/ledger/labels/${workbenchId}`);
       if (!response.ok) throw new Error("Failed to fetch labels");
       const data = await response.json();
       setLabels(data);
@@ -42,7 +44,7 @@ export default function TransactionModal({ isOpen, onClose, workbenchId, onSucce
 
   const fetchParties = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/ops/parties/${workbenchId}`);
+      const response = await fetch(`${API_BASE_URL}/api/ops/parties/${workbenchId}`);
       if (!response.ok) throw new Error("Failed to fetch parties");
       const data = await response.json();
       setParties(data);
@@ -60,13 +62,13 @@ export default function TransactionModal({ isOpen, onClose, workbenchId, onSucce
 
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:8000/api/ledger/transactions", {
+      const response = await fetch(`${API_BASE_URL}/api/ledger/transactions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           workbench_id: workbenchId,
           ...formData,
-          amount: parseFloat(formData.amount),
+          amount: roundMoney(formData.amount),
           // Clean up empty strings to null for backend
           source_party_id: formData.source_party_id || null,
           source_entity_id: formData.source_entity_id || null,

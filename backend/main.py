@@ -13,19 +13,24 @@ print(f"[DEBUG] Loading environment from: {os.path.abspath(env_path)}")
 print(f"[DEBUG] File exists: {os.path.exists(env_path)}")
 load_dotenv(env_path)
 
-from routers import workbenches, ai, coa, ledger, ops, context, inventory, investor, tasks, budgets
+from routers import workbenches, ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, compliance, recurring, reconciliation, rag, ocr, filing, bank, scheduler, forecast
 
 app = FastAPI(title="Datalis API", description="FastAPI Backend for Datalis", version="1.0.0")
 
-# Configure CORS
+# Configure CORS. Local dev origins plus any production origin supplied via
+# FRONTEND_ORIGIN (comma-separated) so deployments don't get blocked.
+_origins = [
+    "http://localhost:5174",
+    "http://localhost:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:5173",
+]
+_extra = os.environ.get("FRONTEND_ORIGIN", "")
+_origins += [o.strip() for o in _extra.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5174",
-        "http://localhost:5173",
-        "http://127.0.0.1:5174",
-        "http://127.0.0.1:5173"
-    ],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,6 +46,15 @@ app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"]
 app.include_router(investor.router, prefix="/api/investor", tags=["Investor"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["Tasks"])
 app.include_router(budgets.router, prefix="/api/budgets", tags=["Budgets"])
+app.include_router(compliance.router, prefix="/api/compliance", tags=["Compliance"])
+app.include_router(recurring.router, prefix="/api/recurring", tags=["Recurring"])
+app.include_router(reconciliation.router, prefix="/api/reconciliation", tags=["Reconciliation"])
+app.include_router(rag.router, prefix="/api/rag", tags=["RAG"])
+app.include_router(ocr.router, prefix="/api/ocr", tags=["OCR"])
+app.include_router(filing.router, prefix="/api/filing", tags=["Filing"])
+app.include_router(bank.router, prefix="/api/bank", tags=["Bank"])
+app.include_router(scheduler.router, prefix="/api/scheduler", tags=["Scheduler"])
+app.include_router(forecast.router, prefix="/api/forecast", tags=["Forecast"])
 
 @app.get("/health")
 def health_check():

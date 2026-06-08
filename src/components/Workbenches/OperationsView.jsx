@@ -26,7 +26,7 @@ import APView from "./detail/APView";
 
 export default function OperationsView({ workbenchId }) {
   const [activeSubTab, setActiveSubTab] = useState("Ops");
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [_isModalOpen, _setIsModalOpen] = useState(false);
 
   const subTabs = [
     { id: "Compliance", icon: BsShieldCheck, label: "Compliance" },
