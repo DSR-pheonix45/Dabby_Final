@@ -12,22 +12,25 @@ export default function ProtectedRoute({ children }) {
       </div>
     );
   }
-  
-  // If not logged in, redirect to login
+
+  // Not authenticated -> send to login, preserve intended path
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If profile is partial and we're not already on onboarding, redirect to onboarding
-  if (profile && profile.status === 'partial' && location.pathname !== '/onboarding') {
-    return <Navigate to="/onboarding" replace />;
+  // If profile is missing or partial, require onboarding before accessing protected areas.
+  // Preserve the intended path so onboarding can redirect back after completion.
+  const isOnboardingRoute = location.pathname === '/onboarding' || location.pathname.startsWith('/onboarding/');
+
+  if ((!profile || profile.status === 'partial') && !isOnboardingRoute) {
+    return <Navigate to="/onboarding" state={{ from: location }} replace />;
   }
 
-  // If profile is active and we're on onboarding, redirect to dashboard
-  if (profile && profile.status === 'active' && location.pathname === '/onboarding') {
-    return <Navigate to="/dashboard" replace />;
+  // If user already completed onboarding, prevent access to onboarding UI
+  if (profile && profile.status === 'active' && isOnboardingRoute) {
+    const intended = location.state?.from?.pathname || '/dashboard';
+    return <Navigate to={intended} replace />;
   }
 
-  console.log("ProtectedRoute authorized access to:", location.pathname);
   return <>{children}</>;
 }

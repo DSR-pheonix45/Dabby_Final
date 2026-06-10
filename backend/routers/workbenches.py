@@ -11,6 +11,7 @@ class WorkbenchCreate(BaseModel):
     name: str
     industry: str
     business_type: str
+    plan: Optional[str] = 'free'
     sector: Optional[str] = None
     location: Optional[str] = "India"
     currency: Optional[str] = "INR"
@@ -31,6 +32,7 @@ async def create_workbench(payload: WorkbenchCreate):
         insert_data = {
             "owner_user_id": payload.owner_user_id,
             "name": payload.name,
+            "plan": getattr(payload, 'plan', 'free'),
             "industry": payload.industry,
             "business_type": payload.business_type,
             "sector": payload.sector,
@@ -77,4 +79,14 @@ async def create_workbench(payload: WorkbenchCreate):
         print(f"[CRITICAL ERROR] Workbench creation failed: {str(e)}")
         import traceback
         traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{workbench_id}/membership")
+async def get_membership(workbench_id: str, user_id: str):
+    try:
+        res = supabase.table('workbench_members').select('*').eq('workbench_id', workbench_id).eq('user_id', user_id).maybe_single().execute()
+        return { 'membership': res.data }
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch membership: {e}")
         raise HTTPException(status_code=500, detail=str(e))

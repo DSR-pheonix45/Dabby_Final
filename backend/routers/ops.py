@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional, Dict
 from pydantic import BaseModel
 from datetime import date
 from supabase_client import supabase
 from services.ledger_service import LedgerService
 from services.ai_service import ai_service
+from .auth_utils import require_membership, get_user_id_from_header
 import uuid
 
 router = APIRouter()
@@ -70,16 +71,18 @@ class BillPaymentRequest(BaseModel):
 
 
 @router.post("/parties")
-async def create_party(party: PartyCreate):
+async def create_party(party: PartyCreate, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        await require_membership(party.workbench_id, x_user_id)
         response = supabase.table("parties").insert(party.dict()).execute()
         return response.data[0]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/parties/{workbench_id}")
-async def list_parties(workbench_id: str):
+async def list_parties(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        await require_membership(workbench_id, x_user_id)
         # Fetch parties with their entities
         response = supabase.table("parties").select("*, entities(*)").eq("workbench_id", workbench_id).execute()
         return response.data
@@ -87,11 +90,13 @@ async def list_parties(workbench_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/parties/initialize-self/{workbench_id}")
-async def initialize_self_party(workbench_id: str):
+async def initialize_self_party(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
     """
     Ensures a 'Self' party exists for the workbench.
     """
     try:
+        # RBAC: ensure requester is a member
+        await require_membership(workbench_id, x_user_id)
         # Check if already exists
         existing = supabase.table("parties").select("*").eq("workbench_id", workbench_id).eq("is_self", True).execute()
         if existing.data:
@@ -114,8 +119,15 @@ async def initialize_self_party(workbench_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/entities")
-async def create_entity(entity: EntityCreate):
+async def create_entity(entity: EntityCreate, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        # Verify membership for the party's workbench
+        party_res = supabase.table("parties").select("workbench_id").eq("id", entity.party_id).maybe_single().execute()
+        party = party_res.data
+        if not party:
+            raise HTTPException(status_code=404, detail='Party not found')
+        await require_membership(party['workbench_id'], x_user_id)
+
         # 1. Create the Entity (Vessel)
         response = supabase.table("entities").insert(entity.dict()).execute()
         new_entity = response.data[0]
@@ -180,16 +192,24 @@ async def create_entity(entity: EntityCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/parties/{party_id}")
-async def delete_party(party_id: str):
+async def delete_party(party_id: str, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        p = supabase.table("parties").select("workbench_id").eq("id", party_id).maybe_single().execute().data
+        if not p:
+            raise HTTPException(status_code=404, detail='Party not found')
+        await require_membership(p['workbench_id'], x_user_id)
         response = supabase.table("parties").delete().eq("id", party_id).execute()
         return response.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/entities/{entity_id}")
-async def delete_entity(entity_id: str):
+async def delete_entity(entity_id: str, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        ent = supabase.table("entities").select("workbench_id").eq("id", entity_id).maybe_single().execute().data
+        if not ent:
+            raise HTTPException(status_code=404, detail='Entity not found')
+        await require_membership(ent['workbench_id'], x_user_id)
         response = supabase.table("entities").delete().eq("id", entity_id).execute()
         return response.data
     except Exception as e:
@@ -198,8 +218,9 @@ async def delete_entity(entity_id: str):
 # --- Invoice Endpoints ---
 
 @router.post("/invoices")
-async def create_invoice(invoice: InvoiceCreate):
+async def create_invoice(invoice: InvoiceCreate, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        await require_membership(invoice.workbench_id, x_user_id)
         # 1. Create Invoice Record
         invoice_data = invoice.dict()
         invoice_data["balance_due"] = invoice.amount
@@ -263,8 +284,9 @@ async def create_invoice(invoice: InvoiceCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/invoices/{workbench_id}")
-async def list_invoices(workbench_id: str):
+async def list_invoices(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        await require_membership(workbench_id, x_user_id)
         res = supabase.table("invoices").select("*, parties(name), labels!revenue_label_id(name), ar_label:labels!ar_label_id(name)").eq("workbench_id", workbench_id).order("created_at", desc=True).execute()
         return res.data
     except Exception as e:
@@ -318,7 +340,7 @@ async def scan_invoice_doc(doc_id: str):
         raise HTTPException(status_code=500, detail=f"AI Engine Error: {str(e)}")
 
 @router.post("/invoices/{invoice_id}/payment")
-async def record_payment(invoice_id: str, req: PaymentRequest):
+async def record_payment(invoice_id: str, req: PaymentRequest, x_user_id: str = Depends(get_user_id_from_header)):
     try:
         # 1. Fetch current invoice
         inv_res = supabase.table("invoices").select("*").eq("id", invoice_id).single().execute()
@@ -335,6 +357,9 @@ async def record_payment(invoice_id: str, req: PaymentRequest):
             "status": status
         }).eq("id", invoice_id).execute()
         
+        # RBAC: ensure caller is member of the workbench
+        await require_membership(invoice["workbench_id"], x_user_id)
+
         # 3. Record Financial Transaction (Dr Bank, Cr AR)
         tx_res = await ledger_service.record_transaction(
             workbench_id=invoice["workbench_id"],
@@ -409,8 +434,9 @@ async def get_ar_metrics(workbench_id: str):
 # --- Bill / AP Endpoints ---
 
 @router.post("/bills")
-async def create_bill(bill: BillCreate):
+async def create_bill(bill: BillCreate, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        await require_membership(bill.workbench_id, x_user_id)
         # 1. Create Bill Record
         bill_data = bill.dict()
         bill_data["balance_due"] = bill.amount
@@ -450,15 +476,16 @@ async def create_bill(bill: BillCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/bills/{workbench_id}")
-async def list_bills(workbench_id: str):
+async def list_bills(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        await require_membership(workbench_id, x_user_id)
         res = supabase.table("bills").select("*, parties(name), labels!expense_label_id(name), ap_label:labels!ap_label_id(name)").eq("workbench_id", workbench_id).order("created_at", desc=True).execute()
         return res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/bills/{bill_id}/payment")
-async def record_bill_payment(bill_id: str, req: BillPaymentRequest):
+async def record_bill_payment(bill_id: str, req: BillPaymentRequest, x_user_id: str = Depends(get_user_id_from_header)):
     try:
         # 1. Fetch current bill
         bill_res = supabase.table("bills").select("*").eq("id", bill_id).single().execute()
@@ -475,6 +502,9 @@ async def record_bill_payment(bill_id: str, req: BillPaymentRequest):
             "status": status
         }).eq("id", bill_id).execute()
         
+        # RBAC: ensure caller is member of workbench
+        await require_membership(bill["workbench_id"], x_user_id)
+
         # 3. Record Financial Transaction (Dr AP, Cr Bank)
         tx_res = await ledger_service.record_transaction(
             workbench_id=bill["workbench_id"],
@@ -544,8 +574,9 @@ async def get_ap_metrics(workbench_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/entities/workbench/{workbench_id}")
-async def list_workbench_entities(workbench_id: str):
+async def list_workbench_entities(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        await require_membership(workbench_id, x_user_id)
         # Fetch all entities for the workbench
         res = supabase.table("entities") \
             .select("*, parties!inner(*)") \

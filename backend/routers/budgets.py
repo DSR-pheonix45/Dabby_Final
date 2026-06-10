@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import date
 from supabase_client import supabase
+from .auth_utils import require_membership, get_user_id_from_header
 
 router = APIRouter()
 
@@ -15,8 +16,9 @@ class BudgetCreate(BaseModel):
     total_amount: float
 
 @router.post("/")
-async def create_budget(budget: BudgetCreate):
+async def create_budget(budget: BudgetCreate, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        await require_membership(budget.workbench_id, x_user_id)
         data = budget.dict()
         data["start_date"] = str(budget.start_date)
         data["end_date"] = str(budget.end_date)
@@ -27,8 +29,9 @@ async def create_budget(budget: BudgetCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{workbench_id}/performance")
-async def get_budget_performance(workbench_id: str):
+async def get_budget_performance(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        await require_membership(workbench_id, x_user_id)
         # Instead of calculating in Python, we can just query the SQL view we created
         response = supabase.table("view_budget_vs_actual").select("*").eq("workbench_id", workbench_id).execute()
         return response.data
@@ -36,11 +39,12 @@ async def get_budget_performance(workbench_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{workbench_id}/transactions/{category}")
-async def get_clubbed_transactions(workbench_id: str, category: str):
+async def get_clubbed_transactions(workbench_id: str, category: str, x_user_id: str = Depends(get_user_id_from_header)):
     """
     Returns the individual fragmented transactions that were clubbed into a budget category.
     """
     try:
+        await require_membership(workbench_id, x_user_id)
         # First, find the budget to get the date range
         budget_res = supabase.table("budgets").select("*").eq("workbench_id", workbench_id).eq("name", category).execute()
         

@@ -353,20 +353,19 @@ function buildTemplate(key, aiData) {
 // ─── Suggestion Pills ───────────────────────────────────────────────────────
 
 const SUGGESTIONS = [
-  { label: "Financial Model", prompt: "Build a 5-year financial model for a SaaS startup" },
-  { label: "Invoice", prompt: "Generate an invoice for a digital marketing agency" },
-  { label: "Quotation", prompt: "Create a quotation for roofing materials" },
-  { label: "Expense Tracker", prompt: "Track expenses for a restaurant business" },
-  { label: "Cashflow", prompt: "Build a cashflow planner for a startup" },
-  { label: "Profit & Loss", prompt: "Create a profit and loss sheet for a retail business" },
-  { label: "Sales Tracker", prompt: "Track sales pipeline for my SaaS team" },
+  { label: "GST Invoice", prompt: "Generate a GST-compliant sales invoice for a services business" },
+  { label: "AR Aging", prompt: "Build an accounts receivable aging report for overdue customer invoices" },
+  { label: "AP Register", prompt: "Create an accounts payable tracker for vendor bills" },
+  { label: "Bank Recon", prompt: "Match bank statement entries to ledger transactions and flag exceptions" },
+  { label: "Cash Flow", prompt: "Project cash flow for the next 60 days based on payables and receivables" },
+  { label: "COA Setup", prompt: "Map transactions to a 3-layer chart of accounts for my trading business" },
 ];
 
 const PLACEHOLDERS = [
-  "Create a cashflow tracker for my startup",
-  "Build a quotation for roofing materials",
-  "Generate an invoice for web development services",
-  "Track expenses for my restaurant business",
+  "Upload bank statement CSV and reconcile it with ledger entries",
+  "Create an AR report for overdue customer invoices",
+  "Generate an AP tracker for vendor bills due next week",
+  "Map supplier invoices into GST-ready accounting ledgers",
 ];
 
 // ─── Loading Steps ──────────────────────────────────────────────────────────
@@ -417,9 +416,9 @@ function AuthModal({ onClose, theme }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
           </svg>
         </div>
-        <h3 className={`text-xl font-bold mb-2 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>Generate your template</h3>
+        <h3 className={`text-xl font-bold mb-2 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>Start your finance workspace</h3>
         <p className={`text-sm leading-relaxed mb-6 ${isDark ? "text-[#787878]" : "text-gray-500"}`}>
-          Create a free account to generate and download AI-powered financial templates instantly.
+          Sign up to access Dabby’s secure accounting workflows and convert bank data into compliant GL, AR/AP, and cashflow insights.
         </p>
         <div className="flex flex-col gap-3">
           <Link to="/signup" className="w-full py-3 px-6 text-sm font-semibold text-black bg-[#81E6D9] rounded-xl text-center hover:bg-[#5fd3c7] transition-colors duration-200">Create a free account</Link>
@@ -687,7 +686,7 @@ export default function Hero() {
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="flex justify-center mb-6">
             <span className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold border ${isDark ? "bg-[#81E6D9]/10 border-[#81E6D9]/25 text-[#81E6D9]" : "bg-[#0D9488]/10 border-[#0D9488]/25 text-[#0D9488]"}`}>
               <span className="w-1.5 h-1.5 rounded-full bg-[#81E6D9] animate-pulse" />
-              Autonomous Financial Operations
+              Accounting Workflow Engine for Growing Indian Businesses
             </span>
           </motion.div>
 
@@ -695,18 +694,20 @@ export default function Hero() {
           <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}
             className={`font-display text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.08] tracking-tight text-center mb-4 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}
           >
-            The AI Workspace for
+            Dabby brings together
             <br className="hidden sm:block" />
-            <span className="text-[#81E6D9]"> Financial Operations Teams.</span>
+            <span className="text-[#81E6D9]">COA, AR/AP, and cash flow</span>
+            <br className="hidden sm:block" />
+            in one secure workspace.
           </motion.h1>
 
           {/* Subheadline */}
           <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
             className={`text-base md:text-lg text-center leading-relaxed mb-10 ${isDark ? "text-[#787878]" : "text-gray-500"}`}
           >
-            Autonomous financial engine that transforms raw data into living intelligence.
+            Upload bank statements, invoices, bills, and CRM exports.
             <br className="hidden md:block" />
-            Automate ingestion, semantic mapping, and real-time monitoring in one collaborative workspace.
+            Dabby auto-maps transactions to your chart of accounts and highlights receivables, payables, and reconciliation gaps.
           </motion.p>
 
           {/* Input */}

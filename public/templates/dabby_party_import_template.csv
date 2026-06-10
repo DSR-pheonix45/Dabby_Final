@@ -1,0 +1,6 @@
+party_name,party_type,email,phone,gst_number,address,city,state,credit_terms_days,is_active
+ABC Trading Private Limited,Customer,accounts@abc.com,+91 9876543210,27AABCU9603R1Z0,123 Business Park MG Road,Bangalore,Karnataka,30,true
+XYZ Manufacturing Ltd,Vendor,purchase@xyz.com,+91 8765432109,29AABCU9603R1Z1,456 Industrial Zone Phase 2,Mumbai,Maharashtra,45,true
+Tech Solutions India,Both,hello@techsol.com,+91 7654321098,,789 Tech Park Cyber City,Pune,Maharashtra,0,true
+Global Exports Pvt Ltd,Customer,sales@globalexp.com,+91 6543210987,24AABCU9603R1Z2,321 Export Hub Trade Center,Chennai,Tamil Nadu,60,true
+Local Suppliers Co,Vendor,billing@localsupply.com,+91 5432109876,,654 Warehouse District,Ahmedabad,Gujarat,15,true

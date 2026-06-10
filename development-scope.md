@@ -206,7 +206,7 @@ Task 2: Record Customer Invoice (AR)
   ├─ Click "New Invoice"
   ├─ Select Customer
   ├─ Enter: Invoice Date, Due Date, Line Items
-  ├─ GST auto-split (18% CGST + 18% SGST)
+  ├─ GST auto-split (9% CGST + 9% SGST)
   └─ GL posts: DR Debtors / CR Revenue
   ↓
 Task 3: Reconcile Bank Statement
@@ -573,4 +573,4 @@ CREATE TABLE ledger_entries (
 6. Testing & bug fixes
 7. Deploy to Vercel + Docker
 8. Pilot customer launch
-
+ 

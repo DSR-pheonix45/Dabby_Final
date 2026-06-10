@@ -148,7 +148,7 @@ export default function Login() {
             Sign in to Dabby
           </h2>
           <p className="mt-2 text-sm text-gray-400">
-            Welcome back! Please sign in with your Google account.
+            Use your Dabby credentials or Google to access your secure finance workspace.
           </p>
         </div>
 

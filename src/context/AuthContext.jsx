@@ -5,6 +5,8 @@ import { signOut, getCurrentUser, onAuthStateChange, supabase } from '../lib/sup
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [subscription, setSubscription] = useState(null);
+  const [plan, setPlan] = useState('free');
   const [loading, setLoading] = useState(true);
 
   /**
@@ -33,8 +35,43 @@ export function AuthProvider({ children }) {
       } else {
         setProfile({ ...data, status: 'active' });
       }
-    } catch (err) {
+    } catch (error) {
+      console.error('Failed to fetch user profile:', error);
       setProfile(null);
+    }
+  };
+
+  const fetchUserSubscription = async (userId) => {
+    if (!userId) {
+      setSubscription(null);
+      setPlan('free');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .select('*, plans(*)')
+        .eq('user_id', userId)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('Failed to fetch subscription:', error);
+        setSubscription(null);
+        setPlan('free');
+      } else if (!data) {
+        setSubscription(null);
+        setPlan('free');
+      } else {
+        setSubscription(data);
+        setPlan(data.plan_id || data?.plans?.id || 'free');
+      }
+    } catch (err) {
+      console.error('Failed to fetch user subscription:', err);
+      setSubscription(null);
+      setPlan('free');
     }
   };
 
@@ -47,14 +84,16 @@ export function AuthProvider({ children }) {
         const { user, error } = await getCurrentUser();
 
         if (error && error !== 'Auth session missing!') {
+          console.warn('Auth init error:', error);
         }
 
         if (user) {
           setUser(user);
           await fetchUserProfile(user.id);
-        } else {
+          await fetchUserSubscription(user.id);
         }
       } catch (err) {
+        console.error('Failed to initialize auth:', err);
       } finally {
         setLoading(false);
       }
@@ -63,23 +102,17 @@ export function AuthProvider({ children }) {
     initAuth();
 
     const { data: listener } = onAuthStateChange((event, session) => {
-      console.log('Auth event:', event);
-
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         if (session?.user) {
-          // If we already have a user, this is likely a background refresh
-          // Don't trigger the global loading state to prevent unmounting protected routes
           setUser(session.user);
-          
-          // Only set loading if it's the first time we're getting a user
-          // (but usually initAuth handles this, so we might not even need it here)
           fetchUserProfile(session.user.id);
+          fetchUserSubscription(session.user.id);
         }
-      }
-
-      if (event === 'SIGNED_OUT') {
+      } else if (event === 'TOKEN_REFRESH_FAILED' || event === 'SIGNED_OUT' || event === 'USER_DELETED') {
         setUser(null);
         setProfile(null);
+        setSubscription(null);
+        setPlan('free');
         setLoading(false);
       }
     });

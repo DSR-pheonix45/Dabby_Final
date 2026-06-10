@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
-import { User, Phone, Calendar, CheckCircle, ArrowRight, Loader, Users } from 'lucide-react';
+import { User, Phone, CheckCircle, ArrowRight, Loader } from 'lucide-react';
 import BrandLogo from '../components/common/BrandLogo';
 import { consumeRedirectIntent } from '../utils/redirectUtility';
 
@@ -14,9 +14,8 @@ export default function Onboarding() {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
-    dob: '',
-    gender: 'other',
   });
+  const [workspace, setWorkspace] = useState({ name: '', plan: 'free' });
 
   useEffect(() => {
     if (profile && profile.status === 'active') {
@@ -44,8 +43,6 @@ export default function Onboarding() {
           id: user.id,
           name: formData.name,
           phone: formData.phone,
-          dob: formData.dob || null,
-          gender: formData.gender,
           email: user.email,
           updated_at: new Date().toISOString(),
         })
@@ -58,6 +55,30 @@ export default function Onboarding() {
       }
 
       if (data) {
+        // Create a workbench for the user
+        try {
+          const wbResp = await fetch('/api/workbenches', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              owner_user_id: user.id,
+              name: workspace.name || `${formData.name} Workspace`,
+              industry: 'services',
+              business_type: 'small',
+              coa_mode: 'create',
+              plan: workspace.plan
+            })
+          });
+
+          if (!wbResp.ok) {
+            console.warn('Workbench creation failed', await wbResp.text());
+          }
+        } catch (wbErr) {
+          console.error('Failed to create workbench:', wbErr);
+        }
+
         setProfile({ ...data, status: 'active' });
         setStep(2); // Success step
 
@@ -113,35 +134,42 @@ export default function Onboarding() {
                   placeholder="e.g. +91 9876543210"
                 />
               </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Workspace name</label>
+                <input
+                  type="text"
+                  required
+                  value={workspace.name}
+                  onChange={(e) => setWorkspace({ ...workspace, name: e.target.value })}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
+                  placeholder="e.g. Acme Finance Pvt Ltd"
+                />
+              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                    <Calendar className="w-3.5 h-3.5 text-teal-500" />
-                    Date of Birth
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.dob}
-                    onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
-                  />
+              <div>
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Choose a plan</label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setWorkspace({ ...workspace, plan: 'free' })}
+                    className={`px-3 py-2 rounded-lg border ${workspace.plan === 'free' ? 'border-teal-500 bg-white/5' : 'border-white/10'}`}
+                  >Free</button>
+                  <button
+                    type="button"
+                    onClick={() => setWorkspace({ ...workspace, plan: 'go' })}
+                    className={`px-3 py-2 rounded-lg border ${workspace.plan === 'go' ? 'border-teal-500 bg-white/5' : 'border-white/10'}`}
+                  >Go</button>
+                  <button
+                    type="button"
+                    onClick={() => setWorkspace({ ...workspace, plan: 'plus' })}
+                    className={`px-3 py-2 rounded-lg border ${workspace.plan === 'plus' ? 'border-teal-500 bg-white/5' : 'border-white/10'}`}
+                  >Plus</button>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                    <Users className="w-3.5 h-3.5 text-teal-500" />
-                    Gender
-                  </label>
-                  <select
-                    value={formData.gender}
-                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                    className="w-full px-4 py-3 bg-[#0a0a0a] border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
-                  >
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
+                <p className="mt-2 text-xs text-gray-400">Plans control usage limits and RBAC — you can upgrade anytime.</p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-gray-400">
+                We only collect your name, phone, email, and workspace details needed to get started. Role assignment: you will be the workspace owner.
               </div>
             </div>
           </>

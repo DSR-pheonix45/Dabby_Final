@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from datetime import date
 from services.ledger_service import LedgerService
 from supabase_client import supabase
+from .auth_utils import require_membership, check_role_allowed, enforce_member_limit, get_user_id_from_header
+from fastapi import Header
 
 router = APIRouter()
 ledger_service = LedgerService(supabase)
@@ -37,36 +39,54 @@ class TransactionCreate(BaseModel):
 # --- Label Endpoints ---
 
 @router.post("/labels")
-async def create_label(label: LabelCreate):
+async def create_label(label: LabelCreate, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        # RBAC: ensure caller is owner/admin for this workbench
+        member = await require_membership(label.workbench_id, x_user_id)
+        await check_role_allowed(member, ['owner', 'admin'])
+
         return await ledger_service.create_label(label.dict())
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/labels/{workbench_id}")
-async def get_labels(workbench_id: str):
+async def get_labels(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        await require_membership(workbench_id, x_user_id)
         return await ledger_service.get_labels(workbench_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.patch("/labels/{label_id}")
-async def update_label(label_id: str, label: LabelUpdate):
+async def update_label(label_id: str, label: LabelUpdate, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        # Fetch label to get workbench_id and verify membership
+        lbl = supabase.table('labels').select('workbench_id').eq('id', label_id).maybe_single().execute().data
+        if not lbl:
+            raise HTTPException(status_code=404, detail='Label not found')
+        member = await require_membership(lbl['workbench_id'], x_user_id)
+        await check_role_allowed(member, ['owner', 'admin'])
         return await ledger_service.update_label(label_id, label.dict(exclude_unset=True))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/labels/{label_id}")
-async def delete_label(label_id: str):
+async def delete_label(label_id: str, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        lbl = supabase.table('labels').select('workbench_id').eq('id', label_id).maybe_single().execute().data
+        if not lbl:
+            raise HTTPException(status_code=404, detail='Label not found')
+        member = await require_membership(lbl['workbench_id'], x_user_id)
+        await check_role_allowed(member, ['owner', 'admin'])
         return await ledger_service.delete_label(label_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/labels/seed/{workbench_id}")
-async def seed_labels(workbench_id: str):
+async def seed_labels(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        member = await require_membership(workbench_id, x_user_id)
+        await check_role_allowed(member, ['owner', 'admin'])
         return await ledger_service.seed_basic_labels(workbench_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -74,8 +94,13 @@ async def seed_labels(workbench_id: str):
 # --- Transaction Endpoints ---
 
 @router.post("/transactions")
-async def create_transaction(tx: TransactionCreate):
+async def create_transaction(tx: TransactionCreate, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        # RBAC: ensure caller is a member (any role)
+        member = await require_membership(tx.workbench_id, x_user_id)
+        # Enforce plan limits if needed (e.g., transactions per month) — placeholder for now
+        # await enforce_transaction_limit(tx.workbench_id)
+
         return await ledger_service.record_transaction(
             workbench_id=tx.workbench_id,
             from_label_id=tx.from_label_id,
@@ -94,8 +119,9 @@ async def create_transaction(tx: TransactionCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/transactions/{workbench_id}")
-async def list_transactions(workbench_id: str):
+async def list_transactions(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        await require_membership(workbench_id, x_user_id)
         return await ledger_service.get_transactions_list(workbench_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -103,8 +129,9 @@ async def list_transactions(workbench_id: str):
 # --- Analytics Endpoints ---
 
 @router.get("/balances/{workbench_id}")
-async def get_balances(workbench_id: str):
+async def get_balances(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        await require_membership(workbench_id, x_user_id)
         return await ledger_service.get_balances(workbench_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

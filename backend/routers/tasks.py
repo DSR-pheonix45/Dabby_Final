@@ -3,6 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from supabase_client import supabase
 from datetime import date
+from .auth_utils import require_membership, get_user_id_from_header
 
 router = APIRouter()
 
@@ -23,8 +24,9 @@ class TaskUpdate(BaseModel):
     due_date: Optional[date] = None
 
 @router.get("/{workbench_id}")
-async def list_tasks(workbench_id: str):
+async def list_tasks(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        await require_membership(workbench_id, x_user_id)
         # 1. Fetch tasks
         tasks_res = supabase.table("workbench_tasks").select("*").eq("workbench_id", workbench_id).order("created_at", desc=True).execute()
         tasks = tasks_res.data
@@ -51,9 +53,10 @@ async def list_tasks(workbench_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/")
-async def create_task(task: TaskCreate):
+async def create_task(task: TaskCreate, x_user_id: str = Depends(get_user_id_from_header)):
     try:
         task_data = task.dict()
+        await require_membership(task.workbench_id, x_user_id)
         # Convert date to string for Supabase serialization
         if task.due_date:
             task_data["due_date"] = str(task.due_date)
@@ -67,9 +70,14 @@ async def create_task(task: TaskCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.patch("/{task_id}")
-async def update_task(task_id: str, task: TaskUpdate):
+async def update_task(task_id: str, task: TaskUpdate, x_user_id: str = Depends(get_user_id_from_header)):
     try:
         update_data = task.dict(exclude_unset=True)
+        # Ensure the requester is a member of the task's workbench
+        t = supabase.table("workbench_tasks").select("workbench_id").eq("id", task_id).maybe_single().execute().data
+        if not t:
+            raise HTTPException(status_code=404, detail="Task not found")
+        await require_membership(t["workbench_id"], x_user_id)
         # Convert date to string for Supabase serialization
         if "due_date" in update_data and update_data["due_date"]:
             update_data["due_date"] = str(update_data["due_date"])
@@ -83,8 +91,12 @@ async def update_task(task_id: str, task: TaskUpdate):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/{task_id}")
-async def delete_task(task_id: str):
+async def delete_task(task_id: str, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        t = supabase.table("workbench_tasks").select("workbench_id").eq("id", task_id).maybe_single().execute().data
+        if not t:
+            raise HTTPException(status_code=404, detail="Task not found")
+        await require_membership(t["workbench_id"], x_user_id)
         supabase.table("workbench_tasks").delete().eq("id", task_id).execute()
         return {"status": "deleted"}
     except Exception as e:
@@ -92,8 +104,9 @@ async def delete_task(task_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{workbench_id}/members")
-async def list_workbench_members(workbench_id: str):
+async def list_workbench_members(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
     try:
+        await require_membership(workbench_id, x_user_id)
         # 1. Fetch members
         res = supabase.table("workbench_members").select("*").eq("workbench_id", workbench_id).execute()
         members = res.data

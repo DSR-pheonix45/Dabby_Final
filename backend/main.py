@@ -14,6 +14,7 @@ print(f"[DEBUG] File exists: {os.path.exists(env_path)}")
 load_dotenv(env_path)
 
 from routers import workbenches, ai, coa, ledger, ops, context, inventory, investor, tasks, budgets
+from jwt_middleware import JWTMiddleware
 
 app = FastAPI(title="Datalis API", description="FastAPI Backend for Datalis", version="1.0.0")
 
@@ -30,6 +31,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add JWT verification middleware
+app.add_middleware(JWTMiddleware)
 
 app.include_router(workbenches.router, prefix="/api/workbenches", tags=["Workbenches"])
 app.include_router(ai.router, prefix="/api/ai", tags=["AI"])
