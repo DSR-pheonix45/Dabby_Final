@@ -9,6 +9,13 @@ Align the landing page and auth experience to the Dabby MVP scope, then begin im
 - Onboarding saves profile state, but product experience is not yet aligned to the accounting MVP.
 - Landing page copy and CTA messaging have been updated to reflect Dabby’s accounting workflows.
 
+### Recent Progress (Completed Fixes & Hardening)
+- **Auth Hardening (Email Filtering)**: Restricted user registrations and logins in `Login.jsx` and `Signup.jsx` to `@gmail.com`, `@yahoo.com`, and `@outlook.com` domains (removed the previous generic `@company.com` default).
+- **CORS & Edge Functions Bypass**: Modified `backendService.js` to bypass the undeployed Supabase Edge Functions (`save-chat-message` and `create-chat-session`) in favor of direct database inserts, eliminating console CORS errors.
+- **Groq Model Upgrades**: Replaced decommissioned Groq models in `llmService.js` with active, supported ones (`llama-3.3-70b-versatile` as flagship, and `llama-3.1-8b-instant` as fallback) to restore the chat assistant features.
+- **Syntax / Lexical Scoping Fix**: Wrapped `case 3` in `CreateWorkbenchModal.jsx` with curly braces to scope the `const` declarations and avoid compiler/linter errors.
+- **Vite Port Configuration**: Locked ports configuration in `vite.config.js` to align with the allowed origins of the FastAPI backend.
+
 ## Tasks
 
 ### 1. Landing page & public experience

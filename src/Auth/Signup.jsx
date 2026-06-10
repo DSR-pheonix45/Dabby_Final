@@ -22,7 +22,13 @@ export default function Signup() {
     }
   }, [user, authLoading, navigate]);
 
-  const validateEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  const ALLOWED_DOMAINS = ['gmail.com', 'yahoo.com', 'outlook.com'];
+  const validateEmail = (value) => {
+    const basicValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    if (!basicValid) return false;
+    const domain = value.split('@')[1]?.toLowerCase();
+    return ALLOWED_DOMAINS.includes(domain);
+  };
   const validatePassword = (value) => {
     return value.length >= 10
       && /[A-Z]/.test(value)
@@ -36,7 +42,7 @@ export default function Signup() {
     
     const trimmedEmail = email.trim();
     if (!validateEmail(trimmedEmail)) {
-      setError("Please enter a valid email address.");
+      setError("Only @gmail.com, @yahoo.com, or @outlook.com email addresses are allowed.");
       return;
     }
 
@@ -156,7 +162,7 @@ export default function Signup() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@company.com"
+              placeholder="yourname@gmail.com"
               className="w-full bg-white/5 border border-white/10 rounded-md px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-[#00FFD1]/50 focus:border-[#00FFD1] transition-all"
             />
           </div>

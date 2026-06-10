@@ -11,7 +11,6 @@ class WorkbenchCreate(BaseModel):
     name: str
     industry: str
     business_type: str
-    plan: Optional[str] = 'free'
     sector: Optional[str] = None
     location: Optional[str] = "India"
     currency: Optional[str] = "INR"
@@ -32,7 +31,6 @@ async def create_workbench(payload: WorkbenchCreate):
         insert_data = {
             "owner_user_id": payload.owner_user_id,
             "name": payload.name,
-            "plan": getattr(payload, 'plan', 'free'),
             "industry": payload.industry,
             "business_type": payload.business_type,
             "sector": payload.sector,

@@ -1,16 +1,11 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 from pydantic import BaseModel
-from supabase import create_client, Client
 import os
 from .auth_utils import require_membership, get_user_id_from_header
+from supabase_client import supabase
 
 router = APIRouter()
-
-# Initialize Supabase client
-supabase_url = os.environ.get("VITE_SUPABASE_URL")
-supabase_key = os.environ.get("VITE_SUPABASE_ANON_KEY")
-supabase: Client = create_client(supabase_url, supabase_key)
 
 class COAItem(BaseModel):
     id: str

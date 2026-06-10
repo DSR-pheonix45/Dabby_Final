@@ -3,7 +3,12 @@ import json
 from typing import Dict, Optional
 from groq import Groq
 
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+    _genai_available = True
+except ImportError:
+    genai = None
+    _genai_available = False
 
 class AIService:
     def __init__(self):
@@ -16,7 +21,7 @@ class AIService:
         else:
             self.groq_client = None
 
-        if gemini_key:
+        if gemini_key and _genai_available:
             sanitized_gemini = gemini_key.strip().strip('"').strip("'")
             genai.configure(api_key=sanitized_gemini)
             # Use 1.5-flash for higher rate limits on free tier

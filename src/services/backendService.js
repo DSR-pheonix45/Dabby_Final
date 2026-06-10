@@ -144,36 +144,10 @@ export const backendService = {
   },
 
   /**
-   * Saves a chat message and updates the session
-   * Falls back to direct insert if edge function is unavailable
+   * Saves a chat message — direct Supabase insert (Edge Functions not deployed)
    */
   async saveChatMessage(sessionId, role, content, metadata, workbenchId = null) {
-    try {
-      const { data, error } = await supabase.functions.invoke('save-chat-message', {
-        body: {
-          session_id: sessionId,
-          role,
-          content,
-          metadata,
-          workbench_id: workbenchId
-        }
-      });
-
-      if (error) {
-        console.warn('Edge Function Error (save-chat-message), falling back to direct insert:', error.message || error);
-        return await this._saveChatMessageDirect(sessionId, role, content, metadata);
-      }
-
-      if (data && data.error) {
-        console.warn('Edge Function returned error, falling back:', data.error);
-        return await this._saveChatMessageDirect(sessionId, role, content, metadata);
-      }
-
-      return data;
-    } catch (err) {
-      console.warn('Failed to call save-chat-message, falling back to direct insert:', err.message);
-      return await this._saveChatMessageDirect(sessionId, role, content, metadata);
-    }
+    return await this._saveChatMessageDirect(sessionId, role, content, metadata);
   },
 
   async aiCategorize(description, labels) {
@@ -210,34 +184,10 @@ export const backendService = {
   },
 
   /**
-   * Creates a new chat session
-   * Falls back to direct insert if edge function is unavailable
+   * Creates a new chat session — direct Supabase insert (Edge Functions not deployed)
    */
   async createChatSession(title, workbenchId = null) {
-    try {
-      const { data, error } = await supabase.functions.invoke('create-chat-session', {
-        body: {
-          title,
-          workbench_id: workbenchId
-        }
-      });
-
-      if (error) {
-        console.warn('Edge Function Error (create-chat-session), falling back to direct insert:', error.message || error);
-        return await this._createChatSessionDirect(title, workbenchId);
-      }
-
-      // Edge function may return error in body
-      if (data && data.error) {
-        console.warn('Edge Function returned error, falling back:', data.error);
-        return await this._createChatSessionDirect(title, workbenchId);
-      }
-
-      return data;
-    } catch (err) {
-      console.warn('Failed to call create-chat-session edge function, falling back to direct insert:', err.message);
-      return await this._createChatSessionDirect(title, workbenchId);
-    }
+    return await this._createChatSessionDirect(title, workbenchId);
   },
 
   /**
@@ -515,7 +465,7 @@ export const backendService = {
       .from("Doc_vault_Raw")
       .download(filePath);
     if (error) throw error;
-    
+
     const url = URL.createObjectURL(data);
     const a = document.createElement('a');
     a.href = url;

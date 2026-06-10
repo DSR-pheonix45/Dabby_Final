@@ -670,7 +670,7 @@ Return only JSON.
     // Extract JSON from response
     const jsonMatch = result.response.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("Could not find JSON in AI response");
-    
+
     const coaData = JSON.parse(jsonMatch[0]);
     return normalizeCOA(coaData);
   } catch (error) {
@@ -689,7 +689,7 @@ function normalizeCOA(coaJson) {
 
   mainAccounts.forEach(mainType => {
     const subAccounts = coaJson[mainType] || {};
-    
+
     Object.entries(subAccounts).forEach(([subName, labels]) => {
       Object.keys(labels).forEach(labelName => {
         rows.push({
@@ -742,7 +742,7 @@ Return ONLY the updated JSON node for the label and its parent sub-account.
       query: prompt,
       context: "",
     });
-    
+
     return result.response;
   } catch (error) {
     console.error("Error suggesting COA extension:", error);
