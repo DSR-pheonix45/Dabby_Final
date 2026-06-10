@@ -3,8 +3,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { BsX, BsTag, BsGrid } from "react-icons/bs";
 import { toast } from "react-hot-toast";
 import { supabase } from "../../../lib/supabase";
+import { useAuth } from "../../../hooks/useAuth";
+import { useWorkbench } from "../../../context/WorkbenchContext";
 
-export default function LabelModal({ isOpen, onClose, workbenchId, onSuccess }) {
+export default function LabelModal({ isOpen, onClose, workbenchId, label, onSuccess }) {
+  const { plan, planLimits } = useAuth();
+  const { labels } = useWorkbench();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -12,6 +16,25 @@ export default function LabelModal({ isOpen, onClose, workbenchId, onSuccess }) 
     sub_account: "",
     is_system: false,
   });
+  const isEditing = Boolean(label?.id);
+
+  React.useEffect(() => {
+    if (label) {
+      setFormData({
+        name: label.name || "",
+        type: label.type || "expense",
+        sub_account: label.sub_account || "",
+        is_system: label.is_system || false,
+      });
+    } else {
+      setFormData({
+        name: "",
+        type: "expense",
+        sub_account: "",
+        is_system: false,
+      });
+    }
+  }, [label]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,29 +48,40 @@ export default function LabelModal({ isOpen, onClose, workbenchId, onSuccess }) 
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const response = await fetch("http://localhost:8000/api/ledger/labels", {
-        method: "POST",
+      const url = isEditing
+        ? `http://localhost:8000/api/ledger/labels/${label.id}`
+        : "http://localhost:8000/api/ledger/labels";
+      const method = isEditing ? "PATCH" : "POST";
+      const payload = isEditing
+        ? {
+            name: formData.name,
+            sub_account: formData.sub_account,
+          }
+        : {
+            workbench_id: workbenchId,
+            ...formData,
+          };
+
+      const response = await fetch(url, {
+        method,
         headers: { 
           "Content-Type": "application/json",
           ...(token ? { "Authorization": `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({
-          workbench_id: workbenchId,
-          ...formData,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         const errText = await response.text();
-        throw new Error(errText || "Failed to create label");
+        throw new Error(errText || (isEditing ? "Failed to update label" : "Failed to create label"));
       }
 
-      toast.success("Category created successfully");
+      toast.success(isEditing ? "Category updated successfully" : "Category created successfully");
       onSuccess?.();
       onClose();
       setFormData({ name: "", type: "expense", sub_account: "", is_system: false });
     } catch (err) {
-      console.error("Error creating label:", err);
+      console.error("Error saving label:", err);
       toast.error(err.message);
     } finally {
       setLoading(false);
@@ -93,6 +127,12 @@ export default function LabelModal({ isOpen, onClose, workbenchId, onSuccess }) 
   };
 
   const types = ["asset", "liability", "equity", "revenue", "expense"];
+
+  const customLabels = (labels || []).filter((label) => label?.is_system !== true);
+  const customLabelCount = customLabels.length;
+  const labelLimit = planLimits?.coa_label_limit ?? 0;
+  const remainingLabelSlots = labelLimit > 0 ? labelLimit - customLabelCount : 0;
+  const labelLimitReached = labelLimit > 0 && customLabelCount >= labelLimit;
 
   const handleTypeChange = (type) => {
     setFormData({ 
@@ -160,12 +200,13 @@ export default function LabelModal({ isOpen, onClose, workbenchId, onSuccess }) 
                     <button
                       key={t}
                       type="button"
-                      onClick={() => handleTypeChange(t)}
+                      onClick={() => { if (!isEditing) handleTypeChange(t); }}
+                      disabled={isEditing}
                       className={`px-2 py-2 rounded-xl text-[9px] font-bold uppercase tracking-wider border transition-all ${
                         formData.type === t
                           ? "bg-blue-500/10 border-blue-500/40 text-blue-400 shadow-lg shadow-blue-500/5"
                           : "bg-white/5 border-white/5 text-gray-500 hover:text-gray-300"
-                      }`}
+                      } ${isEditing ? "opacity-40 cursor-not-allowed" : ""}`}
                     >
                       {t}
                     </button>
@@ -194,6 +235,14 @@ export default function LabelModal({ isOpen, onClose, workbenchId, onSuccess }) 
                 </div>
               </div>
 
+              {labelLimit >= 0 && (
+                <div className="rounded-2xl border border-blue-500/10 bg-blue-500/5 p-3 text-xs text-blue-200">
+                  <p className="font-semibold">{plan?.toUpperCase()} plan limit:</p>
+                  <p>{customLabelCount} of {labelLimit} custom COA labels used.</p>
+                  <p>{labelLimit === 0 ? "Free plan does not allow custom COA labels. Upgrade for more." : remainingLabelSlots > 0 ? `${remainingLabelSlots} remaining.` : "Label quota reached. Upgrade for more."}</p>
+                </div>
+              )}
+
               <div className="pt-4 flex space-x-3">
                 <button
                   type="button"
@@ -204,7 +253,7 @@ export default function LabelModal({ isOpen, onClose, workbenchId, onSuccess }) 
                 </button>
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || labelLimitReached}
                   className="flex-[2] px-6 py-3 bg-blue-500 text-white rounded-2xl text-xs font-bold hover:bg-blue-400 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50"
                 >
                   {loading ? "Creating..." : "Create Category"}

@@ -16,13 +16,15 @@ class LedgerService:
         response = self.supabase.table("labels").insert(label_data).execute()
         return response.data[0]
 
-    async def get_labels(self, workbench_id: str, include_deleted: bool = False):
+    async def get_labels(self, workbench_id: str, include_deleted: bool = False, include_system: bool = False):
         """
         Fetches all labels for a workbench.
         """
         query = self.supabase.table("labels").select("*").eq("workbench_id", workbench_id)
         if not include_deleted:
             query = query.eq("is_deleted", False)
+        if not include_system:
+            query = query.eq("is_system", False)
         
         response = query.execute()
         return response.data

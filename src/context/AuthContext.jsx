@@ -7,18 +7,22 @@ const PLAN_LIMITS = {
   free: {
     max_workbenches: 0, max_members: 0, max_ai_requests: 50,
     doc_vault_mb: 0, investor_view: false, advanced_coa: false, audit_logs: false, priority_ai: false,
+    coa_label_limit: 0,
   },
   go: {
     max_workbenches: 5, max_members: 5, max_ai_requests: 500,
     doc_vault_mb: 100, investor_view: false, advanced_coa: false, audit_logs: false, priority_ai: false,
+    coa_label_limit: 20,
   },
   pro: {
     max_workbenches: 10, max_members: 15, max_ai_requests: 1000,
     doc_vault_mb: 500, investor_view: true, advanced_coa: true, audit_logs: false, priority_ai: true,
+    coa_label_limit: 80,
   },
   enterprise: {
     max_workbenches: 999, max_members: 50, max_ai_requests: 9999,
     doc_vault_mb: 5000, investor_view: true, advanced_coa: true, audit_logs: true, priority_ai: true,
+    coa_label_limit: 9999,
   },
 };
 

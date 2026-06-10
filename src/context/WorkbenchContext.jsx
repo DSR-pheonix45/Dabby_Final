@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
+import { supabase } from '../lib/supabase';
 
 const WorkbenchContext = createContext();
 
@@ -29,8 +30,16 @@ export const WorkbenchProvider = ({ children, workbenchId }) => {
 
         try {
             if (showLoading) setData(prev => ({ ...prev, loading: true }));
+
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
             
-            const response = await fetch(`http://localhost:8000/api/context/${workbenchId}`);
+            const response = await fetch(`http://localhost:8000/api/context/${workbenchId}`, {
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                },
+            });
             if (!response.ok) {
                 const errData = await response.json();
                 throw new Error(errData.detail || 'Failed to fetch workbench context');
@@ -62,6 +71,20 @@ export const WorkbenchProvider = ({ children, workbenchId }) => {
         window.addEventListener('refresh-ledger-data', handleRefresh);
         return () => window.removeEventListener('refresh-ledger-data', handleRefresh);
     }, [fetchContext]);
+
+    // Real-time updates for labels and transactions
+    useEffect(() => {
+        if (!workbenchId) return;
+
+        const channel = supabase.channel(`workbench-context-${workbenchId}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'labels', filter: `workbench_id=eq.${workbenchId}` }, () => fetchContext(false))
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `workbench_id=eq.${workbenchId}` }, () => fetchContext(false))
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [workbenchId, fetchContext]);
 
     const value = {
         ...data,

@@ -1,18 +1,22 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional, Dict
 from pydantic import BaseModel
 from services.ledger_service import LedgerService
 from supabase_client import supabase
+from .auth_utils import require_membership, get_user_id_from_header
 
 router = APIRouter()
 ledger_service = LedgerService(supabase)
 
 @router.get("/{workbench_id}")
-async def get_workbench_context(workbench_id: str):
+async def get_workbench_context(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
     """
     Consolidates all workbench data into a single response for fast initial load.
     """
     try:
+        # Enforce membership before returning sensitive workbench data
+        await require_membership(workbench_id, x_user_id)
+
         # 1. Fetch Workbench details
         workbench_res = supabase.table("workbenches").select("*").eq("id", workbench_id).maybe_single().execute()
         if not workbench_res.data:

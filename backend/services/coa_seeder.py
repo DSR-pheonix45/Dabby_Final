@@ -91,7 +91,7 @@ def seed_coa(supabase_client, workbench_id: str, business_type: str = "services"
                 "Cost of Goods Sold (COGS)": ["Raw Materials Consumed", "Direct Labor", "Factory Power & Fuel", "Machine Maintenance", "Factory Rent", "Quality Control Costs", "Packaging Costs"]
             },
             "LIABILITIES": {
-                "Current Liabilities": ["Supplier Advances"] # Fallback if needed
+                "Current Liabilities": ["Supplier Advances"]
             }
         },
         "services": {
@@ -146,11 +146,66 @@ def seed_coa(supabase_client, workbench_id: str, business_type: str = "services"
         }
     }
 
+    # 3. BUSINESS TYPE OVERLAYS (Adds partner/capital structure details)
+    type_overlays = {
+        "proprietorship": {
+            "EQUITY": {
+                "Owner’s Drawings": ["Owner Withdrawals"]
+            },
+            "ASSETS": {
+                "Cash & Cash Equivalents": ["Proprietor Cash Account"]
+            }
+        },
+        "partnership": {
+            "EQUITY": {
+                "Share Capital": ["Partners’ Capital", "Partner Current Accounts"],
+                "Retained Earnings": ["Partner Profit Share"]
+            },
+            "LIABILITIES": {
+                "Accounts Payable (AP)": ["Partner Capital Advances"]
+            }
+        },
+        "pvt_ltd": {
+            "EQUITY": {
+                "Share Capital": ["Equity Share Capital", "Security Premium"],
+                "Reserves & Surplus": ["General Reserve", "Retained Earnings"]
+            },
+            "LIABILITIES": {
+                "Long-term Debt": ["Term Loans", "Debentures"]
+            }
+        },
+        "llp": {
+            "EQUITY": {
+                "Share Capital": ["Partners’ Capital", "LLP Contribution"],
+                "Retained Earnings": ["Profit Reserve"]
+            },
+            "LIABILITIES": {
+                "Accounts Payable (AP)": ["Partner Advances"]
+            }
+        },
+        "public_ltd": {
+            "EQUITY": {
+                "Share Capital": ["Ordinary Share Capital", "Preference Share Capital"],
+                "Reserves & Surplus": ["Capital Reserve", "Securities Premium"]
+            }
+        }
+    }
+
     # Apply Industry Overlay
     selected_industry = industry.lower()
     if selected_industry in overlays:
         industry_data = overlays[selected_industry]
         for account_name, a_data in industry_data.items():
+            for sub_name, labels in a_data.items():
+                if sub_name not in base_structure[account_name]["sub_accounts"]:
+                    base_structure[account_name]["sub_accounts"][sub_name] = []
+                base_structure[account_name]["sub_accounts"][sub_name].extend(labels)
+
+    # Apply Business Type Overlay
+    selected_business_type = business_type.lower()
+    if selected_business_type in type_overlays:
+        type_data = type_overlays[selected_business_type]
+        for account_name, a_data in type_data.items():
             for sub_name, labels in a_data.items():
                 if sub_name not in base_structure[account_name]["sub_accounts"]:
                     base_structure[account_name]["sub_accounts"][sub_name] = []
@@ -188,16 +243,7 @@ def seed_coa(supabase_client, workbench_id: str, business_type: str = "services"
                 sub_id = sub_resp.data[0]["id"]
                 sub_order += 1
 
-                # 3. Create Essential Labels (Level 3) for the sub-account
-                # We seed one default label per sub-account to make the platform usable immediately
-                label_data = {
-                    "workbench_id": workbench_id,
-                    "name": sub_name, # Use sub-account name as the default label name
-                    "type": data["type"],
-                    "sub_account": sub_name,
-                    "is_system": False
-                }
-                supabase_client.table("labels").insert(label_data).execute()
+                # 3. No pre-made labels are created here. Labels are added by users after workbench setup.
 
         return {"status": "success", "message": "Full 3-Layer COA seeded successfully"}
     except Exception as e:
