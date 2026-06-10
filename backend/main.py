@@ -8,12 +8,13 @@ from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Load env variables
-env_path = os.path.join(os.path.dirname(__file__), '..', '.env.local')
-print(f"[DEBUG] Loading environment from: {os.path.abspath(env_path)}")
-print(f"[DEBUG] File exists: {os.path.exists(env_path)}")
-load_dotenv(env_path)
+env_local_path = os.path.join(os.path.dirname(__file__), '..', '.env.local')
+env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+print(f"[DEBUG] Loading environment from: {os.path.abspath(env_local_path)} and {os.path.abspath(env_path)}")
+load_dotenv(env_local_path, override=True)
+load_dotenv(env_path, override=False)
 
-from routers import workbenches, ai, coa, ledger, ops, context, inventory, investor, tasks, budgets
+from routers import workbenches, ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, records, subscriptions, usage
 from jwt_middleware import JWTMiddleware
 
 app = FastAPI(title="Datalis API", description="FastAPI Backend for Datalis", version="1.0.0")
@@ -49,6 +50,9 @@ app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"]
 app.include_router(investor.router, prefix="/api/investor", tags=["Investor"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["Tasks"])
 app.include_router(budgets.router, prefix="/api/budgets", tags=["Budgets"])
+app.include_router(records.router, prefix="/api/records", tags=["Records"])
+app.include_router(subscriptions.router, prefix="/api/subscriptions", tags=["Subscriptions"])
+app.include_router(usage.router, prefix="/api/usage", tags=["Usage"])
 
 @app.get("/health")
 def health_check():

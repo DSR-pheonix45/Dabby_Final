@@ -1,11 +1,13 @@
 import { supabase } from "../lib/supabase";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 /**
  * Backend Service
  * 
  * All write operations in Dabby MUST go through this service,
- * which calls Supabase Edge Functions. Direct writes to tables
- * are strictly forbidden by the system philosophy.
+ * which calls the local FastAPI backend. The global fetch interceptor
+ * in main.jsx auto-attaches JWT auth headers to all API requests.
  */
 
 export const backendService = {
@@ -14,20 +16,21 @@ export const backendService = {
    */
   async createRecord(workbenchId, recordType, summary, metadata) {
     try {
-      const { data, error } = await supabase.functions.invoke('create-record', {
-        body: {
+      const response = await fetch(`${API_BASE}/api/records/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           workbench_id: workbenchId,
           record_type: recordType,
           summary,
           metadata
-        }
+        })
       });
-
-      if (error) {
-        console.error('Edge Function Error (create-record):', error);
-        throw error;
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.detail || 'Failed to create record');
       }
-      return data;
+      return await response.json();
     } catch (err) {
       console.error('Failed to call create-record:', err);
       throw err;
@@ -39,21 +42,22 @@ export const backendService = {
    */
   async pushAdjustment(workbenchId, originalRecordId, adjustmentType, reason, metadata) {
     try {
-      const { data, error } = await supabase.functions.invoke('push-adjustment', {
-        body: {
+      const response = await fetch(`${API_BASE}/api/records/adjustment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           workbench_id: workbenchId,
           original_record_id: originalRecordId,
           adjustment_type: adjustmentType,
           reason,
           metadata
-        }
+        })
       });
-
-      if (error) {
-        console.error('Edge Function Error (push-adjustment):', error);
-        throw error;
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.detail || 'Failed to push adjustment');
       }
-      return data;
+      return await response.json();
     } catch (err) {
       console.error('Failed to call push-adjustment:', err);
       throw err;
@@ -246,15 +250,15 @@ export const backendService = {
    */
   async confirmRecord(recordId) {
     try {
-      const { data, error } = await supabase.functions.invoke('confirm-record', {
-        body: { record_id: recordId }
+      const response = await fetch(`${API_BASE}/api/records/${recordId}/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
       });
-
-      if (error) {
-        console.error('Edge Function Error (confirm-record):', error);
-        throw error;
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.detail || 'Failed to confirm record');
       }
-      return data;
+      return await response.json();
     } catch (err) {
       console.error('Failed to call confirm-record:', err);
       throw err;
@@ -266,15 +270,15 @@ export const backendService = {
    */
   async runReconciliation(workbenchId) {
     try {
-      const { data, error } = await supabase.functions.invoke('run-reconciliation', {
-        body: { workbench_id: workbenchId }
+      const response = await fetch(`${API_BASE}/api/records/reconcile/${workbenchId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
       });
-
-      if (error) {
-        console.error('Edge Function Error (run-reconciliation):', error);
-        throw error;
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.detail || 'Failed to run reconciliation');
       }
-      return data;
+      return await response.json();
     } catch (err) {
       console.error('Failed to call run-reconciliation:', err);
       throw err;
@@ -286,15 +290,12 @@ export const backendService = {
    */
   async getWorkbenchIntelligence(workbenchId) {
     try {
-      const { data, error } = await supabase.functions.invoke('get-intelligence', {
-        body: { workbench_id: workbenchId }
-      });
-
-      if (error) {
-        console.error('Edge Function Error (get-intelligence):', error);
-        throw error;
+      const response = await fetch(`${API_BASE}/api/records/intelligence/${workbenchId}`);
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.detail || 'Failed to fetch intelligence');
       }
-      return data;
+      return await response.json();
     } catch (err) {
       console.error('Failed to call get-intelligence:', err);
       throw err;
@@ -303,19 +304,21 @@ export const backendService = {
 
   async createSubscriptionLink(planId, customer = {}) {
     try {
-      const { data, error } = await supabase.functions.invoke('create-subscription', {
-        body: {
+      const response = await fetch(`${API_BASE}/api/subscriptions/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           plan_id: planId,
           total_count: 12,
           customer_notify: 1,
           customer
-        }
+        })
       });
-      if (error) {
-        console.error('Edge Function Error (create-subscription):', error);
-        throw error;
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.detail || 'Failed to create subscription');
       }
-      return data;
+      return await response.json();
     } catch (err) {
       console.error('Failed to call create-subscription:', err);
       throw err;

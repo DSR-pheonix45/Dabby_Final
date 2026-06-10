@@ -14,6 +14,7 @@ import {
   BsPlusLg
 } from "react-icons/bs";
 import { toast } from "react-hot-toast";
+import { supabase } from "../../../lib/supabase";
 
 export default function PartyModal({ isOpen, onClose, workbenchId, onSuccess, initialMode = "party", initialParty = null }) {
   const [loading, setLoading] = useState(false);
@@ -65,9 +66,15 @@ export default function PartyModal({ isOpen, onClose, workbenchId, onSuccess, in
 
     try {
       setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       const res = await fetch("http://localhost:8000/api/ops/parties", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           workbench_id: workbenchId,
           ...partyData
@@ -81,7 +88,8 @@ export default function PartyModal({ isOpen, onClose, workbenchId, onSuccess, in
         setMode("entity");
         onSuccess();
       } else {
-        throw new Error("Failed to create party");
+        const errText = await res.text();
+        throw new Error(errText || "Failed to create party");
       }
     } catch (err) {
       toast.error(err.message);
@@ -96,9 +104,15 @@ export default function PartyModal({ isOpen, onClose, workbenchId, onSuccess, in
 
     try {
       setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       const res = await fetch("http://localhost:8000/api/ops/entities", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           party_id: selectedParty.id,
           ...entityData
@@ -113,7 +127,8 @@ export default function PartyModal({ isOpen, onClose, workbenchId, onSuccess, in
         setPartyData({ name: "", category: "individual", email: "", phone: "" });
         setEntityData({ name: "", type: "bank", metadata: { account_no: "", ifsc: "", bank_name: "", upi_id: "" } });
       } else {
-        throw new Error("Failed to link entity");
+        const errText = await res.text();
+        throw new Error(errText || "Failed to link entity");
       }
     } catch (err) {
       toast.error(err.message);

@@ -15,6 +15,8 @@ Align the landing page and auth experience to the Dabby MVP scope, then begin im
 - **Groq Model Upgrades**: Replaced decommissioned Groq models in `llmService.js` with active, supported ones (`llama-3.3-70b-versatile` as flagship, and `llama-3.1-8b-instant` as fallback) to restore the chat assistant features.
 - **Syntax / Lexical Scoping Fix**: Wrapped `case 3` in `CreateWorkbenchModal.jsx` with curly braces to scope the `const` declarations and avoid compiler/linter errors.
 - **Vite Port Configuration**: Locked ports configuration in `vite.config.js` to align with the allowed origins of the FastAPI backend.
+- **Invitation & API Auth Injection**: Resolved `401 Unauthorized`/`500` errors on the member invitation flow by implementing a global fetch interceptor in `main.jsx` to automatically append active Supabase session JWT tokens to all backend API requests, and proactively secured direct modal calls (`InviteMemberModal.jsx`, `ShareSnapshotModal.jsx`, `PartyModal.jsx`, `LabelModal.jsx`, `TransactionModal.jsx`).
+- **Edge Functions → FastAPI Migration**: Removed all 6 remaining `supabase.functions.invoke()` calls from `backendService.js` and replaced them with local FastAPI endpoints (`/api/records/*` and `/api/subscriptions/*`). Created `records.py` (5 endpoints) and `subscriptions.py` (Razorpay). The frontend now has **zero** Supabase Edge Function dependencies — all backend calls go through `localhost:8000`.
 
 ## Tasks
 

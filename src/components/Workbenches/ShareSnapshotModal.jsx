@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { BsX, BsLink45Deg, BsShieldLock, BsClipboard, BsCheck2 } from "react-icons/bs";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
+import { supabase } from "../../lib/supabase";
 
 export default function ShareSnapshotModal({ isOpen, onClose, workbenchId }) {
   const [password, setPassword] = useState("");
@@ -17,19 +18,30 @@ export default function ShareSnapshotModal({ isOpen, onClose, workbenchId }) {
 
     try {
       setLoading(true);
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        throw new Error("Not authenticated");
+      }
+
       const response = await fetch(`http://localhost:8000/api/investor/share/${workbenchId}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({ password })
       });
 
-      if (!response.ok) throw new Error("Failed to generate link");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || "Failed to generate link");
+      }
       const data = await response.json();
       setShareId(data.share_id);
       toast.success("Private link generated!");
     } catch (err) {
       console.error(err);
-      toast.error("Sharing failed");
+      toast.error(err.message || "Sharing failed");
     } finally {
       setLoading(false);
     }

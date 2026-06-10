@@ -3,6 +3,7 @@ import { BsX, BsEnvelope, BsShieldLock, BsClipboard, BsCheck2, BsPeople, BsPerso
 
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
+import { supabase } from "../../lib/supabase";
 
 export default function InviteMemberModal({ isOpen, onClose, workbenchId }) {
   const [email, setEmail] = useState("");
@@ -19,19 +20,30 @@ export default function InviteMemberModal({ isOpen, onClose, workbenchId }) {
 
     try {
       setLoading(true);
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        throw new Error("Not authenticated");
+      }
+
       const response = await fetch(`http://localhost:8000/api/investor/invite/${workbenchId}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({ email, role })
       });
 
-      if (!response.ok) throw new Error("Failed to create invitation");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || "Failed to create invitation");
+      }
       const data = await response.json();
       setInviteToken(data.token);
       toast.success("Invitation generated!");
     } catch (err) {
       console.error(err);
-      toast.error("Invitation failed");
+      toast.error(err.message || "Invitation failed");
     } finally {
       setLoading(false);
     }

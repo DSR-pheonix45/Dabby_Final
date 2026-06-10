@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BsX, BsTag, BsGrid } from "react-icons/bs";
 import { toast } from "react-hot-toast";
+import { supabase } from "../../../lib/supabase";
 
 export default function LabelModal({ isOpen, onClose, workbenchId, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -21,16 +22,25 @@ export default function LabelModal({ isOpen, onClose, workbenchId, onSuccess }) 
 
     try {
       setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       const response = await fetch("http://localhost:8000/api/ledger/labels", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           workbench_id: workbenchId,
           ...formData,
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to create label");
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || "Failed to create label");
+      }
 
       toast.success("Category created successfully");
       onSuccess?.();

@@ -1,20 +1,40 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AuthContext } from './AuthContextBase';
 import { signOut, getCurrentUser, onAuthStateChange, supabase } from '../lib/supabase';
+
+// Plan limits — mirrors backend PLAN_LIMITS in auth_utils.py
+const PLAN_LIMITS = {
+  free: {
+    max_workbenches: 0, max_members: 0, max_ai_requests: 50,
+    doc_vault_mb: 0, investor_view: false, advanced_coa: false, audit_logs: false, priority_ai: false,
+  },
+  go: {
+    max_workbenches: 5, max_members: 5, max_ai_requests: 500,
+    doc_vault_mb: 100, investor_view: false, advanced_coa: false, audit_logs: false, priority_ai: false,
+  },
+  pro: {
+    max_workbenches: 10, max_members: 15, max_ai_requests: 1000,
+    doc_vault_mb: 500, investor_view: true, advanced_coa: true, audit_logs: false, priority_ai: true,
+  },
+  enterprise: {
+    max_workbenches: 999, max_members: 50, max_ai_requests: 9999,
+    doc_vault_mb: 5000, investor_view: true, advanced_coa: true, audit_logs: true, priority_ai: true,
+  },
+};
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [subscription, setSubscription] = useState(null);
   const [plan, setPlan] = useState('free');
   const [loading, setLoading] = useState(true);
 
   /**
-   * Fetch user profile safely
+   * Fetch user profile safely — plan is stored on the users table
    */
   const fetchUserProfile = async (userId) => {
     if (!userId) {
       setProfile(null);
+      setPlan('free');
       return;
     }
 
@@ -27,50 +47,21 @@ export function AuthProvider({ children }) {
 
       if (error) {
         setProfile(null);
+        setPlan('free');
       } else if (!data) {
         setProfile({
           id: userId,
           status: 'partial'
         });
+        setPlan('free');
       } else {
         setProfile({ ...data, status: 'active' });
+        // Plan is directly on the users table
+        setPlan(data.plan || 'free');
       }
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
       setProfile(null);
-    }
-  };
-
-  const fetchUserSubscription = async (userId) => {
-    if (!userId) {
-      setSubscription(null);
-      setPlan('free');
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('user_subscriptions')
-        .select('*, plans(*)')
-        .eq('user_id', userId)
-        .order('started_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.warn('Failed to fetch subscription:', error);
-        setSubscription(null);
-        setPlan('free');
-      } else if (!data) {
-        setSubscription(null);
-        setPlan('free');
-      } else {
-        setSubscription(data);
-        setPlan(data.plan_id || data?.plans?.id || 'free');
-      }
-    } catch (err) {
-      console.error('Failed to fetch user subscription:', err);
-      setSubscription(null);
       setPlan('free');
     }
   };
@@ -90,7 +81,6 @@ export function AuthProvider({ children }) {
         if (user) {
           setUser(user);
           await fetchUserProfile(user.id);
-          await fetchUserSubscription(user.id);
         }
       } catch (err) {
         console.error('Failed to initialize auth:', err);
@@ -106,12 +96,10 @@ export function AuthProvider({ children }) {
         if (session?.user) {
           setUser(session.user);
           fetchUserProfile(session.user.id);
-          fetchUserSubscription(session.user.id);
         }
       } else if (event === 'TOKEN_REFRESH_FAILED' || event === 'SIGNED_OUT' || event === 'USER_DELETED') {
         setUser(null);
         setProfile(null);
-        setSubscription(null);
         setPlan('free');
         setLoading(false);
       }
@@ -131,6 +119,7 @@ export function AuthProvider({ children }) {
       await signOut();
       setUser(null);
       setProfile(null);
+      setPlan('free');
       return { success: true };
     } catch (error) {
       console.error('Sign out error:', error);
@@ -140,11 +129,16 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Compute plan limits from the current plan
+  const planLimits = useMemo(() => PLAN_LIMITS[plan] || PLAN_LIMITS.free, [plan]);
+
   const value = {
     user,
     setUser,
     profile,
     setProfile,
+    plan,
+    planLimits,
     loading,
     signOut: handleSignOut
   };

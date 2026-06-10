@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 from supabase_client import supabase
 from services.coa_seeder import seed_coa
+from .auth_utils import enforce_workbench_limit
 
 router = APIRouter()
 
@@ -27,6 +28,9 @@ class WorkbenchCreate(BaseModel):
 async def create_workbench(payload: WorkbenchCreate):
     print(f"[DEBUG] Received request to create workbench: {payload.name}")
     try:
+        # 0. Enforce plan-based workbench limit
+        await enforce_workbench_limit(payload.owner_user_id)
+
         # 1. Create Workbench
         insert_data = {
             "owner_user_id": payload.owner_user_id,
