@@ -1,9 +1,8 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import date
 from supabase_client import supabase
-from .auth_utils import require_membership, get_user_id_from_header
 
 router = APIRouter()
 
@@ -16,9 +15,8 @@ class BudgetCreate(BaseModel):
     total_amount: float
 
 @router.post("/")
-async def create_budget(budget: BudgetCreate, x_user_id: str = Depends(get_user_id_from_header)):
+async def create_budget(budget: BudgetCreate):
     try:
-        await require_membership(budget.workbench_id, x_user_id)
         data = budget.dict()
         data["start_date"] = str(budget.start_date)
         data["end_date"] = str(budget.end_date)
@@ -29,9 +27,8 @@ async def create_budget(budget: BudgetCreate, x_user_id: str = Depends(get_user_
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{workbench_id}/performance")
-async def get_budget_performance(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
+async def get_budget_performance(workbench_id: str):
     try:
-        await require_membership(workbench_id, x_user_id)
         # Instead of calculating in Python, we can just query the SQL view we created
         response = supabase.table("view_budget_vs_actual").select("*").eq("workbench_id", workbench_id).execute()
         return response.data
@@ -39,12 +36,11 @@ async def get_budget_performance(workbench_id: str, x_user_id: str = Depends(get
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{workbench_id}/transactions/{category}")
-async def get_clubbed_transactions(workbench_id: str, category: str, x_user_id: str = Depends(get_user_id_from_header)):
+async def get_clubbed_transactions(workbench_id: str, category: str):
     """
     Returns the individual fragmented transactions that were clubbed into a budget category.
     """
     try:
-        await require_membership(workbench_id, x_user_id)
         # First, find the budget to get the date range
         budget_res = supabase.table("budgets").select("*").eq("workbench_id", workbench_id).eq("name", category).execute()
         
@@ -69,15 +65,19 @@ async def get_clubbed_transactions(workbench_id: str, category: str, x_user_id: 
         # We can't run raw SQL from client easily unless via rpc, so let's do it via Supabase RPC or Python filtering
         # To avoid RPC, we fetch all relevant entries and filter
         
-        # Fetch labels in category
-        labels_res = supabase.table("labels").select("id, name").eq("workbench_id", workbench_id).eq("sub_account", category).execute()
-        label_ids = [l["id"] for l in labels_res.data]
+        # Fetch accounts in this sub-account category
+        # Note: Now we need to query workbench_accounts based on master_sub_account matching
+        accounts_res = supabase_client.table("workbench_accounts").select("id, full_account_name, master_sub_account_id").eq("workbench_id", workbench_id).execute()
         
-        if not label_ids:
+        # Filter accounts that belong to this category by matching the master_sub_account
+        # For simplicity, we'll match by searching the sub-account in the full_account_name
+        category_account_ids = [a["id"] for a in accounts_res.data if category.lower() in a["full_account_name"].lower()]
+        
+        if not category_account_ids:
             return []
             
-        # Fetch transaction entries
-        te_res = supabase.table("transaction_entries").select("amount, transaction_id, label_id").in_("label_id", label_ids).execute()
+        # Fetch transaction entries for these accounts
+        te_res = supabase.table("transaction_entries").select("amount, transaction_id, account_id").in_("account_id", category_account_ids).execute()
         if not te_res.data:
             return []
             
@@ -93,12 +93,12 @@ async def get_clubbed_transactions(workbench_id: str, category: str, x_user_id: 
         for te in te_res.data:
             if te["transaction_id"] in valid_tx_ids:
                 t = valid_tx_ids[te["transaction_id"]]
-                l_name = next(l["name"] for l in labels_res.data if l["id"] == te["label_id"])
+                acc_name = next((a["full_account_name"] for a in accounts_res.data if a["id"] == te["account_id"]), "Unknown")
                 results.append({
                     "amount": te["amount"],
                     "date": t["transaction_date"],
                     "description": t["description"],
-                    "label_name": l_name
+                    "account_name": acc_name
                 })
                 
         return results

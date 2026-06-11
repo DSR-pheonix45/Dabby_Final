@@ -22,32 +22,12 @@ export default function Signup() {
     }
   }, [user, authLoading, navigate]);
 
-  const ALLOWED_DOMAINS = ['gmail.com', 'yahoo.com', 'outlook.com'];
-  const validateEmail = (value) => {
-    const basicValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-    if (!basicValid) return false;
-    const domain = value.split('@')[1]?.toLowerCase();
-    return ALLOWED_DOMAINS.includes(domain);
-  };
-  const validatePassword = (value) => {
-    return value.length >= 10
-      && /[A-Z]/.test(value)
-      && /[a-z]/.test(value)
-      && /[0-9]/.test(value)
-      && /[^A-Za-z0-9]/.test(value);
-  };
-
   const handleEmailSignup = async (e) => {
     e.preventDefault();
     
     const trimmedEmail = email.trim();
-    if (!validateEmail(trimmedEmail)) {
-      setError("Only @gmail.com, @yahoo.com, or @outlook.com email addresses are allowed.");
-      return;
-    }
-
-    if (!validatePassword(password)) {
-      setError("Password must be at least 10 characters and include uppercase, lowercase, number, and special character.");
+    if (!trimmedEmail || password.length < 6) {
+      setError("Please enter a valid email and a password of at least 6 characters.");
       return;
     }
 
@@ -162,7 +142,7 @@ export default function Signup() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="yourname@gmail.com"
+              placeholder="name@company.com"
               className="w-full bg-white/5 border border-white/10 rounded-md px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-[#00FFD1]/50 focus:border-[#00FFD1] transition-all"
             />
           </div>
@@ -179,7 +159,7 @@ export default function Signup() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                minLength={10}
+                minLength={6}
                 className="w-full bg-white/5 border border-white/10 rounded-md px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-[#00FFD1]/50 focus:border-[#00FFD1] transition-all pr-11"
               />
               <button
@@ -190,13 +170,6 @@ export default function Signup() {
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
-            <p className="mt-2 text-xs text-gray-500">
-              Password must be 10+ characters with uppercase, lowercase, number, and special character.
-            </p>
-          </div>
-
-          <div className="text-sm text-gray-500">
-            We collect only the personal information needed for account access and recovery, in line with DPDP principles.
           </div>
 
           <button

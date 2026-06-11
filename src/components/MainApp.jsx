@@ -17,7 +17,6 @@ import { backendService } from "../services/backendService";
 import { contextService } from "../services/contextService";
 import { supabase } from "../lib/supabase";
 import { BsRocketTakeoff, BsChevronRight } from "react-icons/bs";
-import PlanGate from "./common/PlanGate";
 
 export default function MainApp() {
   useTheme(); // Theme context is used for side effects
@@ -589,8 +588,8 @@ export default function MainApp() {
               }
             />
             <Route path="settings" element={<Settings />} />
-            <Route path="workbenches" element={<PlanGate requiredPlan="go"><Workbenches /></PlanGate>} />
-            <Route path="workbenches/:id" element={<PlanGate requiredPlan="go"><WorkbenchDetail /></PlanGate>} />
+            <Route path="workbenches" element={<Workbenches />} />
+            <Route path="workbenches/:id" element={<WorkbenchDetail />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>

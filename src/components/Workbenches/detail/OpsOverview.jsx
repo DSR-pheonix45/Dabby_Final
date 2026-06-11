@@ -18,16 +18,20 @@ import Card from "../../shared/Card";
 import { useWorkbench } from "../../../context/WorkbenchContext";
 import { backendService } from "../../../services/backendService";
 import { toast } from "react-hot-toast";
+import { useAuth } from "../../../hooks/useAuth";
 import PulseDetailModal from "../ops/PulseDetailModal";
 
 export default function OpsOverview({ workbenchId }) {
   const { labels, balances, loading: contextLoading } = useWorkbench();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState([]);
   const [members, setMembers] = useState([]);
+  const [taskFilter, setTaskFilter] = useState("all"); // 'all' or 'mine'
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [newTask, setNewTask] = useState({ title: '', assigned_to: '', priority: 'medium', due_date: '' });
   const [selectedExpCategory, setSelectedExpCategory] = useState(null);
+
 
   // Modal State
   const [isPulseModalOpen, setIsPulseModalOpen] = useState(false);
@@ -382,11 +386,31 @@ export default function OpsOverview({ workbenchId }) {
         {/* Task Management Section */}
         <section className="space-y-6">
           <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-primary-300/10 text-primary-300 rounded-lg">
-                <BsListTask size={20} />
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-primary-300/10 text-primary-300 rounded-lg">
+                  <BsListTask size={20} />
+                </div>
+                <h3 className="text-sm font-black text-white uppercase tracking-widest">Ops Tasks</h3>
               </div>
-              <h3 className="text-sm font-black text-white uppercase tracking-widest">Ops Tasks & Workflow</h3>
+              <div className="flex bg-white/5 border border-white/10 rounded-xl p-0.5">
+                <button
+                  onClick={() => setTaskFilter("all")}
+                  className={`px-3 py-1 rounded-lg text-[10px] uppercase tracking-wider font-black transition-all ${
+                    taskFilter === "all" ? "bg-white/10 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setTaskFilter("mine")}
+                  className={`px-3 py-1 rounded-lg text-[10px] uppercase tracking-wider font-black transition-all ${
+                    taskFilter === "mine" ? "bg-white/10 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"
+                  }`}
+                >
+                  My Tasks
+                </button>
+              </div>
             </div>
             <button 
               onClick={() => setIsTaskModalOpen(true)}
@@ -397,61 +421,73 @@ export default function OpsOverview({ workbenchId }) {
           </div>
 
           <Card variant="dark" className="border-white/5 bg-[#0E1117]/80 divide-y divide-white/5 min-h-[300px]">
-            {tasks.length === 0 ? (
+            {tasks.filter(t => taskFilter === "all" || t.assigned_to === user?.id).length === 0 ? (
               <div className="p-12 flex flex-col items-center justify-center text-center space-y-3 opacity-30">
                 <BsCheck2Circle size={40} />
-                <p className="text-xs font-bold uppercase tracking-widest text-gray-500">No active tasks</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-500">
+                  {taskFilter === "mine" ? "No tasks assigned to you" : "No active tasks"}
+                </p>
               </div>
             ) : (
-              tasks.map(task => (
-                <div key={task.id} className="p-4 flex items-start justify-between group">
-                  <div className="flex items-start space-x-4">
-                    <button 
-                      onClick={() => handleToggleTaskStatus(task)}
-                      className={`mt-1 p-1 rounded-full border transition-all ${
-                        task.status === 'completed' ? 'bg-teal-500 border-teal-500 text-black' : 'border-white/20 text-transparent hover:border-teal-500'
-                      }`}
-                    >
-                      <BsCheck2Circle size={12} />
-                    </button>
-                    <div>
-                      <h4 className={`text-sm font-bold ${task.status === 'completed' ? 'text-gray-600 line-through' : 'text-gray-200'}`}>
-                        {task.title}
-                      </h4>
-                      <div className="flex items-center space-x-3 mt-1.5">
-                        {task.assigned_to && (
-                          <div className="flex items-center space-x-1 text-[10px] text-gray-500 font-bold uppercase">
-                            <BsPerson size={10} />
-                            <span>{task.assigned_user?.name || 'Assigned'}</span>
-                          </div>
-                        )}
-                        {task.due_date && (
-                          <div className="flex items-center space-x-1 text-[10px] text-amber-500/70 font-bold uppercase">
-                            <BsCalendar size={10} />
-                            <span>{new Date(task.due_date).toLocaleDateString()}</span>
-                          </div>
-                        )}
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase ${
-                          task.priority === 'urgent' ? 'bg-red-500/10 text-red-400' :
-                          task.priority === 'high' ? 'bg-amber-500/10 text-amber-400' :
-                          'bg-white/5 text-gray-600'
-                        }`}>
-                          {task.priority}
-                        </span>
+              tasks
+                .filter(t => taskFilter === "all" || t.assigned_to === user?.id)
+                .map(task => (
+                  <div key={task.id} className="p-4 flex items-start justify-between group">
+                    <div className="flex items-start space-x-4">
+                      <button 
+                        onClick={() => handleToggleTaskStatus(task)}
+                        className={`mt-1 p-1 rounded-full border transition-all ${
+                          task.status === 'completed' ? 'bg-teal-500 border-teal-500 text-black' : 'border-white/20 text-transparent hover:border-teal-500'
+                        }`}
+                      >
+                        <BsCheck2Circle size={12} />
+                      </button>
+                      <div>
+                        <h4 className={`text-sm font-bold ${task.status === 'completed' ? 'text-gray-600 line-through' : 'text-gray-200'}`}>
+                          {task.title}
+                        </h4>
+                        <div className="flex items-center space-x-3 mt-1.5">
+                          {task.assigned_to && (
+                            <div className="flex items-center space-x-1 text-[10px] text-gray-500 font-bold uppercase">
+                              <BsPerson size={10} />
+                              <span>
+                                {task.assigned_user?.name || 'Assigned'}
+                                {task.assigned_user?.role && (
+                                  <span className="ml-1 text-primary-300 opacity-80">
+                                    [{task.assigned_user.role}]
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          )}
+                          {task.due_date && (
+                            <div className="flex items-center space-x-1 text-[10px] text-amber-500/70 font-bold uppercase">
+                              <BsCalendar size={10} />
+                              <span>{new Date(task.due_date).toLocaleDateString()}</span>
+                            </div>
+                          )}
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase ${
+                            task.priority === 'urgent' ? 'bg-red-500/10 text-red-400' :
+                            task.priority === 'high' ? 'bg-amber-500/10 text-amber-400' :
+                            'bg-white/5 text-gray-600'
+                          }`}>
+                            {task.priority}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                    <button 
+                      onClick={() => handleDeleteTask(task.id)}
+                      className="opacity-0 group-hover:opacity-100 p-2 text-gray-600 hover:text-red-400 transition-all"
+                    >
+                      <BsTrash size={14} />
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => handleDeleteTask(task.id)}
-                    className="opacity-0 group-hover:opacity-100 p-2 text-gray-600 hover:text-red-400 transition-all"
-                  >
-                    <BsTrash size={14} />
-                  </button>
-                </div>
-              ))
+                ))
             )}
           </Card>
         </section>
+
 
         {/* Expense Categorization Health */}
         <section className="space-y-6">

@@ -7,52 +7,166 @@ class LedgerService:
     def __init__(self, supabase: Client):
         self.supabase = supabase
 
-    # --- Label System ---
+    # --- Label System (Workbench Accounts) ---
     
+    async def generate_unique_account_code(self, workbench_id: str, master_account_code: str, sub_account_code: str) -> str:
+        """
+        Generates a unique 4-character account code for a workbench.
+        For example: Master Code 'A', Sub Code '01'. Base is 'A01'.
+        If 'A01' exists, we try 'A011', 'A012', ..., 'A019', 'A01A', ..., 'A01Z'.
+        If Sub Code is '001', Base is 'A001'. Since this is already 4 characters,
+        if 'A001' exists, we can use a suffix or increment.
+        """
+        base_code = f"{master_account_code}{sub_account_code}"
+        res = self.supabase.table("workbench_accounts")\
+            .select("account_code")\
+            .eq("workbench_id", workbench_id)\
+            .like("account_code", f"{master_account_code}%")\
+            .execute()
+        
+        existing_codes = {row["account_code"] for row in res.data}
+        
+        if base_code not in existing_codes:
+            return base_code[:4]
+            
+        if len(base_code) <= 3:
+            for char in "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+                candidate = f"{base_code}{char}"
+                if candidate not in existing_codes:
+                    return candidate
+        else:
+            prefix = base_code[:3]
+            for char in "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0":
+                candidate = f"{prefix}{char}"
+                if candidate not in existing_codes:
+                    return candidate
+                    
+        import random, string
+        while True:
+            suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=3))
+            candidate = f"{master_account_code}{suffix}"[:4]
+            if candidate not in existing_codes:
+                return candidate
+
     async def create_label(self, label_data: Dict):
         """
-        Creates a new label in the COA.
+        Creates a new workbench account (label) linked to master account and sub-account.
         """
-        response = self.supabase.table("labels").insert(label_data).execute()
+        master_id = label_data["master_account_id"]
+        sub_id = label_data["master_sub_account_id"]
+        
+        # 1. Fetch master account code
+        master_res = self.supabase.table("master_accounts").select("account_code").eq("id", master_id).single().execute()
+        if not master_res.data:
+            raise ValueError(f"Master Account with ID {master_id} not found")
+        master_code = master_res.data["account_code"]
+        
+        # 2. Fetch master sub-account code
+        sub_res = self.supabase.table("master_sub_accounts").select("sub_account_code").eq("id", sub_id).single().execute()
+        if not sub_res.data:
+            raise ValueError(f"Master Sub-Account with ID {sub_id} not found")
+        sub_code = sub_res.data["sub_account_code"]
+        
+        # 3. Generate unique account code
+        account_code = await self.generate_unique_account_code(label_data["workbench_id"], master_code, sub_code)
+        
+        # 4. Insert workbench account
+        insert_payload = {
+            "workbench_id": label_data["workbench_id"],
+            "master_account_id": master_id,
+            "master_sub_account_id": sub_id,
+            "account_code": account_code,
+            "full_account_name": label_data["full_account_name"],
+            "custom_sub_type": label_data.get("custom_sub_type"),
+            "description": label_data.get("description"),
+            "current_amount": label_data.get("current_amount", 0.0),
+            "is_active": True
+        }
+        
+        response = self.supabase.table("workbench_accounts").insert(insert_payload).execute()
         return response.data[0]
 
-    async def get_labels(self, workbench_id: str, include_deleted: bool = False, include_system: bool = False):
+    async def get_labels(self, workbench_id: str, include_deleted: bool = False):
         """
-        Fetches all labels for a workbench.
+        Fetches all workbench accounts (labels) for a workbench,
+        joining master_accounts and master_sub_accounts to provide
+        type and sub_account for frontend compatibility.
         """
-        query = self.supabase.table("labels").select("*").eq("workbench_id", workbench_id)
-        if not include_deleted:
-            query = query.eq("is_deleted", False)
-        if not include_system:
-            query = query.eq("is_system", False)
-        
-        response = query.execute()
-        return response.data
+        try:
+            query = self.supabase.table("workbench_accounts") \
+                .select("*, master_accounts(account_code, account_name), master_sub_accounts(sub_account_code, sub_account_name)") \
+                .eq("workbench_id", workbench_id)
+                
+            if not include_deleted:
+                query = query.eq("is_active", True)
+            
+            response = query.execute()
+            
+            mapped_labels = []
+            name_map = {
+                "ASSETS": "asset",
+                "LIABILITIES": "liability",
+                "EQUITY": "equity",
+                "REVENUE": "revenue",
+                "EXPENSES": "expense",
+                "INCOME": "revenue"
+            }
+            
+            for item in response.data:
+                m_acc = item.get("master_accounts") or {}
+                m_sub = item.get("master_sub_accounts") or {}
+                
+                raw_type = m_acc.get("account_name", "EXPENSES")
+                mapped_type = name_map.get(raw_type.upper(), "expense")
+                
+                mapped_labels.append({
+                    "id": item["id"],
+                    "workbench_id": item["workbench_id"],
+                    "master_account_id": item["master_account_id"],
+                    "master_sub_account_id": item["master_sub_account_id"],
+                    "account_code": item["account_code"],
+                    "name": item["full_account_name"],
+                    "full_account_name": item["full_account_name"],
+                    "type": mapped_type,
+                    "sub_account": m_sub.get("sub_account_name", "General"),
+                    "custom_sub_type": item.get("custom_sub_type"),
+                    "description": item.get("description"),
+                    "current_amount": float(item.get("current_amount") or 0.0),
+                    "is_active": item.get("is_active", True),
+                    "is_shadow": item.get("is_shadow", False),
+                    "vessel_id": item.get("vessel_id"),
+                    "created_at": item.get("created_at"),
+                    "updated_at": item.get("updated_at")
+                })
+                
+            return mapped_labels
+        except Exception as e:
+            print(f"[ERROR] Failed to get_labels: {str(e)}")
+            raise e
 
     async def update_label(self, label_id: str, update_data: Dict):
         """
-        Updates an existing label.
+        Updates an existing workbench account.
         """
-        response = self.supabase.table("labels").update(update_data).eq("id", label_id).execute()
+        response = self.supabase.table("workbench_accounts").update(update_data).eq("id", label_id).execute()
         return response.data[0]
 
     async def delete_label(self, label_id: str, soft_delete: bool = True):
         """
-        Deletes a label (soft delete by default).
+        Deletes a workbench account (soft delete by default).
         """
         if soft_delete:
-            response = self.supabase.table("labels").update({"is_deleted": True}).eq("id", label_id).execute()
+            response = self.supabase.table("workbench_accounts").update({"is_active": False}).eq("id", label_id).execute()
         else:
-            response = self.supabase.table("labels").delete().eq("id", label_id).execute()
+            response = self.supabase.table("workbench_accounts").delete().eq("id", label_id).execute()
         return response.data
 
     async def seed_basic_labels(self, workbench_id: str):
         """
-        Pre-seeds basic labels for a new workbench.
+        Pre-seeds basic workbench accounts for a new workbench (done via COA seeder).
         """
-        basic_labels = []
-        response = self.supabase.table("labels").insert(basic_labels).execute()
-        return response.data
+        # Seeding is now handled in coa_seeder.py which creates workbench_accounts directly
+        return {"status": "success", "message": "Seeding handled by COA seeder"}
 
     # --- Transaction Engine ---
 
@@ -71,29 +185,35 @@ class LedgerService:
             print(f"[VALIDATION ERROR] Amount must be positive. Received: {amount}")
             raise ValueError("Amount must be positive. Use labels to indicate direction.")
 
-        # Check if both labels exist and fetch their types
-        labels_res = self.supabase.table("labels").select("id, name, type").in_("id", [from_label_id, to_label_id]).execute()
-        existing_labels = {l["id"]: l for l in labels_res.data}
+        # Check if both workbench accounts exist and fetch their types
+        accounts_res = self.supabase.table("workbench_accounts").select("id, full_account_name, master_account_id").in_("id", [from_label_id, to_label_id]).eq("workbench_id", workbench_id).execute()
+        existing_accounts = {a["id"]: a for a in accounts_res.data}
         
-        if from_label_id not in existing_labels:
-            print(f"[VALIDATION ERROR] Source label ID {from_label_id} not found in database.")
-            raise ValueError(f"Source label with ID {from_label_id} not found or has been deleted.")
-        if to_label_id not in existing_labels:
-            print(f"[VALIDATION ERROR] Destination label ID {to_label_id} not found in database.")
-            raise ValueError(f"Destination label with ID {to_label_id} not found or has been deleted.")
+        if from_label_id not in existing_accounts:
+            print(f"[VALIDATION ERROR] Source account ID {from_label_id} not found in workbench {workbench_id}.")
+            raise ValueError(f"Source account with ID {from_label_id} not found.")
+        if to_label_id not in existing_accounts:
+            print(f"[VALIDATION ERROR] Destination account ID {to_label_id} not found in workbench {workbench_id}.")
+            raise ValueError(f"Destination account with ID {to_label_id} not found.")
 
-        source_label_data = existing_labels[from_label_id]
+        source_account_data = existing_accounts[from_label_id]
         
-        # Check for sufficient funds if the source is an Asset account
-        if source_label_data["type"] == "asset":
-            current_balances = await self.get_balances(workbench_id)
-            source_balance_info = current_balances.get(from_label_id, {"net": 0.0})
-            # Handle cases where get_balances might return a direct float or a dict
-            source_balance = source_balance_info.get("net", 0.0) if isinstance(source_balance_info, dict) else source_balance_info
+        # Get master account type to check if it's an asset
+        master_account_res = self.supabase.table("master_accounts").select("account_code").eq("id", source_account_data["master_account_id"]).execute()
+        if master_account_res.data:
+            account_code = master_account_res.data[0]["account_code"]
+            is_asset = account_code == "A"  # 'A' for Assets
             
-            if source_balance < amount:
-                print(f"[VALIDATION ERROR] Insufficient funds in '{source_label_data['name']}'. Balance: ₹{source_balance}, Requested: ₹{amount}")
-                raise ValueError(f"Insufficient funds in '{source_label_data['name']}'. Current balance: ₹{source_balance}, required: ₹{amount}")
+            # Check for sufficient funds if the source is an Asset account
+            if is_asset:
+                current_balances = await self.get_balances(workbench_id)
+                source_balance_info = current_balances.get(from_label_id, {"net": 0.0})
+                # Handle cases where get_balances might return a direct float or a dict
+                source_balance = source_balance_info.get("net", 0.0) if isinstance(source_balance_info, dict) else source_balance_info
+                
+                if source_balance < amount:
+                    print(f"[VALIDATION ERROR] Insufficient funds in '{source_account_data['full_account_name']}'. Balance: ₹{source_balance}, Requested: ₹{amount}")
+                    raise ValueError(f"Insufficient funds in '{source_account_data['full_account_name']}'. Current balance: ₹{source_balance}, required: ₹{amount}")
 
         # 1. Create Transaction Header
         transaction_header = {
@@ -214,65 +334,107 @@ class LedgerService:
     async def get_transactions_list(self, workbench_id: str):
         """
         Returns a list of transactions with their entries and labels.
-        Manual join for parties/entities to avoid PGRST200 join errors.
+        Uses in-memory joins to bypass potential PostgREST foreign key relationship failures.
         """
-        # 1. Fetch transactions and their entries
-        tx_res = self.supabase.table("transactions") \
-            .select("*, transaction_entries(*, labels(*))") \
-            .eq("workbench_id", workbench_id) \
-            .order("transaction_date", desc=True) \
-            .execute()
+        try:
+            # 1. Fetch transactions
+            tx_res = self.supabase.table("transactions") \
+                .select("*") \
+                .eq("workbench_id", workbench_id) \
+                .order("transaction_date", desc=True) \
+                .execute()
+                
+            transactions = tx_res.data
+            if not transactions:
+                return []
+                
+            tx_ids = [tx["id"] for tx in transactions]
             
-        transactions = tx_res.data
-        if not transactions:
-            return []
-
-        # 2. Collect all party and entity IDs for batch fetching
-        party_ids = set()
-        entity_ids = set()
-        for tx in transactions:
-            if tx.get("source_party_id"): party_ids.add(tx["source_party_id"])
-            if tx.get("destination_party_id"): party_ids.add(tx["destination_party_id"])
-            if tx.get("source_entity_id"): entity_ids.add(tx["source_entity_id"])
-            if tx.get("destination_entity_id"): entity_ids.add(tx["destination_entity_id"])
-
-        # 3. Batch fetch names
-        parties_map = {}
-        if party_ids:
-            p_res = self.supabase.table("parties").select("id, name").in_("id", list(party_ids)).execute()
-            parties_map = {p["id"]: p["name"] for p in p_res.data}
+            # 2. Fetch all entries for these transactions in one batch
+            entries_res = self.supabase.table("transaction_entries") \
+                .select("*") \
+                .in_("transaction_id", tx_ids) \
+                .execute()
+                
+            # 3. Fetch all workbench accounts for the workbench to map names
+            labels = await self.get_labels(workbench_id)
+            labels_map = {l["id"]: l for l in labels}
             
-        entities_map = {}
-        if entity_ids:
-            e_res = self.supabase.table("entities").select("id, name").in_("id", list(entity_ids)).execute()
-            entities_map = {e["id"]: e["name"] for e in e_res.data}
-
-        # 4. Format response
-        formatted = []
-        for tx in transactions:
-            amount = 0
-            labels_involved = []
-            for entry in tx["transaction_entries"]:
-                if entry.get("labels"):
-                    labels_involved.append(entry["labels"]["name"])
-                if entry["amount"] > 0:
-                    amount = entry["amount"]
-            
-            formatted.append({
-                "id": tx["id"],
-                "description": tx["description"],
-                "date": tx["transaction_date"],
-                "amount": amount,
-                "labels": labels_involved,
-                "entries": tx["transaction_entries"],
-                "source": {
-                    "party": parties_map.get(tx["source_party_id"]),
-                    "entity": entities_map.get(tx["source_entity_id"])
-                } if tx.get("source_party_id") or tx.get("source_entity_id") else None,
-                "destination": {
-                    "party": parties_map.get(tx["destination_party_id"]),
-                    "entity": entities_map.get(tx["destination_entity_id"])
-                } if tx.get("destination_party_id") or tx.get("destination_entity_id") else None
-            })
-            
-        return formatted
+            # 4. Group entries by transaction_id and attach mapped account info
+            entries_by_tx = {}
+            for entry in entries_res.data:
+                tx_id = entry["transaction_id"]
+                if tx_id not in entries_by_tx:
+                    entries_by_tx[tx_id] = []
+                    
+                # Map label info to entry
+                lid = entry["label_id"]
+                if lid in labels_map:
+                    entry["workbench_accounts"] = {
+                        "id": lid,
+                        "full_account_name": labels_map[lid]["full_account_name"]
+                    }
+                    entry["labels"] = {
+                        "id": lid,
+                        "name": labels_map[lid]["full_account_name"]
+                    }
+                
+                entries_by_tx[tx_id].append(entry)
+                
+            # 5. Collect party and entity IDs for batch fetching
+            party_ids = set()
+            entity_ids = set()
+            for tx in transactions:
+                if tx.get("source_party_id"): party_ids.add(tx["source_party_id"])
+                if tx.get("destination_party_id"): party_ids.add(tx["destination_party_id"])
+                if tx.get("source_entity_id"): entity_ids.add(tx["source_entity_id"])
+                if tx.get("destination_entity_id"): entity_ids.add(tx["destination_entity_id"])
+                
+            # 6. Batch fetch names for parties and entities
+            parties_map = {}
+            if party_ids:
+                p_res = self.supabase.table("parties").select("id, name").in_("id", list(party_ids)).execute()
+                parties_map = {p["id"]: p["name"] for p in p_res.data}
+                
+            entities_map = {}
+            if entity_ids:
+                e_res = self.supabase.table("entities").select("id, name").in_("id", list(entity_ids)).execute()
+                entities_map = {e["id"]: e["name"] for e in e_res.data}
+                
+            # 7. Format final response
+            formatted = []
+            for tx in transactions:
+                tx_id = tx["id"]
+                tx_entries = entries_by_tx.get(tx_id, [])
+                
+                amount = 0
+                accounts_involved = []
+                for entry in tx_entries:
+                    if entry.get("workbench_accounts"):
+                        accounts_involved.append(entry["workbench_accounts"]["full_account_name"])
+                    if entry["amount"] > 0:
+                        amount = entry["amount"]
+                        
+                formatted.append({
+                    "id": tx["id"],
+                    "description": tx["description"],
+                    "date": tx["transaction_date"],
+                    "amount": amount,
+                    "accounts": accounts_involved,
+                    "entries": tx_entries,
+                    "source": {
+                        "party": parties_map.get(tx["source_party_id"]),
+                        "entity": entities_map.get(tx["source_entity_id"])
+                    } if tx.get("source_party_id") or tx.get("source_entity_id") else None,
+                    "destination": {
+                        "party": parties_map.get(tx["destination_party_id"]),
+                        "entity": entities_map.get(tx["destination_entity_id"])
+                    } if tx.get("destination_party_id") or tx.get("destination_entity_id") else None
+                })
+                
+            return formatted
+        except Exception as e:
+            print(f"[ERROR] get_transactions_list failed: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise e

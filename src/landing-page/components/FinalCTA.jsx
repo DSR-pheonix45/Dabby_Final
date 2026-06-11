@@ -177,7 +177,7 @@ export default function FinalCTA() {
                   : "hover:text-[#1a1a1a] hover:border-[#1a1a1a]"
                 }`}
             >
-              Sign Up for Secure Financial Workflows
+              Start Free Trial
             </a>
           </motion.div>
 
@@ -189,7 +189,7 @@ export default function FinalCTA() {
             className={`text-sm mt-4 mb-16 ${isDark ? "text-gray-500" : "text-gray-500"
               }`}
           >
-            Ready for compliance-ready cash flow and AR/AP visibility.
+            Start your data journey today • Cancel anytime
           </motion.p>
 
           {/* Logo Carousel */}

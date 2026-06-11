@@ -71,10 +71,10 @@ async def generate_template(request: TemplateGenRequest):
 
 class CategorizeRequest(BaseModel):
     description: str
-    labels: list
+    accounts: list  # List of workbench_accounts
 
 @router.post("/categorize-transaction")
 async def categorize_transaction(request: CategorizeRequest):
     from services.ai_service import ai_service
-    res = await ai_service.categorize_transaction(request.description, request.labels)
+    res = await ai_service.categorize_transaction(request.description, request.accounts)
     return res

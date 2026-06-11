@@ -4,7 +4,6 @@ from pydantic import BaseModel
 from datetime import date
 from services.inventory_service import InventoryService
 from supabase_client import supabase
-from .auth_utils import require_membership, get_user_id_from_header
 
 router = APIRouter()
 inventory_service = InventoryService(supabase)
@@ -49,10 +48,9 @@ class SaleRequest(BaseModel):
 # --- Item Endpoints ---
 
 @router.post("/items")
-async def create_item(item: ItemCreate, x_user_id: str = Depends(get_user_id_from_header)):
+async def create_item(item: ItemCreate):
     try:
         item_dict = item.dict()
-        await require_membership(item.workbench_id, x_user_id)
         # Convert empty strings to None for optional UUID fields
         for field in ["inventory_label_id", "cogs_label_id", "revenue_label_id"]:
             if item_dict.get(field) == "":
@@ -63,9 +61,8 @@ async def create_item(item: ItemCreate, x_user_id: str = Depends(get_user_id_fro
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/items/{workbench_id}")
-async def get_items(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
+async def get_items(workbench_id: str):
     try:
-        await require_membership(workbench_id, x_user_id)
         return await inventory_service.get_items(workbench_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -81,9 +78,8 @@ async def get_item_stock(item_id: str):
 # --- Flow Endpoints ---
 
 @router.post("/purchase")
-async def purchase_stock(req: PurchaseRequest, x_user_id: str = Depends(get_user_id_from_header)):
+async def purchase_stock(req: PurchaseRequest):
     try:
-        await require_membership(req.workbench_id, x_user_id)
         return await inventory_service.record_purchase(
             workbench_id=req.workbench_id,
             item_id=req.item_id,
@@ -99,9 +95,8 @@ async def purchase_stock(req: PurchaseRequest, x_user_id: str = Depends(get_user
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/sale")
-async def sell_stock(req: SaleRequest, x_user_id: str = Depends(get_user_id_from_header)):
+async def sell_stock(req: SaleRequest):
     try:
-        await require_membership(req.workbench_id, x_user_id)
         return await inventory_service.record_sale(
             workbench_id=req.workbench_id,
             item_id=req.item_id,

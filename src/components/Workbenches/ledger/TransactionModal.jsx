@@ -4,7 +4,6 @@ import { BsX, BsArrowRight, BsJournalText, BsCashStack, BsArrowRepeat } from "re
 import { toast } from "react-hot-toast";
 import ProofUploader from "../shared/ProofUploader";
 import { backendService } from "../../../services/backendService";
-import { supabase } from "../../../lib/supabase";
 
 export default function TransactionModal({ isOpen, onClose, workbenchId, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -32,12 +31,7 @@ export default function TransactionModal({ isOpen, onClose, workbenchId, onSucce
 
   const fetchLabels = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      const response = await fetch(`http://localhost:8000/api/ledger/labels/${workbenchId}`, {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
+      const response = await fetch(`http://localhost:8000/api/ledger/labels/${workbenchId}`);
       if (!response.ok) throw new Error("Failed to fetch labels");
       const data = await response.json();
       setLabels(data);
@@ -48,12 +42,7 @@ export default function TransactionModal({ isOpen, onClose, workbenchId, onSucce
 
   const fetchParties = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      const response = await fetch(`http://localhost:8000/api/ops/parties/${workbenchId}`, {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
+      const response = await fetch(`http://localhost:8000/api/ops/parties/${workbenchId}`);
       if (!response.ok) throw new Error("Failed to fetch parties");
       const data = await response.json();
       setParties(data);
@@ -71,15 +60,9 @@ export default function TransactionModal({ isOpen, onClose, workbenchId, onSucce
 
     try {
       setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
       const response = await fetch("http://localhost:8000/api/ledger/transactions", {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           workbench_id: workbenchId,
           ...formData,
@@ -93,7 +76,7 @@ export default function TransactionModal({ isOpen, onClose, workbenchId, onSucce
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = await response.json();
         console.error("Backend Error Detail:", errorData);
         throw new Error(errorData.detail || "Failed to record transaction");
       }

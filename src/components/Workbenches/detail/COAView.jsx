@@ -11,23 +11,19 @@ import {
   BsHash,
   BsArrowRepeat,
   BsJournalText,
-  BsArrowRight,
-  BsPencil,
-  BsTrash
+  BsArrowRight
 } from "react-icons/bs";
 import { toast } from "react-hot-toast";
-import { supabase } from "../../../lib/supabase";
 import TransactionModal from "../ledger/TransactionModal";
 import LabelModal from "../ledger/LabelModal";
 import { useWorkbench } from "../../../context/WorkbenchContext";
 
 export default function COAView({ workbenchId }) {
-  const { labels, balances, transactions, loading, refreshContext, coa } = useWorkbench();
+  const { labels, balances, transactions, loading, refreshContext } = useWorkbench();
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
-  const [selectedLabel, setSelectedLabel] = useState(null);
 
   useEffect(() => {
     if (labels.length > 0 && expandedRows.size === 0) {
@@ -58,15 +54,6 @@ export default function COAView({ workbenchId }) {
     if (!acc[label.type]) acc[label.type] = {};
     if (!acc[label.type][label.sub_account]) acc[label.type][label.sub_account] = [];
     acc[label.type][label.sub_account].push(label);
-    return acc;
-  }, {});
-
-  const showCoaPlaceholder = !loading && labels.length === 0 && coa.length > 0;
-  const coaHierarchy = coa.reduce((acc, item) => {
-    if (item.level === 2) {
-      if (!acc[item.type]) acc[item.type] = {};
-      if (!acc[item.type][item.name]) acc[item.type][item.name] = [];
-    }
     return acc;
   }, {});
 
@@ -122,40 +109,6 @@ export default function COAView({ workbenchId }) {
     if (next.has(type)) next.delete(type);
     else next.add(type);
     setFlippedCards(next);
-  };
-
-  const openEditLabel = (label) => {
-    setSelectedLabel(label);
-    setIsLabelModalOpen(true);
-  };
-
-  const handleLabelDelete = async (label) => {
-    if (!label?.id) return;
-    if (!window.confirm(`Delete label '${label.name}'? This cannot be undone.`)) return;
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      const response = await fetch(`http://localhost:8000/api/ledger/labels/${label.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        }
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.detail || 'Failed to delete label');
-      }
-
-      toast.success('Label deleted');
-      refreshContext();
-    } catch (err) {
-      console.error('Delete label failed:', err);
-      toast.error(err.message);
-    }
   };
 
   // Seeding logic removed as per user request
@@ -274,21 +227,11 @@ export default function COAView({ workbenchId }) {
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Synchronizing Ledger...</p>
                 </div>
               </div>
-            ) : showCoaPlaceholder ? (
+            ) : labels.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center p-24 text-center">
                  <BsFolder2Open size={64} className="mb-6 text-gray-800 animate-pulse" />
-                 <h3 className="text-xl font-bold text-white mb-2">No Ledger Labels Yet</h3>
-                 <p className="text-gray-500 max-w-xs mx-auto text-sm font-medium mb-4">
-                   Your workbench has a seeded Chart of Accounts, but no custom labels have been created yet.
-                 </p>
-                 <div className="text-left w-full max-w-md mb-8">
-                   {Object.keys(coaHierarchy).map((type) => (
-                     <div key={type} className="border border-white/10 rounded-2xl p-4 mb-3 bg-white/5">
-                       <p className="text-sm font-bold text-white uppercase tracking-wider mb-2">{type}</p>
-                       <p className="text-xs text-gray-400">Create labels to link transactions to these account categories.</p>
-                     </div>
-                   ))}
-                 </div>
+                 <h3 className="text-xl font-bold text-white mb-2">No Ledger Data Found</h3>
+                 <p className="text-gray-500 max-w-xs mx-auto text-sm font-medium mb-8">Your Chart of Accounts is currently empty.</p>
                  <button 
                   onClick={() => setIsLabelModalOpen(true)}
                   className="px-8 py-3 bg-teal-500 text-black rounded-2xl font-bold text-sm hover:bg-teal-400 transition-all shadow-lg shadow-teal-500/20 flex items-center space-x-2"
@@ -328,45 +271,25 @@ export default function COAView({ workbenchId }) {
                           
                           <div className="divide-y divide-white/[0.01]">
                             {labels.map(label => (
-                              <div key={label.id} className="flex flex-col">
-                                <div className="flex items-center justify-between px-16 py-4 hover:bg-white/[0.03] group transition-all">
-                                  <div className="flex items-center space-x-4">
-                                    <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-gray-500 group-hover:text-teal-400 group-hover:border-teal-500/30 transition-all">
-                                      <BsJournalText size={14} />
-                                    </div>
-                                    <div>
-                                      <p className="text-sm font-bold text-gray-200">{label.name}</p>
-                                      <p className="text-[10px] text-gray-500 uppercase tracking-wide">{label.sub_account}</p>
-                                    </div>
+                              <div key={label.id} className="flex items-center justify-between px-16 py-4 hover:bg-white/[0.03] group transition-all">
+                                <div className="flex items-center space-x-4">
+                                  <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-gray-500 group-hover:text-teal-400 group-hover:border-teal-500/30 transition-all">
+                                    <BsJournalText size={14} />
                                   </div>
-                                  <div className="flex items-center gap-3">
-                                    <div className="text-right">
-                                      <p className={`text-sm font-bold ${getLabelBalance(label).net < 0 ? "text-red-400" : "text-gray-200"}`}>
-                                        {formatCurrency(getLabelBalance(label).net)}
-                                      </p>
-                                    </div>
-                                    <button 
-                                      onClick={(e) => { e.stopPropagation(); openEditLabel(label); }}
-                                      className="p-2 rounded-xl bg-white/5 text-gray-400 hover:bg-white/10 hover:text-teal-400 transition-all"
-                                      title="Edit label"
-                                    >
-                                      <BsPencil size={14} />
-                                    </button>
-                                    <button 
-                                      onClick={(e) => { e.stopPropagation(); handleLabelDelete(label); }}
-                                      className="p-2 rounded-xl bg-white/5 text-gray-400 hover:bg-white/10 hover:text-rose-400 transition-all"
-                                      title="Delete label"
-                                    >
-                                      <BsTrash size={14} />
-                                    </button>
-                                    <button 
-                                      onClick={(e) => { e.stopPropagation(); setIsTransactionModalOpen(true); }}
-                                      className="p-2 rounded-xl bg-teal-500/10 text-teal-400 hover:bg-teal-500 hover:text-black transition-all shadow-lg"
-                                      title="Record transaction"
-                                    >
-                                      <BsPlusLg size={12} />
-                                    </button>
+                                  <span className="text-sm font-bold text-gray-200">{label.name}</span>
+                                </div>
+                                <div className="flex items-center space-x-8">
+                                  <div className="text-right">
+                                    <p className={`text-sm font-bold ${getLabelBalance(label).net < 0 ? "text-red-400" : "text-gray-200"}`}>
+                                      {formatCurrency(getLabelBalance(label).net)}
+                                    </p>
                                   </div>
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); setIsTransactionModalOpen(true); }}
+                                    className="p-2 rounded-xl bg-teal-500/10 text-teal-400 hover:bg-teal-500 hover:text-black transition-all shadow-lg"
+                                  >
+                                    <BsPlusLg size={12} />
+                                  </button>
                                 </div>
                               </div>
                             ))}
@@ -407,10 +330,9 @@ export default function COAView({ workbenchId }) {
 
       <LabelModal 
         isOpen={isLabelModalOpen}
-        onClose={() => { setIsLabelModalOpen(false); setSelectedLabel(null); }}
+        onClose={() => setIsLabelModalOpen(false)}
         workbenchId={workbenchId}
-        label={selectedLabel}
-        onSuccess={() => { refreshContext(); setSelectedLabel(null); }}
+        onSuccess={refreshContext}
       />
     </div>
   );

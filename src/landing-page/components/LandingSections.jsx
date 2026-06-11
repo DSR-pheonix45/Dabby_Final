@@ -49,9 +49,9 @@ function Sub({ children, isDark }) {
 const STEPS = [
     {
         num: "01",
-        title: "Ingest Bank, Bills & CRM",
-        desc: `Upload bank statements, vendor bills, and customer lists. Dabby ingests financial exports and prepares them for accounting automatically.`,
-        badge: 'Bank PDF · CSV · Excel',
+        title: "Connect & Ingest Data",
+        desc: `Upload raw bank statements, invoices, or spreadsheets. Datalis ingests data from any source instantly.`,
+        badge: 'Upload .pdf · .csv · .xlsx',
         icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -60,9 +60,9 @@ const STEPS = [
     },
     {
         num: "02",
-        title: "Map to Chart of Accounts",
-        desc: "Auto-classify transactions into GL segments, AR, AP, and GST-ready accounting buckets so your finance team can close faster.",
-        badge: "COA + AR/AP Mapping",
+        title: "Semantic AI Mapping",
+        desc: "Our AI automatically maps every transaction to your 3-layer Chart of Accounts with 99% accuracy.",
+        badge: "Automated Taxonomy Mapping",
         icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -71,9 +71,9 @@ const STEPS = [
     },
     {
         num: "03",
-        title: "Monitor Cash & Compliance",
-        desc: "Track receivables, payables, cash flow and reconciliation gaps in one dashboard built for Indian SMBs. Get visibility without manual spreadsheets.",
-        badge: "Cashflow + Reconciliation",
+        title: "Autonomous Monitoring",
+        desc: "Monitor liquidity, runway, and department spend in real-time. Turn raw data into board-ready insights.",
+        badge: "Real-time Liquidity Intelligence",
         icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
