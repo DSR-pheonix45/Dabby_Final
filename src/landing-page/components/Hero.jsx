@@ -1,794 +1,792 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useRef } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import * as XLSX from "xlsx";
+import { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../hooks/useAuth";
-import { generateTemplateData } from "../../services/templateGeneratorService";
-import { saveRedirectIntent } from "../../utils/redirectUtility";
+import { supabase } from "../../lib/supabase";
+import { 
+  Upload, 
+  FileText, 
+  CheckCircle2, 
+  AlertCircle, 
+  Trash2, 
+  ArrowRight, 
+  Lock, 
+  Loader2, 
+  Sparkles, 
+  RefreshCw, 
+  FileSpreadsheet,
+  AlertTriangle,
+  HelpCircle,
+  TrendingUp,
+  Percent
+} from "lucide-react";
 
-// ─── Intent Classifier ──────────────────────────────────────────────────────
-
-const INTENT_RULES = [
-  { key: "quotation_template", keywords: ["quote", "quotation", "proposal", "pricing proposal", "price estimate", "client quote", "cost estimate", "project estimate", "business proposal", "rate card", "service quote"] },
-  { key: "receivables_tracker", keywords: ["receivable", "unpaid invoice", "customer payment", "money owed", "collect payment", "outstanding payment", "debtors", "accounts receivable", "payment tracking", "pending payment", "overdue payment", "receivables checklist", "who owes me"] },
-  { key: "payables_tracker", keywords: ["payable", "vendor payment", "accounts payable", "pay vendor", "supplier payment", "bill to pay", "outstanding bill", "creditors", "pay supplier", "vendor invoice", "i owe"] },
-  { key: "invoice_template", keywords: ["invoice", "billing template", "bill client", "send invoice", "generate invoice", "tax invoice", "proforma invoice", "gst invoice"] },
-  { key: "expense_tracker", keywords: ["expense", "spending", "cost tracker", "track spend", "reimbursement", "employee expense", "business expense", "petty cash"] },
-  { key: "cashflow_tracker", keywords: ["cashflow", "cash flow", "cash in", "cash out", "liquidity", "runway", "inflow", "outflow", "burn rate"] },
-  { key: "profit_loss", keywords: ["profit", "loss", "p&l", "income statement", "gross margin", "net income", "earnings", "profitability", "net profit"] },
-  { key: "budget_planner", keywords: ["budget", "allocation", "spending plan", "forecast", "annual plan", "department budget", "monthly budget", "quarterly budget"] },
-  { key: "sales_tracker", keywords: ["sales", "deal", "pipeline", "lead tracker", "crm", "conversion rate", "revenue target", "sales rep", "closed deals", "quota"] },
-  { key: "inventory_tracker", keywords: ["inventory", "stock", "sku", "product quantity", "warehouse", "reorder", "units in stock"] },
-  { key: "financial_model", keywords: ["financial model", "financial modeling", "financial projection", "three statement model", "3 statement model", "dcf", "valuation model", "financial forecast", "projections"] },
-  { key: "custom_template", keywords: ["template", "dashboard", "tracker", "planner", "model", "sheet", "record", "log", "report", "journal", "register", "book"] },
+// Rotating title items
+const ROTATING_TITLES = [
+  "manual bank recon",
+  "manual Receivable checklist",
+  "manual Expense breakdown",
+  "manual cash flow planning"
 ];
 
-function classifyIntent(prompt) {
-  const p = prompt.toLowerCase();
-  for (const rule of INTENT_RULES) {
-    if (rule.keywords.some((kw) => p.includes(kw))) return rule.key;
+// Suggested query prompts for quick testing
+const SUGGESTED_QUERIES = [
+  {
+    label: "🔍 Find Duplicate Payments",
+    prompt: "Audit this general ledger against our bank feeds. Identify any duplicate vendor payments, matching transaction references, and double-billing errors."
+  },
+  {
+    label: "📊 Audit GST Splits",
+    prompt: "Scan our Zoho invoice logs against the bank statement. Verify if GST tax splits (18% vs 12%) match our input tax credit claims."
+  },
+  {
+    label: "💸 Identify Cash Leaks",
+    prompt: "Analyze our monthly expense log. Highlight recurring software subscriptions that haven't been active, or any unusual spike in miscellaneous expenses."
+  },
+  {
+    label: "📈 Calculate Runway",
+    prompt: "Assess our current cash inflows and outflows. Estimate monthly burn rate and forecast runway for the next 12 months."
   }
-  return null;
-}
-
-// ─── Template Metadata (layouts — no hardcoded rows) ───────────────────────
-
-const TEMPLATE_META = {
-  quotation_template: { name: "Quotation Template", type: "quotation" },
-  invoice_template: { name: "Invoice Template", type: "invoice" },
-  receivables_tracker: { name: "Accounts Receivable Tracker", type: "receivables" },
-  payables_tracker: { name: "Accounts Payable Tracker", type: "payables" },
-  expense_tracker: { name: "Expense Tracker", type: "expense" },
-  cashflow_tracker: { name: "Cashflow Planner", type: "cashflow" },
-  profit_loss: { name: "Profit & Loss Sheet", type: "profit_loss" },
-  budget_planner: { name: "Budget Planner", type: "budget" },
-  sales_tracker: { name: "Sales Tracker", type: "sales" },
-  inventory_tracker: { name: "Inventory Tracker", type: "inventory" },
-  financial_model: { name: "Financial Model", type: "financial_model" },
-  custom_template: { name: "Custom Financial Tracker", type: "custom" },
-};
-
-// ─── Currency Formatter ─────────────────────────────────────────────────────
-
-const fmt = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
-const pct = (n) => `${Number(n || 0).toFixed(1)}%`;
-
-// ─── AI Data → Display Template Transformers ────────────────────────────────
-// Each function receives the raw AI JSON and returns { headers, rows, meta?, summary? }
-
-const TRANSFORMERS = {
-  quotation_template(ai) {
-    const items = ai.items || [];
-    const meta = [
-      { label: "Client Name", value: ai.client_name || "—" },
-      { label: "Project", value: ai.project || "—" },
-      { label: "Prepared Date", value: ai.prepared_date || new Date().toLocaleDateString("en-IN") },
-      { label: "Validity", value: `${ai.validity_days || 30} days` },
-    ];
-    let grandTotal = 0;
-    const rows = items.map((item) => {
-      const subtotal = (item.qty || 0) * (item.unit_price || 0);
-      const tax = subtotal * ((item.tax_percent || 18) / 100);
-      const total = subtotal + tax;
-      grandTotal += total;
-      return [
-        item.description || "—",
-        `${item.qty} ${item.unit || ""}`.trim(),
-        fmt(item.unit_price),
-        fmt(subtotal),
-        fmt(tax),
-        fmt(total),
-      ];
-    });
-    rows.push(["", "", "", "", "Grand Total", fmt(grandTotal)]);
-    meta.push({ label: "Grand Total", value: `${fmt(grandTotal)} (incl. GST)` });
-    return {
-      headers: ["Item Description", "Qty / Unit", "Unit Price", "Subtotal", "Tax (18%)", "Total"],
-      rows,
-      meta,
-    };
-  },
-
-  invoice_template(ai) {
-    const items = ai.items || [];
-    let grandTotal = 0;
-    const rows = items.map((item) => {
-      const subtotal = (item.qty || 0) * (item.unit_price || 0);
-      const tax = subtotal * ((item.tax_percent || 18) / 100);
-      const total = subtotal + tax;
-      grandTotal += total;
-      return [
-        item.description || "—",
-        `${item.qty} ${item.unit || ""}`.trim(),
-        fmt(item.unit_price),
-        `${item.tax_percent || 18}%`,
-        fmt(total),
-      ];
-    });
-    rows.push(["", "", "", "Grand Total", fmt(grandTotal)]);
-    const meta = [
-      { label: "Client", value: ai.client_name || "—" },
-      { label: "Invoice No.", value: ai.invoice_no || "INV-001" },
-      { label: "Date", value: ai.invoice_date || "—" },
-      { label: "Due Date", value: ai.due_date || "—" },
-      { label: "Grand Total", value: fmt(grandTotal) },
-    ];
-    return {
-      headers: ["Item Description", "Qty / Unit", "Unit Price", "Tax %", "Amount"],
-      rows,
-      meta,
-    };
-  },
-
-  receivables_tracker(ai) {
-    const invoices = ai.invoices || [];
-    const s = ai.summary || {};
-    const summary = [
-      { label: "Total Receivables", value: fmt(s.total_receivable) },
-      { label: "Overdue Amount", value: fmt(s.overdue_amount) },
-      { label: "Pending Invoices", value: String(s.pending_count ?? invoices.filter(i => i.status !== "Paid").length) },
-    ];
-    const rows = invoices.map((inv) => [
-      inv.id || "—", inv.customer || "—", fmt(inv.amount),
-      inv.issue_date || "—", inv.due_date || "—",
-      inv.status || "Pending", inv.notes || "—",
-    ]);
-    return {
-      headers: ["Invoice ID", "Customer", "Amount", "Issue Date", "Due Date", "Status", "Notes"],
-      rows,
-      summary,
-    };
-  },
-
-  payables_tracker(ai) {
-    const vendors = ai.vendors || [];
-    const s = ai.summary || {};
-    const summary = [
-      { label: "Total Payable", value: fmt(s.total_payable) },
-      { label: "Overdue Bills", value: fmt(s.overdue_bills) },
-      { label: "Due This Week", value: String(s.due_this_week ?? 0) },
-    ];
-    const rows = vendors.map((v) => [
-      v.vendor || "—", v.invoice_no || "—", fmt(v.amount),
-      v.issue_date || "—", v.due_date || "—",
-      v.status || "Pending", v.method || "NEFT",
-    ]);
-    return {
-      headers: ["Vendor", "Invoice No.", "Amount", "Issue Date", "Due Date", "Status", "Method"],
-      rows,
-      summary,
-    };
-  },
-
-  expense_tracker(ai) {
-    const expenses = ai.expenses || [];
-    const s = ai.summary || {};
-    const summary = [
-      { label: `Total Spent (${ai.month || "Month"})`, value: fmt(s.total_spent) },
-      { label: "Budget Remaining", value: fmt(s.remaining) },
-      { label: "Categories", value: String(s.category_count ?? new Set(expenses.map(e => e.category)).size) },
-    ];
-    const rows = expenses.map((e) => [
-      e.date || "—", e.category || "—", e.description || "—",
-      fmt(e.amount), e.paid_by || "—", e.receipt || "Pending",
-    ]);
-    return {
-      headers: ["Date", "Category", "Description", "Amount", "Paid By", "Receipt"],
-      rows,
-      summary,
-    };
-  },
-
-  cashflow_tracker(ai) {
-    const months = ai.months || [];
-    const s = ai.summary || {};
-    const summary = [
-      { label: "Cash on Hand", value: fmt(s.cash_on_hand) },
-      { label: "Monthly Burn", value: fmt(s.monthly_burn) },
-      { label: "Runway", value: `${s.runway_months ?? "—"} months` },
-    ];
-    let cumulative = 0;
-    const rows = months.map((m) => {
-      const net = (m.inflows || 0) - (m.outflows || 0);
-      cumulative += net;
-      return [
-        m.label || "—",
-        fmt(m.inflows),
-        fmt(m.outflows),
-        fmt(net),
-        fmt(cumulative),
-      ];
-    });
-    return {
-      headers: ["Month", "Cash Inflows", "Cash Outflows", "Net Cashflow", "Cumulative"],
-      rows,
-      summary,
-    };
-  },
-
-  profit_loss(ai) {
-    const quarters = ai.quarters || [];
-    const s = ai.summary || {};
-    const summary = [
-      { label: "FY Revenue", value: fmt(s.fy_revenue) },
-      { label: "Net Profit", value: fmt(s.net_profit) },
-      { label: "Profit Margin", value: pct(s.profit_margin_pct) },
-    ];
-    // Compute totals
-    const totals = quarters.reduce((acc, q) => {
-      acc.revenue += q.revenue || 0; acc.cogs += q.cost_of_goods || 0;
-      acc.gross += (q.revenue - q.cost_of_goods) || 0;
-      acc.sal += q.salaries || 0; acc.mkt += q.marketing || 0;
-      acc.ga += q.general_admin || 0;
-      return acc;
-    }, { revenue: 0, cogs: 0, gross: 0, sal: 0, mkt: 0, ga: 0 });
-    const fy_net = totals.gross - totals.sal - totals.mkt - totals.ga;
-
-    const build = (label, fn) => [label, ...quarters.map(fn), fmt(quarters.reduce((a, q) => a + (fn(q) ? Number(fn(q).replace(/[₹,]/g, "")) : 0), 0))];
-
-    const rows = [
-      ["Gross Revenue", ...quarters.map(q => fmt(q.revenue)), fmt(totals.revenue)],
-      ["Cost of Goods", ...quarters.map(q => fmt(q.cost_of_goods)), fmt(totals.cogs)],
-      ["Gross Profit", ...quarters.map(q => fmt((q.revenue || 0) - (q.cost_of_goods || 0))), fmt(totals.gross)],
-      ["Salaries & Payroll", ...quarters.map(q => fmt(q.salaries)), fmt(totals.sal)],
-      ["Marketing & Ads", ...quarters.map(q => fmt(q.marketing)), fmt(totals.mkt)],
-      ["General & Admin", ...quarters.map(q => fmt(q.general_admin)), fmt(totals.ga)],
-      ["Net Profit", ...quarters.map(q => fmt((q.revenue || 0) - (q.cost_of_goods || 0) - (q.salaries || 0) - (q.marketing || 0) - (q.general_admin || 0))), fmt(fy_net)],
-    ];
-    return {
-      headers: ["P&L Line Item", "Q1", "Q2", "Q3", "Q4", "Full Year"],
-      rows,
-      summary,
-    };
-  },
-
-  budget_planner(ai) {
-    const depts = ai.departments || [];
-    const s = ai.summary || {};
-    const summary = [
-      { label: "Total Budget", value: fmt(s.total_budget) },
-      { label: "Total Spent", value: fmt(s.total_spent) },
-      { label: "Overall Used", value: pct(s.used_pct) },
-    ];
-    const rows = depts.map((d) => {
-      const remaining = (d.budget || 0) - (d.spent || 0);
-      const usedPct = d.budget ? ((d.spent / d.budget) * 100).toFixed(1) : "0";
-      const status = Number(usedPct) >= 80 ? "Overdue" : Number(usedPct) >= 60 ? "Pending" : "Healthy";
-      return [d.name, fmt(d.budget), fmt(d.spent), fmt(remaining), `${usedPct}%`, status];
-    });
-    return {
-      headers: ["Department", "Annual Budget", "Spent (YTD)", "Remaining", "% Used", "Status"],
-      rows,
-      summary,
-    };
-  },
-
-  sales_tracker(ai) {
-    const team = ai.team || [];
-    const s = ai.summary || {};
-    const summary = [
-      { label: "Total Pipeline", value: fmt(s.total_pipeline) },
-      { label: "Closed Revenue", value: fmt(s.closed_revenue) },
-      { label: "Avg. Conv. Rate", value: pct(s.avg_conversion_pct) },
-    ];
-    const rows = team.map((rep) => {
-      const convPct = rep.leads ? ((rep.deals_closed / rep.leads) * 100).toFixed(1) : "0";
-      const status = Number(convPct) >= 40 ? "Healthy" : Number(convPct) >= 25 ? "Pending" : "Overdue";
-      return [rep.name, String(rep.leads), String(rep.deals_closed), fmt(rep.revenue), `${convPct}%`, status];
-    });
-    return {
-      headers: ["Sales Rep", "Active Leads", "Deals Closed", "Revenue", "Conv. Rate", "Status"],
-      rows,
-      summary,
-    };
-  },
-
-  inventory_tracker(ai) {
-    const items = ai.items || [];
-    const s = ai.summary || {};
-    const summary = [
-      { label: "Total SKUs", value: String(s.total_skus ?? items.length) },
-      { label: "Low Stock Items", value: String(s.low_stock_items ?? items.filter(i => i.in_stock <= i.reorder_point).length) },
-      { label: "Inventory Value", value: fmt(s.inventory_value ?? items.reduce((a, i) => a + (i.in_stock * i.unit_cost), 0)) },
-    ];
-    const rows = items.map((item) => {
-      const value = (item.in_stock || 0) * (item.unit_cost || 0);
-      const status = item.in_stock <= 0 ? "Critical" : item.in_stock <= item.reorder_point ? "Reorder" : "Healthy";
-      return [item.sku, item.name, String(item.in_stock), String(item.reorder_point), fmt(item.unit_cost), fmt(value), status];
-    });
-    return {
-      headers: ["SKU", "Product Name", "In Stock", "Reorder Pt.", "Unit Cost", "Stock Value", "Status"],
-      rows,
-      summary,
-    };
-  },
-
-  financial_model(ai) {
-    const years = ai.years || [];
-    const s = ai.summary || {};
-    const summary = [
-      { label: "NPV", value: fmt(s.npv) },
-      { label: "IRR", value: pct(s.irr) },
-      { label: "Payback Period", value: `${s.payback_period} Yrs` },
-    ];
-    let cumulative = 0;
-    const rows = years.map((y) => {
-      const net = (y.revenue || 0) - (y.expenses || 0);
-      cumulative += net;
-      return [
-        y.year || "—",
-        fmt(y.revenue),
-        fmt(y.expenses),
-        fmt(y.ebitda),
-        fmt(net),
-        fmt(cumulative),
-      ];
-    });
-    return {
-      headers: ["Year", "Revenue", "Expenses", "EBITDA", "Net Cashflow", "Cumulative"],
-      rows,
-      summary,
-    };
-  },
-
-  custom_template(ai) {
-    const rows = (ai.rows || []).map((r) => [
-      r.category, r.description, fmt(r.amount), r.date, r.status || "Active", r.notes || "—",
-    ]);
-    return {
-      headers: ["Category", "Description", "Amount", "Date", "Status", "Notes"],
-      rows,
-    };
-  },
-};
-
-function buildTemplate(key, aiData) {
-  const meta = TEMPLATE_META[key] || TEMPLATE_META.custom_template;
-  const transformer = TRANSFORMERS[key] || TRANSFORMERS.custom_template;
-  const transformed = transformer(aiData);
-  return { name: meta.name, type: meta.type, ...transformed };
-}
-
-// ─── Suggestion Pills ───────────────────────────────────────────────────────
-
-const SUGGESTIONS = [
-  { label: "Financial Model", prompt: "Build a 5-year financial model for a SaaS startup" },
-  { label: "Invoice", prompt: "Generate an invoice for a digital marketing agency" },
-  { label: "Quotation", prompt: "Create a quotation for roofing materials" },
-  { label: "Expense Tracker", prompt: "Track expenses for a restaurant business" },
-  { label: "Cashflow", prompt: "Build a cashflow planner for a startup" },
-  { label: "Profit & Loss", prompt: "Create a profit and loss sheet for a retail business" },
-  { label: "Sales Tracker", prompt: "Track sales pipeline for my SaaS team" },
 ];
-
-const PLACEHOLDERS = [
-  "Create a cashflow tracker for my startup",
-  "Build a quotation for roofing materials",
-  "Generate an invoice for web development services",
-  "Track expenses for my restaurant business",
-];
-
-// ─── Loading Steps ──────────────────────────────────────────────────────────
-
-const LOADING_STEPS = [
-  { key: "detecting", label: "Detecting template type…" },
-  { key: "generating", label: "Generating items with AI…" },
-  { key: "preparing", label: "Preparing your template…" },
-];
-
-// ─── Status Badges ──────────────────────────────────────────────────────────
-
-const STATUS_STYLES = {
-  Paid: "bg-emerald-500/15 text-emerald-400", Confirmed: "bg-emerald-500/15 text-emerald-400",
-  Healthy: "bg-emerald-500/15 text-emerald-400", Active: "bg-emerald-500/15 text-emerald-400",
-  Pending: "bg-amber-500/15 text-amber-400", Reorder: "bg-amber-500/15 text-amber-400",
-  Overdue: "bg-red-500/15 text-red-400", Critical: "bg-red-500/15 text-red-400",
-  Due: "bg-red-500/15 text-red-400",
-};
-
-function CellContent({ value }) {
-  return STATUS_STYLES[value]
-    ? <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_STYLES[value]}`}>{value}</span>
-    : <>{value}</>;
-}
-
-// ─── Auth Modal ─────────────────────────────────────────────────────────────
-
-function AuthModal({ onClose, theme }) {
-  const isDark = theme === "dark";
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-md rounded-2xl p-8 shadow-2xl border relative ${isDark ? "bg-[#111111] border-white/10" : "bg-white border-gray-200"}`}
-      >
-        <button onClick={onClose} className={`absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-full transition-colors ${isDark ? "text-gray-500 hover:bg-white/10" : "text-gray-400 hover:bg-gray-100"}`}>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
-        <div className="w-12 h-12 rounded-xl bg-[#81E6D9]/15 flex items-center justify-center mb-5">
-          <svg className="w-6 h-6 text-[#81E6D9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-          </svg>
-        </div>
-        <h3 className={`text-xl font-bold mb-2 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>Join Dabby Waitlist</h3>
-        <p className={`text-sm leading-relaxed mb-6 ${isDark ? "text-[#787878]" : "text-gray-500"}`}>
-          Join the waitlist to automate your SME accounting and eliminate manual bank statement reconciliation.
-        </p>
-        <div className="flex flex-col gap-3">
-          <Link to="/waitlist" className="w-full py-3 px-6 text-sm font-semibold text-black bg-[#81E6D9] rounded-xl text-center hover:bg-[#5fd3c7] transition-colors duration-200" onClick={onClose}>Join the Waitlist</Link>
-          <Link to="/login" className={`w-full py-3 px-6 text-sm font-semibold rounded-xl text-center border transition-colors duration-200 ${isDark ? "border-white/15 text-white hover:bg-white/5" : "border-gray-200 text-[#1a1a1a] hover:bg-gray-50"}`} onClick={onClose}>Sign in to existing account</Link>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-}
-
-// ─── Loading State UI ───────────────────────────────────────────────────────
-
-function LoadingTemplate({ step, theme }) {
-  const isDark = theme === "dark";
-  const currentIdx = LOADING_STEPS.findIndex((s) => s.key === step);
-  return (
-    <motion.div key="loading" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-      className="mt-10 w-full max-w-3xl mx-auto"
-    >
-      <div className={`rounded-2xl border p-8 ${isDark ? "bg-[#111111] border-white/10" : "bg-white border-gray-200"}`}>
-        <div className="flex flex-col items-center gap-5">
-          <div className="w-12 h-12 rounded-full border-2 border-[#81E6D9] border-t-transparent animate-spin" />
-          <div className="space-y-2 text-center">
-            {LOADING_STEPS.map((s, i) => (
-              <motion.p key={s.key}
-                initial={{ opacity: 0 }} animate={{ opacity: i <= currentIdx ? 1 : 0.25 }}
-                className={`text-sm font-medium flex items-center justify-center gap-2 ${i < currentIdx ? (isDark ? "text-[#81E6D9]/60" : "text-[#0D9488]/60")
-                  : i === currentIdx ? (isDark ? "text-white" : "text-[#1a1a1a]")
-                    : (isDark ? "text-[#787878]/40" : "text-gray-300")
-                  }`}
-              >
-                {i < currentIdx && <svg className="w-3.5 h-3.5 text-[#81E6D9]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                {i === currentIdx && <span className="w-1.5 h-1.5 rounded-full bg-[#81E6D9] animate-pulse inline-block" />}
-                {s.label}
-              </motion.p>
-            ))}
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-// ─── Template Preview Card ──────────────────────────────────────────────────
-
-function TemplatePreview({ template, templateKey, onDownload, theme }) {
-  const isDark = theme === "dark";
-  const isFooterRow = (row) => row.filter(c => c !== "").length <= 2;
-
-  return (
-    <motion.div key={templateKey} initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 12 }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-      className="mt-8 w-full max-w-3xl mx-auto"
-    >
-      {/* Detected label */}
-      <div className="flex items-center gap-2 mb-3">
-        <span className={`text-xs ${isDark ? "text-[#787878]" : "text-gray-400"}`}>Detected template:</span>
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${isDark ? "bg-[#81E6D9]/10 border-[#81E6D9]/25 text-[#81E6D9]" : "bg-[#0D9488]/10 border-[#0D9488]/25 text-[#0D9488]"}`}>
-          <span className="w-1.5 h-1.5 rounded-full bg-[#81E6D9]" />
-          {template.name}
-        </span>
-      </div>
-
-      <div className={`rounded-2xl border overflow-hidden shadow-xl ${isDark ? "bg-[#111111] border-white/10" : "bg-white border-gray-200"}`}>
-        {/* Header */}
-        <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? "border-white/8" : "border-gray-100"}`}>
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-[#81E6D9]/15 flex items-center justify-center flex-shrink-0">
-              <svg className="w-4 h-4 text-[#81E6D9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <p className={`text-sm font-semibold truncate ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>{template.name}</p>
-          </div>
-          <button onClick={onDownload} id="hero-download-btn"
-            className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-black bg-[#81E6D9] rounded-lg hover:bg-[#5fd3c7] transition-colors duration-200 whitespace-nowrap ml-4 flex-shrink-0"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-            Download .xlsx
-          </button>
-        </div>
-
-        {/* Meta strip (quotation / invoice) */}
-        {template.meta && (
-          <div className={`grid grid-cols-2 sm:grid-cols-3 gap-px border-b ${isDark ? "border-white/8 bg-white/4" : "border-gray-100 bg-gray-100"}`}>
-            {template.meta.map((item) => (
-              <div key={item.label} className={`px-4 py-3 ${isDark ? "bg-[#111111]" : "bg-white"}`}>
-                <p className={`text-[10px] mb-0.5 ${isDark ? "text-[#787878]" : "text-gray-400"}`}>{item.label}</p>
-                <p className={`text-xs font-semibold ${item.label === "Grand Total" ? "text-[#81E6D9]" : isDark ? "text-white" : "text-[#1a1a1a]"}`}>{item.value}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Summary strip */}
-        {template.summary && (
-          <div className={`grid grid-cols-3 divide-x border-b ${isDark ? "border-white/8 divide-white/8" : "border-gray-100 divide-gray-100"}`}>
-            {template.summary.map((item) => (
-              <div key={item.label} className="px-4 py-3 text-center">
-                <p className={`text-sm font-bold ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>{item.value}</p>
-                <p className={`text-[10px] mt-0.5 ${isDark ? "text-[#787878]" : "text-gray-400"}`}>{item.label}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className={isDark ? "bg-white/4" : "bg-gray-50"}>
-                {template.headers.map((h) => (
-                  <th key={h} className={`text-left px-4 py-2.5 text-xs font-semibold uppercase tracking-wide whitespace-nowrap ${isDark ? "text-[#787878]" : "text-gray-400"}`}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {template.rows.map((row, ri) => {
-                const footer = isFooterRow(row);
-                return (
-                  <tr key={ri} className={`border-t transition-colors ${isDark ? "border-white/5 hover:bg-white/3" : "border-gray-100 hover:bg-gray-50/60"}`}>
-                    {row.map((cell, ci) => (
-                      <td key={ci} className={`px-4 py-2.5 text-xs whitespace-nowrap ${footer && ci === row.length - 1 ? "font-bold text-[#81E6D9]" : isDark ? "text-gray-300" : "text-gray-700"}`}>
-                        <CellContent value={cell} />
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Footer */}
-        <div className={`px-5 py-3 flex items-center gap-2 border-t ${isDark ? "border-white/5" : "border-gray-100"}`}>
-          <svg className="w-3.5 h-3.5 text-[#81E6D9] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-          <span className={`text-xs ${isDark ? "text-[#787878]" : "text-gray-400"}`}>Generated by Datalis AI · Powered by Groq</span>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-// ─── Main Hero ──────────────────────────────────────────────────────────────
 
 export default function Hero() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const isDark = theme === "dark";
 
-  const [searchParams, setSearchParams] = useSearchParams();
+  // Title Rotation
+  const [titleIndex, setTitleIndex] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTitleIndex((prev) => (prev + 1) % ROTATING_TITLES.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
+  // File Uploader & Prompt states
+  const fileInputRef = useRef(null);
+  const [file, setFile] = useState(null);
   const [prompt, setPrompt] = useState("");
-  const [loadingStep, setLoadingStep] = useState(null);   // null | "detecting" | "generating" | "preparing"
-  const [result, setResult] = useState(null);              // { key, template }
-  const [error, setError] = useState(null);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [placeholderIndex] = useState(() => Math.floor(Math.random() * PLACEHOLDERS.length));
-  const inputRef = useRef(null);
+  const [isDragActive, setIsDragActive] = useState(false);
 
-  // Auto-trigger from URL params
-  const hasTriggered = useRef(false);
-  useState(() => {
-    const incomingPrompt = searchParams.get("prompt");
-    if (incomingPrompt && !hasTriggered.current) {
-        // We set the prompt and trigger after the first render
-        setPrompt(incomingPrompt);
-    }
-  });
+  // Analysis State Machine
+  // 'idle' | 'uploading' | 'parsing' | 'matching' | 'detecting' | 'complete'
+  const [analysisState, setAnalysisState] = useState("idle");
+  const [uploadProgress, setUploadProgress] = useState(0);
 
-  const handleGenerate = async (overridePrompt) => {
-    // If overridePrompt is a string (passed manually), use it.
-    // If it's an event (from onClick) or null, use the state prompt.
-    const activePrompt = (typeof overridePrompt === 'string') ? overridePrompt : prompt;
-    
-    if (!activePrompt || !activePrompt.trim()) { 
-      inputRef.current?.focus(); 
-      return; 
-    }
-    setResult(null);
-    setError(null);
+  // Waitlist Embedded Form states
+  const [waitlistEmail, setWaitlistEmail] = useState("");
+  const [waitlistLoading, setWaitlistLoading] = useState(false);
+  const [waitlistSuccess, setWaitlistSuccess] = useState(false);
+  const [waitlistError, setWaitlistError] = useState("");
 
-    try {
-      // Step 1: Classify
-      setLoadingStep("detecting");
-      const key = classifyIntent(activePrompt);
-      
-      if (!key) {
-        setError("Hey, I didn't get which template do you want, can you specify.");
-        setLoadingStep(null);
-        return;
-      }
-      
-      await new Promise((r) => setTimeout(r, 400));
-
-      // Step 2: Call Groq
-      setLoadingStep("generating");
-      const aiData = await generateTemplateData(activePrompt, key);
-
-      // Step 3: Transform + render
-      setLoadingStep("preparing");
-      await new Promise((r) => setTimeout(r, 400));
-      const template = buildTemplate(key, aiData);
-      setResult({ key, template });
-
-      // Clear search param after successful trigger
-      setSearchParams({}, { replace: true });
-    } catch (err) {
-      console.error("[Hero] Generation failed:", err);
-      setError(err.message || "Failed to generate template. Please try again.");
-    } finally {
-      setLoadingStep(null);
+  // Drag over/enter/leave events
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setIsDragActive(true);
+    } else if (e.type === "dragleave") {
+      setIsDragActive(false);
     }
   };
 
-  // Trigger effect
-  useState(() => {
-    const incomingPrompt = searchParams.get("prompt");
-    if (incomingPrompt && !hasTriggered.current) {
-        hasTriggered.current = true;
-        setTimeout(() => handleGenerate(incomingPrompt), 500);
+  // Drop event
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const droppedFile = e.dataTransfer.files[0];
+      setFile({
+        name: droppedFile.name,
+        size: droppedFile.size,
+        type: droppedFile.type,
+        isSample: false
+      });
     }
-  });
+  };
 
-  const handleKeyDown = (e) => { if (e.key === "Enter") handleGenerate(); };
-  const handleSuggestion = (p) => { setPrompt(p); inputRef.current?.focus(); };
+  // File Select event
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const selectedFile = e.target.files[0];
+      setFile({
+        name: selectedFile.name,
+        size: selectedFile.size,
+        type: selectedFile.type,
+        isSample: false
+      });
+    }
+  };
 
-  const handleDownload = () => {
-    if (!user) {
-      saveRedirectIntent('/');
-      setShowAuthModal(true);
+  // Use Sample statement event
+  const handleUseSample = () => {
+    setFile({
+      name: "zoho_and_tally_ledger_fy26.xlsx",
+      size: 2457600, // 2.4 MB
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      isSample: true
+    });
+    // Prefill with a logical audit prompt
+    setPrompt("Audit this general ledger against our bank feeds. Identify any duplicate vendor payments, matching transaction references, and double-billing errors.");
+  };
+
+  // Delete file event
+  const handleRemoveFile = () => {
+    setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (analysisState !== "idle") setAnalysisState("idle");
+  };
+
+  // Handle Suggested Quick Tag click
+  const handleSuggestedClick = (tag) => {
+    setPrompt(tag.prompt);
+    if (!file) {
+      handleUseSample();
+    }
+  };
+
+  // Trigger analysis simulation
+  const handleAnalyze = () => {
+    if (!file) {
+      alert("Please upload a file or click 'Use sample statement' first.");
       return;
     }
-    if (!result) return;
-    const { template, key } = result;
-    const dataRows = template.rows.filter((row) => row.some((c) => c !== ""));
-    const wsData = [template.headers, ...dataRows];
-    const metaRows = [];
-    if (template.meta) template.meta.forEach(({ label, value }) => metaRows.push([label, value]));
-    if (template.summary) template.summary.forEach(({ label, value }) => metaRows.push([label, value]));
-    if (metaRows.length) metaRows.push(["---"]);
-    const fullSheet = [...metaRows, ...wsData];
-    const ws = XLSX.utils.aoa_to_sheet(fullSheet);
-    const colWidths = fullSheet[0]?.map((_, ci) =>
-      Math.max(...fullSheet.map((row) => String(row[ci] ?? "").length), 10)
-    ) ?? [];
-    ws["!cols"] = colWidths.map((w) => ({ wch: Math.min(w + 4, 40) }));
-    const wb = XLSX.utils.book_new();
-    const sheetName = (template.name || "Template").substring(0, 31);
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    XLSX.writeFile(wb, `${(template.name || "template").replace(/\s+/g, "_")}_Datalis.xlsx`);
+    
+    setAnalysisState("uploading");
+    setUploadProgress(0);
+
+    // Simulate progress updates for uploading
+    const progressInterval = setInterval(() => {
+      setUploadProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(progressInterval);
+          return 100;
+        }
+        return prev + 20;
+      });
+    }, 200);
+
+    // Timeline simulation
+    setTimeout(() => {
+      setAnalysisState("parsing");
+      setTimeout(() => {
+        setAnalysisState("matching");
+        setTimeout(() => {
+          setAnalysisState("detecting");
+          setTimeout(() => {
+            setAnalysisState("complete");
+          }, 1500);
+        }, 1500);
+      }, 1500);
+    }, 1200);
   };
 
-  const isLoading = loadingStep !== null;
+  // Waitlist submission
+  const handleWaitlistSubmit = async (e) => {
+    e.preventDefault();
+    const email = waitlistEmail.trim();
+    if (!email) {
+      setWaitlistError("Please enter your email.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setWaitlistError("Please enter a valid email address.");
+      return;
+    }
+
+    try {
+      setWaitlistLoading(true);
+      setWaitlistError("");
+      const { error } = await supabase
+        .from("waitlist")
+        .insert([{ email }]);
+      
+      if (error) {
+        if (error.code === "23505") {
+          setWaitlistSuccess(true);
+          return;
+        }
+        throw error;
+      }
+      setWaitlistSuccess(true);
+    } catch (err) {
+      console.error("Waitlist error:", err);
+      setWaitlistError("Something went wrong. Please try again.");
+    } finally {
+      setWaitlistLoading(false);
+    }
+  };
+
+  // Reset uploader
+  const handleReset = () => {
+    setFile(null);
+    setPrompt("");
+    setAnalysisState("idle");
+    setWaitlistEmail("");
+    setWaitlistSuccess(false);
+    setWaitlistError("");
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
 
   return (
-    <>
-      <AnimatePresence>
-        {showAuthModal && <AuthModal theme={theme} onClose={() => setShowAuthModal(false)} />}
-      </AnimatePresence>
+    <section className="relative pt-24 md:pt-32 pb-16 md:pb-24 px-4 sm:px-6 md:px-12 overflow-hidden">
+      {/* Background glow effects */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[500px] pointer-events-none overflow-hidden -z-10">
+        <div className={`absolute top-[-20%] left-[20%] w-[350px] sm:w-[500px] h-[350px] sm:h-[500px] rounded-full blur-[120px] opacity-20 ${isDark ? "bg-[#81E6D9]" : "bg-[#0D9488]"}`} />
+        <div className={`absolute top-[-10%] right-[20%] w-[300px] sm:w-[400px] h-[300px] sm:h-[400px] rounded-full blur-[100px] opacity-15 ${isDark ? "bg-blue-400" : "bg-blue-300"}`} />
+      </div>
 
-      <section className="relative pt-28 md:pt-36 pb-16 md:pb-24 px-4 sm:px-6 md:px-12">
-        <div className="max-w-3xl mx-auto">
+      <div className="max-w-4xl mx-auto">
+        {/* Top waitlist badge */}
+        <motion.div 
+          initial={{ opacity: 0, y: 16 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ duration: 0.5 }} 
+          className="flex justify-center mb-6"
+        >
+          <Link to="/waitlist" className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all duration-300 ${isDark ? "bg-[#81E6D9]/10 border-[#81E6D9]/25 text-[#81E6D9] hover:bg-[#81E6D9]/15" : "bg-[#0D9488]/10 border-[#0D9488]/25 text-[#0D9488] hover:bg-[#0D9488]/15"}`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#81E6D9] animate-pulse" />
+            SME Accounting Automated · Join Waitlist
+            <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
+          </Link>
+        </motion.div>
 
-          {/* Badge */}
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="flex justify-center mb-6">
-            <span className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold border ${isDark ? "bg-[#81E6D9]/10 border-[#81E6D9]/25 text-[#81E6D9]" : "bg-[#0D9488]/10 border-[#0D9488]/25 text-[#0D9488]"}`}>
-              <span className="w-1.5 h-1.5 rounded-full bg-[#81E6D9] animate-pulse" />
-              Autonomous Financial Operations
-            </span>
-          </motion.div>
-
-          {/* Headline */}
-          <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}
-            className={`font-display text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.08] tracking-tight text-center mb-4 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}
+        {/* Dynamic Rotating Headline */}
+        <div className="text-center mb-6 min-h-[7rem] sm:min-h-[5.5rem] md:min-h-[6.5rem] flex flex-col justify-end">
+          <motion.h1 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className={`font-display text-3xl sm:text-5xl md:text-6xl font-bold leading-[1.15] sm:leading-[1.1] tracking-tight text-center ${isDark ? "text-white" : "text-[#1a1a1a]"}`}
           >
             Stop wasting 3 days a month
-            <br className="hidden sm:block" />
-            on <span className="text-[#81E6D9]">manual bank reconciliation.</span>
+            <br />
+            on{" "}
+            <span className="relative inline-flex overflow-hidden align-bottom text-[#81E6D9] min-w-[280px] sm:min-w-[480px] justify-center sm:justify-start">
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={titleIndex}
+                  initial={{ y: 35, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: -35, opacity: 0 }}
+                  transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                  className="inline-block text-left"
+                >
+                  {ROTATING_TITLES[titleIndex]}
+                </motion.span>
+              </AnimatePresence>
+            </span>
           </motion.h1>
+        </div>
 
-          {/* Subheadline */}
-          <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
-            className={`text-base md:text-lg text-center leading-relaxed mb-10 ${isDark ? "text-[#787878]" : "text-gray-500"}`}
-          >
-            Stop copying Zoho/Salesforce data or manually matching PDF statement logs. 
-            Dabby auto-maps transactions to your Indian ledger, handles GST tax splits, and tracks receivables in real-time.
-          </motion.p>
+        {/* Subheadline (Narration: solving the main pain) */}
+        <motion.p 
+          initial={{ opacity: 0, y: 20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className={`text-base md:text-lg text-center leading-relaxed mb-8 max-w-2xl mx-auto ${isDark ? "text-[#a0a0a0]" : "text-gray-600"}`}
+        >
+          Indian companies waste hours every week manually reconciling bank statements, mapping GST splits, and tracking down missing vouchers. Dabby automates your entire ledger booking process with real-time AI reconciliation.
+        </motion.p>
 
-          {/* Input */}
-          <motion.div initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }}>
-            <div className={`flex flex-wrap sm:flex-nowrap items-center gap-2 p-2 rounded-2xl border shadow-lg transition-shadow ${isDark ? "bg-[#111111] border-white/10 shadow-black/30 focus-within:border-[#81E6D9]/40" : "bg-white border-gray-200 shadow-gray-100/80 focus-within:border-[#81E6D9]/60"}`}>
-              <div className={`pl-3 flex-shrink-0 ${isDark ? "text-[#787878]" : "text-gray-400"}`}>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-              </div>
-              <input
-                ref={inputRef} id="hero-prompt-input" type="text"
-                value={prompt} onChange={(e) => setPrompt(e.target.value)} onKeyDown={handleKeyDown}
-                placeholder={PLACEHOLDERS[placeholderIndex]}
-                disabled={isLoading}
-                className={`flex-1 w-full bg-transparent text-sm md:text-base py-3 outline-none disabled:opacity-50 ${isDark ? "text-white placeholder-[#787878]" : "text-[#1a1a1a] placeholder-gray-400"}`}
-              />
-              <button id="hero-generate-btn" onClick={handleGenerate} disabled={isLoading}
-                className="flex-shrink-0 w-full sm:w-auto flex items-center gap-2 px-5 py-3 text-sm font-semibold text-black bg-[#81E6D9] rounded-xl hover:bg-[#5fd3c7] disabled:opacity-60 transition-all duration-200"
-              >
-                {isLoading
-                  ? <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg><span className="hidden sm:inline">Working…</span></>
-                  : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg><span className="hidden sm:inline">Generate Template</span><span className="sm:hidden">Generate</span></>
-                }
-              </button>
-            </div>
-          </motion.div>
-
-          {/* Auth hint */}
-          {!user && (
-            <p className={`text-center text-xs mt-3 ${isDark ? "text-[#787878]" : "text-gray-400"}`}>
-              <span className="mr-1">🔒</span>
-              Join the waitlist to unlock early template downloads.
-              <Link to="/waitlist" className="ml-1 underline underline-offset-2 hover:text-[#81E6D9] transition-colors">Join Waitlist →</Link>
-            </p>
-          )}
-
-          {/* Error */}
-          {error && (
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-              className="mt-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center"
-            >
-              {error}
-            </motion.div>
-          )}
-
-          {/* Suggestion Pills */}
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.45 }} className="flex flex-wrap justify-center gap-2 mt-5">
-            {SUGGESTIONS.map((s) => (
-              <button key={s.label} onClick={() => handleSuggestion(s.prompt)} disabled={isLoading}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all duration-150 disabled:opacity-40 ${isDark ? "border-white/12 text-[#b0b0b0] hover:border-[#81E6D9]/40 hover:text-[#81E6D9] hover:bg-[#81E6D9]/8" : "border-gray-200 text-gray-500 hover:border-[#81E6D9]/50 hover:text-[#0D9488] hover:bg-[#81E6D9]/10"}`}
-              >
-                {s.label}
-              </button>
-            ))}
-          </motion.div>
-
-          {/* Loading / Preview */}
+        {/* Main interactive core card */}
+        <motion.div 
+          initial={{ opacity: 0, y: 24 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ duration: 0.6, delay: 0.3 }}
+          className={`w-full rounded-3xl border shadow-2xl relative overflow-hidden transition-all duration-300 ${
+            isDark 
+              ? "bg-[#111111]/70 border-white/10 backdrop-blur-xl shadow-black/50" 
+              : "bg-white border-gray-200 shadow-gray-200/50"
+          }`}
+        >
           <AnimatePresence mode="wait">
-            {isLoading && <LoadingTemplate key="loading" step={loadingStep} theme={theme} />}
-            {!isLoading && result && (
-              <TemplatePreview key={result.key} template={result.template} templateKey={result.key} onDownload={handleDownload} theme={theme} />
-            )}
-          </AnimatePresence>
-
-          {/* Social proof */}
-          <AnimatePresence>
-            {!isLoading && !result && !error && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                transition={{ duration: 0.4, delay: 0.6 }}
-                className={`flex flex-wrap items-center justify-center gap-6 mt-10 pt-8 border-t ${isDark ? "border-white/8" : "border-gray-100"}`}
+            {/* 1. IDLE STATE: Upload & Input Form */}
+            {analysisState === "idle" && (
+              <motion.div
+                key="idle"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="p-6 md:p-8 space-y-6"
               >
-                {[{ stat: "11+", label: "Template types" }, { stat: "Groq AI", label: "Instant generation" }, { stat: "Free", label: "To get started" }].map((item, i) => (
-                  <div key={i} className="flex items-center gap-2.5">
-                    <span className={`text-base font-bold ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>{item.stat}</span>
-                    <span className={`text-sm ${isDark ? "text-[#787878]" : "text-gray-400"}`}>{item.label}</span>
-                    {i < 2 && <span className={`ml-3 hidden sm:block w-px h-4 ${isDark ? "bg-white/10" : "bg-gray-200"}`} />}
+                {/* File Uploader Box */}
+                {!file ? (
+                  <div
+                    onDragEnter={handleDrag}
+                    onDragOver={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-200 relative ${
+                      isDragActive
+                        ? (isDark ? "border-[#81E6D9] bg-[#81E6D9]/5 shadow-[0_0_15px_rgba(129,230,217,0.1)]" : "border-[#0D9488] bg-[#0D9488]/5")
+                        : (isDark ? "border-white/10 bg-white/2 hover:border-[#81E6D9]/30 hover:bg-white/3" : "border-gray-200 bg-gray-50/50 hover:border-[#81E6D9]/50 hover:bg-gray-50")
+                    }`}
+                  >
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      onChange={handleFileChange} 
+                      accept=".pdf,.xls,.xlsx,.csv" 
+                      className="hidden" 
+                    />
+                    <div className="flex flex-col items-center gap-3">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? "bg-[#81E6D9]/10 text-[#81E6D9]" : "bg-[#0D9488]/10 text-[#0D9488]"}`}>
+                        <Upload className="w-6 h-6 animate-pulse" />
+                      </div>
+                      <div>
+                        <p className={`text-sm font-semibold mb-1 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>
+                          Upload raw ledger, P&L, or statements
+                        </p>
+                        <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                          Drag & drop PDF, Excel, or CSV exports (Tally, Zoho, etc.) or click to browse
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className={`text-[10px] px-2 py-0.5 rounded border ${isDark ? "border-white/10 text-gray-500" : "border-gray-200 text-gray-400"}`}>PDF</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded border ${isDark ? "border-white/10 text-gray-500" : "border-gray-200 text-gray-400"}`}>XLSX</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded border ${isDark ? "border-white/10 text-gray-500" : "border-gray-200 text-gray-400"}`}>CSV</span>
+                      </div>
+                    </div>
                   </div>
-                ))}
+                ) : (
+                  // File Selected Display
+                  <div className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${
+                    isDark ? "bg-white/2 border-white/10" : "bg-gray-50 border-gray-100"
+                  }`}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                        file.isSample 
+                          ? "bg-purple-500/10 text-purple-400" 
+                          : (isDark ? "bg-[#81E6D9]/10 text-[#81E6D9]" : "bg-[#0D9488]/10 text-[#0D9488]")
+                      }`}>
+                        {file.name.endsWith(".xlsx") || file.name.endsWith(".xls") ? (
+                          <FileSpreadsheet className="w-5 h-5" />
+                        ) : (
+                          <FileText className="w-5 h-5" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`text-sm font-semibold truncate ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>
+                          {file.name}
+                        </p>
+                        <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                          {formatFileSize(file.size)} {file.isSample && "• Sample statement loaded"}
+                        </p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={handleRemoveFile}
+                      className={`p-2 rounded-lg transition-colors ${
+                        isDark ? "text-gray-500 hover:text-red-400 hover:bg-white/5" : "text-gray-400 hover:text-red-500 hover:bg-gray-100"
+                      }`}
+                      title="Remove file"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Business Query Question Input */}
+                <div className="space-y-2">
+                  <label className={`block text-xs font-semibold uppercase tracking-wider ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                    Ask Dabby AI about your business data
+                  </label>
+                  <textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="E.g., Find cash flow leaks, audit our GST splits against bank records, or detect duplicate entries in this statement..."
+                    className={`w-full min-h-[90px] px-4 py-3 rounded-2xl text-sm outline-none transition-all resize-none ${
+                      isDark 
+                        ? "bg-white/3 border border-white/10 text-white placeholder-gray-600 focus:border-[#81E6D9]/40" 
+                        : "bg-gray-50 border border-gray-200 text-[#1a1a1a] placeholder-gray-400 focus:border-[#81E6D9]/50"
+                    }`}
+                  />
+                </div>
+
+                {/* Suggested prompt chips */}
+                <div className="space-y-2">
+                  <p className={`text-[11px] font-semibold ${isDark ? "text-gray-600" : "text-gray-400"}`}>
+                    Don't have a ledger on hand? Try our sample data with these prompt ideas:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {SUGGESTED_QUERIES.map((item, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleSuggestedClick(item)}
+                        className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
+                          isDark 
+                            ? "border-white/10 bg-white/2 text-gray-400 hover:border-[#81E6D9]/30 hover:text-[#81E6D9] hover:bg-[#81E6D9]/5" 
+                            : "border-gray-200 bg-white text-gray-600 hover:border-[#81E6D9]/50 hover:text-[#0d9488] hover:bg-[#81E6D9]/5"
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                    {!file && (
+                      <button
+                        onClick={handleUseSample}
+                        className={`text-xs px-3 py-1.5 rounded-full border border-purple-500/20 bg-purple-500/5 text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/40 transition-all`}
+                      >
+                        ⚡ Load Sample Statement Only
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Submit button row */}
+                <div className="flex flex-col sm:flex-row justify-between items-center pt-2 gap-4 border-t border-white/5">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className={`w-4 h-4 ${isDark ? "text-gray-600" : "text-gray-400"}`} />
+                    <span className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                      All files processed securely and anonymously.
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleAnalyze}
+                    disabled={!file}
+                    className={`w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-sm text-black bg-[#81E6D9] hover:bg-[#5fd3c7] transition-all ${
+                      !file ? "opacity-40 cursor-not-allowed" : "hover:scale-[1.02] active:scale-[0.98]"
+                    }`}
+                  >
+                    Analyze with Dabby AI <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* 2. LOADING STATE: Multi-step process */}
+            {(analysisState === "uploading" || 
+              analysisState === "parsing" || 
+              analysisState === "matching" || 
+              analysisState === "detecting") && (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                className="p-8 text-center space-y-8 min-h-[350px] flex flex-col justify-center items-center"
+              >
+                {/* Dynamic big loading indicator */}
+                <div className="relative w-20 h-20 flex items-center justify-center">
+                  <div className="absolute inset-0 rounded-full border-4 border-white/5" />
+                  <div className="absolute inset-0 rounded-full border-4 border-[#81E6D9] border-t-transparent animate-spin" />
+                  <Sparkles className="w-8 h-8 text-[#81E6D9] animate-pulse" />
+                </div>
+
+                <div className="space-y-2 max-w-md">
+                  <h3 className={`text-lg font-bold ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>
+                    Dabby AI Auditing Engine Active
+                  </h3>
+                  <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                    Reconciling general ledger entries and statement logs against local taxation frameworks...
+                  </p>
+                </div>
+
+                {/* Step indicators */}
+                <div className="w-full max-w-sm space-y-3.5 text-left border border-white/5 bg-white/1 p-5 rounded-2xl">
+                  {/* Step 1: Uploading */}
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-2">
+                      {analysisState === "uploading" ? (
+                        <Loader2 className="w-3.5 h-3.5 text-[#81E6D9] animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      )}
+                      <span className={analysisState === "uploading" ? "font-bold text-white" : "text-gray-500"}>
+                        Uploading statement data
+                      </span>
+                    </span>
+                    <span className="text-gray-500">
+                      {analysisState === "uploading" ? `${uploadProgress}%` : "Done"}
+                    </span>
+                  </div>
+                  {/* Upload Progress Bar */}
+                  {analysisState === "uploading" && (
+                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <div className="h-full bg-[#81E6D9] transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
+                    </div>
+                  )}
+
+                  {/* Step 2: Parsing */}
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-2">
+                      {analysisState === "uploading" ? (
+                        <div className="w-3.5 h-3.5 rounded-full border border-gray-700" />
+                      ) : analysisState === "parsing" ? (
+                        <Loader2 className="w-3.5 h-3.5 text-[#81E6D9] animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      )}
+                      <span className={analysisState === "parsing" ? "font-bold text-white" : "text-gray-500"}>
+                        Extracting ledger transaction segments
+                      </span>
+                    </span>
+                    <span className="text-gray-500">
+                      {analysisState === "parsing" ? "Processing" : (analysisState === "uploading" ? "Pending" : "Done")}
+                    </span>
+                  </div>
+
+                  {/* Step 3: Reconciling */}
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-2">
+                      {analysisState === "uploading" || analysisState === "parsing" ? (
+                        <div className="w-3.5 h-3.5 rounded-full border border-gray-700" />
+                      ) : analysisState === "matching" ? (
+                        <Loader2 className="w-3.5 h-3.5 text-[#81E6D9] animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      )}
+                      <span className={analysisState === "matching" ? "font-bold text-white" : "text-gray-500"}>
+                        Matching transaction refs against bank records
+                      </span>
+                    </span>
+                    <span className="text-gray-500">
+                      {analysisState === "matching" ? "Reconciling" : (analysisState === "uploading" || analysisState === "parsing" ? "Pending" : "Done")}
+                    </span>
+                  </div>
+
+                  {/* Step 4: GST / Anomaly */}
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-2">
+                      {analysisState !== "detecting" && analysisState !== "complete" ? (
+                        <div className="w-3.5 h-3.5 rounded-full border border-gray-700" />
+                      ) : analysisState === "detecting" ? (
+                        <Loader2 className="w-3.5 h-3.5 text-[#81E6D9] animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      )}
+                      <span className={analysisState === "detecting" ? "font-bold text-white" : "text-gray-500"}>
+                        Auditing GST splits & anomaly flags
+                      </span>
+                    </span>
+                    <span className="text-gray-500">
+                      {analysisState === "detecting" ? "Auditing" : "Pending"}
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* 3. COMPLETE STATE: Blurred Report & Waitlist Overlay */}
+            {analysisState === "complete" && (
+              <motion.div
+                key="complete"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="relative"
+              >
+                {/* BLURRED MOCK DASHBOARD PREVIEW */}
+                <div className="p-6 md:p-8 space-y-6 filter blur-[6px] select-none pointer-events-none opacity-40">
+                  {/* Report Header */}
+                  <div className="flex items-center justify-between border-b border-white/15 pb-4">
+                    <div>
+                      <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-[#81E6D9]" /> 
+                        Financial Intelligence Audit Report
+                      </h2>
+                      <p className="text-xs text-gray-500">{file?.name || "financial_statement_fy26.xlsx"}</p>
+                    </div>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Analysis Complete
+                    </span>
+                  </div>
+
+                  {/* 3-column stats panel */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-xl border border-white/10 bg-white/2">
+                      <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Reconciled Rate</p>
+                      <h4 className="text-xl font-bold text-white">94.2%</h4>
+                      <p className="text-[10px] text-emerald-400 mt-1">2,891 items matched automatically</p>
+                    </div>
+                    <div className="p-4 rounded-xl border border-white/10 bg-white/2">
+                      <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">GST Split Warnings</p>
+                      <h4 className="text-xl font-bold text-amber-400">3 Audited Flags</h4>
+                      <p className="text-[10px] text-gray-500 mt-1">Mismatched Input Tax Credit rates</p>
+                    </div>
+                    <div className="p-4 rounded-xl border border-white/10 bg-white/2">
+                      <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Unmatched Outflows</p>
+                      <h4 className="text-xl font-bold text-red-400">₹8,12,000</h4>
+                      <p className="text-[10px] text-gray-500 mt-1">Duplicate vendor payments detected</p>
+                    </div>
+                  </div>
+
+                  {/* Mock Table */}
+                  <div className="overflow-x-auto rounded-xl border border-white/10">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-white/5 text-gray-500 uppercase font-bold tracking-wider text-[10px]">
+                          <th className="p-3">Date</th>
+                          <th className="p-3">Ledger Description</th>
+                          <th className="p-3">Reference ID</th>
+                          <th className="p-3">Amount</th>
+                          <th className="p-3">Audit Alert Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        <tr>
+                          <td className="p-3">2026-06-12</td>
+                          <td className="p-3">Zoho Invoice #INV-2026-8928</td>
+                          <td className="p-3 font-mono">TXN_987234</td>
+                          <td className="p-3">₹45,000</td>
+                          <td className="p-3"><span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/25">Duplicate Payment</span></td>
+                        </tr>
+                        <tr>
+                          <td className="p-3">2026-06-08</td>
+                          <td className="p-3">HDFC Bank Transfer Outflow</td>
+                          <td className="p-3 font-mono">TXN_002842</td>
+                          <td className="p-3">₹1,20,000</td>
+                          <td className="p-3"><span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/25">Missing Voucher</span></td>
+                        </tr>
+                        <tr>
+                          <td className="p-3">2026-06-02</td>
+                          <td className="p-3">Zoho Purchase Split - DigitalOcean Inc</td>
+                          <td className="p-3 font-mono">TXN_873198</td>
+                          <td className="p-3">₹12,900</td>
+                          <td className="p-3"><span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/25">GST Split Mismatch</span></td>
+                        </tr>
+                        <tr>
+                          <td className="p-3">2026-05-28</td>
+                          <td className="p-3">Tally General Ledger Adjustment</td>
+                          <td className="p-3 font-mono">TXN_287419</td>
+                          <td className="p-3">₹89,000</td>
+                          <td className="p-3"><span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">Auto Reconciled</span></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* OVERLAID PREMIUM WAITLIST CARD */}
+                <div className="absolute inset-0 flex items-center justify-center p-4 sm:p-6 z-10">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className={`max-w-md w-full p-6 sm:p-8 rounded-2xl border text-center shadow-2xl backdrop-blur-md ${
+                      isDark 
+                        ? "bg-[#0b0b0b]/90 border-white/10 shadow-[0_0_50px_rgba(129,230,217,0.1)] text-white" 
+                        : "bg-white/95 border-gray-200 shadow-gray-300/60 text-[#1a1a1a]"
+                    }`}
+                  >
+                    <div className="w-12 h-12 rounded-full bg-[#81E6D9]/15 flex items-center justify-center mx-auto mb-4 text-[#81E6D9]">
+                      <Lock className="w-5 h-5 animate-pulse" />
+                    </div>
+
+                    <h3 className={`text-xl font-bold mb-2 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>
+                      Unlock Detailed Audit Reports
+                    </h3>
+                    <p className={`text-xs sm:text-sm leading-relaxed mb-6 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                      To view reconciliation errors, audit tax splits, and sync Zoho/Tally records live to bank statement logs, join the Dabby Waitlist.
+                    </p>
+
+                    <AnimatePresence mode="wait">
+                      {!waitlistSuccess ? (
+                        <motion.form 
+                          key="form" 
+                          onSubmit={handleWaitlistSubmit} 
+                          className="space-y-3 text-left"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                        >
+                          <label className={`block text-[10px] font-semibold uppercase tracking-wider ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                            Business Email Address
+                          </label>
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <input
+                              type="email"
+                              value={waitlistEmail}
+                              onChange={(e) => setWaitlistEmail(e.target.value)}
+                              placeholder="you@company.com"
+                              className={`flex-grow px-4 py-3 rounded-xl text-xs outline-none transition-all ${
+                                isDark 
+                                  ? "bg-white/5 border border-white/10 text-white placeholder-gray-600 focus:border-[#81E6D9]/50" 
+                                  : "bg-gray-50 border border-gray-200 text-[#1a1a1a] placeholder-gray-400 focus:border-[#81E6D9]"
+                              }`}
+                              disabled={waitlistLoading}
+                            />
+                            <button
+                              type="submit"
+                              disabled={waitlistLoading}
+                              className="px-5 py-3 rounded-xl font-semibold text-xs text-black bg-[#81E6D9] hover:bg-[#5fd3c7] disabled:opacity-50 transition-all flex items-center justify-center gap-1 whitespace-nowrap"
+                            >
+                              {waitlistLoading ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <>Join Waitlist <ArrowRight className="w-3.5 h-3.5" /></>
+                              )}
+                            </button>
+                          </div>
+
+                          {waitlistError && (
+                            <motion.p 
+                              initial={{ opacity: 0, y: 5 }} 
+                              animate={{ opacity: 1 }} 
+                              className="text-[11px] text-red-400 flex items-center gap-1 mt-1"
+                            >
+                              <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                              {waitlistError}
+                            </motion.p>
+                          )}
+                        </motion.form>
+                      ) : (
+                        <motion.div
+                          key="success"
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="space-y-4"
+                        >
+                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 border border-emerald-500/25 text-emerald-400">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Saved! You are on the list.
+                          </div>
+                          <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                            We will send your invite credentials to <strong>{waitlistEmail || "your email"}</strong> as soon as your cohort opens.
+                          </p>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Reset Button to try another file */}
+                    <div className="mt-6 pt-4 border-t border-white/5 flex justify-center">
+                      <button
+                        onClick={handleReset}
+                        className={`text-xs flex items-center gap-1.5 transition-colors ${
+                          isDark ? "text-gray-500 hover:text-white" : "text-gray-400 hover:text-black"
+                        }`}
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        Analyze another ledger
+                      </button>
+                    </div>
+                  </motion.div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
+        </motion.div>
 
-        </div>
-      </section>
-    </>
+        {/* Existing Waitlist Link under the card */}
+        <p className={`text-center text-xs mt-6 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+          🔒 Dabby integrates securely using industry-standard ledger encryption.
+          <Link to="/waitlist" className="ml-1 text-[#81E6D9] underline hover:text-[#5fd3c7] transition-colors">
+            Learn more about early access cohorts →
+          </Link>
+        </p>
+
+      </div>
+    </section>
   );
 }
