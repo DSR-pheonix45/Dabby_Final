@@ -28,7 +28,7 @@ const plans = [
             "Test AI logic risk-free"
         ],
         cta: "Start Free",
-        link: "/signup",
+        link: "/waitlist",
         highlight: false,
     },
     {
@@ -52,7 +52,7 @@ const plans = [
             "Automated ingestion"
         ],
         cta: "Get Started",
-        link: "/signup",
+        link: "/waitlist",
         highlight: true,
     },
     {
@@ -76,7 +76,7 @@ const plans = [
             "Maximum mapping labels"
         ],
         cta: "Start Free Trial",
-        link: "/signup",
+        link: "/waitlist",
         highlight: false,
     },
     {
@@ -261,7 +261,7 @@ export default function Pricing({ showDetails = false }) {
                                 </a>
                             ) : (
                                 <Link
-                                    to={plan.link || "/signup"}
+                                    to={plan.link || "/waitlist"}
                                     onClick={() => saveRedirectIntent("/pricing")}
                                     className={`block w-full py-4 px-6 rounded-2xl text-center font-bold transition-all duration-200 ${plan.highlight
                                         ? "bg-[#81E6D9] text-black hover:bg-[#70d4c7] hover:scale-[1.02]"

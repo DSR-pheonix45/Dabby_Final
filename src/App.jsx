@@ -30,6 +30,7 @@ const TermsOfService = lazy(() => import("./landing-page/pages/TermsOfService"))
 const PrivacyPolicy = lazy(() => import("./landing-page/pages/PrivacyPolicy"));
 const PaymentComingSoon = lazy(() => import("./landing-page/pages/PricingPage"));
 const Pay = lazy(() => import("./landing-page/pages/Pay"));
+const Waitlist = lazy(() => import("./landing-page/pages/Waitlist"));
 const Navbar = lazy(() => import("./landing-page/components/Navbar"));
 const Footer = lazy(() => import("./landing-page/components/Footer"));
 
@@ -138,6 +139,7 @@ function App() {
                   <Route path="/privacy" element={<PrivacyPolicy />} />
                   <Route path="/pay" element={<Pay />} />
                   <Route path="/pricing" element={<PaymentComingSoon />} />
+                  <Route path="/waitlist" element={<Waitlist />} />
                   <Route path="/ingest" element={
                     <ProtectedRoute>
                       <DataIngestionPage />

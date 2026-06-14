@@ -416,13 +416,13 @@ function AuthModal({ onClose, theme }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
           </svg>
         </div>
-        <h3 className={`text-xl font-bold mb-2 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>Start your finance workspace</h3>
+        <h3 className={`text-xl font-bold mb-2 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>Join Dabby Waitlist</h3>
         <p className={`text-sm leading-relaxed mb-6 ${isDark ? "text-[#787878]" : "text-gray-500"}`}>
-          Sign up to access Dabby’s secure accounting workflows and convert bank data into compliant GL, AR/AP, and cashflow insights.
+          Join the waitlist to automate your SME accounting and eliminate manual bank statement reconciliation.
         </p>
         <div className="flex flex-col gap-3">
-          <Link to="/signup" className="w-full py-3 px-6 text-sm font-semibold text-black bg-[#81E6D9] rounded-xl text-center hover:bg-[#5fd3c7] transition-colors duration-200">Create a free account</Link>
-          <Link to="/login" className={`w-full py-3 px-6 text-sm font-semibold rounded-xl text-center border transition-colors duration-200 ${isDark ? "border-white/15 text-white hover:bg-white/5" : "border-gray-200 text-[#1a1a1a] hover:bg-gray-50"}`}>Sign in to existing account</Link>
+          <Link to="/waitlist" className="w-full py-3 px-6 text-sm font-semibold text-black bg-[#81E6D9] rounded-xl text-center hover:bg-[#5fd3c7] transition-colors duration-200" onClick={onClose}>Join the Waitlist</Link>
+          <Link to="/login" className={`w-full py-3 px-6 text-sm font-semibold rounded-xl text-center border transition-colors duration-200 ${isDark ? "border-white/15 text-white hover:bg-white/5" : "border-gray-200 text-[#1a1a1a] hover:bg-gray-50"}`} onClick={onClose}>Sign in to existing account</Link>
         </div>
       </motion.div>
     </motion.div>
@@ -694,20 +694,17 @@ export default function Hero() {
           <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}
             className={`font-display text-4xl sm:text-5xl md:text-6xl font-bold leading-[1.08] tracking-tight text-center mb-4 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}
           >
-            Dabby brings together
+            Stop wasting 3 days a month
             <br className="hidden sm:block" />
-            <span className="text-[#81E6D9]">COA, AR/AP, and cash flow</span>
-            <br className="hidden sm:block" />
-            in one secure workspace.
+            on <span className="text-[#81E6D9]">manual bank reconciliation.</span>
           </motion.h1>
 
           {/* Subheadline */}
           <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
             className={`text-base md:text-lg text-center leading-relaxed mb-10 ${isDark ? "text-[#787878]" : "text-gray-500"}`}
           >
-            Upload bank statements, invoices, bills, and CRM exports.
-            <br className="hidden md:block" />
-            Dabby auto-maps transactions to your chart of accounts and highlights receivables, payables, and reconciliation gaps.
+            Stop copying Zoho/Salesforce data or manually matching PDF statement logs. 
+            Dabby auto-maps transactions to your Indian ledger, handles GST tax splits, and tracks receivables in real-time.
           </motion.p>
 
           {/* Input */}
@@ -738,8 +735,8 @@ export default function Hero() {
           {!user && (
             <p className={`text-center text-xs mt-3 ${isDark ? "text-[#787878]" : "text-gray-400"}`}>
               <span className="mr-1">🔒</span>
-              Free account required to generate &amp; download templates.
-              <Link to="/signup" className="ml-1 underline underline-offset-2 hover:text-[#81E6D9] transition-colors">Sign up free →</Link>
+              Join the waitlist to unlock early template downloads.
+              <Link to="/waitlist" className="ml-1 underline underline-offset-2 hover:text-[#81E6D9] transition-colors">Join Waitlist →</Link>
             </p>
           )}
 

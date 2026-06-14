@@ -49,9 +49,9 @@ function Sub({ children, isDark }) {
 const STEPS = [
     {
         num: "01",
-        title: "Ingest Bank, Bills & CRM",
-        desc: `Upload bank statements, vendor bills, and customer lists. Dabby ingests financial exports and prepares them for accounting automatically.`,
-        badge: 'Bank PDF · CSV · Excel',
+        title: "Dump Statements & Invoices",
+        desc: "Ditch manual data-entry. Upload raw bank PDFs, supplier bills, and Zoho/Salesforce exports. Dabby extracts all contact and transaction details automatically.",
+        badge: "No Manual Transcription",
         icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -60,9 +60,9 @@ const STEPS = [
     },
     {
         num: "02",
-        title: "Map to Chart of Accounts",
-        desc: "Auto-classify transactions into GL segments, AR, AP, and GST-ready accounting buckets so your finance team can close faster.",
-        badge: "COA + AR/AP Mapping",
+        title: "Auto-Map & Split Taxes",
+        desc: "Dabby instantly maps transactions to your Chart of Accounts, calculates CGST/SGST/IGST splits, and prepares journal entries for your accountant's review.",
+        badge: "Automated GST & COA Mapping",
         icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -71,9 +71,9 @@ const STEPS = [
     },
     {
         num: "03",
-        title: "Monitor Cash & Compliance",
-        desc: "Track receivables, payables, cash flow and reconciliation gaps in one dashboard built for Indian SMBs. Get visibility without manual spreadsheets.",
-        badge: "Cashflow + Reconciliation",
+        title: "Ditch spreadsheet tracking",
+        desc: "Say goodbye to disjointed Excel trackers. Monitor real-time cash runway, upcoming vendor payments, and aging receivables in one secure hub.",
+        badge: "Real-Time cash control",
         icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -345,12 +345,12 @@ export function TheWorkspace() {
                     <motion.div {...fadeUp(0.12)}>
                         <Pill isDark={isDark}>The AI Workbench</Pill>
                         <H2 isDark={isDark} className="mb-4">
-                            Beyond Sheets:
+                            Stop managing finance
                             <br />
-                            <span className="text-[#81E6D9]">A Team-First Workbench</span>
+                            <span className="text-[#81E6D9]">in email threads and sheets.</span>
                         </H2>
                         <p className={`text-base leading-relaxed mb-8 ${isDark ? "text-[#787878]" : "text-gray-500"}`}>
-                            Stop managing flat, disconnected spreadsheets. The Datalis Workbench provides a centralized source of truth with a professional 3-layer hierarchy.
+                            Dabby replaces disconnected tools and manual checklists. Your team gets a centralized, secure general ledger with role-based controls, so analysts, founders, and CAs stay aligned without data fragmentation.
                         </p>
 
                         <div className="space-y-6 mb-8">
@@ -374,8 +374,8 @@ export function TheWorkspace() {
                             </div>
                         </div>
 
-                        <Link to="/signup" className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-black bg-[#81E6D9] rounded-xl hover:bg-[#5fd3c7] transition-colors duration-200">
-                            Create Your Workbench
+                        <Link to="/waitlist" className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-black bg-[#81E6D9] rounded-xl hover:bg-[#5fd3c7] transition-colors duration-200">
+                            Join the Waitlist
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                         </Link>
                     </motion.div>
@@ -652,7 +652,7 @@ export function PricingSection() {
                                     ))}
                                 </ul>
 
-                                <Link to="/signup" className={`w-full py-3 rounded-xl text-sm font-semibold text-center transition-all duration-200 ${plan.popular
+                                <Link to="/waitlist" className={`w-full py-3 rounded-xl text-sm font-semibold text-center transition-all duration-200 ${plan.popular
                                     ? "text-black bg-[#81E6D9] hover:bg-[#5fd3c7]"
                                     : isDark
                                         ? "text-white border border-white/20 hover:bg-white/8"
@@ -703,22 +703,22 @@ export function FinalCTASection() {
                         </div>
 
                         <h2 className={`font-display text-4xl sm:text-5xl md:text-[3.25rem] font-bold leading-[1.05] tracking-tight mb-4 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>
-                            Stop Building Financial
+                            Stop Reconciling Bank
                             <br />
-                            <span className="text-[#81E6D9]">Sheets Manually</span>
+                            <span className="text-[#81E6D9]">Statements Manually</span>
                         </h2>
 
                         <p className={`text-base md:text-lg max-w-xl mx-auto mb-10 ${isDark ? "text-[#787878]" : "text-gray-500"}`}>
-                            Generate templates, analyze data and discover insights with AI. Your next financial document is one prompt away.
+                            Join the waitlist to automate your general ledger mapping, calculate CGST/SGST splits instantly, and import CRM contacts with zero manual transcription.
                         </p>
 
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                            <Link to="/signup" className="px-8 py-3.5 text-sm font-bold text-black bg-[#81E6D9] rounded-full hover:bg-[#5fd3c7] transition-colors duration-200">
-                                Start Generating Templates
+                            <Link to="/waitlist" className="px-8 py-3.5 text-sm font-bold text-black bg-[#81E6D9] rounded-full hover:bg-[#5fd3c7] transition-colors duration-200">
+                                Join the Waitlist
                             </Link>
-                            <Link to="/signup" className={`px-8 py-3.5 text-sm font-semibold rounded-full border transition-colors duration-200 ${isDark ? "text-white border-white/20 hover:bg-white/8" : "text-[#1a1a1a] border-gray-300 hover:bg-gray-100"
+                            <Link to="/waitlist" className={`px-8 py-3.5 text-sm font-semibold rounded-full border transition-colors duration-200 ${isDark ? "text-white border-white/20 hover:bg-white/8" : "text-[#1a1a1a] border-gray-300 hover:bg-gray-100"
                                 }`}>
-                                Create Account
+                                Request Early Access
                             </Link>
                         </div>
 

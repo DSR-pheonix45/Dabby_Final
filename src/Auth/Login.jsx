@@ -159,7 +159,7 @@ export default function Login() {
             Sign in to Dabby
           </h2>
           <p className="mt-2 text-sm text-gray-400">
-            Use your Dabby credentials or Google to access your secure finance workspace.
+            Use your Dabby credentials to access your secure finance workspace.
           </p>
         </div>
 
@@ -228,30 +228,16 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-white/10"></div>
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-[#0a0a0a] px-2 text-gray-500">Or continue with</span>
-          </div>
+        <div className="mt-6 text-center">
+          <p className="text-sm text-gray-400">
+            Want early access?{" "}
+            <Link to="/waitlist" className="font-medium text-[#00FFD1] hover:text-[#00FFD1]/80 hover:underline">
+              Join the Waitlist
+            </Link>
+          </p>
         </div>
 
         <div className="mt-4 space-y-4">
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 bg-white text-black py-3 px-4 rounded-md hover:bg-gray-100 transition-all disabled:opacity-70 font-semibold shadow-lg"
-          >
-            {loading ? (
-              <Loader className="w-5 h-5 animate-spin" />
-            ) : (
-              <FcGoogle className="w-6 h-6" />
-            )}
-            <span>Continue with Google</span>
-          </button>
-
           <p className="text-center text-xs text-gray-500">
             By signing in, you agree to our{' '}
             <Link to="/terms" className="text-[#00FFD1] hover:underline">Terms of Service</Link>

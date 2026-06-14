@@ -163,13 +163,13 @@ export default function Navbar() {
             ) : (
               <>
                 <Link
-                  to="/signup"
+                  to="/waitlist"
                   className={`px-6 py-2 text-base font-mono font-medium text-black bg-[#81E6D9] rounded-full border border-[#81E6D9] hover:bg-transparent transition-all duration-200 ${theme === "dark"
                     ? "hover:text-white hover:border-white"
                     : "hover:text-[#1a1a1a] hover:border-[#1a1a1a]"
                     }`}
                 >
-                  Sign Up
+                  Join Waitlist
                 </Link>
                 <Link
                   to="/login"
@@ -318,13 +318,13 @@ export default function Navbar() {
                 ) : (
                   <>
                     <Link
-                      to="/signup"
+                      to="/waitlist"
                       className={`px-6 py-3 text-base font-mono font-normal text-black bg-[#81E6D9] border border-[#81E6D9] hover:bg-transparent transition-colors duration-200 text-center rounded-full ${theme === "dark"
                         ? "hover:text-white hover:border-white"
                         : "hover:text-[#1a1a1a] hover:border-[#1a1a1a]"
                         }`}
                     >
-                      Sign Up
+                      Join Waitlist
                     </Link>
                     <Link
                       to="/login"
