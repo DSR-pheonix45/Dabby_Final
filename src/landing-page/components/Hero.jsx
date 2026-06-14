@@ -19,7 +19,9 @@ import {
   AlertTriangle,
   HelpCircle,
   TrendingUp,
-  Percent
+  Percent,
+  Share2,
+  X
 } from "lucide-react";
 
 // Rotating title items
@@ -49,6 +51,24 @@ const SUGGESTED_QUERIES = [
     prompt: "Assess our current cash inflows and outflows. Estimate monthly burn rate and forecast runway for the next 12 months."
   }
 ];
+
+// Custom Summary Generator based on the business question
+function getAuditSummary(query) {
+  const q = (query || "").toLowerCase();
+  if (q.includes("duplicate") || q.includes("double") || q.includes("billing")) {
+    return "Dabby's anomaly engine detected 1 duplicate payment of ₹45,000 paid to Acme Corp under reference TXN_987234. Our ledger split matching indicates the same invoice voucher was processed twice within a 24-hour window, bypassing Zoho's standard validation.";
+  }
+  if (q.includes("gst") || q.includes("tax") || q.includes("split")) {
+    return "GST Split Audit: Flagged 3 discrepancies in Zoho purchase records. Input tax credit of 18% was claimed on DigitalOcean cloud services, but bank transactions only show a 12% GST charge reference. Estimated potential tax liability gap of ₹12,900.";
+  }
+  if (q.includes("leak") || q.includes("expense") || q.includes("subscription")) {
+    return "Expense Audit: Identified 2 inactive recurring subscriptions (Slack Pro and Adobe Suite) totalling ₹8,500/month with zero usage logs in the past 90 days. High-risk alert on travel reimbursements: 2 invoices submitted without receipt attachments.";
+  }
+  if (q.includes("runway") || q.includes("cash") || q.includes("burn")) {
+    return "Runway Analysis: Average monthly cash burn is ₹4,20,000. Based on your current bank ledger balance of ₹35,80,000, your business has a runway of approximately 8.5 months. Recommending credit line expansion or optimizing software subscription leaks.";
+  }
+  return "General Ledger Audit: Parsed all accounts receivable and bank statement logs. Reconciled 94.2% of entries automatically. Flagged 3 transactions for manual review due to missing transaction references, and highlighted ₹8,12,000 in unmatched cash outflows.";
+}
 
 export default function Hero() {
   const { theme } = useTheme();
@@ -80,6 +100,35 @@ export default function Hero() {
   const [waitlistLoading, setWaitlistLoading] = useState(false);
   const [waitlistSuccess, setWaitlistSuccess] = useState(false);
   const [waitlistError, setWaitlistError] = useState("");
+
+  // Share link states
+  const [isSharedView, setIsSharedView] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+
+  // Parse shareable link on page mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shareParam = params.get("share");
+    if (shareParam) {
+      try {
+        const decodedJson = decodeURIComponent(escape(atob(shareParam)));
+        const data = JSON.parse(decodedJson);
+        if (data && data.name && data.query) {
+          setFile({
+            name: data.name,
+            size: data.size || 0,
+            type: "application/octet-stream",
+            isSample: true
+          });
+          setPrompt(data.query);
+          setAnalysisState("complete");
+          setIsSharedView(true);
+        }
+      } catch (e) {
+        console.error("Failed to parse shared report data", e);
+      }
+    }
+  }, []);
 
   // Drag over/enter/leave events
   const handleDrag = (e) => {
@@ -220,13 +269,35 @@ export default function Hero() {
     }
   };
 
-  // Reset uploader
-  const handleReset = () => {
+  // Share Report URL Generation
+  const handleShareReport = () => {
+    if (!file) return;
+    const shareData = {
+      name: file.name,
+      size: file.size,
+      query: prompt
+    };
+    const base64Str = btoa(unescape(encodeURIComponent(JSON.stringify(shareData))));
+    const shareUrl = `${window.location.origin}${window.location.pathname}?share=${base64Str}`;
+    
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    });
+  };
+
+  // Reset/Close Report
+  const handleCloseReport = () => {
+    // Clear URL search params
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, document.title, newUrl);
+    
     setFile(null);
     setPrompt("");
     setAnalysisState("idle");
-    setWaitlistEmail("");
+    setIsSharedView(false);
     setWaitlistSuccess(false);
+    setWaitlistEmail("");
     setWaitlistError("");
   };
 
@@ -245,6 +316,29 @@ export default function Hero() {
         <div className={`absolute top-[-20%] left-[20%] w-[350px] sm:w-[500px] h-[350px] sm:h-[500px] rounded-full blur-[120px] opacity-20 ${isDark ? "bg-[#81E6D9]" : "bg-[#0D9488]"}`} />
         <div className={`absolute top-[-10%] right-[20%] w-[300px] sm:w-[400px] h-[300px] sm:h-[400px] rounded-full blur-[100px] opacity-15 ${isDark ? "bg-blue-400" : "bg-blue-300"}`} />
       </div>
+
+      {/* Shared Report Top Banner */}
+      {isSharedView && (
+        <div className="max-w-4xl mx-auto mb-6">
+          <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl border text-center sm:text-left ${
+            isDark ? "bg-[#111111]/80 border-[#81E6D9]/30 text-white" : "bg-white border-[#0D9488]/30 text-[#1a1a1a]"
+          }`}>
+            <div className="flex items-center gap-3">
+              <Sparkles className="w-5 h-5 text-[#81E6D9] flex-shrink-0 animate-pulse" />
+              <div>
+                <p className="text-xs font-bold">Viewing Shared Dabby AI Audit Report</p>
+                <p className={`text-[11px] ${isDark ? "text-gray-400" : "text-gray-500"}`}>Want to run an interactive audit on your own ledger sheets?</p>
+              </div>
+            </div>
+            <button 
+              onClick={handleCloseReport}
+              className="px-4 py-2 bg-[#81E6D9] text-black font-bold text-xs rounded-xl hover:bg-[#5fd3c7] transition-all whitespace-nowrap"
+            >
+              Analyze Your Statement
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-4xl mx-auto">
         {/* Top waitlist badge */}
@@ -272,7 +366,7 @@ export default function Hero() {
             Stop wasting 3 days a month
             <br />
             on{" "}
-            <span className="relative inline-flex overflow-hidden align-bottom text-[#81E6D9] min-w-[280px] sm:min-w-[480px] justify-center sm:justify-start">
+            <span className="relative inline-block overflow-hidden align-bottom text-[#81E6D9] min-w-[280px] sm:min-w-[480px] justify-center sm:justify-start">
               <AnimatePresence mode="wait">
                 <motion.span
                   key={titleIndex}
@@ -579,7 +673,7 @@ export default function Hero() {
               </motion.div>
             )}
 
-            {/* 3. COMPLETE STATE: Blurred Report & Waitlist Overlay */}
+            {/* 3. COMPLETE STATE: Blurred Dashboard + Waitlist Overlay OR Unblurred Modal */}
             {analysisState === "complete" && (
               <motion.div
                 key="complete"
@@ -588,120 +682,92 @@ export default function Hero() {
                 exit={{ opacity: 0 }}
                 className="relative"
               >
-                {/* BLURRED MOCK DASHBOARD PREVIEW */}
-                <div className="p-6 md:p-8 space-y-6 filter blur-[6px] select-none pointer-events-none opacity-40">
-                  {/* Report Header */}
-                  <div className="flex items-center justify-between border-b border-white/15 pb-4">
-                    <div>
-                      <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-[#81E6D9]" /> 
-                        Financial Intelligence Audit Report
-                      </h2>
-                      <p className="text-xs text-gray-500">{file?.name || "financial_statement_fy26.xlsx"}</p>
-                    </div>
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Analysis Complete
-                    </span>
-                  </div>
+                {/* A. If not yet subscribed and not in shared view: show BLURRED mock dashboard and waitlist signup form */}
+                {!waitlistSuccess && !isSharedView ? (
+                  <>
+                    {/* BLURRED PREVIEW */}
+                    <div className="p-6 md:p-8 space-y-6 filter blur-[6px] select-none pointer-events-none opacity-40">
+                      {/* Report Header */}
+                      <div className="flex items-center justify-between border-b border-white/15 pb-4">
+                        <div>
+                          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-[#81E6D9]" /> 
+                            Financial Intelligence Audit Report
+                          </h2>
+                          <p className="text-xs text-gray-500">{file?.name || "financial_statement_fy26.xlsx"}</p>
+                        </div>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Analysis Complete
+                        </span>
+                      </div>
 
-                  {/* 3-column stats panel */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="p-4 rounded-xl border border-white/10 bg-white/2">
-                      <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Reconciled Rate</p>
-                      <h4 className="text-xl font-bold text-white">94.2%</h4>
-                      <p className="text-[10px] text-emerald-400 mt-1">2,891 items matched automatically</p>
-                    </div>
-                    <div className="p-4 rounded-xl border border-white/10 bg-white/2">
-                      <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">GST Split Warnings</p>
-                      <h4 className="text-xl font-bold text-amber-400">3 Audited Flags</h4>
-                      <p className="text-[10px] text-gray-500 mt-1">Mismatched Input Tax Credit rates</p>
-                    </div>
-                    <div className="p-4 rounded-xl border border-white/10 bg-white/2">
-                      <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Unmatched Outflows</p>
-                      <h4 className="text-xl font-bold text-red-400">₹8,12,000</h4>
-                      <p className="text-[10px] text-gray-500 mt-1">Duplicate vendor payments detected</p>
-                    </div>
-                  </div>
+                      {/* 3-column stats panel */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="p-4 rounded-xl border border-white/10 bg-white/2">
+                          <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Reconciled Rate</p>
+                          <h4 className="text-xl font-bold text-white">94.2%</h4>
+                          <p className="text-[10px] text-emerald-400 mt-1">2,891 items matched automatically</p>
+                        </div>
+                        <div className="p-4 rounded-xl border border-white/10 bg-white/2">
+                          <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">GST Split Warnings</p>
+                          <h4 className="text-xl font-bold text-amber-400">3 Audited Flags</h4>
+                          <p className="text-[10px] text-gray-500 mt-1">Mismatched Input Tax Credit rates</p>
+                        </div>
+                        <div className="p-4 rounded-xl border border-white/10 bg-white/2">
+                          <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Unmatched Outflows</p>
+                          <h4 className="text-xl font-bold text-red-400">₹8,12,000</h4>
+                          <p className="text-[10px] text-gray-500 mt-1">Duplicate vendor payments detected</p>
+                        </div>
+                      </div>
 
-                  {/* Mock Table */}
-                  <div className="overflow-x-auto rounded-xl border border-white/10">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-white/5 text-gray-500 uppercase font-bold tracking-wider text-[10px]">
-                          <th className="p-3">Date</th>
-                          <th className="p-3">Ledger Description</th>
-                          <th className="p-3">Reference ID</th>
-                          <th className="p-3">Amount</th>
-                          <th className="p-3">Audit Alert Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5">
-                        <tr>
-                          <td className="p-3">2026-06-12</td>
-                          <td className="p-3">Zoho Invoice #INV-2026-8928</td>
-                          <td className="p-3 font-mono">TXN_987234</td>
-                          <td className="p-3">₹45,000</td>
-                          <td className="p-3"><span className="px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/25">Duplicate Payment</span></td>
-                        </tr>
-                        <tr>
-                          <td className="p-3">2026-06-08</td>
-                          <td className="p-3">HDFC Bank Transfer Outflow</td>
-                          <td className="p-3 font-mono">TXN_002842</td>
-                          <td className="p-3">₹1,20,000</td>
-                          <td className="p-3"><span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/25">Missing Voucher</span></td>
-                        </tr>
-                        <tr>
-                          <td className="p-3">2026-06-02</td>
-                          <td className="p-3">Zoho Purchase Split - DigitalOcean Inc</td>
-                          <td className="p-3 font-mono">TXN_873198</td>
-                          <td className="p-3">₹12,900</td>
-                          <td className="p-3"><span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/25">GST Split Mismatch</span></td>
-                        </tr>
-                        <tr>
-                          <td className="p-3">2026-05-28</td>
-                          <td className="p-3">Tally General Ledger Adjustment</td>
-                          <td className="p-3 font-mono">TXN_287419</td>
-                          <td className="p-3">₹89,000</td>
-                          <td className="p-3"><span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">Auto Reconciled</span></td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* OVERLAID PREMIUM WAITLIST CARD */}
-                <div className="absolute inset-0 flex items-center justify-center p-4 sm:p-6 z-10">
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className={`max-w-md w-full p-6 sm:p-8 rounded-2xl border text-center shadow-2xl backdrop-blur-md ${
-                      isDark 
-                        ? "bg-[#0b0b0b]/90 border-white/10 shadow-[0_0_50px_rgba(129,230,217,0.1)] text-white" 
-                        : "bg-white/95 border-gray-200 shadow-gray-300/60 text-[#1a1a1a]"
-                    }`}
-                  >
-                    <div className="w-12 h-12 rounded-full bg-[#81E6D9]/15 flex items-center justify-center mx-auto mb-4 text-[#81E6D9]">
-                      <Lock className="w-5 h-5 animate-pulse" />
+                      {/* Table */}
+                      <div className="overflow-x-auto rounded-xl border border-white/10">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-white/5 text-gray-500 uppercase font-bold tracking-wider text-[10px]">
+                              <th className="p-3">Date</th>
+                              <th className="p-3">Ledger Description</th>
+                              <th className="p-3">Reference ID</th>
+                              <th className="p-3">Amount</th>
+                              <th className="p-3">Alert Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td className="p-3">2026-06-12</td>
+                              <td className="p-3">Zoho Invoice #INV-2026-8928</td>
+                              <td className="p-3">TXN_987234</td>
+                              <td className="p-3">₹45,000</td>
+                              <td className="p-3">Duplicate Payment</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
 
-                    <h3 className={`text-xl font-bold mb-2 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>
-                      Unlock Detailed Audit Reports
-                    </h3>
-                    <p className={`text-xs sm:text-sm leading-relaxed mb-6 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                      To view reconciliation errors, audit tax splits, and sync Zoho/Tally records live to bank statement logs, join the Dabby Waitlist.
-                    </p>
+                    {/* OVERLAID SIGNUP WALL */}
+                    <div className="absolute inset-0 flex items-center justify-center p-4 sm:p-6 z-10">
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        className={`max-w-md w-full p-6 sm:p-8 rounded-2xl border text-center shadow-2xl backdrop-blur-md ${
+                          isDark 
+                            ? "bg-[#0b0b0b]/90 border-white/10 shadow-[0_0_50px_rgba(129,230,217,0.1)] text-white" 
+                            : "bg-white/95 border-gray-200 shadow-gray-300/60 text-[#1a1a1a]"
+                        }`}
+                      >
+                        <div className="w-12 h-12 rounded-full bg-[#81E6D9]/15 flex items-center justify-center mx-auto mb-4 text-[#81E6D9]">
+                          <Lock className="w-5 h-5 animate-pulse" />
+                        </div>
 
-                    <AnimatePresence mode="wait">
-                      {!waitlistSuccess ? (
-                        <motion.form 
-                          key="form" 
-                          onSubmit={handleWaitlistSubmit} 
-                          className="space-y-3 text-left"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                        >
+                        <h3 className={`text-xl font-bold mb-2 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>
+                          Unlock Detailed Audit Reports
+                        </h3>
+                        <p className={`text-xs sm:text-sm leading-relaxed mb-6 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                          To view reconciliation errors, audit tax splits, and sync Zoho/Tally records live to bank statement logs, join the Dabby Waitlist.
+                        </p>
+
+                        <form onSubmit={handleWaitlistSubmit} className="space-y-3 text-left">
                           <label className={`block text-[10px] font-semibold uppercase tracking-wider ${isDark ? "text-gray-500" : "text-gray-400"}`}>
                             Business Email Address
                           </label>
@@ -741,38 +807,269 @@ export default function Hero() {
                               {waitlistError}
                             </motion.p>
                           )}
-                        </motion.form>
-                      ) : (
-                        <motion.div
-                          key="success"
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          className="space-y-4"
-                        >
-                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 border border-emerald-500/25 text-emerald-400">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Saved! You are on the list.
-                          </div>
-                          <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                            We will send your invite credentials to <strong>{waitlistEmail || "your email"}</strong> as soon as your cohort opens.
-                          </p>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                        </form>
 
-                    {/* Reset Button to try another file */}
-                    <div className="mt-6 pt-4 border-t border-white/5 flex justify-center">
-                      <button
-                        onClick={handleReset}
-                        className={`text-xs flex items-center gap-1.5 transition-colors ${
-                          isDark ? "text-gray-500 hover:text-white" : "text-gray-400 hover:text-black"
-                        }`}
-                      >
-                        <RefreshCw className="w-3 h-3" />
-                        Analyze another ledger
-                      </button>
+                        <div className="mt-6 pt-4 border-t border-white/5 flex justify-center">
+                          <button
+                            onClick={handleCloseReport}
+                            className={`text-xs flex items-center gap-1.5 transition-colors ${
+                              isDark ? "text-gray-500 hover:text-white" : "text-gray-400 hover:text-black"
+                            }`}
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                            Analyze another ledger
+                          </button>
+                        </div>
+                      </motion.div>
                     </div>
-                  </motion.div>
-                </div>
+                  </>
+                ) : (
+                  // B. UNBLURRED STANDALONE ONE-PAGER REPORT VIEW MODAL
+                  <div className={`fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md flex items-center justify-center p-4 md:p-8`}>
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.97, y: 15 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      className={`max-w-4xl w-full rounded-3xl border shadow-2xl overflow-hidden flex flex-col relative my-8 ${
+                        isDark 
+                          ? "bg-[#0c0c0c] border-white/10 text-white shadow-black/80" 
+                          : "bg-white border-gray-200 text-[#1a1a1a] shadow-gray-300/40"
+                      }`}
+                    >
+                      {/* Top Header Controls */}
+                      <div className={`flex items-center justify-between px-6 py-4 border-b ${
+                        isDark ? "border-white/10 bg-white/2" : "border-gray-100 bg-gray-50/50"
+                      }`}>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-lg bg-[#81E6D9]/15 flex items-center justify-center ${isDark ? "text-[#81E6D9]" : "text-[#0d9488]"}`}>
+                            <Sparkles className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h2 className="text-sm font-bold flex items-center gap-2">
+                              Dabby AI Audit Analysis Report
+                            </h2>
+                            <p className={`text-[10px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                              File: {file?.name || "statement.xlsx"} • size: {formatFileSize(file?.size || 0)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Top Actions */}
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={handleShareReport}
+                            className={`flex items-center gap-1.5 px-3 py-1.8 rounded-xl font-bold text-xs transition-all border ${
+                              copySuccess
+                                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                                : (isDark 
+                                    ? "bg-white/5 border-white/10 text-white hover:bg-white/10" 
+                                    : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100")
+                            }`}
+                          >
+                            <Share2 className="w-3.5 h-3.5" />
+                            {copySuccess ? "Link Copied!" : "Share Report"}
+                          </button>
+                          
+                          <button
+                            onClick={handleCloseReport}
+                            className={`p-2 rounded-xl transition-colors ${
+                              isDark ? "text-gray-500 hover:bg-white/5 hover:text-white" : "text-gray-400 hover:bg-gray-100 hover:text-[#1a1a1a]"
+                            }`}
+                            title="Close Report"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Modal Body Contents */}
+                      <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+                        
+                        {/* Custom Query + Dabby AI Response Section */}
+                        <div className={`p-5 rounded-2xl border ${
+                          isDark ? "bg-white/2 border-white/10" : "bg-gray-50/50 border-gray-100"
+                        }`}>
+                          <div className="flex items-start gap-3.5">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                              isDark ? "bg-[#81E6D9]/10 text-[#81E6D9]" : "bg-[#0d9488]/10 text-[#0d9488]"
+                            }`}>
+                              <HelpCircle className="w-4 h-4" />
+                            </div>
+                            <div className="space-y-1">
+                              <p className={`text-[10px] uppercase font-bold tracking-wider ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                                User Audit Inquiry
+                              </p>
+                              <p className="text-xs italic">
+                                "{prompt || "General ledger reconciliation check."}"
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className={`mt-5 pt-4 border-t ${isDark ? "border-white/5" : "border-gray-200/50"} flex items-start gap-3.5`}>
+                            <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center flex-shrink-0 mt-0.5 animate-pulse">
+                              <Sparkles className="w-4 h-4" />
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[10px] uppercase font-bold tracking-wider text-purple-400">
+                                Dabby AI Executive Audit Note
+                              </p>
+                              <p className={`text-xs leading-relaxed ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                                {getAuditSummary(prompt)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Summary Metrics */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <div className={`p-4 rounded-2xl border ${isDark ? "border-white/10 bg-white/1" : "border-gray-100 bg-gray-50/20"}`}>
+                            <p className={`text-[10px] uppercase font-bold tracking-wider mb-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                              Reconciliation Rate
+                            </p>
+                            <div className="flex items-baseline gap-2">
+                              <h4 className="text-2xl font-bold">94.2%</h4>
+                              <span className="text-[10px] text-emerald-400 flex items-center font-semibold">
+                                <TrendingUp className="w-3 h-3 mr-0.5" /> High Match
+                              </span>
+                            </div>
+                            <p className={`text-[10px] mt-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                              2,891 ledger items matched HDFC bank entries
+                            </p>
+                          </div>
+
+                          <div className={`p-4 rounded-2xl border ${isDark ? "border-white/10 bg-white/1" : "border-gray-100 bg-gray-50/20"}`}>
+                            <p className={`text-[10px] uppercase font-bold tracking-wider mb-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                              Audited Tax Warnings
+                            </p>
+                            <div className="flex items-baseline gap-2">
+                              <h4 className="text-2xl font-bold text-amber-400">3 Flags</h4>
+                              <span className="text-[10px] text-amber-400 flex items-center font-semibold">
+                                <AlertTriangle className="w-3 h-3 mr-0.5" /> GST Risk
+                              </span>
+                            </div>
+                            <p className={`text-[10px] mt-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                              Mismatched Input Tax Credit rates in Zoho purchase vouchers
+                            </p>
+                          </div>
+
+                          <div className={`p-4 rounded-2xl border ${isDark ? "border-white/10 bg-white/1" : "border-gray-100 bg-gray-50/20"}`}>
+                            <p className={`text-[10px] uppercase font-bold tracking-wider mb-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                              Unmatched Outflows
+                            </p>
+                            <div className="flex items-baseline gap-2">
+                              <h4 className="text-2xl font-bold text-red-400">₹8,12,000</h4>
+                              <span className="text-[10px] text-red-400 flex items-center font-semibold">
+                                <AlertCircle className="w-3 h-3 mr-0.5" /> Missing Match
+                              </span>
+                            </div>
+                            <p className={`text-[10px] mt-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                              Potential duplicate payment references found
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Interactive Table of Anomalies */}
+                        <div className="space-y-2">
+                          <h4 className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                            Flagged ledger anomalies & ledger items
+                          </h4>
+                          <div className={`overflow-x-auto rounded-2xl border ${isDark ? "border-white/10" : "border-gray-200"}`}>
+                            <table className="w-full text-left border-collapse text-xs">
+                              <thead>
+                                <tr className={`uppercase font-bold tracking-wider text-[10px] ${
+                                  isDark ? "bg-white/3 text-gray-500" : "bg-gray-50 text-gray-400"
+                                }`}>
+                                  <th className="p-3">Date</th>
+                                  <th className="p-3">Ledger Transaction Detail</th>
+                                  <th className="p-3">Reference ID</th>
+                                  <th className="p-3">Voucher Value</th>
+                                  <th className="p-3">Audit Alert Status</th>
+                                </tr>
+                              </thead>
+                              <tbody className={`divide-y ${isDark ? "divide-white/5" : "divide-gray-100"}`}>
+                                <tr className={isDark ? "hover:bg-white/1" : "hover:bg-gray-50"}>
+                                  <td className="p-3">2026-06-12</td>
+                                  <td className="p-3 font-medium">Zoho Purchase Invoice #INV-2026-8928 (Acme Corp)</td>
+                                  <td className="p-3 font-mono text-[10px] text-gray-500">TXN_987234</td>
+                                  <td className="p-3 font-semibold">₹45,000</td>
+                                  <td className="p-3">
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 border border-red-500/20 text-red-400">
+                                      ● Duplicate payment reference
+                                    </span>
+                                  </td>
+                                </tr>
+                                <tr className={isDark ? "hover:bg-white/1" : "hover:bg-gray-50"}>
+                                  <td className="p-3">2026-06-08</td>
+                                  <td className="p-3 font-medium">HDFC Bank Debit - Self Withdraw Ref 2842</td>
+                                  <td className="p-3 font-mono text-[10px] text-gray-500">TXN_002842</td>
+                                  <td className="p-3 font-semibold">₹1,20,000</td>
+                                  <td className="p-3">
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                                      ⚠️ Missing bookkeeping voucher
+                                    </span>
+                                  </td>
+                                </tr>
+                                <tr className={isDark ? "hover:bg-white/1" : "hover:bg-gray-50"}>
+                                  <td className="p-3">2026-06-02</td>
+                                  <td className="p-3 font-medium">Zoho Purchase Split - Cloud Compute DigitalOcean</td>
+                                  <td className="p-3 font-mono text-[10px] text-gray-500">TXN_873198</td>
+                                  <td className="p-3 font-semibold">₹12,900</td>
+                                  <td className="p-3">
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                                      ⚠️ GST Split rate mismatch (18% vs 12%)
+                                    </span>
+                                  </td>
+                                </tr>
+                                <tr className={isDark ? "hover:bg-white/1" : "hover:bg-gray-50"}>
+                                  <td className="p-3">2026-05-28</td>
+                                  <td className="p-3 font-medium">Tally General Ledger Transfer - Vikas Retailers</td>
+                                  <td className="p-3 font-mono text-[10px] text-gray-500">TXN_287419</td>
+                                  <td className="p-3 font-semibold">₹89,000</td>
+                                  <td className="p-3">
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                                      ✓ Reconciled automatically
+                                    </span>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                      </div>
+
+                      {/* Modal Footer */}
+                      <div className={`px-6 py-4 flex flex-col sm:flex-row items-center justify-between border-t gap-3 ${
+                        isDark ? "border-white/10 bg-white/1" : "border-gray-100 bg-gray-50/30"
+                      }`}>
+                        <span className={`text-[10.5px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                          Dabby AI Engine audits data using bank-grade AES-256 ledger security.
+                        </span>
+                        
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleShareReport}
+                            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all border ${
+                              copySuccess
+                                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                                : (isDark 
+                                    ? "bg-white/5 border-white/10 text-white hover:bg-white/10" 
+                                    : "bg-gray-50 border-gray-200 text-[#1a1a1a] hover:bg-gray-100")
+                            }`}
+                          >
+                            {copySuccess ? "Copied Link!" : "Copy Report Link"}
+                          </button>
+                          
+                          <button
+                            onClick={handleCloseReport}
+                            className="px-4 py-2 bg-[#81E6D9] text-black font-bold text-xs rounded-xl hover:bg-[#5fd3c7] transition-all"
+                          >
+                            Analyze Another Ledger
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
