@@ -1,13 +1,11 @@
 import { supabase } from "../lib/supabase";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-
 /**
  * Backend Service
  * 
  * All write operations in Dabby MUST go through this service,
- * which calls the local FastAPI backend. The global fetch interceptor
- * in main.jsx auto-attaches JWT auth headers to all API requests.
+ * which calls Supabase Edge Functions. Direct writes to tables
+ * are strictly forbidden by the system philosophy.
  */
 
 export const backendService = {
@@ -16,21 +14,20 @@ export const backendService = {
    */
   async createRecord(workbenchId, recordType, summary, metadata) {
     try {
-      const response = await fetch(`${API_BASE}/api/records/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('create-record', {
+        body: {
           workbench_id: workbenchId,
           record_type: recordType,
           summary,
           metadata
-        })
+        }
       });
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || 'Failed to create record');
+
+      if (error) {
+        console.error('Edge Function Error (create-record):', error);
+        throw error;
       }
-      return await response.json();
+      return data;
     } catch (err) {
       console.error('Failed to call create-record:', err);
       throw err;
@@ -42,22 +39,21 @@ export const backendService = {
    */
   async pushAdjustment(workbenchId, originalRecordId, adjustmentType, reason, metadata) {
     try {
-      const response = await fetch(`${API_BASE}/api/records/adjustment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('push-adjustment', {
+        body: {
           workbench_id: workbenchId,
           original_record_id: originalRecordId,
           adjustment_type: adjustmentType,
           reason,
           metadata
-        })
+        }
       });
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || 'Failed to push adjustment');
+
+      if (error) {
+        console.error('Edge Function Error (push-adjustment):', error);
+        throw error;
       }
-      return await response.json();
+      return data;
     } catch (err) {
       console.error('Failed to call push-adjustment:', err);
       throw err;
@@ -148,10 +144,36 @@ export const backendService = {
   },
 
   /**
-   * Saves a chat message — direct Supabase insert (Edge Functions not deployed)
+   * Saves a chat message and updates the session
+   * Falls back to direct insert if edge function is unavailable
    */
   async saveChatMessage(sessionId, role, content, metadata, workbenchId = null) {
-    return await this._saveChatMessageDirect(sessionId, role, content, metadata);
+    try {
+      const { data, error } = await supabase.functions.invoke('save-chat-message', {
+        body: {
+          session_id: sessionId,
+          role,
+          content,
+          metadata,
+          workbench_id: workbenchId
+        }
+      });
+
+      if (error) {
+        console.warn('Edge Function Error (save-chat-message), falling back to direct insert:', error.message || error);
+        return await this._saveChatMessageDirect(sessionId, role, content, metadata);
+      }
+
+      if (data && data.error) {
+        console.warn('Edge Function returned error, falling back:', data.error);
+        return await this._saveChatMessageDirect(sessionId, role, content, metadata);
+      }
+
+      return data;
+    } catch (err) {
+      console.warn('Failed to call save-chat-message, falling back to direct insert:', err.message);
+      return await this._saveChatMessageDirect(sessionId, role, content, metadata);
+    }
   },
 
   async aiCategorize(description, labels) {
@@ -188,10 +210,34 @@ export const backendService = {
   },
 
   /**
-   * Creates a new chat session — direct Supabase insert (Edge Functions not deployed)
+   * Creates a new chat session
+   * Falls back to direct insert if edge function is unavailable
    */
   async createChatSession(title, workbenchId = null) {
-    return await this._createChatSessionDirect(title, workbenchId);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-chat-session', {
+        body: {
+          title,
+          workbench_id: workbenchId
+        }
+      });
+
+      if (error) {
+        console.warn('Edge Function Error (create-chat-session), falling back to direct insert:', error.message || error);
+        return await this._createChatSessionDirect(title, workbenchId);
+      }
+
+      // Edge function may return error in body
+      if (data && data.error) {
+        console.warn('Edge Function returned error, falling back:', data.error);
+        return await this._createChatSessionDirect(title, workbenchId);
+      }
+
+      return data;
+    } catch (err) {
+      console.warn('Failed to call create-chat-session edge function, falling back to direct insert:', err.message);
+      return await this._createChatSessionDirect(title, workbenchId);
+    }
   },
 
   /**
@@ -250,15 +296,15 @@ export const backendService = {
    */
   async confirmRecord(recordId) {
     try {
-      const response = await fetch(`${API_BASE}/api/records/${recordId}/confirm`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const { data, error } = await supabase.functions.invoke('confirm-record', {
+        body: { record_id: recordId }
       });
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || 'Failed to confirm record');
+
+      if (error) {
+        console.error('Edge Function Error (confirm-record):', error);
+        throw error;
       }
-      return await response.json();
+      return data;
     } catch (err) {
       console.error('Failed to call confirm-record:', err);
       throw err;
@@ -270,15 +316,15 @@ export const backendService = {
    */
   async runReconciliation(workbenchId) {
     try {
-      const response = await fetch(`${API_BASE}/api/records/reconcile/${workbenchId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const { data, error } = await supabase.functions.invoke('run-reconciliation', {
+        body: { workbench_id: workbenchId }
       });
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || 'Failed to run reconciliation');
+
+      if (error) {
+        console.error('Edge Function Error (run-reconciliation):', error);
+        throw error;
       }
-      return await response.json();
+      return data;
     } catch (err) {
       console.error('Failed to call run-reconciliation:', err);
       throw err;
@@ -290,12 +336,15 @@ export const backendService = {
    */
   async getWorkbenchIntelligence(workbenchId) {
     try {
-      const response = await fetch(`${API_BASE}/api/records/intelligence/${workbenchId}`);
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || 'Failed to fetch intelligence');
+      const { data, error } = await supabase.functions.invoke('get-intelligence', {
+        body: { workbench_id: workbenchId }
+      });
+
+      if (error) {
+        console.error('Edge Function Error (get-intelligence):', error);
+        throw error;
       }
-      return await response.json();
+      return data;
     } catch (err) {
       console.error('Failed to call get-intelligence:', err);
       throw err;
@@ -304,21 +353,19 @@ export const backendService = {
 
   async createSubscriptionLink(planId, customer = {}) {
     try {
-      const response = await fetch(`${API_BASE}/api/subscriptions/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('create-subscription', {
+        body: {
           plan_id: planId,
           total_count: 12,
           customer_notify: 1,
           customer
-        })
+        }
       });
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || 'Failed to create subscription');
+      if (error) {
+        console.error('Edge Function Error (create-subscription):', error);
+        throw error;
       }
-      return await response.json();
+      return data;
     } catch (err) {
       console.error('Failed to call create-subscription:', err);
       throw err;
@@ -468,7 +515,7 @@ export const backendService = {
       .from("Doc_vault_Raw")
       .download(filePath);
     if (error) throw error;
-
+    
     const url = URL.createObjectURL(data);
     const a = document.createElement('a');
     a.href = url;

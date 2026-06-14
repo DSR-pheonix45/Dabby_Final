@@ -2,9 +2,8 @@ import os
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
-# Load env variables from the root .env.local first, then fallback to .env
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env.local'), override=True)
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'), override=False)
+# Load env variables from the root .env or .env.local
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env.local'))
 
 url: str = os.environ.get("VITE_SUPABASE_URL")
 # IMPORTANT: Backend uses Service Role to bypass RLS for trusted operations

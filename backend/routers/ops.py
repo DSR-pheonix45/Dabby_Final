@@ -1,11 +1,10 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from typing import List, Optional, Dict
 from pydantic import BaseModel
 from datetime import date
 from supabase_client import supabase
 from services.ledger_service import LedgerService
 from services.ai_service import ai_service
-from .auth_utils import require_membership, get_user_id_from_header
 import uuid
 
 router = APIRouter()
@@ -71,18 +70,16 @@ class BillPaymentRequest(BaseModel):
 
 
 @router.post("/parties")
-async def create_party(party: PartyCreate, x_user_id: str = Depends(get_user_id_from_header)):
+async def create_party(party: PartyCreate):
     try:
-        await require_membership(party.workbench_id, x_user_id)
         response = supabase.table("parties").insert(party.dict()).execute()
         return response.data[0]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/parties/{workbench_id}")
-async def list_parties(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
+async def list_parties(workbench_id: str):
     try:
-        await require_membership(workbench_id, x_user_id)
         # Fetch parties with their entities
         response = supabase.table("parties").select("*, entities(*)").eq("workbench_id", workbench_id).execute()
         return response.data
@@ -90,13 +87,11 @@ async def list_parties(workbench_id: str, x_user_id: str = Depends(get_user_id_f
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/parties/initialize-self/{workbench_id}")
-async def initialize_self_party(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
+async def initialize_self_party(workbench_id: str):
     """
     Ensures a 'Self' party exists for the workbench.
     """
     try:
-        # RBAC: ensure requester is a member
-        await require_membership(workbench_id, x_user_id)
         # Check if already exists
         existing = supabase.table("parties").select("*").eq("workbench_id", workbench_id).eq("is_self", True).execute()
         if existing.data:
@@ -119,15 +114,8 @@ async def initialize_self_party(workbench_id: str, x_user_id: str = Depends(get_
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/entities")
-async def create_entity(entity: EntityCreate, x_user_id: str = Depends(get_user_id_from_header)):
+async def create_entity(entity: EntityCreate):
     try:
-        # Verify membership for the party's workbench
-        party_res = supabase.table("parties").select("workbench_id").eq("id", entity.party_id).maybe_single().execute()
-        party = party_res.data
-        if not party:
-            raise HTTPException(status_code=404, detail='Party not found')
-        await require_membership(party['workbench_id'], x_user_id)
-
         # 1. Create the Entity (Vessel)
         response = supabase.table("entities").insert(entity.dict()).execute()
         new_entity = response.data[0]
@@ -143,46 +131,65 @@ async def create_entity(entity: EntityCreate, x_user_id: str = Depends(get_user_
         label_type = "asset"
         
         if not party.get("is_self"):
-            # This is an external party. We check if they have invoices (Client) or bills (Vendor)
-            # For simplicity in this version, we'll use 'Accounts Receivable (AR)' as default for clients
-            # and 'Accounts Payable (AP)' for vendors.
-            # We can distinguish by party category or metadata if needed.
-            # For now, let's assume all external parties start in AR unless specified.
             parent_sub_name = "Accounts Receivable (AR)"
             label_type = "asset"
         
         # Find the parent sub-account ID
-        parent_res = supabase.table("coa_accounts") \
-            .select("id") \
-            .eq("workbench_id", party["workbench_id"]) \
-            .eq("name", parent_sub_name) \
-            .eq("level", 2) \
+        sub_acc_res = supabase.table("master_sub_accounts") \
+            .select("id, master_account_id, sub_account_code") \
+            .eq("sub_account_name", parent_sub_name) \
+            .eq("is_active", True) \
             .execute()
         
-        parent_id = parent_res.data[0]["id"] if parent_res.data else None
+        if not sub_acc_res.data:
+            raise ValueError(f"Master sub-account '{parent_sub_name}' not found")
+            
+        sub_acc = sub_acc_res.data[0]
+        master_account_id = sub_acc["master_account_id"]
+        sub_account_code = sub_acc["sub_account_code"]
         
-        # Create the Shadow Label
-        # Note: We are using the existing 'labels' table. 
-        # We'll use the 'sub_account' field to store the parent pillar name for now 
-        # as a fallback since we might not have the is_shadow column yet.
+        # Find master account code
+        master_acc_res = supabase.table("master_accounts") \
+            .select("account_code") \
+            .eq("id", master_account_id) \
+            .execute()
+            
+        if not master_acc_res.data:
+            raise ValueError("Master account not found")
+        master_code = master_acc_res.data[0]["account_code"]
+        
+        # Generate unique code
+        account_code = await ledger_service.generate_unique_account_code(
+            party["workbench_id"], master_code, sub_account_code
+        )
+        
+        # Create the Shadow Label in workbench_accounts
         label_data = {
             "workbench_id": party["workbench_id"],
-            "name": f"{party['name']} - {new_entity['name']}",
-            "type": label_type,
-            "sub_account": parent_sub_name,
-            "is_system": False,
-            "is_shadow": True,
-            "vessel_id": new_entity["id"]
+            "master_account_id": master_account_id,
+            "master_sub_account_id": sub_acc["id"],
+            "account_code": account_code,
+            "full_account_name": f"{party['name']} - {new_entity['name']}",
+            "is_active": True
         }
         
-        # If the migration was run, we can add these. If not, the insert will still work (Supabase ignores unknown columns usually)
-        # But to be safe, let's try to keep it compatible.
+        label_res = None
+        try:
+            # First try inserting with is_shadow and vessel_id
+            try_data = {
+                **label_data,
+                "is_shadow": True,
+                "vessel_id": new_entity["id"]
+            }
+            label_res = supabase.table("workbench_accounts").insert(try_data).execute()
+        except Exception as insert_err:
+            # If that fails (e.g. columns don't exist), fall back to standard fields
+            print(f"[WARNING] Inserting shadow label with is_shadow/vessel_id failed, falling back: {insert_err}")
+            label_res = supabase.table("workbench_accounts").insert(label_data).execute()
         
-        # 3. Save the Label and Link back to Entity
-        label_res = supabase.table("labels").insert(label_data).execute()
-        if label_res.data:
+        # 3. Link back to Entity if label was created
+        if label_res and label_res.data:
             label_id = label_res.data[0]["id"]
-            # Update the entity with its shadow label ID
             supabase.table("entities").update({"label_id": label_id}).eq("id", new_entity["id"]).execute()
             new_entity["label_id"] = label_id
         
@@ -192,24 +199,16 @@ async def create_entity(entity: EntityCreate, x_user_id: str = Depends(get_user_
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/parties/{party_id}")
-async def delete_party(party_id: str, x_user_id: str = Depends(get_user_id_from_header)):
+async def delete_party(party_id: str):
     try:
-        p = supabase.table("parties").select("workbench_id").eq("id", party_id).maybe_single().execute().data
-        if not p:
-            raise HTTPException(status_code=404, detail='Party not found')
-        await require_membership(p['workbench_id'], x_user_id)
         response = supabase.table("parties").delete().eq("id", party_id).execute()
         return response.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/entities/{entity_id}")
-async def delete_entity(entity_id: str, x_user_id: str = Depends(get_user_id_from_header)):
+async def delete_entity(entity_id: str):
     try:
-        ent = supabase.table("entities").select("workbench_id").eq("id", entity_id).maybe_single().execute().data
-        if not ent:
-            raise HTTPException(status_code=404, detail='Entity not found')
-        await require_membership(ent['workbench_id'], x_user_id)
         response = supabase.table("entities").delete().eq("id", entity_id).execute()
         return response.data
     except Exception as e:
@@ -218,9 +217,8 @@ async def delete_entity(entity_id: str, x_user_id: str = Depends(get_user_id_fro
 # --- Invoice Endpoints ---
 
 @router.post("/invoices")
-async def create_invoice(invoice: InvoiceCreate, x_user_id: str = Depends(get_user_id_from_header)):
+async def create_invoice(invoice: InvoiceCreate):
     try:
-        await require_membership(invoice.workbench_id, x_user_id)
         # 1. Create Invoice Record
         invoice_data = invoice.dict()
         invoice_data["balance_due"] = invoice.amount
@@ -284,11 +282,28 @@ async def create_invoice(invoice: InvoiceCreate, x_user_id: str = Depends(get_us
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/invoices/{workbench_id}")
-async def list_invoices(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
+async def list_invoices(workbench_id: str):
     try:
-        await require_membership(workbench_id, x_user_id)
-        res = supabase.table("invoices").select("*, parties(name), labels!revenue_label_id(name), ar_label:labels!ar_label_id(name)").eq("workbench_id", workbench_id).order("created_at", desc=True).execute()
-        return res.data
+        res = supabase.table("invoices") \
+            .select("*, parties(name), labels:workbench_accounts!revenue_label_id(full_account_name), ar_label:workbench_accounts!ar_label_id(full_account_name)") \
+            .eq("workbench_id", workbench_id) \
+            .order("created_at", desc=True) \
+            .execute()
+            
+        invoices = res.data
+        for inv in invoices:
+            # Map backend keys to expected frontend structure
+            if "labels" in inv and inv["labels"]:
+                inv["labels"] = {"name": inv["labels"]["full_account_name"]}
+            else:
+                inv["labels"] = {"name": "General Revenue"}
+                
+            if "ar_label" in inv and inv["ar_label"]:
+                inv["ar_label"] = {"name": inv["ar_label"]["full_account_name"]}
+            else:
+                inv["ar_label"] = {"name": "Accounts Receivable"}
+                
+        return invoices
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -340,7 +355,7 @@ async def scan_invoice_doc(doc_id: str):
         raise HTTPException(status_code=500, detail=f"AI Engine Error: {str(e)}")
 
 @router.post("/invoices/{invoice_id}/payment")
-async def record_payment(invoice_id: str, req: PaymentRequest, x_user_id: str = Depends(get_user_id_from_header)):
+async def record_payment(invoice_id: str, req: PaymentRequest):
     try:
         # 1. Fetch current invoice
         inv_res = supabase.table("invoices").select("*").eq("id", invoice_id).single().execute()
@@ -357,9 +372,6 @@ async def record_payment(invoice_id: str, req: PaymentRequest, x_user_id: str = 
             "status": status
         }).eq("id", invoice_id).execute()
         
-        # RBAC: ensure caller is member of the workbench
-        await require_membership(invoice["workbench_id"], x_user_id)
-
         # 3. Record Financial Transaction (Dr Bank, Cr AR)
         tx_res = await ledger_service.record_transaction(
             workbench_id=invoice["workbench_id"],
@@ -434,9 +446,8 @@ async def get_ar_metrics(workbench_id: str):
 # --- Bill / AP Endpoints ---
 
 @router.post("/bills")
-async def create_bill(bill: BillCreate, x_user_id: str = Depends(get_user_id_from_header)):
+async def create_bill(bill: BillCreate):
     try:
-        await require_membership(bill.workbench_id, x_user_id)
         # 1. Create Bill Record
         bill_data = bill.dict()
         bill_data["balance_due"] = bill.amount
@@ -476,16 +487,33 @@ async def create_bill(bill: BillCreate, x_user_id: str = Depends(get_user_id_fro
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/bills/{workbench_id}")
-async def list_bills(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
+async def list_bills(workbench_id: str):
     try:
-        await require_membership(workbench_id, x_user_id)
-        res = supabase.table("bills").select("*, parties(name), labels!expense_label_id(name), ap_label:labels!ap_label_id(name)").eq("workbench_id", workbench_id).order("created_at", desc=True).execute()
-        return res.data
+        res = supabase.table("bills") \
+            .select("*, parties(name), labels:workbench_accounts!expense_label_id(full_account_name), ap_label:workbench_accounts!ap_label_id(full_account_name)") \
+            .eq("workbench_id", workbench_id) \
+            .order("created_at", desc=True) \
+            .execute()
+            
+        bills = res.data
+        for bill in bills:
+            # Map backend keys to expected frontend structure
+            if "labels" in bill and bill["labels"]:
+                bill["labels"] = {"name": bill["labels"]["full_account_name"]}
+            else:
+                bill["labels"] = {"name": "General Expense"}
+                
+            if "ap_label" in bill and bill["ap_label"]:
+                bill["ap_label"] = {"name": bill["ap_label"]["full_account_name"]}
+            else:
+                bill["ap_label"] = {"name": "Accounts Payable"}
+                
+        return bills
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/bills/{bill_id}/payment")
-async def record_bill_payment(bill_id: str, req: BillPaymentRequest, x_user_id: str = Depends(get_user_id_from_header)):
+async def record_bill_payment(bill_id: str, req: BillPaymentRequest):
     try:
         # 1. Fetch current bill
         bill_res = supabase.table("bills").select("*").eq("id", bill_id).single().execute()
@@ -502,9 +530,6 @@ async def record_bill_payment(bill_id: str, req: BillPaymentRequest, x_user_id: 
             "status": status
         }).eq("id", bill_id).execute()
         
-        # RBAC: ensure caller is member of workbench
-        await require_membership(bill["workbench_id"], x_user_id)
-
         # 3. Record Financial Transaction (Dr AP, Cr Bank)
         tx_res = await ledger_service.record_transaction(
             workbench_id=bill["workbench_id"],
@@ -574,9 +599,8 @@ async def get_ap_metrics(workbench_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/entities/workbench/{workbench_id}")
-async def list_workbench_entities(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
+async def list_workbench_entities(workbench_id: str):
     try:
-        await require_membership(workbench_id, x_user_id)
         # Fetch all entities for the workbench
         res = supabase.table("entities") \
             .select("*, parties!inner(*)") \

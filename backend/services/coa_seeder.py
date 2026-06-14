@@ -91,7 +91,7 @@ def seed_coa(supabase_client, workbench_id: str, business_type: str = "services"
                 "Cost of Goods Sold (COGS)": ["Raw Materials Consumed", "Direct Labor", "Factory Power & Fuel", "Machine Maintenance", "Factory Rent", "Quality Control Costs", "Packaging Costs"]
             },
             "LIABILITIES": {
-                "Current Liabilities": ["Supplier Advances"]
+                "Current Liabilities": ["Supplier Advances"] # Fallback if needed
             }
         },
         "services": {
@@ -146,51 +146,6 @@ def seed_coa(supabase_client, workbench_id: str, business_type: str = "services"
         }
     }
 
-    # 3. BUSINESS TYPE OVERLAYS (Adds partner/capital structure details)
-    type_overlays = {
-        "proprietorship": {
-            "EQUITY": {
-                "Owner’s Drawings": ["Owner Withdrawals"]
-            },
-            "ASSETS": {
-                "Cash & Cash Equivalents": ["Proprietor Cash Account"]
-            }
-        },
-        "partnership": {
-            "EQUITY": {
-                "Share Capital": ["Partners’ Capital", "Partner Current Accounts"],
-                "Retained Earnings": ["Partner Profit Share"]
-            },
-            "LIABILITIES": {
-                "Accounts Payable (AP)": ["Partner Capital Advances"]
-            }
-        },
-        "pvt_ltd": {
-            "EQUITY": {
-                "Share Capital": ["Equity Share Capital", "Security Premium"],
-                "Reserves & Surplus": ["General Reserve", "Retained Earnings"]
-            },
-            "LIABILITIES": {
-                "Long-term Debt": ["Term Loans", "Debentures"]
-            }
-        },
-        "llp": {
-            "EQUITY": {
-                "Share Capital": ["Partners’ Capital", "LLP Contribution"],
-                "Retained Earnings": ["Profit Reserve"]
-            },
-            "LIABILITIES": {
-                "Accounts Payable (AP)": ["Partner Advances"]
-            }
-        },
-        "public_ltd": {
-            "EQUITY": {
-                "Share Capital": ["Ordinary Share Capital", "Preference Share Capital"],
-                "Reserves & Surplus": ["Capital Reserve", "Securities Premium"]
-            }
-        }
-    }
-
     # Apply Industry Overlay
     selected_industry = industry.lower()
     if selected_industry in overlays:
@@ -201,51 +156,43 @@ def seed_coa(supabase_client, workbench_id: str, business_type: str = "services"
                     base_structure[account_name]["sub_accounts"][sub_name] = []
                 base_structure[account_name]["sub_accounts"][sub_name].extend(labels)
 
-    # Apply Business Type Overlay
-    selected_business_type = business_type.lower()
-    if selected_business_type in type_overlays:
-        type_data = type_overlays[selected_business_type]
-        for account_name, a_data in type_data.items():
-            for sub_name, labels in a_data.items():
-                if sub_name not in base_structure[account_name]["sub_accounts"]:
-                    base_structure[account_name]["sub_accounts"][sub_name] = []
-                base_structure[account_name]["sub_accounts"][sub_name].extend(labels)
-
     # Seed to Supabase
+    # New Schema: Use global master_accounts and master_sub_accounts
+    # Create workbench_accounts as instances for this workbench
     try:
-        acc_order = 1
-        for account_name, data in base_structure.items():
-            # 1. Create Account (Level 1)
-            acc_resp = supabase_client.table("coa_accounts").insert({
-                "workbench_id": workbench_id,
-                "name": account_name,
-                "type": data["type"],
-                "is_system": True,
-                "display_order": acc_order,
-                "level": 1
-            }).execute()
-            acc_id = acc_resp.data[0]["id"]
-            acc_order += 1
-
-            sub_order = 1
-            for sub_name, labels in data["sub_accounts"].items():
-                # 2. Create Sub-Account (Level 2)
-                sub_resp = supabase_client.table("coa_accounts").insert({
+        # Fetch all master accounts and sub-accounts
+        master_accs_res = supabase_client.table("master_accounts").select("*").eq("is_active", True).execute()
+        master_subs_res = supabase_client.table("master_sub_accounts").select("*").eq("is_active", True).execute()
+        
+        master_accounts = {acc["id"]: acc for acc in master_accs_res.data}
+        
+        # Create workbench_accounts for each master_sub_account
+        workbench_accounts_to_insert = []
+        for master_sub in master_subs_res.data:
+            master_account_id = master_sub["master_account_id"]
+            if master_account_id in master_accounts:
+                master_acc = master_accounts[master_account_id]
+                
+                # Generate account code as: Master Code + Sub Code (e.g., A001, L002)
+                account_code = f"{master_acc['account_code']}{master_sub['sub_account_code']}"
+                
+                workbench_accounts_to_insert.append({
                     "workbench_id": workbench_id,
-                    "name": sub_name,
-                    "type": data["type"],
-                    "parent_id": acc_id,
-                    "sub_account": account_name,
-                    "is_system": True,
-                    "display_order": sub_order,
-                    "level": 2
-                }).execute()
-                sub_id = sub_resp.data[0]["id"]
-                sub_order += 1
-
-                # 3. No pre-made labels are created here. Labels are added by users after workbench setup.
-
-        return {"status": "success", "message": "Full 3-Layer COA seeded successfully"}
+                    "master_account_id": master_account_id,
+                    "master_sub_account_id": master_sub["id"],
+                    "account_code": account_code,
+                    "full_account_name": master_sub["sub_account_name"],
+                    "description": master_sub["description"],
+                    "current_amount": 0.0,
+                    "is_active": True
+                })
+        
+        # Batch insert all workbench_accounts
+        if workbench_accounts_to_insert:
+            supabase_client.table("workbench_accounts").insert(workbench_accounts_to_insert).execute()
+            print(f"[DEBUG] Seeded {len(workbench_accounts_to_insert)} workbench accounts for workbench {workbench_id}")
+        
+        return {"status": "success", "message": f"Seeded {len(workbench_accounts_to_insert)} workbench accounts successfully"}
     except Exception as e:
         print(f"[ERROR] COA Seeding failed: {str(e)}")
         return {"status": "error", "message": str(e)}

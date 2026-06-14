@@ -28,23 +28,12 @@ export default function Login() {
     }
   }, [user, profile, authLoading, navigate, location]);
 
-  const ALLOWED_DOMAINS = ['gmail.com', 'yahoo.com', 'outlook.com'];
-  const validateEmailDomain = (value) => {
-    const domain = value.split('@')[1]?.toLowerCase();
-    return ALLOWED_DOMAINS.includes(domain);
-  };
-
   const handleEmailLogin = async (e) => {
     e.preventDefault();
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
       setError("Please enter both email and password.");
-      return;
-    }
-
-    if (!validateEmailDomain(trimmedEmail)) {
-      setError("Only @gmail.com, @yahoo.com, or @outlook.com email addresses are allowed.");
       return;
     }
 
@@ -181,7 +170,7 @@ export default function Login() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="yourname@gmail.com"
+              placeholder="name@company.com"
               className="w-full bg-white/5 border border-white/10 rounded-md px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-[#00FFD1]/50 focus:border-[#00FFD1] transition-all"
             />
           </div>

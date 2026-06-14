@@ -3,7 +3,6 @@ from pydantic import BaseModel
 from typing import Optional
 from supabase_client import supabase
 from services.coa_seeder import seed_coa
-from .auth_utils import enforce_workbench_limit
 
 router = APIRouter()
 
@@ -28,9 +27,6 @@ class WorkbenchCreate(BaseModel):
 async def create_workbench(payload: WorkbenchCreate):
     print(f"[DEBUG] Received request to create workbench: {payload.name}")
     try:
-        # 0. Enforce plan-based workbench limit
-        await enforce_workbench_limit(payload.owner_user_id)
-
         # 1. Create Workbench
         insert_data = {
             "owner_user_id": payload.owner_user_id,
@@ -81,14 +77,4 @@ async def create_workbench(payload: WorkbenchCreate):
         print(f"[CRITICAL ERROR] Workbench creation failed: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/{workbench_id}/membership")
-async def get_membership(workbench_id: str, user_id: str):
-    try:
-        res = supabase.table('workbench_members').select('*').eq('workbench_id', workbench_id).eq('user_id', user_id).maybe_single().execute()
-        return { 'membership': res.data }
-    except Exception as e:
-        print(f"[ERROR] Failed to fetch membership: {e}")
         raise HTTPException(status_code=500, detail=str(e))

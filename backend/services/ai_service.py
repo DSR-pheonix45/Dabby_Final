@@ -3,12 +3,7 @@ import json
 from typing import Dict, Optional
 from groq import Groq
 
-try:
-    import google.generativeai as genai
-    _genai_available = True
-except ImportError:
-    genai = None
-    _genai_available = False
+import google.generativeai as genai
 
 class AIService:
     def __init__(self):
@@ -21,7 +16,7 @@ class AIService:
         else:
             self.groq_client = None
 
-        if gemini_key and _genai_available:
+        if gemini_key:
             sanitized_gemini = gemini_key.strip().strip('"').strip("'")
             genai.configure(api_key=sanitized_gemini)
             # Use 1.5-flash for higher rate limits on free tier
@@ -118,25 +113,25 @@ class AIService:
                 print(f"[DEBUG] Gemini Error Response: {e.response}")
             raise e
 
-    async def categorize_transaction(self, description: str, labels: list) -> Dict:
+    async def categorize_transaction(self, description: str, accounts: list) -> Dict:
         """
-        Maps a transaction description to the most appropriate Chart of Accounts label.
+        Maps a transaction description to the most appropriate workbench account.
         """
         if not self.groq_client:
             raise ValueError("GROQ_API_KEY not configured")
 
         system_prompt = """
-        You are an expert accountant. Given a transaction description and a list of possible Chart of Account labels, 
-        select the single most appropriate label for the entry.
+        You are an expert accountant. Given a transaction description and a list of possible Chart of Account entries, 
+        select the single most appropriate account for the entry.
         
         Rules:
-        1. Only pick one label.
-        2. Return ONLY a JSON object with: {"label_id": "uuid", "label_name": "string", "confidence": float, "reasoning": "string"}.
-        3. If no label fits well, pick the closest one but set confidence low.
+        1. Only pick one account.
+        2. Return ONLY a JSON object with: {"account_id": "uuid", "account_name": "string", "confidence": float, "reasoning": "string"}.
+        3. If no account fits well, pick the closest one but set confidence low.
         """
         
-        labels_ctx = "\n".join([f"- {l['id']}: {l['name']} (Sub-account: {l['sub_account']})" for l in labels])
-        user_msg = f"Transaction Description: {description}\n\nAvailable Labels:\n{labels_ctx}"
+        accounts_ctx = "\n".join([f"- {a['id']}: {a['full_account_name']} (Account Code: {a['account_code']})" for a in accounts])
+        user_msg = f"Transaction Description: {description}\n\nAvailable Accounts:\n{accounts_ctx}"
         
         try:
             completion = self.groq_client.chat.completions.create(
@@ -150,6 +145,6 @@ class AIService:
             return json.loads(completion.choices[0].message.content)
         except Exception as e:
             print(f"[ERROR] AI Categorization failed: {str(e)}")
-            return {"label_id": None, "error": str(e)}
+            return {"account_id": None, "error": str(e)}
 
 ai_service = AIService()

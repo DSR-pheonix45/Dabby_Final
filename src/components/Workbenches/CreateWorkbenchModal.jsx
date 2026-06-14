@@ -238,9 +238,9 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
                 <div className="form-group span-2">
                   <label>Chart of Accounts Setup</label>
                   <div className="coa-type-selector">
-                    <div
+                    <div 
                       className={`coa-option ${formData.coa_mode === 'create' ? 'active' : ''}`}
-                      onClick={() => setFormData({ ...formData, coa_mode: 'create' })}
+                      onClick={() => setFormData({...formData, coa_mode: 'create'})}
                     >
                       <div className="option-icon"><Plus size={18} /></div>
                       <div className="option-info">
@@ -248,9 +248,9 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
                         <span>Build 4-layer architecture</span>
                       </div>
                     </div>
-                    <div
+                    <div 
                       className={`coa-option ${formData.coa_mode === 'import' ? 'active' : ''}`}
-                      onClick={() => setFormData({ ...formData, coa_mode: 'import' })}
+                      onClick={() => setFormData({...formData, coa_mode: 'import'})}
                     >
                       <div className="option-icon"><ArrowRight size={18} /></div>
                       <div className="option-info">

@@ -1,33 +1,29 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from services.investor_service import InvestorService
 from supabase_client import supabase
-from .auth_utils import require_membership, check_role_allowed, get_user_id_from_header
 
 router = APIRouter()
 investor_service = InvestorService(supabase)
 
 @router.get("/intelligence/{workbench_id}")
-async def get_investor_intelligence(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
+async def get_investor_intelligence(workbench_id: str):
     try:
-        await require_membership(workbench_id, x_user_id)
         return await investor_service.get_intelligence(workbench_id)
     except Exception as e:
         print(f"Error in investor intelligence: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/statements/{workbench_id}")
-async def get_financial_statements(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
+async def get_financial_statements(workbench_id: str):
     try:
-        await require_membership(workbench_id, x_user_id)
         return await investor_service.get_financial_statements(workbench_id)
     except Exception as e:
         print(f"Error in financial statements: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/share/{workbench_id}")
-async def create_share_link(workbench_id: str, body: dict, x_user_id: str = Depends(get_user_id_from_header)):
+async def create_share_link(workbench_id: str, body: dict):
     try:
-        await require_membership(workbench_id, x_user_id)
         password = body.get("password")
         if not password:
             raise HTTPException(status_code=400, detail="Password is required")
@@ -47,12 +43,8 @@ async def get_shared_snapshot(share_id: str, body: dict):
         raise HTTPException(status_code=401, detail=str(e))
 
 @router.post("/invite/{workbench_id}")
-async def create_invite(workbench_id: str, body: dict, x_user_id: str = Depends(get_user_id_from_header)):
+async def create_invite(workbench_id: str, body: dict):
     try:
-        # only owner/admin can invite
-        member = await require_membership(workbench_id, x_user_id)
-        await check_role_allowed(member, ["owner", "admin"])
-
         email = body.get("email")
         role = body.get("role", "viewer")
         if not email:

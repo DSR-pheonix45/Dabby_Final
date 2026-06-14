@@ -1,145 +1,143 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BsX, BsTag, BsGrid } from "react-icons/bs";
 import { toast } from "react-hot-toast";
-import { supabase } from "../../../lib/supabase";
-import { useAuth } from "../../../hooks/useAuth";
-import { useWorkbench } from "../../../context/WorkbenchContext";
 
-export default function LabelModal({ isOpen, onClose, workbenchId, label, onSuccess }) {
-  const { plan, planLimits } = useAuth();
-  const { labels } = useWorkbench();
+export default function LabelModal({ isOpen, onClose, workbenchId, onSuccess }) {
   const [loading, setLoading] = useState(false);
+  const [masterAccounts, setMasterAccounts] = useState([]);
+  const [masterSubAccounts, setMasterSubAccounts] = useState([]);
+  const [loadingLookups, setLoadingLookups] = useState(true);
   const [formData, setFormData] = useState({
     name: "",
     type: "expense",
-    sub_account: "",
-    is_system: false,
+    master_sub_account_id: "",
+    description: "",
   });
-  const isEditing = Boolean(label?.id);
 
-  React.useEffect(() => {
-    if (label) {
-      setFormData({
-        name: label.name || "",
-        type: label.type || "expense",
-        sub_account: label.sub_account || "",
-        is_system: label.is_system || false,
-      });
-    } else {
-      setFormData({
-        name: "",
-        type: "expense",
-        sub_account: "",
-        is_system: false,
-      });
+  useEffect(() => {
+    if (isOpen) {
+      fetchLookups();
     }
-  }, [label]);
+  }, [isOpen]);
+
+  const fetchLookups = async () => {
+    try {
+      setLoadingLookups(true);
+      const [accsRes, subsRes] = await Promise.all([
+        fetch("http://localhost:8000/api/ledger/master-accounts"),
+        fetch("http://localhost:8000/api/ledger/master-sub-accounts")
+      ]);
+      if (!accsRes.ok || !subsRes.ok) throw new Error("Failed to fetch account definitions");
+      
+      const accs = await accsRes.json();
+      const subs = await subsRes.json();
+      
+      setMasterAccounts(accs);
+      setMasterSubAccounts(subs);
+      
+      // Select the first sub-account of the default type (expense)
+      const nameMap = {
+        asset: "ASSETS",
+        liability: "LIABILITIES",
+        equity: "EQUITY",
+        revenue: "REVENUE",
+        expense: "EXPENSES"
+      };
+      const expenseAcc = accs.find(acc => acc.account_name.toUpperCase() === nameMap["expense"]);
+      if (expenseAcc) {
+        const firstSub = subs.find(sub => sub.master_account_id === expenseAcc.id);
+        if (firstSub) {
+          setFormData(prev => ({
+            ...prev,
+            master_sub_account_id: firstSub.id
+          }));
+        }
+      }
+    } catch (err) {
+      console.error("Error loading account groups:", err);
+      toast.error("Failed to load Chart of Account groups");
+    } finally {
+      setLoadingLookups(false);
+    }
+  };
+
+  const nameMap = {
+    asset: "ASSETS",
+    liability: "LIABILITIES",
+    equity: "EQUITY",
+    revenue: "REVENUE",
+    expense: "EXPENSES"
+  };
+
+  const getMasterAccountByType = (type) => {
+    const targetName = nameMap[type];
+    return masterAccounts.find(acc => acc.account_name.toUpperCase() === targetName);
+  };
+
+  const selectedMasterAcc = getMasterAccountByType(formData.type);
+  const filteredSubAccounts = selectedMasterAcc 
+    ? masterSubAccounts.filter(sub => sub.master_account_id === selectedMasterAcc.id)
+    : [];
+
+  const types = ["asset", "liability", "equity", "revenue", "expense"];
+
+  const handleTypeChange = (type) => {
+    const targetAcc = getMasterAccountByType(type);
+    const firstSub = targetAcc 
+      ? masterSubAccounts.find(sub => sub.master_account_id === targetAcc.id)
+      : null;
+      
+    setFormData({ 
+      ...formData, 
+      type, 
+      master_sub_account_id: firstSub ? firstSub.id : ""
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.sub_account) {
+    const selectedMasterAcc = getMasterAccountByType(formData.type);
+
+    if (!formData.name || !formData.master_sub_account_id || !selectedMasterAcc) {
       toast.error("Please fill in all required fields");
       return;
     }
 
     try {
       setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      const url = isEditing
-        ? `http://localhost:8000/api/ledger/labels/${label.id}`
-        : "http://localhost:8000/api/ledger/labels";
-      const method = isEditing ? "PATCH" : "POST";
-      const payload = isEditing
-        ? {
-            name: formData.name,
-            sub_account: formData.sub_account,
-          }
-        : {
-            workbench_id: workbenchId,
-            ...formData,
-          };
-
-      const response = await fetch(url, {
-        method,
-        headers: { 
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(payload),
+      const response = await fetch("http://localhost:8000/api/ledger/labels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workbench_id: workbenchId,
+          master_account_id: selectedMasterAcc.id,
+          master_sub_account_id: formData.master_sub_account_id,
+          full_account_name: formData.name,
+          description: formData.description || "",
+        }),
       });
 
       if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(errText || (isEditing ? "Failed to update label" : "Failed to create label"));
+        const errData = await response.json();
+        throw new Error(errData.detail || "Failed to create label");
       }
 
-      toast.success(isEditing ? "Category updated successfully" : "Category created successfully");
+      toast.success("Ledger account created successfully");
       onSuccess?.();
       onClose();
-      setFormData({ name: "", type: "expense", sub_account: "", is_system: false });
+      // Reset name and description
+      setFormData(prev => ({
+        ...prev,
+        name: "",
+        description: "",
+      }));
     } catch (err) {
-      console.error("Error saving label:", err);
+      console.error("Error creating label:", err);
       toast.error(err.message);
     } finally {
       setLoading(false);
     }
-  };
-
-  const SUB_ACCOUNT_MAP = {
-    asset: [
-      "Cash & Equivalents",
-      "Accounts Receivable",
-      "Inventory",
-      "Investments",
-      "Fixed Assets",
-      "Prepayments"
-    ],
-    liability: [
-      "Accounts Payable",
-      "Credit Card Debts",
-      "Short-term Loans",
-      "Accrued Expenses",
-      "Long-term Debts"
-    ],
-    equity: [
-      "Owner's Capital",
-      "Retained Earnings",
-      "Dividends"
-    ],
-    revenue: [
-      "Sales Revenue",
-      "Service Revenue",
-      "Other Income",
-      "Interest Income"
-    ],
-    expense: [
-      "Payroll & Benefits",
-      "Marketing & Advertising",
-      "Rent & Utilities",
-      "Taxes & Licenses",
-      "Travel & Entertainment",
-      "OpEx",
-      "COGS"
-    ]
-  };
-
-  const types = ["asset", "liability", "equity", "revenue", "expense"];
-
-  const customLabels = (labels || []).filter((label) => label?.is_system !== true);
-  const customLabelCount = customLabels.length;
-  const labelLimit = planLimits?.coa_label_limit ?? 0;
-  const remainingLabelSlots = labelLimit > 0 ? labelLimit - customLabelCount : 0;
-  const labelLimitReached = labelLimit > 0 && customLabelCount >= labelLimit;
-
-  const handleTypeChange = (type) => {
-    setFormData({ 
-      ...formData, 
-      type, 
-      sub_account: SUB_ACCOUNT_MAP[type][0] // Default to first sub-account in new type
-    });
   };
 
   return (
@@ -200,13 +198,12 @@ export default function LabelModal({ isOpen, onClose, workbenchId, label, onSucc
                     <button
                       key={t}
                       type="button"
-                      onClick={() => { if (!isEditing) handleTypeChange(t); }}
-                      disabled={isEditing}
+                      onClick={() => handleTypeChange(t)}
                       className={`px-2 py-2 rounded-xl text-[9px] font-bold uppercase tracking-wider border transition-all ${
                         formData.type === t
                           ? "bg-blue-500/10 border-blue-500/40 text-blue-400 shadow-lg shadow-blue-500/5"
                           : "bg-white/5 border-white/5 text-gray-500 hover:text-gray-300"
-                      } ${isEditing ? "opacity-40 cursor-not-allowed" : ""}`}
+                      }`}
                     >
                       {t}
                     </button>
@@ -218,30 +215,42 @@ export default function LabelModal({ isOpen, onClose, workbenchId, label, onSucc
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Sub-Account Group</label>
                 <div className="flex flex-wrap gap-2 p-4 bg-white/[0.02] border border-white/5 rounded-2xl min-h-[100px]">
-                  {SUB_ACCOUNT_MAP[formData.type].map((sub) => (
-                    <button
-                      key={sub}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, sub_account: sub })}
-                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${
-                        formData.sub_account === sub
-                          ? "bg-teal-500/10 border-teal-500/30 text-teal-400 shadow-lg"
-                          : "bg-white/5 border-white/5 text-gray-500 hover:text-gray-300"
-                      }`}
-                    >
-                      {sub}
-                    </button>
-                  ))}
+                  {loadingLookups ? (
+                    <div className="w-full flex items-center justify-center py-4">
+                      <div className="w-5 h-5 border-2 border-teal-500/20 border-t-teal-500 rounded-full animate-spin" />
+                    </div>
+                  ) : filteredSubAccounts.length === 0 ? (
+                    <span className="text-xs text-gray-600 font-bold m-auto">No groups found under this pillar</span>
+                  ) : (
+                    filteredSubAccounts.map((sub) => (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, master_sub_account_id: sub.id })}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${
+                          formData.master_sub_account_id === sub.id
+                            ? "bg-teal-500/10 border-teal-500/30 text-teal-400 shadow-lg"
+                            : "bg-white/5 border-white/5 text-gray-500 hover:text-gray-300"
+                        }`}
+                      >
+                        {sub.sub_account_name}
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
 
-              {labelLimit >= 0 && (
-                <div className="rounded-2xl border border-blue-500/10 bg-blue-500/5 p-3 text-xs text-blue-200">
-                  <p className="font-semibold">{plan?.toUpperCase()} plan limit:</p>
-                  <p>{customLabelCount} of {labelLimit} custom COA labels used.</p>
-                  <p>{labelLimit === 0 ? "Free plan does not allow custom COA labels. Upgrade for more." : remainingLabelSlots > 0 ? `${remainingLabelSlots} remaining.` : "Label quota reached. Upgrade for more."}</p>
-                </div>
-              )}
+              {/* Description */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Description (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="Additional details..."
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500/50 text-white transition-all"
+                />
+              </div>
 
               <div className="pt-4 flex space-x-3">
                 <button
@@ -253,7 +262,7 @@ export default function LabelModal({ isOpen, onClose, workbenchId, label, onSucc
                 </button>
                 <button
                   type="submit"
-                  disabled={loading || labelLimitReached}
+                  disabled={loading || loadingLookups}
                   className="flex-[2] px-6 py-3 bg-blue-500 text-white rounded-2xl text-xs font-bold hover:bg-blue-400 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50"
                 >
                   {loading ? "Creating..." : "Create Category"}

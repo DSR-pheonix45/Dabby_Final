@@ -1,8 +1,6 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from typing import List, Optional
 from pydantic import BaseModel
-import os
-from .auth_utils import require_membership, get_user_id_from_header
 from supabase_client import supabase
 
 router = APIRouter()
@@ -17,13 +15,11 @@ class COAItem(BaseModel):
     display_order: int
 
 @router.get("/{workbench_id}")
-async def get_coa(workbench_id: str, x_user_id: str = Depends(get_user_id_from_header)):
+async def get_coa(workbench_id: str):
     """
     Fetches the full COA hierarchy for a workbench.
     """
     try:
-        # RBAC: ensure user is a member of the workbench
-        await require_membership(workbench_id, x_user_id)
         print(f"[DEBUG] Fetching COA for workbench: {workbench_id}")
         response = supabase.table("coa_accounts") \
             .select("*") \

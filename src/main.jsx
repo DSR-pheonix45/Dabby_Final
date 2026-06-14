@@ -4,44 +4,6 @@ import App from './App';
 import './index.css';
 import { inject } from '@vercel/analytics';
 import { injectSpeedInsights } from '@vercel/speed-insights';
-import { supabase } from './lib/supabase';
-
-// Global fetch interceptor to automatically attach Supabase JWT bearer token to backend API requests
-const originalFetch = window.fetch;
-window.fetch = async function (resource, config) {
-  const url = typeof resource === 'string' ? resource : resource?.url || '';
-  
-  if (url.includes('http://localhost:8000/api') || url.includes('/api/')) {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      
-      if (token) {
-        config = config || {};
-        config.headers = config.headers || {};
-        
-        if (config.headers instanceof Headers) {
-          if (!config.headers.has('Authorization')) {
-            config.headers.append('Authorization', `Bearer ${token}`);
-          }
-        } else if (Array.isArray(config.headers)) {
-          const hasAuth = config.headers.some(([key]) => key.toLowerCase() === 'authorization');
-          if (!hasAuth) {
-            config.headers.push(['Authorization', `Bearer ${token}`]);
-          }
-        } else {
-          if (!config.headers['Authorization'] && !config.headers['authorization']) {
-            config.headers['Authorization'] = `Bearer ${token}`;
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('[DEBUG] Fetch interceptor error:', e);
-    }
-  }
-  
-  return originalFetch(resource, config);
-};
 
 // Initialize Vercel Analytics and Speed Insights
 inject();

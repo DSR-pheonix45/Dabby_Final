@@ -17,7 +17,7 @@ import KeyboardShortcutsModal from "../KeyboardShortcuts/KeyboardShortcutsModal"
 import OnboardingTour from "../Onboarding/OnboardingTour";
 
 export default function Settings() {
-  const { user, profile, setProfile, plan, planLimits } = useAuth();
+  const { user, profile, setProfile } = useAuth();
   const [activeSection, setActiveSection] = useState("account");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -26,8 +26,8 @@ export default function Settings() {
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   // Billing states
+  const [subscription, setSubscription] = useState(null);
   const [plansList, setPlansList] = useState([]);
-  const [usageData, setUsageData] = useState(null);
   const [loadingBilling, setLoadingBilling] = useState(false);
 
   useEffect(() => {
@@ -39,18 +39,24 @@ export default function Settings() {
   const fetchBillingData = async () => {
     setLoadingBilling(true);
     try {
-      // Fetch plans list from backend (graceful fallback)
-      const plansResp = await fetch('http://localhost:8000/api/usage/plans');
-      if (plansResp.ok) {
-        const plansData = await plansResp.json();
-        setPlansList(plansData);
+      const { data: subData } = await supabase
+        .from('user_subscriptions')
+        .select(`*, plans(*)`)
+        .eq('user_id', user.id)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (subData) {
+        setSubscription(subData);
       }
 
-      // Fetch usage stats
-      const usageResp = await fetch('http://localhost:8000/api/usage/me');
-      if (usageResp.ok) {
-        const usage = await usageResp.json();
-        setUsageData(usage);
+      const { data: plansData } = await supabase
+        .from('plans')
+        .select('*')
+        .order('id');
+      if (plansData) {
+        setPlansList(plansData);
       }
     } catch (err) {
       console.error("Error fetching billing:", err);
@@ -343,52 +349,36 @@ export default function Settings() {
                   <div className="bg-black/40 border border-white/10 rounded-xl p-4 lg:p-6">
                     <h4 className="text-white font-medium mb-1">Current Plan</h4>
                     <p className="text-2xl font-bold text-[#00C6C2] capitalize mb-2">
-                      {plan?.charAt(0).toUpperCase() + plan?.slice(1) || "Free"} Plan
+                      {subscription?.plans?.name || subscription?.plan_id || "Free"} Plan
                     </p>
                     <p className="text-sm text-gray-400">
-                      Status: <span className="text-white capitalize">Active</span>
+                      Status: <span className="text-white capitalize">{subscription?.status || "Active"}</span>
                     </p>
-                    {usageData && (
-                      <div className="mt-4 grid grid-cols-3 gap-3">
-                        <div className="bg-white/5 rounded-lg p-3">
-                          <div className="text-xs text-gray-400">Workbenches</div>
-                          <div className="text-lg font-bold text-white">{usageData.usage.workbenches} <span className="text-xs text-gray-500">/ {usageData.limits.max_workbenches}</span></div>
-                        </div>
-                        <div className="bg-white/5 rounded-lg p-3">
-                          <div className="text-xs text-gray-400">Storage</div>
-                          <div className="text-lg font-bold text-white">{usageData.usage.storage_mb} <span className="text-xs text-gray-500">/ {usageData.limits.doc_vault_mb} MB</span></div>
-                        </div>
-                        <div className="bg-white/5 rounded-lg p-3">
-                          <div className="text-xs text-gray-400">AI Requests</div>
-                          <div className="text-lg font-bold text-white">{usageData.usage.ai_requests_this_month} <span className="text-xs text-gray-500">/ {usageData.limits.max_ai_requests}</span></div>
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   {/* Available Plans */}
                   <div>
                     <h4 className="text-lg font-medium text-white mb-4">Available Plans</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {plansList.length > 0 ? plansList.map((p) => (
-                        <div key={p.id} className={`p-5 rounded-xl border ${plan === p.id ? 'bg-[#00C6C2]/10 border-[#00C6C2] shadow-[0_0_15px_rgba(0,198,194,0.1)]' : 'bg-white/5 border-white/10'} flex flex-col justify-between`}>
+                      {plansList.length > 0 ? plansList.map((plan) => (
+                        <div key={plan.id} className={`p-5 rounded-xl border ${subscription?.plan_id === plan.id ? 'bg-[#00C6C2]/10 border-[#00C6C2] shadow-[0_0_15px_rgba(0,198,194,0.1)]' : 'bg-white/5 border-white/10'} flex flex-col justify-between`}>
                           <div>
-                            <h5 className="text-white font-bold text-lg capitalize">{p.name}</h5>
+                            <h5 className="text-white font-bold text-lg capitalize">{plan.name}</h5>
                             <div className="my-3">
-                              <span className="text-2xl font-bold text-white">₹{p.price_inr != null ? p.price_inr : (p.price || p.price_monthly || p.amount || 0)}</span>
+                              <span className="text-2xl font-bold text-white">₹{plan.price_inr != null ? plan.price_inr : (plan.price || plan.price_monthly || plan.amount || 0)}</span>
                               <span className="text-gray-400 text-sm">/mo</span>
                             </div>
-                            {p.description && <p className="text-sm text-gray-400 mb-4">{p.description}</p>}
+                            {plan.description && <p className="text-sm text-gray-400 mb-4">{plan.description}</p>}
                           </div>
                           <button
                             onClick={() => {
-                              if (p.id === 'go') window.open('https://rzp.io/rzp/fki0zDFJ', '_blank');
-                              if (p.id === 'pro') window.open('https://rzp.io/rzp/geIFJn7n', '_blank');
+                              if (plan.id === 'go') window.open('https://rzp.io/rzp/fki0zDFJ', '_blank');
+                              if (plan.id === 'pro') window.open('https://rzp.io/rzp/geIFJn7n', '_blank');
                             }}
-                            disabled={plan === p.id}
-                            className={`w-full py-2 rounded-lg font-semibold text-sm transition-all ${plan === p.id ? 'bg-white/10 text-gray-400 cursor-not-allowed' : 'bg-[#00C6C2] text-black hover:bg-[#00FFD1]'}`}
+                            disabled={subscription?.plan_id === plan.id}
+                            className={`w-full py-2 rounded-lg font-semibold text-sm transition-all ${subscription?.plan_id === plan.id ? 'bg-white/10 text-gray-400 cursor-not-allowed' : 'bg-[#00C6C2] text-black hover:bg-[#00FFD1]'}`}
                           >
-                            {plan === p.id ? 'Current Plan' : 'Upgrade Plan'}
+                            {subscription?.plan_id === plan.id ? 'Current Plan' : 'Upgrade Plan'}
                           </button>
                         </div>
                       )) : (

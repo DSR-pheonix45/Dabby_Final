@@ -353,19 +353,20 @@ function buildTemplate(key, aiData) {
 // ─── Suggestion Pills ───────────────────────────────────────────────────────
 
 const SUGGESTIONS = [
-  { label: "GST Invoice", prompt: "Generate a GST-compliant sales invoice for a services business" },
-  { label: "AR Aging", prompt: "Build an accounts receivable aging report for overdue customer invoices" },
-  { label: "AP Register", prompt: "Create an accounts payable tracker for vendor bills" },
-  { label: "Bank Recon", prompt: "Match bank statement entries to ledger transactions and flag exceptions" },
-  { label: "Cash Flow", prompt: "Project cash flow for the next 60 days based on payables and receivables" },
-  { label: "COA Setup", prompt: "Map transactions to a 3-layer chart of accounts for my trading business" },
+  { label: "Financial Model", prompt: "Build a 5-year financial model for a SaaS startup" },
+  { label: "Invoice", prompt: "Generate an invoice for a digital marketing agency" },
+  { label: "Quotation", prompt: "Create a quotation for roofing materials" },
+  { label: "Expense Tracker", prompt: "Track expenses for a restaurant business" },
+  { label: "Cashflow", prompt: "Build a cashflow planner for a startup" },
+  { label: "Profit & Loss", prompt: "Create a profit and loss sheet for a retail business" },
+  { label: "Sales Tracker", prompt: "Track sales pipeline for my SaaS team" },
 ];
 
 const PLACEHOLDERS = [
-  "Upload bank statement CSV and reconcile it with ledger entries",
-  "Create an AR report for overdue customer invoices",
-  "Generate an AP tracker for vendor bills due next week",
-  "Map supplier invoices into GST-ready accounting ledgers",
+  "Create a cashflow tracker for my startup",
+  "Build a quotation for roofing materials",
+  "Generate an invoice for web development services",
+  "Track expenses for my restaurant business",
 ];
 
 // ─── Loading Steps ──────────────────────────────────────────────────────────
@@ -686,7 +687,7 @@ export default function Hero() {
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="flex justify-center mb-6">
             <span className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold border ${isDark ? "bg-[#81E6D9]/10 border-[#81E6D9]/25 text-[#81E6D9]" : "bg-[#0D9488]/10 border-[#0D9488]/25 text-[#0D9488]"}`}>
               <span className="w-1.5 h-1.5 rounded-full bg-[#81E6D9] animate-pulse" />
-              Accounting Workflow Engine for Growing Indian Businesses
+              Autonomous Financial Operations
             </span>
           </motion.div>
 
