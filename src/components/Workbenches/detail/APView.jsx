@@ -9,6 +9,7 @@ import {
   BsFilter,
   BsArrowRight,
   BsCurrencyRupee,
+  BsCurrencyDollar,
   BsGraphUp,
   BsLayers,
   BsCloudDownload,
@@ -39,7 +40,23 @@ export default function APView({ workbenchId }) {
   const [isMapperOpen, setIsMapperOpen] = useState(false);
   const [currentDoc, setCurrentDoc] = useState(null);
 
-  const { labels } = useWorkbench();
+  const { labels, workbench } = useWorkbench();
+
+  const formatCurrency = (amount) => {
+    const currency = workbench?.currency || 'INR';
+    const locale = currency.toUpperCase() === 'USD' ? 'en-US' : 'en-IN';
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    }).format(amount || 0);
+  };
+
+  const formatCurrencyShort = (val) => {
+    const currency = workbench?.currency || 'INR';
+    const symbol = currency.toUpperCase() === 'USD' ? '$' : '₹';
+    const amountStr = val >= 1000 ? (val/1000).toFixed(1) + 'k' : Number(val).toLocaleString();
+    return `${symbol}${amountStr}`;
+  };
 
   useEffect(() => {
     fetchData();
@@ -161,11 +178,15 @@ export default function APView({ workbenchId }) {
               style={{ backfaceVisibility: 'hidden' }}
             >
               <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
-                 <BsCurrencyRupee size={60} className="text-rose-400" />
+                 {workbench?.currency?.toUpperCase() === 'USD' ? (
+                   <BsCurrencyDollar size={60} className="text-rose-400" />
+                 ) : (
+                   <BsCurrencyRupee size={60} className="text-rose-400" />
+                 )}
               </div>
               <div>
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-2">Total Payable</span>
-                <h3 className="text-3xl font-black text-white">₹{Number(metrics.total_payable || 0).toLocaleString()}</h3>
+                <h3 className="text-3xl font-black text-white">{formatCurrency(metrics.total_payable)}</h3>
               </div>
               <div className="flex items-center justify-between mt-auto">
                 <div className="flex items-center space-x-2">
@@ -186,7 +207,7 @@ export default function APView({ workbenchId }) {
               </div>
               <div>
                 <span className="text-[10px] font-bold text-rose-400/60 uppercase tracking-widest block mb-2">Total Expense/Payable</span>
-                <h3 className="text-3xl font-black text-white">₹{Number(metrics.total_gross_expense || 0).toLocaleString()}</h3>
+                <h3 className="text-3xl font-black text-white">{formatCurrency(metrics.total_gross_expense)}</h3>
               </div>
               <div className="mt-auto">
                 <p className="text-[10px] text-rose-400/80 font-medium">Gross expenses booked in timeframe</p>
@@ -205,7 +226,7 @@ export default function APView({ workbenchId }) {
         </Card>
 
         <Card className="col-span-2 p-6 bg-white/[0.02] border-white/5 flex flex-col justify-between">
-          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-4">Aging Buckets (INR)</span>
+          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-4">Aging Buckets ({workbench?.currency || 'INR'})</span>
           <div className="flex h-4 w-full bg-white/5 rounded-full overflow-hidden mb-4">
             {Object.entries(metrics.aging || {}).map(([key, val]) => {
               const percentage = metrics.total_payable > 0 ? (val / metrics.total_payable) * 100 : 0;
@@ -214,7 +235,7 @@ export default function APView({ workbenchId }) {
                   key={key} 
                   style={{ width: `${percentage}%` }} 
                   className={`${agingColors[key]} transition-all`}
-                  title={`${key}: ₹${val}`}
+                  title={`${key}: ${formatCurrencyShort(val)}`}
                 />
               );
             })}
@@ -226,7 +247,7 @@ export default function APView({ workbenchId }) {
                    <div className={`w-2 h-2 rounded-full ${agingColors[key]}`} />
                    <span className="text-[9px] font-bold text-gray-500">{key}</span>
                 </div>
-                <span className="text-xs font-bold text-gray-300">₹{val >= 1000 ? (val/1000).toFixed(1) + 'k' : val}</span>
+                <span className="text-xs font-bold text-gray-300">{formatCurrencyShort(val)}</span>
               </div>
             ))}
           </div>
@@ -327,7 +348,7 @@ export default function APView({ workbenchId }) {
                            {bill.status}
                          </span>
                        </td>
-                       <td className="p-6 text-right font-black text-white">₹{Number(bill.balance_due).toLocaleString()}</td>
+                        <td className="p-6 text-right font-black text-white">{formatCurrency(bill.balance_due)}</td>
                        <td className="p-6 text-right text-xs text-gray-500 font-medium">{bill.due_date ? new Date(bill.due_date).toLocaleDateString() : 'No Due Date'}</td>
                        <td className="p-6 text-right pr-8">
                          <button 

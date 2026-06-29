@@ -11,6 +11,7 @@ import { backendService } from "../../services/backendService";
 import { useAuth } from "../../hooks/useAuth";
 import { supabase } from "../../lib/supabase";
 import { toast } from "react-hot-toast";
+import { useWorkbench } from "../../context/WorkbenchContext";
 
 const ADJUSTMENT_TYPES = [
   { id: 'reverse', label: 'Reverse Entry', description: 'Completely undo the financial impact', types: ['transaction', 'budget'] },
@@ -22,6 +23,9 @@ const ADJUSTMENT_TYPES = [
 
 export default function AdjustmentModal({ isOpen, onClose, record, workbenchId, onSuccess }) {
   const { user } = useAuth();
+  const { workbench } = useWorkbench();
+  const currencySymbol = workbench?.currency?.toUpperCase() === 'USD' ? '$' : '₹';
+  const currencyName = workbench?.currency || 'INR';
   const [loading, setLoading] = useState(false);
   const [parties, setParties] = useState([]);
   const [formData, setFormData] = useState({
@@ -243,9 +247,9 @@ export default function AdjustmentModal({ isOpen, onClose, record, workbenchId, 
           {/* Amount Impact (Only for financial records) */}
           {record.record_type !== 'compliance' && (
             <div className="space-y-3">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] ml-1">Monetary Impact (INR)</label>
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] ml-1">Monetary Impact ({currencyName})</label>
               <div className="relative group">
-                <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-rose-400 font-bold">₹</span>
+                <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-rose-400 font-bold">{currencySymbol}</span>
                 <input
                   type="number"
                   step="0.01"

@@ -13,8 +13,10 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import { reportService } from "../../services/reportService";
+import { useWorkbench } from "../../context/WorkbenchContext";
 
 export default function FinancialDataRoomModal({ isOpen, onClose, workbenchId, workbenchName }) {
+  const { workbench } = useWorkbench();
 
   const [activeTab, setActiveTab] = useState("pl");
   const [loading, setLoading] = useState(true);
@@ -58,9 +60,11 @@ export default function FinancialDataRoomModal({ isOpen, onClose, workbenchId, w
 
 
   const formatCurrency = (val) => {
-    return new Intl.NumberFormat('en-IN', {
+    const currency = workbench?.currency || 'INR';
+    const locale = currency.toUpperCase() === 'USD' ? 'en-US' : 'en-IN';
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
-      currency: 'INR',
+      currency: currency.toUpperCase(),
       maximumFractionDigits: 0
     }).format(val);
   };

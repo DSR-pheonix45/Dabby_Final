@@ -21,6 +21,7 @@ import Card from "../shared/Card";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../hooks/useAuth";
 import AdjustmentModal from "./AdjustmentModal";
+import { useWorkbench } from "../../context/WorkbenchContext";
 
 const TYPE_CONFIG = {
   transaction: {
@@ -78,6 +79,9 @@ const TABS = [
 
 export default function LogsView({ workbenchId }) {
   const { user } = useAuth();
+  const { workbench } = useWorkbench();
+  const currencySymbol = workbench?.currency?.toUpperCase() === 'USD' ? '$' : '₹';
+  const currencyName = workbench?.currency || 'INR';
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [records, setRecords] = useState([]);
@@ -304,7 +308,7 @@ export default function LogsView({ workbenchId }) {
                                   <span className="text-[10px] text-gray-500 uppercase font-bold block mb-1">Financial Impact</span>
                                   <div className="flex items-baseline space-x-2">
                                     <span className="text-2xl font-black text-white font-mono">
-                                      ₹{(
+                                      {currencySymbol}{(
                                         record.net_amount || 
                                         record.gross_amount || 
                                         parseFloat(record.metadata?.amount) || 
@@ -312,10 +316,10 @@ export default function LogsView({ workbenchId }) {
                                         0
                                       ).toLocaleString()}
                                     </span>
-                                    <span className="text-[10px] text-gray-600 font-bold uppercase tracking-tighter">INR</span>
+                                    <span className="text-[10px] text-gray-600 font-bold uppercase tracking-tighter">{currencyName}</span>
                                   </div>
                                   {record.tax_amount > 0 && (
-                                    <p className="text-[9px] text-gray-500 mt-1">Incl. ₹{record.tax_amount.toLocaleString()} tax</p>
+                                    <p className="text-[9px] text-gray-500 mt-1">Incl. {currencySymbol}{record.tax_amount.toLocaleString()} tax</p>
                                   )}
                                 </div>
                               )}

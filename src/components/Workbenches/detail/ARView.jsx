@@ -19,6 +19,8 @@ import { supabase } from "../../../lib/supabase";
 import Card from "../../shared/Card";
 import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+import { useWorkbench } from "../../../context/WorkbenchContext";
+import { BsCurrencyDollar } from "react-icons/bs";
 import RecordPaymentModal from "../ops/RecordPaymentModal";
 import { motion, AnimatePresence } from "framer-motion";
 import ScanMapperModal from "../ops/ScanMapperModal";
@@ -26,6 +28,7 @@ import ScanMapperModal from "../ops/ScanMapperModal";
 
 export default function ARView({ workbenchId }) {
   const navigate = useNavigate();
+  const { workbench } = useWorkbench();
   const [activeTab, setActiveTab] = useState("receivables");
   const [invoices, setInvoices] = useState([]);
   const [vaultInvoices, setVaultInvoices] = useState([]);
@@ -38,6 +41,22 @@ export default function ARView({ workbenchId }) {
   const [extractedInvoice, setExtractedInvoice] = useState(null);
   const [currentDoc, setCurrentDoc] = useState(null);
 
+
+  const formatCurrency = (amount) => {
+    const currency = workbench?.currency || 'INR';
+    const locale = currency.toUpperCase() === 'USD' ? 'en-US' : 'en-IN';
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    }).format(amount || 0);
+  };
+
+  const formatCurrencyShort = (val) => {
+    const currency = workbench?.currency || 'INR';
+    const symbol = currency.toUpperCase() === 'USD' ? '$' : '₹';
+    const amountStr = val >= 1000 ? (val/1000).toFixed(1) + 'k' : Number(val).toLocaleString();
+    return `${symbol}${amountStr}`;
+  };
 
   useEffect(() => {
     fetchData();
@@ -128,11 +147,15 @@ export default function ARView({ workbenchId }) {
               style={{ backfaceVisibility: 'hidden' }}
             >
               <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
-                 <BsCurrencyRupee size={60} className="text-teal-400" />
+                 {workbench?.currency?.toUpperCase() === 'USD' ? (
+                   <BsCurrencyDollar size={60} className="text-teal-400" />
+                 ) : (
+                   <BsCurrencyRupee size={60} className="text-teal-400" />
+                 )}
               </div>
               <div>
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-2">Total Receivable</span>
-                <h3 className="text-3xl font-black text-white">₹{Number(metrics.total_receivable || 0).toLocaleString()}</h3>
+                <h3 className="text-3xl font-black text-white">{formatCurrency(metrics.total_receivable)}</h3>
               </div>
               <div className="flex items-center justify-between mt-auto">
                 <div className="flex items-center space-x-2">
@@ -153,7 +176,7 @@ export default function ARView({ workbenchId }) {
               </div>
               <div>
                 <span className="text-[10px] font-bold text-teal-400/60 uppercase tracking-widest block mb-2">Total Sales Revenue</span>
-                <h3 className="text-3xl font-black text-white">₹{Number(metrics.total_sales_revenue || 0).toLocaleString()}</h3>
+                <h3 className="text-3xl font-black text-white">{formatCurrency(metrics.total_sales_revenue)}</h3>
               </div>
               <div className="mt-auto">
                 <p className="text-[10px] text-teal-400/80 font-medium">Gross revenue booked in timeframe</p>
@@ -172,7 +195,7 @@ export default function ARView({ workbenchId }) {
         </Card>
 
         <Card className="col-span-2 p-6 bg-white/[0.02] border-white/5 flex flex-col justify-between">
-          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-4">Aging Buckets (INR)</span>
+          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-4">Aging Buckets ({workbench?.currency || 'INR'})</span>
           <div className="flex h-4 w-full bg-white/5 rounded-full overflow-hidden mb-4">
             {Object.entries(metrics.aging || {}).map(([key, val]) => {
               const percentage = metrics.total_receivable > 0 ? (val / metrics.total_receivable) * 100 : 0;
@@ -181,7 +204,7 @@ export default function ARView({ workbenchId }) {
                   key={key} 
                   style={{ width: `${percentage}%` }} 
                   className={`${agingColors[key]} transition-all`}
-                  title={`${key}: ₹${val}`}
+                  title={`${key}: ${formatCurrencyShort(val)}`}
                 />
               );
             })}
@@ -193,7 +216,7 @@ export default function ARView({ workbenchId }) {
                    <div className={`w-2 h-2 rounded-full ${agingColors[key]}`} />
                    <span className="text-[9px] font-bold text-gray-500">{key}</span>
                 </div>
-                <span className="text-xs font-bold text-gray-300">₹{val >= 1000 ? (val/1000).toFixed(1) + 'k' : val}</span>
+                <span className="text-xs font-bold text-gray-300">{formatCurrencyShort(val)}</span>
               </div>
             ))}
           </div>
@@ -309,7 +332,7 @@ export default function ARView({ workbenchId }) {
                            {inv.status}
                          </span>
                        </td>
-                       <td className="p-6 text-right font-black text-white">₹{Number(inv.balance_due).toLocaleString()}</td>
+                        <td className="p-6 text-right font-black text-white">{formatCurrency(inv.balance_due)}</td>
                        <td className="p-6 text-right text-xs text-gray-500 font-medium">{inv.due_date ? new Date(inv.due_date).toLocaleDateString() : 'No Due Date'}</td>
                        <td className="p-6 text-right pr-8">
                          <button 

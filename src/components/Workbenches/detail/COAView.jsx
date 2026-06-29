@@ -70,9 +70,11 @@ export default function COAView({ workbenchId }) {
   }, {});
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
+    const currency = workbench?.currency || 'INR';
+    const locale = currency.toUpperCase() === 'USD' ? 'en-US' : 'en-IN';
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
-      currency: 'INR',
+      currency: currency.toUpperCase(),
     }).format(amount || 0);
   };
 
@@ -363,7 +365,7 @@ export default function COAView({ workbenchId }) {
 }
 
 function TransactionList() {
-  const { transactions, loading } = useWorkbench();
+  const { transactions, loading, workbench } = useWorkbench();
 
   if (loading) return (
     <div className="p-8 flex justify-center">
@@ -371,12 +373,21 @@ function TransactionList() {
     </div>
   );
 
+  const formatCurrency = (amount) => {
+    const currency = workbench?.currency || 'INR';
+    const locale = currency.toUpperCase() === 'USD' ? 'en-US' : 'en-IN';
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    }).format(amount || 0);
+  };
+
   return (
     <table className="w-full text-left border-collapse">
       <thead className="bg-white/[0.02] sticky top-0 z-10">
         <tr className="border-b border-white/5">
           <th className="px-6 py-4 text-[9px] font-black text-gray-500 uppercase tracking-widest">Date & Trade Context</th>
-          <th className="px-6 py-4 text-[9px] font-black text-gray-500 uppercase tracking-widest text-right">Volume (INR)</th>
+          <th className="px-6 py-4 text-[9px] font-black text-gray-500 uppercase tracking-widest text-right">Volume ({workbench?.currency || 'INR'})</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-white/[0.02]">
@@ -436,7 +447,7 @@ function TransactionList() {
                 </div>
               </td>
               <td className="px-6 py-5 text-right align-top">
-                <span className="text-sm font-black text-white tracking-tight">₹{Math.abs(sourceEntry?.amount || 0).toLocaleString()}</span>
+                <span className="text-sm font-black text-white tracking-tight">{formatCurrency(Math.abs(sourceEntry?.amount || 0))}</span>
               </td>
             </tr>
           );
