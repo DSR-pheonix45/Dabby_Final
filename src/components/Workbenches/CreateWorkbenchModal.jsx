@@ -1,35 +1,166 @@
 import React, { useState } from 'react';
-import { X, Building2, MapPin, ShieldCheck, CreditCard, ChevronRight, ChevronLeft, Globe, DollarSign, Clock, Check, ArrowRight, RefreshCw, Plus } from 'lucide-react';
+import { X, Building2, MapPin, ShieldCheck, CreditCard, ChevronRight, ChevronLeft, Globe, DollarSign, Clock, Check, ArrowRight, RefreshCw, Plus, BookOpen, AlertTriangle, Layers, ChevronDown } from 'lucide-react';
 import { backendService } from '../../services/backendService';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
+
+const COUNTRIES = [
+  { value: 'India', label: 'India', currency: 'INR', fyDefault: 'April' },
+  { value: 'United States', label: 'United States', currency: 'USD', fyDefault: 'January' },
+  { value: 'United Kingdom', label: 'United Kingdom', currency: 'GBP', fyDefault: 'April' },
+  { value: 'UAE', label: 'United Arab Emirates', currency: 'AED', fyDefault: 'January' },
+  { value: 'Singapore', label: 'Singapore', currency: 'SGD', fyDefault: 'January' },
+  { value: 'Australia', label: 'Australia', currency: 'AUD', fyDefault: 'July' },
+  { value: 'Canada', label: 'Canada', currency: 'CAD', fyDefault: 'January' },
+  { value: 'Germany', label: 'Germany', currency: 'EUR', fyDefault: 'January' },
+];
+
+const INDUSTRY_COA_TEMPLATES = {
+  services: {
+    technology: [
+      { type: 'income', sub_account: 'Revenue', name: 'SaaS Revenue' },
+      { type: 'income', sub_account: 'Revenue', name: 'Consulting Income' },
+      { type: 'income', sub_account: 'Revenue', name: 'Service Fees' },
+      { type: 'expense', sub_account: 'Operating Expenses', name: 'Cloud Hosting' },
+      { type: 'expense', sub_account: 'Operating Expenses', name: 'Software Subscriptions' },
+      { type: 'expense', sub_account: 'Payroll', name: 'Employee Salaries' },
+      { type: 'expense', sub_account: 'Payroll', name: 'Contractor Payments' },
+      { type: 'expense', sub_account: 'Marketing', name: 'Digital Ads' },
+      { type: 'expense', sub_account: 'Marketing', name: 'Events & Conferences' },
+      { type: 'asset', sub_account: 'Current Assets', name: 'Cash & Bank' },
+      { type: 'asset', sub_account: 'Current Assets', name: 'Accounts Receivable' },
+      { type: 'liability', sub_account: 'Current Liabilities', name: 'Accounts Payable' },
+      { type: 'liability', sub_account: 'Current Liabilities', name: 'Accrued Expenses' },
+    ],
+    default: [
+      { type: 'income', sub_account: 'Revenue', name: 'Service Revenue' },
+      { type: 'income', sub_account: 'Revenue', name: 'Other Income' },
+      { type: 'expense', sub_account: 'Operating Expenses', name: 'Rent & Utilities' },
+      { type: 'expense', sub_account: 'Payroll', name: 'Salaries & Wages' },
+      { type: 'expense', sub_account: 'Administrative', name: 'Office Supplies' },
+      { type: 'asset', sub_account: 'Current Assets', name: 'Cash & Bank' },
+      { type: 'asset', sub_account: 'Current Assets', name: 'Accounts Receivable' },
+      { type: 'liability', sub_account: 'Current Liabilities', name: 'Accounts Payable' },
+    ],
+  },
+  manufacturing: {
+    default: [
+      { type: 'income', sub_account: 'Revenue', name: 'Product Sales' },
+      { type: 'income', sub_account: 'Revenue', name: 'Export Revenue' },
+      { type: 'expense', sub_account: 'Cost of Goods Sold', name: 'Raw Materials' },
+      { type: 'expense', sub_account: 'Cost of Goods Sold', name: 'Direct Labour' },
+      { type: 'expense', sub_account: 'Cost of Goods Sold', name: 'Manufacturing Overhead' },
+      { type: 'expense', sub_account: 'Operating Expenses', name: 'Utilities' },
+      { type: 'expense', sub_account: 'Payroll', name: 'Salaries & Wages' },
+      { type: 'asset', sub_account: 'Current Assets', name: 'Cash & Bank' },
+      { type: 'asset', sub_account: 'Current Assets', name: 'Inventory' },
+      { type: 'asset', sub_account: 'Current Assets', name: 'Accounts Receivable' },
+      { type: 'asset', sub_account: 'Fixed Assets', name: 'Plant & Machinery' },
+      { type: 'liability', sub_account: 'Current Liabilities', name: 'Accounts Payable' },
+    ],
+  },
+  trading: {
+    default: [
+      { type: 'income', sub_account: 'Revenue', name: 'Sales Revenue' },
+      { type: 'income', sub_account: 'Revenue', name: 'Commission Income' },
+      { type: 'expense', sub_account: 'Cost of Goods Sold', name: 'Purchases' },
+      { type: 'expense', sub_account: 'Cost of Goods Sold', name: 'Freight & Shipping' },
+      { type: 'expense', sub_account: 'Operating Expenses', name: 'Warehouse Rent' },
+      { type: 'expense', sub_account: 'Payroll', name: 'Salaries' },
+      { type: 'asset', sub_account: 'Current Assets', name: 'Cash & Bank' },
+      { type: 'asset', sub_account: 'Current Assets', name: 'Inventory' },
+      { type: 'asset', sub_account: 'Current Assets', name: 'Accounts Receivable' },
+      { type: 'liability', sub_account: 'Current Liabilities', name: 'Accounts Payable' },
+    ],
+  },
+  ecommerce: {
+    default: [
+      { type: 'income', sub_account: 'Revenue', name: 'Online Sales' },
+      { type: 'income', sub_account: 'Revenue', name: 'Marketplace Revenue' },
+      { type: 'expense', sub_account: 'Cost of Goods Sold', name: 'Product Cost' },
+      { type: 'expense', sub_account: 'Cost of Goods Sold', name: 'Shipping & Logistics' },
+      { type: 'expense', sub_account: 'Operating Expenses', name: 'Platform Fees' },
+      { type: 'expense', sub_account: 'Marketing', name: 'Digital Advertising' },
+      { type: 'expense', sub_account: 'Payroll', name: 'Salaries' },
+      { type: 'asset', sub_account: 'Current Assets', name: 'Cash & Bank' },
+      { type: 'asset', sub_account: 'Current Assets', name: 'Inventory' },
+      { type: 'liability', sub_account: 'Current Liabilities', name: 'Accounts Payable' },
+    ],
+  },
+  others: {
+    default: [
+      { type: 'income', sub_account: 'Revenue', name: 'Primary Revenue' },
+      { type: 'income', sub_account: 'Revenue', name: 'Other Income' },
+      { type: 'expense', sub_account: 'Operating Expenses', name: 'General Expenses' },
+      { type: 'expense', sub_account: 'Payroll', name: 'Salaries' },
+      { type: 'asset', sub_account: 'Current Assets', name: 'Cash & Bank' },
+      { type: 'asset', sub_account: 'Current Assets', name: 'Accounts Receivable' },
+      { type: 'liability', sub_account: 'Current Liabilities', name: 'Accounts Payable' },
+    ],
+  },
+};
+
+const getCoaTemplate = (industry, sector) => {
+  const industryTemplates = INDUSTRY_COA_TEMPLATES[industry] || INDUSTRY_COA_TEMPLATES.others;
+  return industryTemplates[sector] || industryTemplates.default || INDUSTRY_COA_TEMPLATES.others.default;
+};
+
+const TYPE_COLORS = {
+  income: { bg: 'rgba(16, 185, 129, 0.1)', border: 'rgba(16, 185, 129, 0.3)', text: '#10B981' },
+  expense: { bg: 'rgba(239, 68, 68, 0.1)', border: 'rgba(239, 68, 68, 0.3)', text: '#EF4444' },
+  asset: { bg: 'rgba(59, 130, 246, 0.1)', border: 'rgba(59, 130, 246, 0.3)', text: '#3B82F6' },
+  liability: { bg: 'rgba(245, 158, 11, 0.1)', border: 'rgba(245, 158, 11, 0.3)', text: '#F59E0B' },
+};
 
 const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [coaLoading, setCoaLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [createdWorkbench, setCreatedWorkbench] = useState(null);
+  const [jurisdictionAccepted, setJurisdictionAccepted] = useState(false);
   const [formData, setFormData] = useState({
-    // Part 1: Company Info
     name: '',
     industry: 'services',
     sector: 'technology',
     business_type: 'pvt_ltd',
-    // Part 2: Location
     location: 'India',
     currency: 'INR',
-    // Part 3: Legal and Compliance
     legal_name: '',
     pan: '',
     gstin: '',
     incorporation_date: '',
-    // Part 4: Books and Start
-    fy_start: '',
+    fy_start: 'April',
     books_start_date: new Date().toISOString().split('T')[0],
-    coa_mode: 'create', // create or import
   });
 
   if (!isOpen) return null;
 
+  const isIndia = formData.location === 'India';
+  const selectedCountry = COUNTRIES.find(c => c.value === formData.location) || COUNTRIES[0];
+
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    const updates = { [name]: value };
+
+    // Auto-set currency and FY start when country changes
+    if (name === 'location') {
+      const country = COUNTRIES.find(c => c.value === value);
+      if (country) {
+        updates.currency = country.currency;
+        updates.fy_start = country.fyDefault;
+      }
+      // Clear India-specific fields when switching away
+      if (value !== 'India') {
+        updates.pan = '';
+        updates.gstin = '';
+      }
+      // Reset jurisdiction acceptance on country change
+      setJurisdictionAccepted(false);
+    }
+
+    setFormData({ ...formData, ...updates });
   };
 
   const isStepValid = () => {
@@ -42,6 +173,10 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
       case 2:
         return formData.location.trim() !== '' && formData.currency.trim() !== '';
       case 3:
+        if (!isIndia) {
+          // Non-India: require legal name, incorporation date, and jurisdiction acceptance
+          return formData.legal_name.trim() !== '' && formData.incorporation_date !== '' && jurisdictionAccepted;
+        }
         const vPan = formData.pan.trim().toUpperCase();
         const vGstin = formData.gstin.trim().toUpperCase();
         return (
@@ -81,31 +216,39 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
         extraData
       );
 
+      setCreatedWorkbench(workbench);
       onSuccess(workbench);
       onClose();
-      // Reset state
-      setStep(1);
-      setFormData({
-        name: '',
-        industry: 'services',
-        sector: 'technology',
-        business_type: 'pvt_ltd',
-        location: 'India',
-        currency: 'INR',
-        legal_name: '',
-        pan: '',
-        gstin: '',
-        incorporation_date: '',
-        fy_start: '',
-        books_start_date: new Date().toISOString().split('T')[0],
-        coa_mode: 'create',
-      });
+      resetModal();
     } catch (err) {
       console.error("Error creating workbench:", err);
       setError(err.message || "Failed to create workbench");
     } finally {
       setLoading(false);
     }
+  };
+
+
+
+  const resetModal = () => {
+    setStep(1);
+    setCreatedWorkbench(null);
+    setError(null);
+    setJurisdictionAccepted(false);
+    setFormData({
+      name: '',
+      industry: 'services',
+      sector: 'technology',
+      business_type: 'pvt_ltd',
+      location: 'India',
+      currency: 'INR',
+      legal_name: '',
+      pan: '',
+      gstin: '',
+      incorporation_date: '',
+      fy_start: 'April',
+      books_start_date: new Date().toISOString().split('T')[0],
+    });
   };
 
   const steps = [
@@ -115,22 +258,26 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
     { title: 'Books & Start', icon: <Clock size={18} /> },
   ];
 
+
+
   return (
     <div className="modal-overlay">
       <div className="modal-content glass">
-        <button className="close-btn" onClick={onClose}><X size={20} /></button>
+        <button className="close-btn" onClick={() => { resetModal(); onClose(); }}><X size={20} /></button>
 
         <div className="modal-header">
           <h2>Create New Workbench</h2>
-          <div className="step-progress">
-            {steps.map((s, i) => (
-              <div key={i} className={`step-item ${step > i + 1 ? 'completed' : ''} ${step === i + 1 ? 'active' : ''}`}>
-                <div className="step-icon">{s.icon}</div>
-                <span className="step-title">{s.title}</span>
-                {i < steps.length - 1 && <div className="step-line"></div>}
-              </div>
-            ))}
-          </div>
+          {step <= 4 && (
+            <div className="step-progress">
+              {steps.map((s, i) => (
+                <div key={i} className={`step-item ${step > i + 1 ? 'completed' : ''} ${step === i + 1 ? 'active' : ''}`}>
+                  <div className="step-icon">{step > i + 1 ? <Check size={14} /> : s.icon}</div>
+                  <span className="step-title">{s.title}</span>
+                  {i < steps.length - 1 && <div className="step-line"></div>}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="modal-body">
@@ -187,8 +334,12 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
             <div className="form-step">
               <div className="form-grid">
                 <div className="form-group">
-                  <label><Globe size={14} /> Location</label>
-                  <input type="text" name="location" value={formData.location} onChange={handleChange} placeholder="e.g. India" />
+                  <label><Globe size={14} /> Country</label>
+                  <select name="location" value={formData.location} onChange={handleChange}>
+                    {COUNTRIES.map(c => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label><DollarSign size={14} /> Currency</label>
@@ -205,14 +356,44 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
                   <label>Legal Entity Name *</label>
                   <input type="text" name="legal_name" value={formData.legal_name} onChange={handleChange} placeholder="Full legal name" required />
                 </div>
-                <div className="form-group">
-                  <label>PAN *</label>
-                  <input type="text" name="pan" value={formData.pan} onChange={handleChange} placeholder="ABCDE1234F" required />
-                </div>
-                <div className="form-group">
-                  <label>GSTIN</label>
-                  <input type="text" name="gstin" value={formData.gstin} onChange={handleChange} placeholder="22AAAAA0000A1Z5" />
-                </div>
+
+                {isIndia ? (
+                  <>
+                    <div className="form-group">
+                      <label>PAN *</label>
+                      <input type="text" name="pan" value={formData.pan} onChange={handleChange} placeholder="ABCDE1234F" required />
+                    </div>
+                    <div className="form-group">
+                      <label>GSTIN</label>
+                      <input type="text" name="gstin" value={formData.gstin} onChange={handleChange} placeholder="22AAAAA0000A1Z5" />
+                    </div>
+                  </>
+                ) : (
+                  <div className="form-group span-2">
+                    <label
+                      className="jurisdiction-checkbox-wrapper"
+                      onClick={() => setJurisdictionAccepted(!jurisdictionAccepted)}
+                    >
+                      <div className={`jurisdiction-check ${jurisdictionAccepted ? 'checked' : ''}`}>
+                        {jurisdictionAccepted && <Check size={12} />}
+                      </div>
+                      <div className="jurisdiction-content">
+                        <strong>Jurisdiction Acceptance *</strong>
+                        <p>
+                          I acknowledge that Dabby is incorporated and operates exclusively under 
+                          <strong> Indian jurisdiction</strong>. Dabby does not collect tax identification 
+                          numbers or regulatory compliance documents for entities outside India. 
+                          I understand that Dabby and its parent entity are <strong>not liable</strong> for 
+                          any regulatory, tax, or legal obligations arising in <strong>{selectedCountry.label}</strong> or 
+                          any jurisdiction outside India. This platform is provided as a financial 
+                          intelligence tool only — not as a licensed accounting or tax advisory service 
+                          in my country.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                )}
+
                 <div className="form-group span-2">
                   <label>Date of Incorporation *</label>
                   <input type="date" name="incorporation_date" value={formData.incorporation_date} onChange={handleChange} required />
@@ -227,74 +408,55 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
                 <div className="form-group">
                   <label>Financial Year Start *</label>
                   <select name="fy_start" value={formData.fy_start} onChange={handleChange}>
-                    <option value="April">April</option>
                     <option value="January">January</option>
+                    <option value="April">April</option>
+                    <option value="July">July</option>
+                    <option value="October">October</option>
                   </select>
                 </div>
                 <div className="form-group">
                   <label>Books Start Date *</label>
                   <input type="date" name="books_start_date" value={formData.books_start_date} onChange={handleChange} required />
                 </div>
-                <div className="form-group span-2">
-                  <label>Chart of Accounts Setup</label>
-                  <div className="coa-type-selector">
-                    <div 
-                      className={`coa-option ${formData.coa_mode === 'create' ? 'active' : ''}`}
-                      onClick={() => setFormData({...formData, coa_mode: 'create'})}
-                    >
-                      <div className="option-icon"><Plus size={18} /></div>
-                      <div className="option-info">
-                        <strong>Create New</strong>
-                        <span>Build 4-layer architecture</span>
-                      </div>
-                    </div>
-                    <div 
-                      className={`coa-option ${formData.coa_mode === 'import' ? 'active' : ''}`}
-                      onClick={() => setFormData({...formData, coa_mode: 'import'})}
-                    >
-                      <div className="option-icon"><ArrowRight size={18} /></div>
-                      <div className="option-info">
-                        <strong>Import COA</strong>
-                        <span>From CSV or Zoho</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           )}
 
-          <div className="modal-footer">
-            {step > 1 && (
-              <button type="button" className="back-btn" onClick={handleBack}>
-                <ChevronLeft size={18} /> Back
-              </button>
-            )}
-            <div className="spacer"></div>
-            {step < 4 ? (
-              <button
-                type="button"
-                className={`next-btn ${!isStepValid() ? 'disabled' : ''}`}
-                onClick={handleNext}
-                disabled={!isStepValid()}
-              >
-                Next Step <ChevronRight size={18} />
-              </button>
-            ) : (
-              <button
-                type="submit"
-                className={`submit-btn ${!isStepValid() || loading ? 'disabled' : ''}`}
-                onClick={handleSubmit}
-                disabled={!isStepValid() || loading}
-              >
-                {loading ? (
-                  <>
-                    <RefreshCw size={18} className="spinning" /> Creating...
-                  </>
-                ) : 'Create Workbench'}
-              </button>
-            )}
-          </div>
+
+
+          {step <= 4 && (
+            <div className="modal-footer">
+              {step > 1 && (
+                <button type="button" className="back-btn" onClick={handleBack}>
+                  <ChevronLeft size={18} /> Back
+                </button>
+              )}
+              <div className="spacer"></div>
+              {step < 4 ? (
+                <button
+                  type="button"
+                  className={`next-btn ${!isStepValid() ? 'disabled' : ''}`}
+                  onClick={handleNext}
+                  disabled={!isStepValid()}
+                >
+                  Next Step <ChevronRight size={18} />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className={`submit-btn ${!isStepValid() || loading ? 'disabled' : ''}`}
+                  onClick={handleSubmit}
+                  disabled={!isStepValid() || loading}
+                >
+                  {loading ? (
+                    <>
+                      <RefreshCw size={18} className="spinning" /> Creating...
+                    </>
+                  ) : 'Create Workbench'}
+                </button>
+              )}
+            </div>
+          )}
         </form>
       </div>
 
@@ -337,6 +499,7 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
           background: none;
           border: none;
           cursor: pointer;
+          z-index: 10;
         }
 
         .close-btn:hover {
@@ -516,66 +679,6 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
           cursor: pointer;
         }
 
-        .coa-type-selector {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 1rem;
-        }
-
-        .coa-option {
-          padding: 1.25rem;
-          background-color: #121212;
-          border: 1px solid #2a2a2a;
-          border-radius: 1rem;
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .coa-option:hover {
-          border-color: #444;
-          background-color: #161616;
-        }
-
-        .coa-option.active {
-          border-color: #81E6D9;
-          background-color: rgba(129, 230, 217, 0.05);
-          box-shadow: 0 0 15px rgba(129, 230, 217, 0.1);
-        }
-
-        .option-icon {
-          width: 40px;
-          height: 40px;
-          border-radius: 10px;
-          background-color: #1a1a1a;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #888;
-        }
-
-        .coa-option.active .option-icon {
-          background-color: rgba(129, 230, 217, 0.2);
-          color: #81E6D9;
-        }
-
-        .option-info {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .option-info strong {
-          font-size: 0.9rem;
-          color: white;
-        }
-
-        .option-info span {
-          font-size: 0.75rem;
-          color: #666;
-        }
-        
         .error-notice {
           padding: 0.75rem 1rem;
           background-color: rgba(239, 68, 68, 0.1);
@@ -584,6 +687,250 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
           color: #ef4444;
           font-size: 0.85rem;
           margin-bottom: 1.5rem;
+        }
+
+        /* Jurisdiction Checkbox */
+        .jurisdiction-checkbox-wrapper {
+          display: flex;
+          gap: 1rem;
+          padding: 1.25rem;
+          background-color: rgba(245, 158, 11, 0.05);
+          border: 1px solid rgba(245, 158, 11, 0.2);
+          border-radius: 1rem;
+          margin-top: 0.5rem;
+          cursor: pointer;
+          transition: all 0.2s;
+          align-items: flex-start;
+        }
+
+        .jurisdiction-checkbox-wrapper:hover {
+          background-color: rgba(245, 158, 11, 0.08);
+          border-color: rgba(245, 158, 11, 0.35);
+        }
+
+        .jurisdiction-check {
+          flex-shrink: 0;
+          width: 22px;
+          height: 22px;
+          border-radius: 6px;
+          border: 2px solid rgba(245, 158, 11, 0.4);
+          background-color: transparent;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: transparent;
+          transition: all 0.2s;
+          margin-top: 2px;
+        }
+
+        .jurisdiction-check.checked {
+          background-color: #F59E0B;
+          border-color: #F59E0B;
+          color: #000;
+        }
+
+        .jurisdiction-content strong {
+          display: block;
+          font-size: 0.85rem;
+          color: #F59E0B;
+          margin-bottom: 0.5rem;
+        }
+
+        .jurisdiction-content p {
+          font-size: 0.75rem;
+          line-height: 1.6;
+          color: #999;
+          margin: 0;
+        }
+
+        .jurisdiction-content p strong {
+          display: inline;
+          color: #ccc;
+          font-size: 0.75rem;
+        }
+
+        /* COA Guide Styles */
+        .coa-guide {
+          display: flex;
+          flex-direction: column;
+          gap: 1.5rem;
+        }
+
+        .coa-intro {
+          display: flex;
+          gap: 1rem;
+          align-items: flex-start;
+        }
+
+        .coa-intro-icon {
+          flex-shrink: 0;
+          width: 48px;
+          height: 48px;
+          border-radius: 12px;
+          background: linear-gradient(135deg, rgba(129, 230, 217, 0.15), rgba(129, 230, 217, 0.05));
+          border: 1px solid rgba(129, 230, 217, 0.2);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #81E6D9;
+        }
+
+        .coa-intro h3 {
+          font-size: 1rem;
+          font-weight: 700;
+          color: white;
+          margin-bottom: 0.4rem;
+        }
+
+        .coa-intro p {
+          font-size: 0.8rem;
+          color: #888;
+          line-height: 1.5;
+          margin: 0;
+        }
+
+        .coa-hierarchy {
+          display: flex;
+          flex-direction: column;
+          gap: 0;
+          padding: 1rem 1.25rem;
+          background-color: #0d0d0d;
+          border: 1px solid #1a1a1a;
+          border-radius: 1rem;
+        }
+
+        .hierarchy-item {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.6rem 0;
+        }
+
+        .hierarchy-number {
+          width: 28px;
+          height: 28px;
+          border-radius: 8px;
+          background-color: rgba(129, 230, 217, 0.1);
+          border: 1px solid rgba(129, 230, 217, 0.2);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.7rem;
+          font-weight: 800;
+          color: #81E6D9;
+          flex-shrink: 0;
+        }
+
+        .hierarchy-item strong {
+          display: block;
+          font-size: 0.8rem;
+          color: white;
+        }
+
+        .hierarchy-item span {
+          font-size: 0.7rem;
+          color: #666;
+        }
+
+        .hierarchy-connector {
+          width: 1px;
+          height: 8px;
+          background-color: #2a2a2a;
+          margin-left: 14px;
+        }
+
+        .coa-recommended {
+          border: 1px solid #1a1a1a;
+          border-radius: 1rem;
+          padding: 1.25rem;
+          background-color: #0d0d0d;
+        }
+
+        .coa-recommended h4 {
+          font-size: 0.8rem;
+          font-weight: 700;
+          color: #ccc;
+          margin-bottom: 1rem;
+        }
+
+        .coa-labels-grid {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+
+        .coa-label-chip {
+          display: flex;
+          flex-direction: column;
+          padding: 0.5rem 0.75rem;
+          border-radius: 0.5rem;
+          border: 1px solid;
+          gap: 0.15rem;
+        }
+
+        .coa-label-type {
+          font-size: 0.55rem;
+          font-weight: 800;
+          letter-spacing: 0.05em;
+        }
+
+        .coa-label-name {
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: white;
+        }
+
+        .coa-label-sub {
+          font-size: 0.6rem;
+          color: #666;
+        }
+
+        .coa-actions {
+          display: flex;
+          gap: 1rem;
+          padding-top: 0.5rem;
+        }
+
+        .coa-action-btn {
+          flex: 1;
+          padding: 0.85rem 1.5rem;
+          border-radius: 0.75rem;
+          font-weight: 700;
+          font-size: 0.85rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          cursor: pointer;
+          transition: all 0.2s;
+          border: none;
+        }
+
+        .coa-action-btn.primary {
+          background-color: #81E6D9;
+          color: #000;
+        }
+
+        .coa-action-btn.primary:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 20px rgba(129, 230, 217, 0.2);
+        }
+
+        .coa-action-btn.primary:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        .coa-action-btn.secondary {
+          background-color: #1a1a1a;
+          color: #999;
+          border: 1px solid #2a2a2a;
+        }
+
+        .coa-action-btn.secondary:hover {
+          border-color: #444;
+          color: white;
         }
 
         @keyframes spin {

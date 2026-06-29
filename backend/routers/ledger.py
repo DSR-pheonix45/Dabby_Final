@@ -38,6 +38,14 @@ class TransactionCreate(BaseModel):
     destination_party_id: Optional[str] = None
     destination_entity_id: Optional[str] = None
 
+class SeedLabelItem(BaseModel):
+    type: str
+    sub_account: str
+    name: str
+
+class CustomSeedPayload(BaseModel):
+    labels: Optional[List[SeedLabelItem]] = None
+
 # --- Label Endpoints ---
 
 @router.post("/labels")
@@ -69,9 +77,10 @@ async def delete_label(label_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/labels/seed/{workbench_id}")
-async def seed_labels(workbench_id: str):
+async def seed_labels(workbench_id: str, payload: Optional[CustomSeedPayload] = None):
     try:
-        return await ledger_service.seed_basic_labels(workbench_id)
+        custom_labels = [l.dict() for l in payload.labels] if (payload and payload.labels) else None
+        return await ledger_service.seed_basic_labels(workbench_id, custom_labels)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

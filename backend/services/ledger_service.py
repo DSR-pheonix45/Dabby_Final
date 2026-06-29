@@ -161,12 +161,89 @@ class LedgerService:
             response = self.supabase.table("workbench_accounts").delete().eq("id", label_id).execute()
         return response.data
 
-    async def seed_basic_labels(self, workbench_id: str):
+    async def seed_basic_labels(self, workbench_id: str, custom_labels: Optional[List] = None):
         """
-        Pre-seeds basic workbench accounts for a new workbench (done via COA seeder).
+        Pre-seeds basic workbench accounts for a new workbench.
         """
-        # Seeding is now handled in coa_seeder.py which creates workbench_accounts directly
-        return {"status": "success", "message": "Seeding handled by COA seeder"}
+        try:
+            wb_res = self.supabase.table("workbenches").select("*").eq("id", workbench_id).maybe_single().execute()
+            if not wb_res.data:
+                raise ValueError("Workbench not found")
+            wb = wb_res.data
+            
+            # If custom labels are provided, map and insert them directly
+            if custom_labels:
+                master_accs_res = self.supabase.table("master_accounts").select("*").eq("is_active", True).execute()
+                master_subs_res = self.supabase.table("master_sub_accounts").select("*").eq("is_active", True).execute()
+                
+                master_accounts = {acc["account_name"].upper(): acc for acc in master_accs_res.data}
+                
+                name_map = {
+                    "asset": "ASSETS",
+                    "liability": "LIABILITIES",
+                    "equity": "EQUITY",
+                    "revenue": "REVENUE",
+                    "income": "REVENUE",
+                    "expense": "EXPENSES"
+                }
+                
+                subs_by_master = {}
+                for sub in master_subs_res.data:
+                    m_id = sub["master_account_id"]
+                    if m_id not in subs_by_master:
+                        subs_by_master[m_id] = []
+                    subs_by_master[m_id].append(sub)
+                
+                workbench_accounts_to_insert = []
+                for item in custom_labels:
+                    p_type = item.get("type", "expense").lower()
+                    pillar_name = name_map.get(p_type, "EXPENSES")
+                    m_acc = master_accounts.get(pillar_name)
+                    if not m_acc:
+                        continue
+                        
+                    subs = subs_by_master.get(m_acc["id"], [])
+                    sub_name_target = item.get("sub_account", "")
+                    m_sub = next((s for s in subs if s["sub_account_name"].lower() == sub_name_target.lower()), None)
+                    if not m_sub:
+                        m_sub = next((s for s in subs if sub_name_target.lower() in s["sub_account_name"].lower()), None)
+                    if not m_sub and subs:
+                        m_sub = subs[0]
+                    if not m_sub:
+                        continue
+                        
+                    account_code = f"{m_acc['account_code']}{m_sub['sub_account_code']}"
+                    
+                    workbench_accounts_to_insert.append({
+                        "workbench_id": workbench_id,
+                        "master_account_id": m_acc["id"],
+                        "master_sub_account_id": m_sub["id"],
+                        "account_code": account_code,
+                        "full_account_name": item.get("name", "Unnamed Account"),
+                        "description": f"Custom seeded label under {m_sub['sub_account_name']}",
+                        "current_amount": 0.0,
+                        "is_active": True
+                    })
+                    
+                if workbench_accounts_to_insert:
+                    self.supabase.table("workbench_accounts").insert(workbench_accounts_to_insert).execute()
+                return {"status": "success", "message": f"Seeded {len(workbench_accounts_to_insert)} custom accounts successfully"}
+            
+            # Seeding default template
+            from services.coa_seeder import seed_coa
+            res = seed_coa(
+                self.supabase, 
+                workbench_id, 
+                wb.get("business_type") or "services", 
+                "small", 
+                wb.get("industry") or "others"
+            )
+            if res.get("status") == "error":
+                raise ValueError(res.get("message", "Seeding failed"))
+            return res
+        except Exception as e:
+            print(f"[ERROR] Failed to seed ledger labels: {str(e)}")
+            raise e
 
     # --- Transaction Engine ---
 

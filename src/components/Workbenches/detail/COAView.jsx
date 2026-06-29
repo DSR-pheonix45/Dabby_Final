@@ -17,13 +17,25 @@ import { toast } from "react-hot-toast";
 import TransactionModal from "../ledger/TransactionModal";
 import LabelModal from "../ledger/LabelModal";
 import { useWorkbench } from "../../../context/WorkbenchContext";
+import { supabase } from "../../../lib/supabase";
+import COASetupModal from "./COASetupModal";
+import { BsCheck } from "react-icons/bs";
+
+
 
 export default function COAView({ workbenchId }) {
-  const { labels, balances, transactions, loading, refreshContext } = useWorkbench();
+  const { labels, balances, transactions, loading, refreshContext, workbench } = useWorkbench();
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
+  const [isCOASetupModalOpen, setIsCOASetupModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (!loading && labels.length === 0) {
+      setIsCOASetupModalOpen(true);
+    }
+  }, [loading, labels.length]);
 
   useEffect(() => {
     if (labels.length > 0 && expandedRows.size === 0) {
@@ -166,7 +178,7 @@ export default function COAView({ workbenchId }) {
             return (
               <div 
                 key={type} 
-                className="relative h-32 w-full cursor-pointer"
+                className="relative h-20 w-full cursor-pointer"
                 onClick={() => toggleFlip(type)}
               >
                 <motion.div
@@ -175,26 +187,26 @@ export default function COAView({ workbenchId }) {
                   transition={{ duration: 0.6, type: "spring", stiffness: 260, damping: 20 }}
                 >
                   {/* Front: Left/Net */}
-                  <div className="absolute inset-0 backface-hidden p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col space-y-1 group-hover:border-teal-500/30 transition-all shadow-xl">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{type}</span>
-                    <div className="flex-1 flex flex-col justify-end">
-                      <span className={`text-lg font-bold ${net < 0 ? "text-red-400" : "text-white"}`}>
+                  <div className="absolute inset-0 backface-hidden p-3 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col justify-between hover:border-teal-500/30 transition-all shadow-xl">
+                    <span className="text-[8px] font-bold text-gray-500 uppercase tracking-widest leading-none">{type}</span>
+                    <div className="flex flex-col">
+                      <span className={`text-sm sm:text-base font-bold leading-none ${net < 0 ? "text-red-400" : "text-white"}`}>
                         {formatCurrency(net)}
                       </span>
-                      <span className="text-[9px] font-black uppercase tracking-tighter text-gray-600">
+                      <span className="text-[7px] font-black uppercase tracking-tighter text-gray-600 mt-0.5 leading-none">
                         LEFT / NET
                       </span>
                     </div>
                   </div>
 
                   {/* Back: Marked/Gross */}
-                  <div className="absolute inset-0 backface-hidden p-4 rounded-2xl bg-teal-500/5 border border-teal-500/20 flex flex-col space-y-1 rotate-x-180 shadow-2xl">
-                    <span className="text-[10px] font-bold text-teal-400 uppercase tracking-widest">{type} Incurred</span>
-                    <div className="flex-1 flex flex-col justify-end">
-                      <span className="text-lg font-bold text-teal-400">
+                  <div className="absolute inset-0 backface-hidden p-3 rounded-2xl bg-teal-500/5 border border-teal-500/20 flex flex-col justify-between rotate-x-180 shadow-2xl">
+                    <span className="text-[8px] font-bold text-teal-400 uppercase tracking-widest leading-none">{type} Incurred</span>
+                    <div className="flex flex-col">
+                      <span className="text-sm sm:text-base font-bold text-teal-400 leading-none">
                         {formatCurrency(gross)}
                       </span>
-                      <span className="text-[9px] font-black uppercase tracking-tighter text-teal-400/40">
+                      <span className="text-[7px] font-black uppercase tracking-tighter text-teal-400/40 mt-0.5 leading-none">
                         MARKED / GROSS
                       </span>
                     </div>
@@ -228,17 +240,22 @@ export default function COAView({ workbenchId }) {
                 </div>
               </div>
             ) : labels.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center p-24 text-center">
-                 <BsFolder2Open size={64} className="mb-6 text-gray-800 animate-pulse" />
-                 <h3 className="text-xl font-bold text-white mb-2">No Ledger Data Found</h3>
-                 <p className="text-gray-500 max-w-xs mx-auto text-sm font-medium mb-8">Your Chart of Accounts is currently empty.</p>
-                 <button 
-                  onClick={() => setIsLabelModalOpen(true)}
-                  className="px-8 py-3 bg-teal-500 text-black rounded-2xl font-bold text-sm hover:bg-teal-400 transition-all shadow-lg shadow-teal-500/20 flex items-center space-x-2"
-                 >
-                   <BsPlusLg />
-                   <span>Create First Label</span>
-                 </button>
+              <div className="flex-grow flex flex-col items-center justify-center p-8 max-w-sm mx-auto space-y-6 text-center animate-in fade-in duration-500 min-h-[300px]">
+                <div className="p-4 bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded-3xl shadow-lg shadow-teal-500/5">
+                  <BsJournalText size={32} />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-base font-bold text-white">Initialize Chart of Accounts</h3>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    Set up your ledger ontology tree by auto-seeding industry templates or importing your active categories.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsCOASetupModalOpen(true)}
+                  className="px-6 py-3 bg-teal-500 text-black hover:bg-teal-400 font-bold rounded-2xl text-xs transition-all shadow-lg shadow-teal-500/10 flex items-center justify-center space-x-2 cursor-pointer active:scale-95"
+                >
+                  <BsPlusLg /> <span>Initialize Ledger</span>
+                </button>
               </div>
             ) : (
               <div className="divide-y divide-white/[0.03]">
@@ -332,6 +349,13 @@ export default function COAView({ workbenchId }) {
         isOpen={isLabelModalOpen}
         onClose={() => setIsLabelModalOpen(false)}
         workbenchId={workbenchId}
+        onSuccess={refreshContext}
+      />
+
+      <COASetupModal 
+        isOpen={isCOASetupModalOpen}
+        onClose={() => setIsCOASetupModalOpen(false)}
+        workbench={workbench}
         onSuccess={refreshContext}
       />
     </div>
