@@ -31,17 +31,33 @@ export default function ScanMapperModal({ isOpen, onClose, extractedData, doc, m
 
   useEffect(() => {
     if (extractedData) {
+      const partiesData = extractedData.parties || {};
+      const financialsData = extractedData.financials || {};
+      const referencesData = extractedData.references || {};
+      const metadataData = extractedData.document_metadata || {};
+
+      const vendorName = partiesData.vendor_name || extractedData.vendorName || "";
+      const customerName = partiesData.customer_name || extractedData.clientName || "";
+      const partyName = mode === "AP" ? vendorName : customerName;
+
+      const amount = financialsData.total_amount || financialsData.subtotal || extractedData.totalAmount || extractedData.amount || 0;
+      const docDate = metadataData.document_date || extractedData.date || new Date().toISOString().split('T')[0];
+      const invoiceNum = referencesData.invoice_number || extractedData.invoiceNumber || extractedData.invoice_no || "";
+      
+      const lineItems = extractedData.line_items || extractedData.items || [];
+      const description = extractedData.description || `Scanned ${mode}: ${partyName || "Document"}`;
+
       setFormData({
         party_id: extractedData.party_id || "",
-        amount: extractedData.totalAmount || extractedData.amount || 0,
-        date: extractedData.date || new Date().toISOString().split('T')[0],
-        invoice_number: extractedData.invoiceNumber || extractedData.invoice_no || "",
-        description: extractedData.description || `Scanned ${mode}: ${extractedData.vendorName || extractedData.clientName || "Document"}`,
-        items: extractedData.items || []
+        amount: amount,
+        date: docDate,
+        invoice_number: invoiceNum,
+        description: description,
+        items: lineItems
       });
 
       // Try to auto-match party
-      const nameToMatch = (extractedData.vendorName || extractedData.clientName || "").toLowerCase();
+      const nameToMatch = partyName.toLowerCase();
       if (nameToMatch) {
         const matched = parties.find(p => p.name.toLowerCase().includes(nameToMatch));
         if (matched) {

@@ -33,17 +33,72 @@ class AIService:
             return await self.scan_document_vision(file_content.encode(), "text/plain", filename)
 
         system_prompt = """
-        You are an expert financial auditor. Extract the following details from the provided invoice content:
-        1. Client/Recipient Name
-        2. Vendor/Sender Name
-        3. Invoice Number
-        4. Date Issued (YYYY-MM-DD)
-        5. Due Date (YYYY-MM-DD)
-        6. Total Amount (Number)
-        7. Currency (e.g. INR, USD)
-        8. Items (List of objects: description, quantity, price, hsn_code)
+        You are an expert financial AI. Analyze the document text content and extract the fields according to the Dabby OCR Contract (v1).
         
-        Return the result ONLY as a JSON object. If a field is missing, use null.
+        Classify the document into one of the following exact 'document_type' string values:
+        - 'sales_invoice' (Create Revenue event)
+        - 'customer_payment_receipt' (Receive Customer Payment event)
+        - 'vendor_invoice' (Receive Vendor Bill event)
+        - 'vendor_payment_receipt' (Pay Vendor event)
+        - 'bank_statement' (Import Bank Transactions event)
+        - 'expense_receipt' (Record Expense event)
+        - 'payroll_register' (Process Payroll event)
+        - 'credit_note' (Reverse Revenue event)
+        - 'debit_note' (Vendor Adjustment event)
+        - 'loan_agreement' (Create Loan event)
+        - 'investment_agreement' (Raise Capital event)
+        - 'tax_document' (Tax Liability event)
+        - 'purchase_order' (Procurement Commitment event)
+        - 'sales_order' (Revenue Pipeline event)
+        - 'manual_journal' (Manual Journal event)
+
+        Return ONLY a JSON object adhering exactly to this schema (no extra formatting or keys outside this structure):
+        {
+          "document_type": "vendor_invoice", // Classify into one of the types above
+          "confidence": 0.98,
+
+          "document_metadata": {
+            "document_id": null,
+            "document_date": "YYYY-MM-DD", // Extract date of document issue/creation
+            "currency": "INR", // 3-letter currency code (e.g. USD, INR)
+            "language": "en"
+          },
+
+          "parties": {
+            "vendor_name": null, // Name of the vendor/merchant if applicable
+            "customer_name": null, // Name of customer/recipient if applicable
+            "gst_number": null
+          },
+
+          "financials": {
+            "subtotal": 0, // Numeric amount
+            "tax_amount": 0, // Numeric amount
+            "discount": 0, // Numeric amount
+            "total_amount": 0 // Numeric amount
+          },
+
+          "line_items": [
+            {
+              "description": "",
+              "quantity": 1,
+              "unit_price": 0,
+              "amount": 0,
+              "tax_rate": 18,
+              "tax_amount": 0
+            }
+          ],
+
+          "references": {
+            "invoice_number": null, // Invoice/bill/receipt reference number
+            "purchase_order": null,
+            "reference_invoice": null,
+            "transaction_reference": null
+          },
+
+          "additional_fields": {}
+        }
+        
+        Ensure numbers are represented as floats or integers, and missing/unknown string values are represented as null.
         """
         
         user_msg = f"Document Filename: {filename}\nContent:\n{file_content[:15000]}"
@@ -70,17 +125,72 @@ class AIService:
             raise ValueError("GEMINI_API_KEY not configured")
 
         prompt = """
-        Analyze this financial document (invoice, bill, or receipt) and extract:
-        1. Vendor/Sender Name
-        2. Client/Recipient Name
-        3. Invoice/Bill Number
-        4. Date Issued (YYYY-MM-DD)
-        5. Due Date (YYYY-MM-DD)
-        6. Total Amount (Numeric only)
-        7. Currency (e.g. INR)
-        8. Items (List of objects with: description, quantity, price, hsn_code)
+        You are an expert financial AI. Analyze this document and extract the fields according to the Dabby OCR Contract (v1).
+        
+        Classify the document into one of the following exact 'document_type' string values:
+        - 'sales_invoice'
+        - 'customer_payment_receipt'
+        - 'vendor_invoice'
+        - 'vendor_payment_receipt'
+        - 'bank_statement'
+        - 'expense_receipt'
+        - 'payroll_register'
+        - 'credit_note'
+        - 'debit_note'
+        - 'loan_agreement'
+        - 'investment_agreement'
+        - 'tax_document'
+        - 'purchase_order'
+        - 'sales_order'
+        - 'manual_journal'
 
-        Return ONLY a JSON object. If a value is unknown, use null.
+        Return ONLY a JSON object adhering exactly to this schema:
+        {
+          "document_type": "vendor_invoice", // Classify into one of the types above
+          "confidence": 0.98,
+
+          "document_metadata": {
+            "document_id": null,
+            "document_date": "YYYY-MM-DD", // Extract date of document issue/creation
+            "currency": "INR", // 3-letter currency code (e.g. USD, INR)
+            "language": "en"
+          },
+
+          "parties": {
+            "vendor_name": null, // Name of the vendor/merchant if applicable
+            "customer_name": null, // Name of customer/recipient if applicable
+            "gst_number": null
+          },
+
+          "financials": {
+            "subtotal": 0, // Numeric amount
+            "tax_amount": 0, // Numeric amount
+            "discount": 0, // Numeric amount
+            "total_amount": 0 // Numeric amount
+          },
+
+          "line_items": [
+            {
+              "description": "",
+              "quantity": 1,
+              "unit_price": 0,
+              "amount": 0,
+              "tax_rate": 18,
+              "tax_amount": 0
+            }
+          ],
+
+          "references": {
+            "invoice_number": null, // Invoice/bill/receipt reference number
+            "purchase_order": null,
+            "reference_invoice": null,
+            "transaction_reference": null
+          },
+
+          "additional_fields": {}
+        }
+        
+        Ensure numbers are represented as floats or integers, and missing/unknown string values are represented as null.
         """
 
         try:
