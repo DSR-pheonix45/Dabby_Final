@@ -120,25 +120,52 @@ export const backendService = {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const response = await fetch('http://localhost:8000/api/workbenches', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // 1. Insert into workbenches table
+      const { data: workbench, error: wbError } = await supabase
+        .from('workbenches')
+        .insert({
+          name: name.trim(),
           owner_user_id: user.id,
-          name,
           books_start_date: booksStartDate,
-          ...extraData
+          description: description || `Workbench for ${name.trim()}`,
+          location: extraData.location || 'India',
+          currency: extraData.currency || 'INR',
+          industry: extraData.industry || null,
+          sector: extraData.sector || null,
+          business_type: extraData.business_type || null,
+          legal_name: extraData.legal_name || null,
+          pan: extraData.pan || null,
+          gstin: extraData.gstin || null,
+          incorporation_date: extraData.incorporation_date || null,
+          fy_start: extraData.fy_start || 'April',
+          status: 'active',
+          settings: extraData.settings || {},
         })
-      });
+        .select()
+        .single();
 
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || 'Failed to create workbench');
+      if (wbError) {
+        console.error('Supabase workbench insert error:', wbError);
+        throw new Error(wbError.message || 'Failed to create workbench');
       }
 
-      return await response.json();
+      // 2. Insert into workbench_members table
+      const { error: memError } = await supabase
+        .from('workbench_members')
+        .insert({
+          workbench_id: workbench.id,
+          user_id: user.id,
+          role: 'founder',
+        });
+
+      if (memError) {
+        console.warn('Failed to add founder membership:', memError.message);
+        // Don't throw — workbench was created, membership is secondary
+      }
+
+      return workbench;
     } catch (err) {
-      console.error('Failed to call create-workbench API:', err);
+      console.error('Failed to create workbench:', err);
       throw err;
     }
   },

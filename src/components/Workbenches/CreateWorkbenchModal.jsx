@@ -133,6 +133,7 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
     incorporation_date: '',
     fy_start: 'April',
     books_start_date: new Date().toISOString().split('T')[0],
+    enable_inventory: true,
   });
 
   if (!isOpen) return null;
@@ -208,12 +209,22 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
     setError(null);
 
     try {
-      const { name, books_start_date, ...extraData } = formData;
+      const { name, books_start_date, enable_inventory, ...extraData } = formData;
+      
+      const payload = {
+        ...extraData,
+        settings: {
+          enable_inventory: ['manufacturing', 'trading'].includes(formData.industry)
+            ? enable_inventory !== false
+            : false
+        }
+      };
+
       const workbench = await backendService.createWorkbench(
         name.trim(),
         books_start_date,
         `Workbench for ${name.trim()}`,
-        extraData
+        payload
       );
 
       setCreatedWorkbench(workbench);
@@ -248,6 +259,7 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
       incorporation_date: '',
       fy_start: 'April',
       books_start_date: new Date().toISOString().split('T')[0],
+      enable_inventory: true,
     });
   };
 
@@ -326,6 +338,21 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
                     <option value="public_ltd">Public Limited</option>
                   </select>
                 </div>
+                {['manufacturing', 'trading'].includes(formData.industry) && (
+                  <div className="form-group span-2 flex items-center space-x-2 bg-white/5 p-4 rounded-2xl border border-white/5 mt-2 animate-in slide-in-from-top-2 duration-200">
+                    <input
+                      type="checkbox"
+                      id="enable_inventory"
+                      name="enable_inventory"
+                      checked={formData.enable_inventory !== false}
+                      onChange={(e) => setFormData({ ...formData, enable_inventory: e.target.checked })}
+                      className="w-4 h-4 rounded border-white/10 text-primary-300 focus:ring-0 focus:ring-offset-0 bg-white/5 cursor-pointer"
+                    />
+                    <label htmlFor="enable_inventory" className="text-xs font-bold text-gray-300 cursor-pointer select-none">
+                      Enable Inventory & Stock management page
+                    </label>
+                  </div>
+                )}
               </div>
             </div>
           )}

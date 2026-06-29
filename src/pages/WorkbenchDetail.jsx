@@ -75,12 +75,21 @@ export default function WorkbenchDetail() {
     return () => window.removeEventListener('open-transaction-modal', handleOpenModal);
   }, []);
 
+  const showInventory = ['manufacturing', 'trading'].includes(workbench?.industry) && 
+    workbench?.settings?.enable_inventory === true;
+
+  useEffect(() => {
+    if (activeTab === "Inventory" && !showInventory && workbench) {
+      setActiveTab("COA");
+    }
+  }, [activeTab, showInventory, workbench]);
+
   const navItems = [
     { id: "COA", label: "Chart of Accounts", icon: BsShieldCheck },
     { id: "DocVault", label: "Doc Vault", icon: BsFolder2 },
     { id: "Ops", label: "Ops", icon: BsLightningCharge },
     { id: "Investor", label: "Investor View", icon: BsArrowUpRight },
-    { id: "Inventory", label: "Inventory & Stock", icon: BsBoxSeam },
+    ...(showInventory ? [{ id: "Inventory", label: "Inventory & Stock", icon: BsBoxSeam }] : []),
     { id: "Settings", label: "Settings", icon: BsGear },
   ];
 
