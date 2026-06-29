@@ -169,8 +169,8 @@ export default function DocVault({ workbenchId }) {
   return (
     <div className="flex flex-col h-full bg-[#0a0a0a] text-white animate-in fade-in duration-500 overflow-hidden">
       {/* Header Section */}
-      <div className="p-8 pb-6">
-        <div className="flex justify-between items-start mb-8">
+      <div className="p-6 pb-2">
+        <div className="flex justify-between items-start mb-4">
           <div className="flex items-center space-x-4">
             <div className="p-3 rounded-2xl bg-teal-500/10 text-teal-400 border border-teal-500/20">
               <BsShieldLock size={28} />
@@ -212,7 +212,7 @@ export default function DocVault({ workbenchId }) {
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center space-x-3 mb-8 overflow-x-auto pb-2 custom-scrollbar">
+        <div className="flex items-center space-x-3 mb-4 overflow-x-auto pb-2 custom-scrollbar">
           {DOC_TYPES.map(type => (
             <button
               key={type.id}
@@ -229,14 +229,14 @@ export default function DocVault({ workbenchId }) {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-4 gap-6 mb-4">
           {[
             { label: "Total Docs", val: stats.total, color: "text-white" },
             { label: "Mapped to Units", val: stats.mapped, color: "text-teal-400" },
             { label: "Unmapped", val: stats.unmapped, color: "text-rose-400" },
             { label: "Active Filter", val: DOC_TYPES.find(t => t.id === activeFilter)?.label, color: "text-gray-400", isFilter: true },
           ].map((stat, i) => (
-            <div key={i} className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 relative overflow-hidden group">
+            <div key={i} className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 relative overflow-hidden group">
               <div className="flex flex-col space-y-1 relative z-10">
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{stat.label}</span>
                 <span className={`text-2xl font-bold ${stat.color}`}>{stat.val}</span>

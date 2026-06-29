@@ -130,7 +130,7 @@ export default function COAView({ workbenchId }) {
   return (
     <div className="flex flex-col h-full bg-[#0a0a0a] text-white animate-in fade-in duration-500 overflow-hidden">
       {/* Header */}
-      <div className="p-8 pb-6 flex flex-col space-y-6">
+      <div className="p-6 pb-2 flex flex-col space-y-4">
         <div className="flex justify-between items-start">
           <div className="flex items-center space-x-6">
             <div className="p-3 rounded-2xl bg-teal-500/10 text-teal-400 border border-teal-500/20 shadow-lg shadow-teal-500/5">
@@ -173,7 +173,7 @@ export default function COAView({ workbenchId }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-5 gap-4 perspective-1000">
+        <div className="grid grid-cols-5 gap-4 mb-2 perspective-1000">
           {["asset", "liability", "equity", "revenue", "expense"].map(type => {
             const { gross, net } = getPillarBalance(type);
             const isFlipped = flippedCards.has(type);

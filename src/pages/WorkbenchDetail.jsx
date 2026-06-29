@@ -177,13 +177,13 @@ export default function WorkbenchDetail() {
             </div>
           </header>
 
-          <main className="flex-1 overflow-auto relative">
+          <main className="flex-grow flex flex-col min-h-0 relative overflow-hidden">
             {activeTab === "COA" && <COAView workbenchId={id} />}
             {activeTab === "Ops" && <OperationsView workbenchId={id} />}
-            {activeTab === "Investor" && <div className="p-8"><InvestorView workbenchId={id} workbenchName={workbench?.name} /></div>}
+            {activeTab === "Investor" && <div className="p-8 overflow-auto h-full custom-scrollbar"><InvestorView workbenchId={id} workbenchName={workbench?.name} /></div>}
             {activeTab === "DocVault" && <DocVault workbenchId={id} />}
             {activeTab === "Inventory" && <InventoryView workbenchId={id} />}
-            {activeTab === "Settings" && <WorkbenchSettings workbench={workbench} workbenchId={id} />}
+            {activeTab === "Settings" && <div className="overflow-auto h-full custom-scrollbar"><WorkbenchSettings workbench={workbench} workbenchId={id} /></div>}
           </main>
         </div>
 
