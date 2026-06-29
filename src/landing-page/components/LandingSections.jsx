@@ -60,9 +60,9 @@ const STEPS = [
     },
     {
         num: "02",
-        title: "Auto-Map & Split Taxes",
-        desc: "Dabby instantly maps transactions to your Chart of Accounts, calculates CGST/SGST/IGST splits, and prepares journal entries for your accountant's review.",
-        badge: "Automated GST & COA Mapping",
+        title: "Auto-Map to Entities",
+        desc: "Dabby instantly extracts ledger entries, maps transactions to your core entities, and prepares structured analysis templates for business review.",
+        badge: "Automated Entity & COA Mapping",
         icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -727,6 +727,226 @@ export function FinalCTASection() {
                         </p>
                     </div>
                 </motion.div>
+            </div>
+        </section>
+    );
+}
+
+// ─── NEW COMPONENT: WHAT DABBY UNDERSTANDS ──────────────────────────────────
+export function WhatDabbyUnderstands() {
+    const { theme } = useTheme();
+    const isDark = theme === "dark";
+
+    const docTypes = [
+        {
+            title: "Profit & Loss Statements",
+            desc: "Dabby parses revenue categories, COGS, operating costs, and margins.",
+            fields: ["Gross Revenue", "COGS", "OpEx Lines", "Net Margin", "EBITDA", "Depreciation"],
+            icon: "📊"
+        },
+        {
+            title: "Bank Statements & Ledgers",
+            desc: "Extract transaction logs, ledger narratives, payments, and deposits.",
+            fields: ["Txn Date", "Reference ID", "Narrative", "Debit/Credit", "Closing Bal"],
+            icon: "🏦"
+        },
+        {
+            title: "Invoices & Receipts",
+            desc: "Scans bills and matches line items to your inventory and growth accounts.",
+            fields: ["Vendor Name", "Line Items", "Unit Prices", "Amount", "Invoice Date"],
+            icon: "🧾"
+        },
+        {
+            title: "Payroll & Salaries",
+            desc: "Maps employee payroll registries and deductions for operational spend.",
+            fields: ["Employee Ref", "Basic Salary", "EPF/ESIC", "Allowances", "Operational Cost"],
+            icon: "👥"
+        }
+    ];
+
+    return (
+        <section className={`py-20 md:py-28 px-4 sm:px-6 md:px-12 ${isDark ? "bg-[#0b0b0b]" : "bg-gray-50"}`}>
+            <div className="max-w-6xl mx-auto">
+                <motion.div {...fadeUp()} className="text-center mb-16">
+                    <Pill isDark={isDark}>Document Ingestion</Pill>
+                    <H2 isDark={isDark}>
+                        What Dabby <span className="text-[#81E6D9]">Understands</span>
+                    </H2>
+                    <Sub isDark={isDark}>Dabby's parser extracts key metadata fields from a wide variety of commercial documents.</Sub>
+                </motion.div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {docTypes.map((doc, idx) => (
+                        <motion.div
+                            key={idx}
+                            {...fadeUp(idx * 0.1)}
+                            whileHover={{ y: -4 }}
+                            className={`p-6 rounded-3xl border transition-all duration-300 ${
+                                isDark 
+                                    ? "bg-[#121212] border-white/10 hover:border-[#81E6D9]/30" 
+                                    : "bg-white border-gray-200 hover:shadow-lg"
+                            }`}
+                        >
+                            <div className="flex gap-4">
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 ${
+                                    isDark ? "bg-[#81E6D9]/10" : "bg-teal-50"
+                                }`}>
+                                    {doc.icon}
+                                </div>
+                                <div className="space-y-4 flex-grow">
+                                    <div>
+                                        <h3 className={`text-lg font-bold ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>{doc.title}</h3>
+                                        <p className={`text-xs mt-1 leading-relaxed ${isDark ? "text-gray-400" : "text-gray-500"}`}>{doc.desc}</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/5">
+                                        {doc.fields.map((f, i) => (
+                                            <span
+                                                key={i}
+                                                className={`text-[10px] px-2.5 py-1 rounded-full font-medium ${
+                                                    isDark 
+                                                        ? "bg-white/5 border border-white/5 text-[#81E6D9]" 
+                                                        : "bg-teal-50 border border-teal-100/50 text-[#0d9488]"
+                                                }`}
+                                            >
+                                                {f}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
+}
+
+// ─── NEW COMPONENT: PRIVACY AND SECURITY ───────────────────────────────────
+export function PrivacySecuritySection() {
+    const { theme } = useTheme();
+    const isDark = theme === "dark";
+
+    const securityItems = [
+        {
+            title: "AES-256 bank-grade Encryption",
+            desc: "All financial data, files, and chat messages are encrypted at rest and in transit using military-grade AES-256 protocols.",
+            icon: "🔒"
+        },
+        {
+            title: "DPDP Act 2023 Alignment",
+            desc: "Fully aligned with India's Digital Personal Data Protection regulations, implementing clean consent gates and grievance contact structures.",
+            icon: "⚖️"
+        },
+        {
+            title: "Row-Level Database Isolation",
+            desc: "We use Supabase Row-Level Security (RLS) policies to ensure that your business transactions are completely separated from others.",
+            icon: "🛡️"
+        },
+        {
+            title: "Zero training on your records",
+            desc: "Your data is only parsed during live query context execution. Dabby never trains any public AI model on your uploaded files.",
+            icon: "🚫"
+        }
+    ];
+
+    return (
+        <section className={`py-20 md:py-28 px-4 sm:px-6 md:px-12 ${isDark ? "bg-[#0b0b0b]" : "bg-white"}`}>
+            <div className="max-w-6xl mx-auto">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                    <motion.div {...fadeUp()}>
+                        <Pill isDark={isDark}>Enterprise Security</Pill>
+                        <H2 isDark={isDark}>
+                            Trust, Security, and <span className="text-[#81E6D9]">DPDP Compliance</span>
+                        </H2>
+                        <p className={`text-base leading-relaxed mt-4 mb-8 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                            Dabby is built from the ground up for high compliance workspaces. Your financial base data is processed securely, respecting user data consent and Indian data privacy standards.
+                        </p>
+                        <div className="flex gap-4 p-4 rounded-2xl border border-dashed border-[#81E6D9]/30 bg-[#81E6D9]/5">
+                            <span className="text-2xl">🇮🇳</span>
+                            <div className="space-y-1">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-[#81E6D9]">Compliance Contact</h4>
+                                <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                                    Have data auditing questions? Reach our grievance desk at <span className="font-semibold text-white">medhanshk02@gmail.com</span>.
+                                </p>
+                            </div>
+                        </div>
+                    </motion.div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {securityItems.map((item, idx) => (
+                            <motion.div
+                                key={idx}
+                                {...fadeUp(idx * 0.08)}
+                                className={`p-5 rounded-2xl border ${
+                                    isDark ? "bg-[#111111] border-white/5" : "bg-gray-50 border-gray-100"
+                                }`}
+                            >
+                                <div className="text-2xl mb-3">{item.icon}</div>
+                                <h4 className={`text-sm font-bold mb-1.5 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>{item.title}</h4>
+                                <p className={`text-xs leading-relaxed ${isDark ? "text-gray-400" : "text-gray-500"}`}>{item.desc}</p>
+                            </motion.div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+// ─── NEW COMPONENT: REPORTING AND ANALYTICS ─────────────────────────────────
+export function ReportingAnalyticsSection() {
+    const { theme } = useTheme();
+    const isDark = theme === "dark";
+
+    const analyticItems = [
+        {
+            title: "Cash Burn & Runway tracker",
+            desc: "Automatically determine monthly operating cash outflows, net profit burn rate, and projected cash runway.",
+            icon: "⏳"
+        },
+        {
+            title: "KPI & Performance Tracking",
+            desc: "Dabby extracts and graphs key business growth parameters, operating margins, and custom metrics.",
+            icon: "📈"
+        },
+        {
+            title: "Spend leaks diagnostic",
+            desc: "Dabby matches opex channels to identify double billing, vendor rate surges, and zombie subscriptions.",
+            icon: "💸"
+        }
+    ];
+
+    return (
+        <section className={`py-20 md:py-28 px-4 sm:px-6 md:px-12 ${isDark ? "bg-[#0f0f0f]" : "bg-gray-50/50"}`}>
+            <div className="max-w-6xl mx-auto">
+                <motion.div {...fadeUp()} className="text-center mb-16">
+                    <Pill isDark={isDark}>Reporting & Analytics</Pill>
+                    <H2 isDark={isDark}>
+                        Advanced <span className="text-[#81E6D9]">Financial Diagnostics</span>
+                    </H2>
+                    <Sub isDark={isDark}>Monitor run rate margins, KPI trends, and spend metrics in real time.</Sub>
+                </motion.div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {analyticItems.map((item, idx) => (
+                        <motion.div
+                            key={idx}
+                            {...fadeUp(idx * 0.1)}
+                            className={`p-6 rounded-3xl border transition-all duration-300 ${
+                                isDark ? "bg-[#161616] border-white/10 hover:border-[#81E6D9]/30" : "bg-white border-gray-200 hover:shadow-md"
+                            }`}
+                        >
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl mb-4 ${
+                                isDark ? "bg-white/5" : "bg-teal-50"
+                            }`}>
+                                {item.icon}
+                            </div>
+                            <h4 className={`text-base font-bold mb-2.5 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>{item.title}</h4>
+                            <p className={`text-xs leading-relaxed ${isDark ? "text-gray-400" : "text-gray-500"}`}>{item.desc}</p>
+                        </motion.div>
+                    ))}
+                </div>
             </div>
         </section>
     );

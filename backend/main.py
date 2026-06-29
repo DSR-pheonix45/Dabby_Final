@@ -52,6 +52,12 @@ app.include_router(budgets.router, prefix="/api/budgets", tags=["Budgets"])
 def health_check():
     return {"status": "healthy"}
 
+@app.on_event("startup")
+async def startup_event():
+    from services import queue_service
+    queue_service.start_worker()
+    print("[STARTUP] Document processing queue worker launched successfully")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

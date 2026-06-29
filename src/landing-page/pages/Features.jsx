@@ -6,39 +6,51 @@ import { useTheme } from "../../context/ThemeContext";
 const featuresData = [
     {
         id: 1,
-        title: "Natural Language Queries",
-        highlight: "Ask questions in plain English",
-        description: "Your finance team can get instant insights without writing complex queries. Simply type 'What was our revenue last quarter?' and get immediate answers.",
+        title: "Profit & Loss AI Ingestion (Business MRI)",
+        highlight: "Get an instant diagnostic of business health",
+        description: "Dabby parses messy P&L sheets and statements instantly, extracting key KPIs and flagging margins, expense anomalies, and potential leakage points in seconds.",
         details: [
-            "No SQL or technical skills required",
-            "Context-aware responses based on your data",
-            "Supports follow-up questions for deeper analysis"
+            "Dual-layer validation checks to prevent incorrect uploads",
+            "Automated cost-leak diagnostics and gross margin reviews",
+            "Key metrics (Revenue, COGS, EBITDA) extraction in seconds"
+        ],
+        workflowType: "grid-output"
+    },
+    {
+        id: 2,
+        title: "AI-Native Finance Chat (RAG)",
+        highlight: "Chat directly with your financial records",
+        description: "Use natural language to query your general ledgers, invoices, and accounts spreadsheets. Dabby uses a secure RAG engine to find exact numbers, calculate runway, or check transaction trends.",
+        details: [
+            "No complex SQL queries or database experience needed",
+            "Runway, burn rate, and cash projections calculated live",
+            "Direct reference citations tracing back to specific ledger lines"
         ],
         workflowType: "branching-right"
     },
     {
-        id: 2,
-        title: "Real-Time Data Access (Upcoming)",
-        highlight: "Live connection to your data sources",
-        description: "Connect directly to Supabase for real-time data access. No data duplication, always current information for accurate decision-making.",
+        id: 3,
+        title: "Automated Document Template Instantiation",
+        highlight: "Generate models, invoices, and trackers in one click",
+        description: "Generate ready-to-use professional templates directly from the workbench. Quickly spawn structured Financial Models, Quotation cards, Receivable trackers, and professional Invoices.",
         details: [
-            "Direct Supabase integration",
-            "Real-time data synchronization",
-            "Secure encrypted connections"
+            "Ready-to-use interactive template worksheets",
+            "Auto-filled data rows derived from user conversational prompts",
+            "Clean CSV and PDF exports for instant sharing"
         ],
-        workflowType: "converging"
+        workflowType: "horizontal-flow"
     },
     {
-        id: 3,
-        title: "Deep Insights from Documents",
-        highlight: "Analyze complex financial PDFs",
-        description: "Extract meaningful information from financial statements, invoices, and various documents. Dabby understands the structure of financial data to give you deep analysis.",
+        id: 4,
+        title: "Advanced Analytics & Runway Forecasting",
+        highlight: "Predict cash trends and plan runways",
+        description: "Generate cash burn analysis and forward-looking runway forecasts using historical ledger records. Dabby runs predictive analysis to map out future cash flows and monthly balances.",
         details: [
-            "Extract key insights from PDFs",
-            "Identify trends across multiple documents",
-            "Summarize long financial statements"
+            "Live runway and cash burn analytics calculation",
+            "Predictive cash flow projections based on patterns",
+            "Detailed forecast charts and diagnostic summaries"
         ],
-        workflowType: "grid-output"
+        workflowType: "converging"
     }
 ];
 
@@ -65,10 +77,10 @@ const WorkflowBranchingRight = ({ isDark, isInView }) => {
                         <svg className="w-10 h-10 text-white mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                         </svg>
-                        <span className="text-white font-bold text-sm text-center uppercase tracking-wide">Natural Language</span>
+                        <span className="text-white font-bold text-sm text-center uppercase tracking-wide">Finance RAG Chat</span>
                     </div>
                 </motion.div>
-
+ 
                 {/* SVG Connector with Arrows */}
                 <svg width="120" height="200" className="mx-2" style={{ overflow: 'visible' }}>
                     <defs>
@@ -113,13 +125,13 @@ const WorkflowBranchingRight = ({ isDark, isInView }) => {
                         transition={{ delay: 0.5, duration: 0.6 }}
                     />
                 </svg>
-
+ 
                 {/* Output Cards */}
                 <div className="flex flex-col gap-4">
                     {[
-                        { label: "Contextual Analysis", icon: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" },
-                        { label: "Data Insights", icon: "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" },
-                        { label: "Quick Answers", icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" }
+                        { label: "Contextual RAG", icon: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" },
+                        { label: "Runway Projections", icon: "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" },
+                        { label: "Anomaly Flags", icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" }
                     ].map((item, idx) => (
                         <motion.div
                             key={idx}
@@ -153,9 +165,9 @@ const WorkflowConverging = ({ isDark, isInView }) => {
             {/* Top Row - Input Cards */}
             <div className="flex items-end justify-center gap-8 mb-2">
                 {[
-                    { label: "Supabase", icon: "M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" },
-                    { label: "AWS Storage", icon: "M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" },
-                    { label: "Data Files", icon: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" }
+                    { label: "Ledger Logs", icon: "M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" },
+                    { label: "Growth Rates", icon: "M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" },
+                    { label: "Overhead Budgets", icon: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" }
                 ].map((item, idx) => (
                     <motion.div
                         key={idx}
@@ -234,9 +246,9 @@ const WorkflowConverging = ({ isDark, isInView }) => {
                         <div className="w-2 h-2 rounded-full bg-white/50"></div>
                     </div>
                     <svg className="w-10 h-10 text-white mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                     </svg>
-                    <span className="text-white font-bold text-sm text-center uppercase tracking-wide">Real-Time Access</span>
+                    <span className="text-white font-bold text-sm text-center uppercase tracking-wide">Cash Flow Forecast</span>
                 </div>
             </motion.div>
         </div>
@@ -265,7 +277,7 @@ const WorkflowGridOutput = ({ isDark, isInView }) => {
                         <svg className="w-10 h-10 text-white mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                         </svg>
-                        <span className="text-white font-bold text-sm text-center uppercase tracking-wide">Analysis Engine</span>
+                        <span className="text-white font-bold text-sm text-center uppercase tracking-wide">P&L MRI Scanner</span>
                     </div>
                 </motion.div>
 
@@ -311,7 +323,7 @@ const WorkflowGridOutput = ({ isDark, isInView }) => {
 
                 {/* Output Grid */}
                 <div className="flex flex-col gap-3">
-                    {["Insight Extraction", "Trend ID", "Summarization"].map((label, idx) => (
+                    {["MRI Metrics", "Opex Leaks", "Gross Margin"].map((label, idx) => (
                         <motion.div
                             key={idx}
                             initial={{ opacity: 0, x: 20 }}
@@ -446,10 +458,10 @@ const WorkflowHorizontalFlow = ({ isDark, isInView }) => {
                         : "bg-white border-2 border-[#81E6D9]/40 shadow-md"
                         }`}>
                         <svg className={`w-8 h-8 ${isDark ? "text-[#81E6D9]" : "text-[#0D9488]"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                         </svg>
                     </div>
-                    <span className={`text-xs font-bold mt-2 uppercase tracking-wide ${isDark ? "text-white" : "text-gray-800"}`}>Raw Data</span>
+                    <span className={`text-xs font-bold mt-2 uppercase tracking-wide ${isDark ? "text-white" : "text-gray-800"}`}>User Prompt</span>
                 </motion.div>
 
                 {/* Arrow 1 */}
@@ -486,9 +498,9 @@ const WorkflowHorizontalFlow = ({ isDark, isInView }) => {
                             <div className="w-2 h-2 rounded-full bg-white/50"></div>
                         </div>
                         <svg className="w-10 h-10 text-white mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                         </svg>
-                        <span className="text-white font-bold text-xs text-center uppercase tracking-wide">Intelligence Engine</span>
+                        <span className="text-white font-bold text-xs text-center uppercase tracking-wide">Template Engine</span>
                     </div>
                 </motion.div>
 
@@ -522,7 +534,7 @@ const WorkflowHorizontalFlow = ({ isDark, isInView }) => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                     </div>
-                    <span className={`text-xs font-bold mt-2 uppercase tracking-wide ${isDark ? "text-white" : "text-gray-800"}`}>Insights</span>
+                    <span className={`text-xs font-bold mt-2 uppercase tracking-wide ${isDark ? "text-white" : "text-gray-800"}`}>Financial Sheet</span>
                 </motion.div>
             </div>
         </div>

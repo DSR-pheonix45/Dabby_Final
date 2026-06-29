@@ -307,6 +307,22 @@ async def list_invoices(workbench_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/documents/process/{doc_id}")
+async def process_document(doc_id: str):
+    """
+    Enqueues a document for background processing.
+    """
+    try:
+        from services import queue_service
+        doc_res = supabase.table("workbench_documents").select("*").eq("id", doc_id).single().execute()
+        if not doc_res.data:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        await queue_service.enqueue_document(doc_id)
+        return {"status": "queued", "doc_id": doc_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/invoices/scan/{doc_id}")
 async def scan_invoice_doc(doc_id: str):
     try:

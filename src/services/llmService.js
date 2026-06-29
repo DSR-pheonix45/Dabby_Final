@@ -50,7 +50,7 @@ const FREE_MODELS = [
 /**
  * Read file content based on file type
  */
-async function readFileContent(file) {
+export async function readFileContent(file) {
   const fileExtension = file.name.split(".").pop()?.toLowerCase();
 
   // Handle text-based files
@@ -285,6 +285,31 @@ Your mission is to analyze business documents and real-time ledger data. You hel
 - **Conversational & Professional**: Maintain a helpful, natural tone for complex analysis, but stay brief for simple data retrieval.
 - **Strategic Insights**: Explain what numbers mean only when asked for an analysis, not for a simple lookup.
 - **Evidence-Based**: While being natural, your answers must still be strictly derived from the provided context.
+
+### DYNAMIC VISUAL LAYOUT COMPONENTS (OPTIONAL & ON-DEMAND ONLY)
+1. **CHARTS**: Do NOT generate any visual charts (using \`json-chart\` blocks) UNLESS the user explicitly asks for a chart, graph, or visual plot. When explicitly requested, you may output a chart block of language "json-chart" in this format:
+\`\`\`json-chart
+{
+  "title": "YoY Profit and Loss Summary",
+  "type": "bar", // "line" | "bar" | "area" | "pie"
+  "data": [
+    {"name": "2023", "Revenue": 175500, "Expenses": 27120, "Net Profit": 105147},
+    {"name": "2024", "Revenue": 192000, "Expenses": 26100, "Net Profit": 120070}
+  ],
+  "keys": ["Revenue", "Expenses", "Net Profit"],
+  "colors": ["#81E6D9", "#E53E3E", "#48BB78"]
+}
+\`\`\`
+2. **INTERACTIVE SCENARIO ANALYSIS**: Do NOT generate any scenario analysis blocks (using \`scenario-analysis\` blocks) UNLESS the user explicitly asks to run a scenario analysis, growth model, or interactive simulator. When explicitly requested, append a scenario analysis block of language "scenario-analysis" in this format:
+\`\`\`scenario-analysis
+{
+  "revenue": 192000,
+  "opex": 26100,
+  "cogs": 36000,
+  "cashBalance": 150000
+}
+\`\`\`
+Ensure all values represent the actual company balance sheet figures parsed. This will render an interactive scenario modeling widget in the chat interface.
 
 Current System Date: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`,
           },

@@ -72,8 +72,11 @@ export default function Workbenches() {
     fetchWorkbenches();
   }, [fetchWorkbenches]);
 
-  const handleCreateSuccess = () => {
+  const handleCreateSuccess = (workbench) => {
     fetchWorkbenches();
+    if (workbench?.id) {
+      navigate(`/dashboard/workbenches/${workbench.id}`);
+    }
   };
 
   const getTimeAgo = (date) => {
@@ -135,19 +138,19 @@ export default function Workbenches() {
                   <div className="w-6 flex justify-start">
                     <BsGlobe className="text-sm" />
                   </div>
-                  <span>India</span>
+                  <span>{wb.location || 'India'}</span>
                 </div>
                 <div className="flex items-center text-gray-500 text-[13px] group-hover:text-gray-400 transition-colors">
                   <div className="w-6 flex justify-start">
                     <BsCurrencyDollar className="text-sm" />
                   </div>
-                  <span>INR</span>
+                  <span>{wb.currency || 'INR'}</span>
                 </div>
                 <div className="flex items-center text-gray-500 text-[13px] group-hover:text-gray-400 transition-colors">
                   <div className="w-6 flex justify-start">
                     <BsCalendarCheck className="text-sm" />
                   </div>
-                  <span>FY starts April</span>
+                  <span>FY starts {wb.fy_start || 'April'}</span>
                 </div>
               </div>
 

@@ -93,8 +93,8 @@ export default function Waitlist() {
               </h1>
               
               <p className={`text-base sm:text-lg leading-relaxed mb-10 max-w-lg mx-auto ${isDark ? "text-[#a0a0a0]" : "text-gray-600"}`}>
-                Indian companies waste hours every week manually reconciling bank statements, mapping GST tax splits, and fixing CRM sync errors. 
-                Dabby automates your ledger, GST allocation, and reconciliation so you can run your business with real-time numbers.
+                Indian companies waste hours every week manually tracking operational metrics, analyzing financial health, and trying to forecast cash runways. 
+                Dabby acts as your intelligent financial copilot, helping you track core business KPIs to grow.
               </p>
 
               {/* Waitlist Box */}

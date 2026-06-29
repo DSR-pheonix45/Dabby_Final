@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../hooks/useAuth";
+import BrandLogo from "../../components/common/BrandLogo";
 
 
 export default function Navbar() {
@@ -44,12 +45,12 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto flex items-center justify-center h-full">
           {/* Logo */}
           <Link to="/" className="inline-flex items-center gap-3">
-            <img
-              src={theme === "dark" ? "/Datalis_Logo.png" : "/Datalis_Logo-2.png"}
-              alt="Datalis"
-              className="h-8 w-auto"
-              loading="lazy"
-              decoding="async"
+            <BrandLogo
+              label="Dabby"
+              iconSize={32}
+              textClassName={`text-xl font-bold tracking-tight ${theme === "dark" ? "text-white" : "text-[#1e293b]"}`}
+              iconClassName="text-[#81E6D9]"
+              iconSrc="/dabby-logo.svg"
             />
           </Link>
 
@@ -70,28 +71,22 @@ export default function Navbar() {
               />
             </Link>
 
-            {/* About Link */}
+            {/* Features Link */}
             <Link
-              to="/about"
+              to="/features"
               className={`relative group text-[14.4px] font-mono font-medium px-4 py-2 transition-all duration-200 ${theme === "dark" ? "text-white " : "text-[#292929] "}`}
             >
-              About
-              <span className={`absolute bottom-0 left-0 w-full h-0.5 bg-[#81E6D9] transition-transform duration-200 origin-left ${isActive("/about") ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`} />
+              Features
+              <span className={`absolute bottom-0 left-0 w-full h-0.5 bg-[#81E6D9] transition-transform duration-200 origin-left ${isActive("/features") ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`} />
             </Link>
 
-            {/* Templates Link */}
+            {/* Security Link */}
             <Link
-              to="/templates"
-              className={`relative group text-[14.4px] font-mono font-medium px-4 py-2 transition-all duration-200 ${theme === "dark" ? "text-white " : "text-[#292929] "
-                }`}
+              to="/security"
+              className={`relative group text-[14.4px] font-mono font-medium px-4 py-2 transition-all duration-200 ${theme === "dark" ? "text-white " : "text-[#292929] "}`}
             >
-              Templates
-              <span
-                className={`absolute bottom-0 left-0 w-full h-0.5 bg-[#81E6D9] transition-transform duration-200 origin-left ${isActive("/templates")
-                  ? "scale-x-100"
-                  : "scale-x-0 group-hover:scale-x-100"
-                  }`}
-              ></span>
+              Security
+              <span className={`absolute bottom-0 left-0 w-full h-0.5 bg-[#81E6D9] transition-transform duration-200 origin-left ${isActive("/security") ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`} />
             </Link>
 
             {/* Pricing Link */}
@@ -103,6 +98,21 @@ export default function Navbar() {
               Pricing
               <span
                 className={`absolute bottom-0 left-0 w-full h-0.5 bg-[#81E6D9] transition-transform duration-200 origin-left ${isActive("/pricing")
+                  ? "scale-x-100"
+                  : "scale-x-0 group-hover:scale-x-100"
+                  }`}
+              ></span>
+            </Link>
+
+            {/* Documentation Link */}
+            <Link
+              to="/docs"
+              className={`relative group text-[14.4px] font-mono font-medium px-4 py-2 transition-all duration-200 ${theme === "dark" ? "text-white " : "text-[#292929] "
+                }`}
+            >
+              Docs
+              <span
+                className={`absolute bottom-0 left-0 w-full h-0.5 bg-[#81E6D9] transition-transform duration-200 origin-left ${isActive("/docs")
                   ? "scale-x-100"
                   : "scale-x-0 group-hover:scale-x-100"
                   }`}
@@ -163,22 +173,22 @@ export default function Navbar() {
             ) : (
               <>
                 <Link
-                  to="/waitlist"
+                  to="/login"
+                  className={`text-base font-mono font-normal px-6 py-2 border rounded-full transition-all duration-200 ${theme === "dark"
+                    ? "text-white border-white/30 hover:border-white"
+                    : "text-[#292929] border-[#292929]/30 hover:border-[#292929]"
+                    }`}
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
                   className={`px-6 py-2 text-base font-mono font-medium text-black bg-[#81E6D9] rounded-full border border-[#81E6D9] hover:bg-transparent transition-all duration-200 ${theme === "dark"
                     ? "hover:text-white hover:border-white"
                     : "hover:text-[#1a1a1a] hover:border-[#1a1a1a]"
                     }`}
                 >
-                  Join Waitlist
-                </Link>
-                <Link
-                  to="/login"
-                  className={`text-base font-mono font-normal px-6 py-2 border rounded-full transition-all duration-200 ${theme === "dark"
-                    ? "text-white border-white/30 "
-                    : "text-[#292929] border-[#292929] "
-                    }`}
-                >
-                  Login
+                  Sign Up
                 </Link>
               </>
             )}
@@ -231,19 +241,16 @@ export default function Navbar() {
             >
               <div className="flex flex-col gap-2 px-4">
                 <Link
-                  to="/about"
+                  to="/features"
                   className={`text-[14.4px] font-mono font-medium px-4 py-3 text-left transition-colors duration-200 ${theme === "dark" ? "text-white hover:text-[#81E6D9]" : "text-[#292929] hover:text-[#0D9488]"}`}
                 >
-                  About
+                  Features
                 </Link>
                 <Link
-                  to="/templates"
-                  className={`text-[14.4px] font-mono font-medium px-4 py-3 text-left transition-colors duration-200 ${theme === "dark"
-                    ? "text-white hover:text-[#81E6D9]"
-                    : "text-[#292929] hover:text-[#0D9488]"
-                    }`}
+                  to="/security"
+                  className={`text-[14.4px] font-mono font-medium px-4 py-3 text-left transition-colors duration-200 ${theme === "dark" ? "text-white hover:text-[#81E6D9]" : "text-[#292929] hover:text-[#0D9488]"}`}
                 >
-                  Templates
+                  Security
                 </Link>
                 <Link
                   to="/pricing"
@@ -253,6 +260,12 @@ export default function Navbar() {
                     }`}
                 >
                   Pricing
+                </Link>
+                <Link
+                  to="/docs"
+                  className={`text-[14.4px] font-mono font-medium px-4 py-3 text-left transition-colors duration-200 ${theme === "dark" ? "text-white hover:text-[#81E6D9]" : "text-[#292929] hover:text-[#0D9488]"}`}
+                >
+                  Docs
                 </Link>
                 <hr
                   className={
@@ -318,15 +331,6 @@ export default function Navbar() {
                 ) : (
                   <>
                     <Link
-                      to="/waitlist"
-                      className={`px-6 py-3 text-base font-mono font-normal text-black bg-[#81E6D9] border border-[#81E6D9] hover:bg-transparent transition-colors duration-200 text-center rounded-full ${theme === "dark"
-                        ? "hover:text-white hover:border-white"
-                        : "hover:text-[#1a1a1a] hover:border-[#1a1a1a]"
-                        }`}
-                    >
-                      Join Waitlist
-                    </Link>
-                    <Link
                       to="/login"
                       className={`text-base font-mono font-normal px-4 py-3 transition-colors duration-200 ${theme === "dark"
                         ? "text-white hover:text-[#81E6D9]"
@@ -334,6 +338,15 @@ export default function Navbar() {
                         }`}
                     >
                       Login
+                    </Link>
+                    <Link
+                      to="/signup"
+                      className={`text-base font-mono font-normal px-4 py-3 transition-colors duration-200 ${theme === "dark"
+                        ? "text-white hover:text-[#81E6D9]"
+                        : "text-[#292929] hover:text-[#0D9488]"
+                        }`}
+                    >
+                      Sign Up
                     </Link>
                   </>
                 )}

@@ -25,8 +25,13 @@ const footerLinks = {
     },
   ],
   Legal: [
-    { name: "Privacy", href: "/privacy" },
-    { name: "Terms", href: "/terms" },
+    { name: "Privacy Policy", href: "/privacy" },
+    { name: "Terms of Service", href: "/terms" },
+    { name: "Cookie Policy", href: "/cookie-policy" },
+    { name: "AI Transparency", href: "/ai-transparency" },
+    { name: "Responsible AI", href: "/responsible-ai" },
+    { name: "Data Processing (DPA)", href: "/dpa" },
+    { name: "Data Retention Policy", href: "/data-retention" },
   ],
 };
 

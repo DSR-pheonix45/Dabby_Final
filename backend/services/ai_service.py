@@ -19,8 +19,7 @@ class AIService:
         if gemini_key:
             sanitized_gemini = gemini_key.strip().strip('"').strip("'")
             genai.configure(api_key=sanitized_gemini)
-            # Use 1.5-flash for higher rate limits on free tier
-            self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+            self.gemini_model = genai.GenerativeModel('gemini-2.5-flash')
         else:
             self.gemini_model = None
 
@@ -52,7 +51,11 @@ class AIService:
         - 'sales_order' (Revenue Pipeline event)
         - 'manual_journal' (Manual Journal event)
 
-        Return ONLY a JSON object adhering exactly to this schema (no extra formatting or keys outside this structure):
+        RULES:
+        1. OCR is ONLY responsible for extracting facts and metadata. Do NOT output ledger accounts (e.g. do not suggest debit_account or credit_account keys).
+        2. Any mandatory classification fields specified in the Dabby OCR Contract (v1) that do not have their own standard keys in the Generic JSON Schema below MUST be placed inside the "additional_fields" dictionary (e.g. payment_method, employees, filing_period, bank_name, statement period, lender, principal).
+
+        Return ONLY a JSON object adhering exactly to this schema:
         {
           "document_type": "vendor_invoice", // Classify into one of the types above
           "confidence": 0.98,
@@ -121,6 +124,15 @@ class AIService:
         """
         Uses Gemini Vision to extract data from images or PDFs.
         """
+        # If text/csv/txt file, delegate to text-based extraction
+        is_text = (mime_type or "").startswith("text/") or filename.endswith(".csv") or filename.endswith(".txt")
+        if is_text:
+            try:
+                text_content = file_bytes.decode("utf-8", errors="ignore")
+                return await self.scan_invoice(text_content, filename)
+            except Exception as text_err:
+                print(f"[WARNING] Text decoding failed, falling back to vision: {text_err}")
+
         if not self.gemini_model:
             raise ValueError("GEMINI_API_KEY not configured")
 
@@ -143,6 +155,10 @@ class AIService:
         - 'purchase_order'
         - 'sales_order'
         - 'manual_journal'
+
+        RULES:
+        1. OCR is ONLY responsible for extracting facts and metadata. Do NOT output ledger accounts (e.g. do not suggest debit_account or credit_account keys).
+        2. Any mandatory classification fields specified in the Dabby OCR Contract (v1) that do not have their own standard keys in the Generic JSON Schema below MUST be placed inside the "additional_fields" dictionary (e.g. payment_method, employees, filing_period, bank_name, statement period, lender, principal).
 
         Return ONLY a JSON object adhering exactly to this schema:
         {
@@ -194,10 +210,74 @@ class AIService:
         """
 
         try:
-            response = self.gemini_model.generate_content([
-                prompt,
-                {"mime_type": mime_type, "data": file_bytes}
-            ])
+            schema = {
+                "type": "OBJECT",
+                "properties": {
+                    "document_type": {"type": "STRING"},
+                    "confidence": {"type": "NUMBER"},
+                    "document_metadata": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "document_id": {"type": "STRING"},
+                            "document_date": {"type": "STRING"},
+                            "currency": {"type": "STRING"},
+                            "language": {"type": "STRING"}
+                        }
+                    },
+                    "parties": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "vendor_name": {"type": "STRING"},
+                            "customer_name": {"type": "STRING"},
+                            "gst_number": {"type": "STRING"}
+                        }
+                    },
+                    "financials": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "subtotal": {"type": "NUMBER"},
+                            "tax_amount": {"type": "NUMBER"},
+                            "discount": {"type": "NUMBER"},
+                            "total_amount": {"type": "NUMBER"}
+                        }
+                    },
+                    "line_items": {
+                        "type": "ARRAY",
+                        "items": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "description": {"type": "STRING"},
+                                "quantity": {"type": "NUMBER"},
+                                "unit_price": {"type": "NUMBER"},
+                                "amount": {"type": "NUMBER"},
+                                "tax_rate": {"type": "NUMBER"},
+                                "tax_amount": {"type": "NUMBER"}
+                            }
+                        }
+                    },
+                    "references": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "invoice_number": {"type": "STRING"},
+                            "purchase_order": {"type": "STRING"},
+                            "reference_invoice": {"type": "STRING"},
+                            "transaction_reference": {"type": "STRING"}
+                        }
+                    },
+                    "additional_fields": {
+                        "type": "OBJECT"
+                    }
+                },
+                "required": ["document_type", "confidence", "document_metadata", "parties", "financials", "line_items", "references", "additional_fields"]
+            }
+
+            response = self.gemini_model.generate_content(
+                [prompt, {"mime_type": mime_type, "data": file_bytes}],
+                generation_config={
+                    "response_mime_type": "application/json",
+                    "response_schema": schema
+                }
+            )
             
             # Safer text extraction
             if not response.candidates or not response.candidates[0].content.parts:

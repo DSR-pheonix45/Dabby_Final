@@ -3,13 +3,14 @@ import { useEffect, useState } from "react";
 import Hero from "../components/Hero";
 import {
   HowItWorks,
-  WhatYouCanGenerate,
-  TheWorkspace,
-  AIIntelligence,
-  DataToDecisions,
-  PricingSection,
-  FinalCTASection,
+  WhatDabbyUnderstands,
+  PrivacySecuritySection,
+  ReportingAnalyticsSection,
 } from "../components/LandingSections";
+import WhyChoose from "../components/WhyChoose";
+import Testimonial from "../components/Testimonial";
+import FAQ from "../components/FAQ";
+import FinalCTA from "../components/FinalCTA";
 
 export default function Home() {
   const { theme } = useTheme();
@@ -39,29 +40,32 @@ export default function Home() {
     >
       <div className="relative z-10">
         <main>
-          {/* Hero — AI Template Generator (do not modify) */}
+          {/* 1. Hero Section */}
           <Hero />
 
-          {/* S1: How It Works */}
+          {/* 2. How Dabby Works */}
           <HowItWorks />
 
-          {/* S2: Template Gallery */}
-          <WhatYouCanGenerate />
+          {/* 3. What Dabby Understands */}
+          <WhatDabbyUnderstands />
 
-          {/* S3: The Workspace */}
-          <TheWorkspace />
+          {/* 4. Why Dabby */}
+          <WhyChoose />
 
-          {/* S4: AI Intelligence */}
-          <AIIntelligence />
+          {/* 5. Privacy and Security */}
+          <PrivacySecuritySection />
 
-          {/* S5: Data to Decisions */}
-          <DataToDecisions />
+          {/* 6. Reporting and Analytics */}
+          <ReportingAnalyticsSection />
 
-          {/* S6: Pricing */}
-          <PricingSection />
+          {/* 7. Testimonials */}
+          <Testimonial />
 
-          {/* S7: Final CTA */}
-          <FinalCTASection />
+          {/* 8. FAQ */}
+          <FAQ />
+
+          {/* 9. Final CTA */}
+          <FinalCTA />
         </main>
       </div>
     </div>

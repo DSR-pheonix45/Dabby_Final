@@ -16,6 +16,47 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
+  // Bot Protection Captcha & Consent
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [captchaPassed, setCaptchaPassed] = useState(false);
+  const [captchaTarget, setCaptchaTarget] = useState('');
+  const [captchaOptions, setCaptchaOptions] = useState([]);
+
+  useEffect(() => {
+    const targets = [
+      { name: 'Triangle', char: '▲' },
+      { name: 'Square', char: '■' },
+      { name: 'Circle', char: '●' },
+      { name: 'Heart', char: '♥' },
+      { name: 'Star', char: '★' }
+    ];
+    const shuffled = [...targets].sort(() => 0.5 - Math.random());
+    const selectedOptions = shuffled.slice(0, 3);
+    const target = selectedOptions[Math.floor(Math.random() * selectedOptions.length)];
+    setCaptchaTarget(target.name);
+    setCaptchaOptions(selectedOptions);
+  }, []);
+
+  const handleCaptchaClick = (name) => {
+    if (name === captchaTarget) {
+      setCaptchaPassed(true);
+    } else {
+      alert("Incorrect shape selected. Please try again.");
+      const targets = [
+        { name: 'Triangle', char: '▲' },
+        { name: 'Square', char: '■' },
+        { name: 'Circle', char: '●' },
+        { name: 'Heart', char: '♥' },
+        { name: 'Star', char: '★' }
+      ];
+      const shuffled = [...targets].sort(() => 0.5 - Math.random());
+      const selectedOptions = shuffled.slice(0, 3);
+      const target = selectedOptions[Math.floor(Math.random() * selectedOptions.length)];
+      setCaptchaTarget(target.name);
+      setCaptchaOptions(selectedOptions);
+    }
+  };
+
   // Redirect if already logged in
   useEffect(() => {
     if (user && !authLoading) {
@@ -30,6 +71,16 @@ export default function Login() {
 
   const handleEmailLogin = async (e) => {
     e.preventDefault();
+
+    if (!consentChecked) {
+      setError("Please accept the terms and consent before signing in.");
+      return;
+    }
+
+    if (!captchaPassed) {
+      setError("Please complete the bot protection check.");
+      return;
+    }
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
@@ -208,10 +259,60 @@ export default function Login() {
             </div>
           </div>
 
+          {/* Captcha Block */}
+          <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Bot Protection Check
+            </label>
+            {!captchaPassed ? (
+              <div className="space-y-3">
+                <p className="text-[11px] text-gray-300">
+                  Verify you are human. Select the shape: <span className="text-[#00FFD1] font-bold">{captchaTarget}</span>
+                </p>
+                <div className="flex gap-4 justify-center">
+                  {captchaOptions.map((opt, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleCaptchaClick(opt.name)}
+                      className="w-11 h-11 text-xl flex items-center justify-center rounded-xl bg-white/10 border border-white/10 text-white hover:bg-white/20 hover:border-[#00FFD1] hover:text-[#00FFD1] transition-all hover:scale-105 active:scale-95"
+                    >
+                      {opt.char}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-lg">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                Human verification successful.
+              </div>
+            )}
+          </div>
+
+          {/* Consent Checkbox */}
+          <div className="flex items-start gap-2.5 pt-2">
+            <input
+              type="checkbox"
+              id="consent-checkbox"
+              checked={consentChecked}
+              onChange={(e) => setConsentChecked(e.target.checked)}
+              className="mt-0.5 rounded border-gray-700 text-[#00FFD1] focus:ring-[#00FFD1]/50 bg-transparent cursor-pointer"
+            />
+            <label htmlFor="consent-checkbox" className="text-xs leading-relaxed cursor-pointer select-none text-gray-400">
+              I consent to Dabby processing my uploaded financial records in accordance with the{" "}
+              <Link to="/privacy" target="_blank" className="text-[#00FFD1] hover:underline font-semibold">Privacy Policy</Link>{" "}
+              and the{" "}
+              <Link to="/dpa" target="_blank" className="text-[#00FFD1] hover:underline font-semibold">Data Processing Addendum (DPA)</Link>.
+            </label>
+          </div>
+
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-[#00FFD1] text-black py-2.5 rounded-md hover:bg-[#00FFD1]/90 transition-all disabled:opacity-70 font-bold mt-2"
+            disabled={loading || !consentChecked || !captchaPassed}
+            className={`w-full bg-[#00FFD1] text-black py-2.5 rounded-md hover:bg-[#00FFD1]/90 transition-all font-bold mt-2 ${
+              (loading || !consentChecked || !captchaPassed) ? "opacity-50 cursor-not-allowed" : "hover:scale-[1.01]"
+            }`}
           >
             {loading ? <Loader className="w-5 h-5 animate-spin mx-auto" /> : 'Sign In'}
           </button>

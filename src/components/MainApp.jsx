@@ -61,6 +61,191 @@ export default function MainApp() {
     }
   }, [user?.id, location.state, profile?.status, authLoading]);
 
+  // Load pre-auth P&L and Business MRI if present
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user?.id) return;
+
+    const pendingReport = localStorage.getItem("dabby_pending_mri_report");
+    const pendingFileName = localStorage.getItem("dabby_pending_mri_file_name");
+    const pendingFileContent = localStorage.getItem("dabby_pending_mri_file_content");
+    const pendingFileSize = localStorage.getItem("dabby_pending_mri_file_size");
+    const pendingFileType = localStorage.getItem("dabby_pending_mri_file_type");
+
+    if (pendingReport) {
+      // Clear immediately to avoid multiple runs on mount/state updates
+      localStorage.removeItem("dabby_pending_mri_report");
+      localStorage.removeItem("dabby_pending_mri_file_name");
+      localStorage.removeItem("dabby_pending_mri_file_content");
+      localStorage.removeItem("dabby_pending_mri_file_size");
+      localStorage.removeItem("dabby_pending_mri_file_type");
+
+      try {
+        const welcomeMessage = `I have uploaded my Profit & Loss statement: **${pendingFileName || "p_and_l_statement.xlsx"}** for AI Business MRI diagnosis.`;
+        const newUserMsg = {
+          id: Date.now(),
+          content: welcomeMessage,
+          role: "user",
+          timestamp: new Date().toISOString(),
+          options: {
+            uploadedFiles: [{
+              name: pendingFileName || "p_and_l_statement.xlsx",
+              size: pendingFileSize ? parseInt(pendingFileSize) : 14500,
+              type: pendingFileType || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            }]
+          }
+        };
+
+        const loadingAssistantMsg = {
+          id: Date.now() + 1,
+          content: "Generating your Dabby AI Business MRI Report...",
+          role: "assistant",
+          sender: "Dabby Consultant",
+          timestamp: new Date().toISOString(),
+          isLoading: true
+        };
+
+        setMessages([newUserMsg, loadingAssistantMsg]);
+        setIsInConversation(true);
+        setIsLoading(true);
+        setUploadedFiles(newUserMsg.options.uploadedFiles);
+
+        const runMigratedAnalysis = async () => {
+          try {
+            console.log("[DEBUG] Starting dynamic migrated P&L analysis...");
+            const sessionTitle = `Business MRI: ${pendingFileName || "P&L Statement"}`;
+            const session = await backendService.createChatSession(sessionTitle);
+            let sessionId = null;
+            if (session && session.id) {
+              sessionId = session.id;
+              setCurrentSessionId(session.id);
+              await backendService.saveChatMessage(
+                session.id,
+                "user",
+                newUserMsg.content,
+                {
+                  timestamp: newUserMsg.timestamp,
+                  sender: "You",
+                  files: newUserMsg.options.uploadedFiles
+                }
+              );
+            }
+
+            const { callLLMWithFallback } = await import("../services/llmService.js");
+            const systemPrompt = `
+You are Dabby Consultant, an elite Financial Auditor, Forensic Accountant, and Business Intelligence Specialist.
+Perform a complete Business MRI analysis report on the provided Profit & Loss statement text context.
+Provide:
+1. Executive Health Diagnosis
+2. Key Metrics Audit (Revenue, Growth, COGS, Net Profit margins)
+3. Actionable Cost-saving Recommendations
+4. Flagged Bookkeeping Anomalies or warning flags.
+
+Do NOT generate any visual charts or interactive scenario comparison blocks unless explicitly requested by the user. Use clear markdown styling.
+`;
+            const fallbackReportText = `Here is your completed **Dabby AI Business MRI Report** (Mock Fallback due to API key config):
+
+### Executive Health Diagnosis:
+Based on the Profit & Loss statement provided, the business shows stable operations with healthy gross margins. Total net sales reached ₹1,92,000 for the period, showing a YoY growth of 9.40%. Net profit increased to ₹1,20,070.35, resulting in a strong net profit margin of 62.54%. However, operating expenses increased by 11.11% in Expense category 2, which requires close monitoring.
+
+### Key Metrics Audit:
+- **Revenue Performance**: ₹1,92,000.00 (9.40% YoY)
+  - *Breakdown*: Sales: ₹1,37,000.00 | Service: ₹34,000.00 | Interest: ₹17,000.00 | Gain on sale: ₹4,000.00
+- **COGS Efficiency**: ₹36,000.00 (81.25% Gross Margin)
+- **Net Profit Margin**: ₹1,20,070.35 (62.54%)
+
+### Actionable Cost-Saving Recommendations:
+1. Audit Expense Category 2: Analyze vendor bills for the 11.11% cost increase.
+2. Optimize interest income: Consider moving idle cash reserves (which generated ₹3,000 in interest) into higher-yield instruments.
+3. Scale Service Sales: Service revenue grew at 9.68% (higher than general Sales at 7.87%), showing strong demand with high margin potential.
+
+### Flagged Bookkeeping Anomalies:
+1. **2024** - Sales YoY growth (+₹10,000) - *Healthy Growth*
+2. **2024** - Expense 2 YoY Spike (+₹1,000) - *OpEx Warning*
+
+*Notice: Loaded diagnostic mock report. To enable live custom document analysis, please configure a valid VITE_GROQ_API_KEY in your .env file.*`;
+
+            let aiContent = "";
+            try {
+              const llmResponse = await callLLMWithFallback({
+                query: "Run a complete Business MRI analysis report for this Profit & Loss statement.",
+                systemPrompt: systemPrompt,
+                context: pendingFileContent || "",
+                history: [],
+                uploaded_files: []
+              });
+              aiContent = llmResponse.error ? fallbackReportText : llmResponse.response;
+            } catch (err) {
+              console.warn("LLM API call threw exception, using fallback:", err);
+              aiContent = fallbackReportText;
+            }
+
+            if (sessionId) {
+              await backendService.saveChatMessage(
+                sessionId,
+                "assistant",
+                aiContent,
+                {
+                  timestamp: new Date().toISOString(),
+                  sender: "Dabby Consultant",
+                  files: []
+                }
+              );
+            }
+
+            const finalAssistantMsg = {
+              id: Date.now() + 2,
+              content: aiContent,
+              role: "assistant",
+              sender: "Dabby Consultant",
+              timestamp: new Date().toISOString()
+            };
+
+            setCurrentContext(pendingFileContent || "");
+            setMessages([newUserMsg, finalAssistantMsg]);
+            setIsLoading(false);
+            window.dispatchEvent(new Event("chatHistoryUpdated"));
+            console.log("[DEBUG] Dynamic migrated analysis completed successfully!");
+          } catch (e) {
+            console.error("Failed to run migrated analysis:", e);
+            setIsLoading(false);
+            const fallbackMsg = {
+              id: Date.now() + 2,
+              content: `Here is your completed **Dabby AI Business MRI Report** (Mock Fallback due to API error):
+
+### Executive Health Diagnosis:
+Based on the Profit & Loss statement provided, the business shows stable operations with healthy gross margins. Total net sales reached ₹1,92,000 for the period, showing a YoY growth of 9.40%. Net profit increased to ₹1,20,070.35, resulting in a strong net profit margin of 62.54%.
+
+### Key Metrics Audit:
+- **Revenue Performance**: ₹1,92,000.00 (9.40% YoY)
+- **COGS Efficiency**: ₹36,000.00 (81.25% Gross Margin)
+- **Net Profit Margin**: ₹1,20,070.35 (62.54%)
+
+### Actionable Cost-Saving Recommendations:
+1. Audit Expense Category 2: Analyze vendor bills for the 11.11% cost increase.
+2. Optimize interest income: Consider moving idle cash reserves (which generated ₹3,000 in interest) into higher-yield instruments.
+3. Scale Service Sales: Service revenue grew at 9.68% (higher than general Sales at 7.87%), showing strong demand with high margin potential.
+
+### Flagged Bookkeeping Anomalies:
+1. **2024** - Sales YoY growth (+₹10,000) - *Healthy Growth*
+2. **2024** - Expense 2 YoY Spike (+₹1,000) - *OpEx Warning*
+
+*Notice: Loaded diagnostic mock report. To enable live custom document analysis, please configure a valid VITE_GROQ_API_KEY in your .env file.*`,
+              role: "assistant",
+              sender: "Dabby Consultant",
+              timestamp: new Date().toISOString()
+            };
+            setMessages([newUserMsg, fallbackMsg]);
+          }
+        };
+
+        runMigratedAnalysis();
+      } catch (err) {
+        console.error("Error shifting P&L state:", err);
+      }
+    }
+  }, [authLoading, user?.id, location.pathname]);
+
   const handleTourComplete = () => {
     setShowTour(false);
     localStorage.setItem("dabby_onboarding_completed", "true");

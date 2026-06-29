@@ -86,7 +86,7 @@ export const backendService = {
         file_size: file.size || 0,
         mime_type: file.type || 'application/octet-stream',
         document_type: documentType,
-        status: 'processed'
+        status: 'uploaded'
       };
 
       console.log('[DEBUG] Attempting to register document:', docPayload);
@@ -103,6 +103,11 @@ export const backendService = {
       }
 
       console.log('Document successfully registered in workbench_documents:', data);
+
+      // Trigger background processing on backend asynchronously
+      fetch(`http://localhost:8000/api/ops/documents/process/${data.id}`, { method: 'POST' }).catch(err => {
+        console.warn('Failed to call process document endpoint:', err);
+      });
 
       return data;
     } catch (err) {

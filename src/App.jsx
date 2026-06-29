@@ -34,6 +34,16 @@ const Waitlist = lazy(() => import("./landing-page/pages/Waitlist"));
 const Navbar = lazy(() => import("./landing-page/components/Navbar"));
 const Footer = lazy(() => import("./landing-page/components/Footer"));
 
+// Compliance and Security Pages
+const CookiePolicy = lazy(() => import("./landing-page/pages/CookiePolicy"));
+const CookieBanner = lazy(() => import("./landing-page/pages/CookiePolicy").then(m => ({ default: m.CookieBanner })));
+const AiTransparency = lazy(() => import("./landing-page/pages/AiTransparency"));
+const ResponsibleAi = lazy(() => import("./landing-page/pages/ResponsibleAi"));
+const DataProcessingAddendum = lazy(() => import("./landing-page/pages/DataProcessingAddendum"));
+const DataRetentionPolicy = lazy(() => import("./landing-page/pages/DataRetentionPolicy"));
+const SecurityPage = lazy(() => import("./landing-page/pages/Security"));
+
+
 // Authentication Components
 const Login = lazy(() => import("./Auth/Login"));
 const Signup = lazy(() => import("./Auth/Signup"));
@@ -65,6 +75,9 @@ function LandingLayout({ children }) {
         <Navbar />
       </Suspense>
       {children}
+      <Suspense fallback={null}>
+        <CookieBanner />
+      </Suspense>
       <Suspense fallback={null}>
         <Footer />
       </Suspense>
@@ -139,6 +152,12 @@ function App() {
                   <Route path="/privacy" element={<PrivacyPolicy />} />
                   <Route path="/pay" element={<Pay />} />
                   <Route path="/pricing" element={<PaymentComingSoon />} />
+                  <Route path="/cookie-policy" element={<CookiePolicy />} />
+                  <Route path="/ai-transparency" element={<AiTransparency />} />
+                  <Route path="/responsible-ai" element={<ResponsibleAi />} />
+                  <Route path="/dpa" element={<DataProcessingAddendum />} />
+                  <Route path="/data-retention" element={<DataRetentionPolicy />} />
+                  <Route path="/security" element={<SecurityPage />} />
                   <Route path="/waitlist" element={<Waitlist />} />
                   <Route path="/ingest" element={
                     <ProtectedRoute>
