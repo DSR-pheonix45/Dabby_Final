@@ -194,6 +194,36 @@ class LedgerService:
                         subs_by_master[m_id] = []
                     subs_by_master[m_id].append(sub)
                 
+                # Fetch existing account codes for this workbench to prevent collisions
+                existing_res = self.supabase.table("workbench_accounts").select("account_code").eq("workbench_id", workbench_id).execute()
+                existing_codes = {row["account_code"] for row in existing_res.data}
+                used_codes_in_batch = set()
+                
+                def get_unique_code(master_code, sub_code):
+                    base_code = f"{master_code}{sub_code}"
+                    if base_code not in existing_codes and base_code not in used_codes_in_batch:
+                        return base_code[:4]
+                    
+                    if len(base_code) <= 3:
+                        for char in "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+                            candidate = f"{base_code}{char}"
+                            if candidate not in existing_codes and candidate not in used_codes_in_batch:
+                                return candidate
+                    else:
+                        prefix = base_code[:3]
+                        for char in "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0":
+                            candidate = f"{prefix}{char}"
+                            if candidate not in existing_codes and candidate not in used_codes_in_batch:
+                                return candidate
+                                
+                    # Suffix fallback
+                    import random, string
+                    while True:
+                        suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=2))
+                        candidate = f"{master_code}{suffix}"
+                        if candidate not in existing_codes and candidate not in used_codes_in_batch:
+                            return candidate
+
                 workbench_accounts_to_insert = []
                 for item in custom_labels:
                     p_type = item.get("type", "expense").lower()
@@ -212,7 +242,8 @@ class LedgerService:
                     if not m_sub:
                         continue
                         
-                    account_code = f"{m_acc['account_code']}{m_sub['sub_account_code']}"
+                    account_code = get_unique_code(m_acc['account_code'], m_sub['sub_account_code'])
+                    used_codes_in_batch.add(account_code)
                     
                     workbench_accounts_to_insert.append({
                         "workbench_id": workbench_id,
