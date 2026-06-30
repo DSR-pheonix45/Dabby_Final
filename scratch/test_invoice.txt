@@ -1,0 +1,18 @@
+INVOICE
+Vendor: Acme Corp
+Customer: Wayne Enterprises
+Invoice Number: INV-2026-999
+Date: 2026-06-25
+Due Date: 2026-07-25
+Currency: USD
+
+Line Items:
+1. Batmobile Upgrade Kit - Qty: 2 - Price: $50,000.00 each
+2. Graphite Armor Plates - Qty: 100 - Price: $120.00 each
+
+Subtotal: $112,000.00
+Tax (10%): $11,200.00
+Total: $123,200.00
+
+Paid via Bank Transfer
+Ref: TXN-77788822
