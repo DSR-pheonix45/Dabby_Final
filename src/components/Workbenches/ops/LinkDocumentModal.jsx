@@ -53,10 +53,12 @@ export default function LinkDocumentModal({ isOpen, onClose, document, workbench
     }
   };
 
-  const filteredTransactions = transactions.filter(tx => 
-    tx.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    tx.labels.some(l => l.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredTransactions = transactions.filter(tx => {
+    const descMatches = (tx.description || "").toLowerCase().includes(searchQuery.toLowerCase());
+    const accounts = tx.accounts || [];
+    const accountMatches = accounts.some(acc => acc.toLowerCase().includes(searchQuery.toLowerCase()));
+    return descMatches || accountMatches;
+  });
 
   if (!isOpen) return null;
 
@@ -126,12 +128,15 @@ export default function LinkDocumentModal({ isOpen, onClose, document, workbench
                       <div className="flex items-center space-x-2 mt-1">
                         <span className="text-[10px] text-gray-500 font-medium">{new Date(tx.date).toLocaleDateString()}</span>
                         <span className="w-1 h-1 rounded-full bg-gray-700" />
-                        <div className="flex items-center space-x-1">
-                          {tx.labels.map((l, i) => (
-                            <span key={i} className="text-[9px] font-black text-teal-500/80 uppercase tracking-tighter bg-teal-500/5 px-1.5 py-0.5 rounded">
-                              {l}
-                            </span>
-                          ))}
+                         <div className="flex flex-wrap items-center gap-1">
+                          {(tx.accounts || []).map((acc, i) => {
+                            const displayName = acc.includes("->") ? acc.split("->").pop().trim() : acc;
+                            return (
+                              <span key={i} className="text-[9px] font-black text-teal-500/80 uppercase tracking-tighter bg-teal-500/5 px-1.5 py-0.5 rounded">
+                                {displayName}
+                              </span>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>

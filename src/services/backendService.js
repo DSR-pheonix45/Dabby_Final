@@ -291,22 +291,23 @@ export const backendService = {
     return data;
   },
 
-  /**
-   * Confirms a record and creates ledger entries
-   */
   async confirmRecord(recordId) {
     try {
-      const { data, error } = await supabase.functions.invoke('confirm-record', {
-        body: { record_id: recordId }
+      const response = await fetch('http://localhost:8000/api/documents/confirm-record', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ record_id: recordId })
       });
 
-      if (error) {
-        console.error('Edge Function Error (confirm-record):', error);
-        throw error;
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to confirm record');
       }
-      return data;
+      return await response.json();
     } catch (err) {
-      console.error('Failed to call confirm-record:', err);
+      console.error('Failed to call confirmRecord:', err);
       throw err;
     }
   },
@@ -500,6 +501,66 @@ export const backendService = {
     if (!doc.id) throw new Error("Document upload failed to return ID");
     const extracted = await this.scanInvoice(doc.id);
     return { ...extracted, doc_id: doc.id };
+  },
+
+  // --- Document Extraction Engine (13-step) ---
+
+  async extractDocument(docId) {
+    const response = await fetch(`http://localhost:8000/api/documents/extract/${docId}`, {
+      method: 'POST'
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.detail || 'Document extraction failed');
+    }
+    return await response.json();
+  },
+
+  async extractDocumentUpload(workbenchId, file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (workbenchId) {
+      formData.append('workbench_id', workbenchId);
+    }
+    const response = await fetch('http://localhost:8000/api/documents/extract-upload', {
+      method: 'POST',
+      body: formData
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.detail || 'Document extraction failed');
+    }
+    return await response.json();
+  },
+
+  // --- Staging & Journal Review Pipeline ---
+
+  async processPipeline(docId) {
+    const response = await fetch(`http://localhost:8000/api/documents/process-pipeline/${docId}`, {
+      method: 'POST'
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.detail || 'Pipeline processing failed');
+    }
+    return await response.json();
+  },
+
+  async processPipelineUpload(workbenchId, file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (workbenchId) {
+      formData.append('workbench_id', workbenchId);
+    }
+    const response = await fetch('http://localhost:8000/api/documents/process-pipeline-upload', {
+      method: 'POST',
+      body: formData
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.detail || 'Pipeline processing failed');
+    }
+    return await response.json();
   },
 
   async getDocumentUrl(filePath) {

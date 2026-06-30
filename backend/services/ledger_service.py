@@ -514,6 +514,8 @@ class LedgerService:
             for tx in transactions:
                 tx_id = tx["id"]
                 tx_entries = entries_by_tx.get(tx_id, [])
+                if not tx_entries:
+                    continue
                 
                 amount = 0
                 accounts_involved = []

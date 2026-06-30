@@ -26,6 +26,8 @@ import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import LinkDocumentModal from "../ops/LinkDocumentModal";
 import { useNavigate } from "react-router-dom";
+import ProcessingLoader from "../ops/ProcessingLoader";
+import StagingReviewModal from "../ops/StagingReviewModal";
 
 const DOC_TYPES = [
   { id: 'all', label: 'All', color: 'bg-teal-500/10 text-teal-400' },
@@ -47,6 +49,10 @@ export default function DocVault({ workbenchId }) {
   const [isUploading, setIsUploading] = useState(false);
   const [selectedDocForLinking, setSelectedDocForLinking] = useState(null);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [isLoaderOpen, setIsLoaderOpen] = useState(false);
+  const [loaderStep, setLoaderStep] = useState(1);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [selectedDocForReview, setSelectedDocForReview] = useState(null);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
 
@@ -136,19 +142,34 @@ export default function DocVault({ workbenchId }) {
 
     try {
       setIsUploading(true);
-      toast.loading("Sending to Doc_vault_Raw...", { id: "upload-doc" });
+      setIsLoaderOpen(true);
+      setLoaderStep(1);
       
-      // Use active filter as type if it's a valid doc type, else default to invoice
+      // Step 1: Upload raw document
       const docType = activeFilter !== 'all' ? activeFilter : 'invoice';
-      await backendService.uploadDocument(workbenchId, file, docType);
+      const doc = await backendService.uploadDocument(workbenchId, file, docType);
       
-      toast.success("Document uploaded to raw bucket!", { id: "upload-doc" });
-      // We wait a bit before fetching as processing might take time
-      setTimeout(() => fetchDocuments(), 1500);
+      // Step 2: OCR & Intent
+      setLoaderStep(2);
+      
+      // Step 3: Journal & Staging
+      const res = await backendService.processPipeline(doc.id);
+      setLoaderStep(3);
+
+      // Brief delay for visual completion
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      toast.success("Document processed and staged!");
+      await fetchDocuments();
+      
+      // Directly open review modal
+      setSelectedDocForReview({ ...doc, status: 'processed' });
+      setIsReviewOpen(true);
     } catch (err) {
-      toast.error("Upload failed: " + err.message, { id: "upload-doc" });
+      toast.error("Pipeline failed: " + err.message);
     } finally {
       setIsUploading(false);
+      setIsLoaderOpen(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -326,6 +347,18 @@ export default function DocVault({ workbenchId }) {
                                {doc.display_linked_unit}
                              </span>
                           </div>
+                         ) : doc.metadata?.record_id ? (
+                           <button
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               setSelectedDocForReview(doc);
+                               setIsReviewOpen(true);
+                             }}
+                             className="flex items-center space-x-2 px-3.5 py-1.5 bg-teal-500/10 text-teal-400 border border-teal-500/20 rounded-full hover:bg-teal-500 hover:text-black transition-all group/review"
+                           >
+                             <BsMagic size={11} className="group-hover/review:rotate-12 transition-transform" />
+                             <span className="text-[9px] font-black uppercase tracking-widest">Pending Review</span>
+                           </button>
                          ) : (
                           <div className="flex items-center space-x-2">
                             <button 
@@ -441,6 +474,19 @@ export default function DocVault({ workbenchId }) {
         onClose={() => setIsLinkModalOpen(false)}
         document={selectedDocForLinking}
         workbenchId={workbenchId}
+        onSuccess={fetchDocuments}
+      />
+
+      <ProcessingLoader
+        isOpen={isLoaderOpen}
+        currentStep={loaderStep}
+        onClose={() => setIsLoaderOpen(false)}
+      />
+
+      <StagingReviewModal
+        isOpen={isReviewOpen}
+        onClose={() => setIsReviewOpen(false)}
+        doc={selectedDocForReview}
         onSuccess={fetchDocuments}
       />
     </div>
