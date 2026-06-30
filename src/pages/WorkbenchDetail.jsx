@@ -11,7 +11,8 @@ import {
   BsArrowUpRight,
   BsBoxSeam,
   BsGear,
-  BsPlusLg
+  BsPlusLg,
+  BsArrowLeftRight
 } from "react-icons/bs";
 import { useAuth } from "../hooks/useAuth";
 import { supabase } from "../lib/supabase";
@@ -29,6 +30,7 @@ import ReportGenerationModal from "../components/Workbenches/ReportGenerationMod
 import InventoryView from "../components/Workbenches/detail/InventoryView";
 import WorkbenchSettings from "../components/Workbenches/WorkbenchSettings";
 import TransactionModal from "../components/Workbenches/ledger/TransactionModal";
+import TradeEngine from "./TradeEngine";
 
 import { WorkbenchProvider } from "../context/WorkbenchContext";
 
@@ -72,7 +74,18 @@ export default function WorkbenchDetail() {
   useEffect(() => {
     const handleOpenModal = () => setIsTransactionModalOpen(true);
     window.addEventListener('open-transaction-modal', handleOpenModal);
-    return () => window.removeEventListener('open-transaction-modal', handleOpenModal);
+    
+    const handleChangeTab = (e) => {
+      if (e.detail?.tab) {
+        setActiveTab(e.detail.tab);
+      }
+    };
+    window.addEventListener('change-workbench-tab', handleChangeTab);
+    
+    return () => {
+      window.removeEventListener('open-transaction-modal', handleOpenModal);
+      window.removeEventListener('change-workbench-tab', handleChangeTab);
+    };
   }, []);
 
   const showInventory = ['manufacturing', 'trading'].includes(workbench?.industry) && 
@@ -87,6 +100,7 @@ export default function WorkbenchDetail() {
   const navItems = [
     { id: "COA", label: "Chart of Accounts", icon: BsShieldCheck },
     { id: "DocVault", label: "Doc Vault", icon: BsFolder2 },
+    { id: "TradeEngine", label: "Trade Engine", icon: BsArrowLeftRight },
     { id: "Ops", label: "Ops", icon: BsLightningCharge },
     { id: "Investor", label: "Investor View", icon: BsArrowUpRight },
     ...(showInventory ? [{ id: "Inventory", label: "Inventory & Stock", icon: BsBoxSeam }] : []),
@@ -179,6 +193,7 @@ export default function WorkbenchDetail() {
 
           <main className="flex-grow flex flex-col min-h-0 relative overflow-hidden">
             {activeTab === "COA" && <COAView workbenchId={id} />}
+            {activeTab === "TradeEngine" && <TradeEngine workbenchId={id} />}
             {activeTab === "Ops" && <OperationsView workbenchId={id} />}
             {activeTab === "Investor" && <div className="p-8 overflow-auto h-full custom-scrollbar"><InvestorView workbenchId={id} workbenchName={workbench?.name} /></div>}
             {activeTab === "DocVault" && <DocVault workbenchId={id} />}

@@ -473,17 +473,31 @@ export default function DocVault({ workbenchId }) {
                                </button>
                              )}
                              {doc.status === 'analyzed' && doc.metadata?.extracted_invoice && (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setAnalysisNoteDoc(doc);
-                                    setIsAnalysisModalOpen(true);
-                                  }}
-                                  title="View AI Analysis Note"
-                                  className="p-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500 hover:text-black transition-all"
-                                >
-                                   <BsStars size={14} />
-                                </button>
+                                <div className="flex space-x-1">
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setAnalysisNoteDoc(doc);
+                                      setIsAnalysisModalOpen(true);
+                                    }}
+                                    title="View AI Analysis Note"
+                                    className="p-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500 hover:text-black transition-all"
+                                  >
+                                     <BsStars size={14} />
+                                  </button>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      window.dispatchEvent(new CustomEvent('change-workbench-tab', {
+                                        detail: { tab: 'TradeEngine', documentId: doc.id }
+                                      }));
+                                    }}
+                                    title="Open in Trade Engine"
+                                    className="p-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500 hover:text-black transition-all"
+                                  >
+                                     <BsArrowRight size={14} />
+                                  </button>
+                                </div>
                               )}
                              {(doc.status === 'uploaded' || doc.status === 'failed' || !doc.status) && (
                                <button 
