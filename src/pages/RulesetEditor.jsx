@@ -16,6 +16,7 @@ import {
 import { supabase } from "../lib/supabase";
 import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
+import { apiFetch } from "../lib/apiClient";
 
 const DOCUMENT_TYPES = [
   { id: "sales_invoice", label: "Sales Invoice" },
@@ -85,7 +86,7 @@ export default function RulesetEditor() {
   const fetchRulesetDetails = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/rulesets/${id}`);
+      const res = await apiFetch(`/api/rulesets/${id}`);
       if (!res.ok) throw new Error("Failed to load ruleset details");
       const data = await res.json();
       
@@ -124,7 +125,7 @@ export default function RulesetEditor() {
   const handleAutoSave = async (updates) => {
     try {
       setSaving(true);
-      const res = await fetch(`/api/rulesets/${id}`, {
+      const res = await apiFetch(`/api/rulesets/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates)
@@ -156,7 +157,7 @@ export default function RulesetEditor() {
       toast.loading("Saving playbook...", { id: "ruleset-save" });
       
       // 1. Save general ruleset info
-      const res = await fetch(`/api/rulesets/${id}`, {
+      const res = await apiFetch(`/api/rulesets/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -173,7 +174,7 @@ export default function RulesetEditor() {
       
       // 2. Commit the current prompt & structured logic version
       const nextVerNum = (parseFloat(ruleset.version || "1.0") + 0.1).toFixed(1);
-      const versionRes = await fetch(`/api/rulesets/${id}/version`, {
+      const versionRes = await apiFetch(`/api/rulesets/${id}/version`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -212,7 +213,7 @@ export default function RulesetEditor() {
       // Gather available variables
       const flatVars = Object.values(OCR_VARIABLES).flat();
       
-      const res = await fetch("/api/rulesets/generate-logic", {
+      const res = await apiFetch("/api/rulesets/generate-logic", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -233,7 +234,7 @@ export default function RulesetEditor() {
       
       // Save new version
       const nextVerNum = (parseFloat(ruleset.version || "1.0") + 0.1).toFixed(1);
-      const saveVerRes = await fetch(`/api/rulesets/${id}/version`, {
+      const saveVerRes = await apiFetch(`/api/rulesets/${id}/version`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -267,7 +268,7 @@ export default function RulesetEditor() {
     setSimulating(true);
     setSimulationResult(null);
     try {
-      const res = await fetch("/api/rulesets/simulate", {
+      const res = await apiFetch("/api/rulesets/simulate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

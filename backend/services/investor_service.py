@@ -23,22 +23,18 @@ class InvestorService:
         """
         Generates a compressed financial intelligence layer and saves a snapshot for AI context.
         """
-        # 1. Fetch transactions and their entries with label metadata
-        # Correct join for our schema: transactions -> transaction_entries -> labels
-        res = self.supabase.table("transactions").select('''
-            id,
-            description,
-            transaction_date,
-            transaction_entries (
-                amount,
-                labels (
-                    name,
-                    type,
-                    sub_account
-                )
-            )
-        ''').eq("workbench_id", workbench_id).execute()
-        
+        # 1. Fetch transactions + entries. transaction_entries reference
+        # workbench_accounts via label_id (there is NO `labels` table to embed),
+        # so resolve account metadata through a label map — the same pattern
+        # get_balances() uses. Embedding labels(...) here raises PGRST200.
+        from services.ledger_service import LedgerService
+        labels = await LedgerService(self.supabase).get_labels(workbench_id)
+        label_map = {l["id"]: l for l in labels}
+
+        res = self.supabase.table("transactions").select(
+            "id, description, transaction_date, transaction_entries(amount, label_id)"
+        ).eq("workbench_id", workbench_id).execute()
+
         transactions = res.data or []
 
         # 2. Aggregation Logic
@@ -59,12 +55,12 @@ class InvestorService:
                 monthly_data[month_key] = {"revenue": 0, "expense": 0}
 
             for entry in tx.get("transaction_entries", []):
-                label = entry.get("labels")
+                label = label_map.get(entry.get("label_id"))
                 if not label: continue
-                
+
                 amount = float(entry["amount"])
-                label_type = label["type"].lower()
-                sub_acc = label.get("sub_account", "").lower()
+                label_type = (label.get("type") or "").lower()
+                sub_acc = (label.get("sub_account") or "").lower()
                 
                 # REVENUE: Sum the absolute values of all revenue credits
                 if label_type == "revenue":
@@ -146,13 +142,11 @@ class InvestorService:
         """
         Generates P&L, Balance Sheet, and MIS data based on the ledger.
         """
-        # Fetch all labels for the workbench
-        labels_res = self.supabase.table("labels").select("*").eq("workbench_id", workbench_id).execute()
-        labels = labels_res.data or []
-        
-        # Fetch current balances
+        # `labels` is not a real table — workbench accounts come via get_labels()
+        # (which maps type/name/sub_account off workbench_accounts + master tables).
         from services.ledger_service import LedgerService
         ledger_service = LedgerService(self.supabase)
+        labels = await ledger_service.get_labels(workbench_id)
         balances = await ledger_service.get_balances(workbench_id)
         
         # Initialize statement structures

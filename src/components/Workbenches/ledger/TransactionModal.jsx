@@ -4,6 +4,7 @@ import { BsX, BsArrowRight, BsJournalText, BsCashStack, BsArrowRepeat } from "re
 import { toast } from "react-hot-toast";
 import ProofUploader from "../shared/ProofUploader";
 import { backendService } from "../../../services/backendService";
+import { apiFetch } from "../../../lib/apiClient";
 
 const TRADE_TYPES = [
   "Vendor Invoice", "Vendor Payment", "Sales Invoice", "Customer Payment",
@@ -42,7 +43,7 @@ export default function TransactionModal({ isOpen, onClose, workbenchId, onSucce
 
   const fetchParties = async () => {
     try {
-      const response = await fetch(`/api/ops/parties/${workbenchId}`);
+      const response = await apiFetch(`/api/ops/parties/${workbenchId}`);
       if (!response.ok) throw new Error("Failed to fetch parties");
       const data = await response.json();
       setParties(data || []);
@@ -88,7 +89,7 @@ export default function TransactionModal({ isOpen, onClose, workbenchId, onSucce
         status: "Draft"
       };
 
-      const response = await fetch("/api/trades", {
+      const response = await apiFetch("/api/trades", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -114,7 +115,7 @@ export default function TransactionModal({ isOpen, onClose, workbenchId, onSucce
           
           if (docRes && docRes.id) {
             // Link document to the trade
-            await fetch(`/api/trades/${result.id}`, {
+            await apiFetch(`/api/trades/${result.id}`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ document_id: docRes.id })

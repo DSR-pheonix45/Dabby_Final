@@ -3,10 +3,11 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from supabase_client import supabase
+from auth import require_permission, require_membership, P
 
 router = APIRouter()
 
-@router.get("/workbench/{workbench_id}")
+@router.get("/workbench/{workbench_id}", dependencies=[Depends(require_membership())])
 async def get_workbench_trades(workbench_id: str, status: Optional[str] = None):
     try:
         query = supabase.table("trades").select("*").eq("workbench_id", workbench_id)
@@ -43,7 +44,7 @@ async def get_workbench_trades(workbench_id: str, status: Optional[str] = None):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{trade_id}")
+@router.get("/{trade_id}", dependencies=[Depends(require_membership())])
 async def get_trade(trade_id: str):
     try:
         t_res = supabase.table("trades").select("*").eq("id", trade_id).single().execute()
@@ -75,7 +76,7 @@ async def get_trade(trade_id: str):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.put("/{trade_id}")
+@router.put("/{trade_id}", dependencies=[Depends(require_permission(P.EDIT_DRAFT))])
 async def update_trade(trade_id: str, payload: Dict):
     try:
         # Fetch trade to ensure it exists
@@ -258,7 +259,7 @@ async def update_trade(trade_id: str, payload: Dict):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/process-document/{doc_id}")
+@router.post("/process-document/{doc_id}", dependencies=[Depends(require_permission(P.EDIT_DRAFT))])
 async def process_document_trade(doc_id: str):
     try:
         from services.trade_service import trade_service
@@ -287,7 +288,7 @@ async def process_document_trade(doc_id: str):
             pass
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("")
+@router.post("", dependencies=[Depends(require_permission(P.EDIT_DRAFT))])
 async def create_manual_trade(payload: Dict):
     try:
         workbench_id = payload.get("workbench_id")
@@ -438,7 +439,7 @@ async def create_manual_trade(payload: Dict):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{trade_id}/activities")
+@router.get("/{trade_id}/activities", dependencies=[Depends(require_membership())])
 async def get_trade_activities(trade_id: str):
     try:
         res = supabase.table("trade_activities").select("*").eq("trade_id", trade_id).order("sequence").execute()
@@ -450,7 +451,7 @@ async def get_trade_activities(trade_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.put("/{trade_id}/save-activities")
+@router.put("/{trade_id}/save-activities", dependencies=[Depends(require_permission(P.EDIT_DRAFT))])
 async def save_trade_activities(trade_id: str, payload: Dict):
     try:
         activities = payload.get("activities") or []
@@ -479,7 +480,7 @@ async def save_trade_activities(trade_id: str, payload: Dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{trade_id}/audit-trail")
+@router.get("/{trade_id}/audit-trail", dependencies=[Depends(require_membership())])
 async def get_trade_audit_trail(trade_id: str):
     try:
         res = supabase.table("audit_logs").select("*").eq("trade_id", trade_id).order("created_at", desc=True).execute()
@@ -487,7 +488,7 @@ async def get_trade_audit_trail(trade_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/{trade_id}/execute")
+@router.post("/{trade_id}/execute", dependencies=[Depends(require_permission(P.EXECUTE_TRADE))])
 async def execute_trade_activities(trade_id: str, payload: Dict = None):
     """
     Stage 10-12: Execute confirmed trade activities → compile double-entry journal
@@ -610,7 +611,7 @@ async def execute_trade_activities(trade_id: str, payload: Dict = None):
 
 
 
-@router.post("/workbench/{workbench_id}/recompute-coa")
+@router.post("/workbench/{workbench_id}/recompute-coa", dependencies=[Depends(require_permission(P.EXECUTE_TRADE))])
 async def recompute_coa_for_workbench(workbench_id: str):
     """
     Stage 12 manual trigger — recomputes workbench_accounts.current_amount
@@ -625,7 +626,7 @@ async def recompute_coa_for_workbench(workbench_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/{trade_id}/regenerate-activities")
+@router.post("/{trade_id}/regenerate-activities", dependencies=[Depends(require_permission(P.EDIT_DRAFT))])
 async def regenerate_trade_activities(trade_id: str):
     """
     Deletes all pending (non-Executed) activities for a trade and re-generates
@@ -655,7 +656,7 @@ async def regenerate_trade_activities(trade_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/{trade_id}/reset-for-retry")
+@router.post("/{trade_id}/reset-for-retry", dependencies=[Depends(require_permission(P.EDIT_DRAFT))])
 async def reset_trade_for_retry(trade_id: str):
     """
     Full retry reset for a trade that got stuck in Approved/Settled state without

@@ -1,10 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional, Dict
 from pydantic import BaseModel
 from datetime import date
 from supabase_client import supabase
 from services.ledger_service import LedgerService
 from services.ai_service import ai_service
+from services import plan_service
+from auth import require_permission, P
 import uuid
 
 router = APIRouter()
@@ -307,19 +309,25 @@ async def list_invoices(workbench_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/documents/process/{doc_id}")
+@router.post("/documents/process/{doc_id}", dependencies=[Depends(require_permission(P.UPLOAD_DOCUMENT))])
 async def process_document(doc_id: str):
     """
     Enqueues a document for background processing.
+    Enforces the plan's monthly OCR-upload quota (Module 12) before queuing.
     """
     try:
         from services import queue_service
         doc_res = supabase.table("workbench_documents").select("*").eq("id", doc_id).single().execute()
         if not doc_res.data:
             raise HTTPException(status_code=404, detail="Document not found")
-        
+
+        # Plan gate: raises HTTP 402 when the monthly upload limit is hit.
+        plan_service.check_and_increment_upload(doc_res.data["workbench_id"])
+
         await queue_service.enqueue_document(doc_id)
         return {"status": "queued", "doc_id": doc_id}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

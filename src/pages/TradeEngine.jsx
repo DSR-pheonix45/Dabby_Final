@@ -23,6 +23,9 @@ import { backendService } from "../services/backendService";
 import Card from "../components/shared/Card";
 import { toast } from "react-hot-toast";
 import TradeResolveModal from "../components/Workbenches/TradeResolveModal";
+import { apiFetch } from "../lib/apiClient";
+import { useWorkbenchRole } from "../hooks/useWorkbenchRole";
+import { PERM, ROLE_LABELS } from "../lib/permissions";
 
 
 const TRADE_STATUS_TABS = [
@@ -39,6 +42,11 @@ export default function TradeEngine({ workbenchId }) {
   // Workbench state
   const selectedWorkbenchId = workbenchId;
   const workbenchLoading = false;
+
+  // RBAC (Module 11): resolve caller's role; gate write actions
+  const { role, can } = useWorkbenchRole(selectedWorkbenchId);
+  const canEdit = can(PERM.EDIT_DRAFT);
+  const canExecute = can(PERM.EXECUTE_TRADE);
 
   // Queue state
   const [trades, setTrades] = useState([]);
@@ -132,7 +140,7 @@ export default function TradeEngine({ workbenchId }) {
   const fetchLabels = useCallback(async () => {
     if (!selectedWorkbenchId) return;
     try {
-      const res = await fetch(`/api/ledger/labels/${selectedWorkbenchId}`);
+      const res = await apiFetch(`/api/ledger/labels/${selectedWorkbenchId}`);
       if (!res.ok) throw new Error("Failed to fetch labels");
       const data = await res.json();
       setLabels(data || []);
@@ -167,7 +175,7 @@ export default function TradeEngine({ workbenchId }) {
         } else {
           // If no trade exists yet, let's process it now!
           toast.loading("Initializing Trade Engine for document...", { id: "proc-trade" });
-          const procRes = await fetch(`/api/trades/process-document/${docId}`, {
+          const procRes = await apiFetch(`/api/trades/process-document/${docId}`, {
             method: "POST"
           });
           if (procRes.ok) {
@@ -244,7 +252,7 @@ export default function TradeEngine({ workbenchId }) {
 
     // FETCH ACTIVITIES
     try {
-      const actRes = await fetch(`/api/trades/${trade.id}/activities`);
+      const actRes = await apiFetch(`/api/trades/${trade.id}/activities`);
       if (actRes.ok) {
         const actData = await actRes.json();
         setActivities(actData || []);
@@ -255,7 +263,7 @@ export default function TradeEngine({ workbenchId }) {
 
     // FETCH AUDIT TRAIL
     try {
-      const auditRes = await fetch(`/api/trades/${trade.id}/audit-trail`);
+      const auditRes = await apiFetch(`/api/trades/${trade.id}/audit-trail`);
       if (auditRes.ok) {
         const auditData = await auditRes.json();
         setAuditTrail(auditData || []);
@@ -332,7 +340,7 @@ export default function TradeEngine({ workbenchId }) {
         payload.status = newStatus;
       }
 
-      const res = await fetch(`/api/trades/${selectedTrade.id}`, {
+      const res = await apiFetch(`/api/trades/${selectedTrade.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -344,7 +352,7 @@ export default function TradeEngine({ workbenchId }) {
       toast.success(newStatus ? `Trade status updated to ${newStatus}` : "Trade draft saved successfully");
       
       // Re-fetch trade details to update validation sidebars
-      const freshRes = await fetch(`/api/trades/${selectedTrade.id}`);
+      const freshRes = await apiFetch(`/api/trades/${selectedTrade.id}`);
       if (freshRes.ok) {
         const freshData = await freshRes.json();
         setSelectedTrade(freshData);
@@ -364,7 +372,7 @@ export default function TradeEngine({ workbenchId }) {
       toast.loading("Executing operational activities...", { id: "exec-trade" });
       
       // 1. Save activities updates first
-      const saveActRes = await fetch(`/api/trades/${selectedTrade.id}/save-activities`, {
+      const saveActRes = await apiFetch(`/api/trades/${selectedTrade.id}/save-activities`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ activities })
@@ -383,7 +391,7 @@ export default function TradeEngine({ workbenchId }) {
         // Do NOT set status here — the /execute endpoint owns the status transition
       };
 
-      const saveRes = await fetch(`/api/trades/${selectedTrade.id}`, {
+      const saveRes = await apiFetch(`/api/trades/${selectedTrade.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -391,7 +399,7 @@ export default function TradeEngine({ workbenchId }) {
       if (!saveRes.ok) throw new Error("Failed to save trade details");
 
       // 3. Trigger activity execution (Stages 10-12)
-      const execRes = await fetch(`/api/trades/${selectedTrade.id}/execute`, {
+      const execRes = await apiFetch(`/api/trades/${selectedTrade.id}/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: user?.id })
@@ -427,7 +435,7 @@ export default function TradeEngine({ workbenchId }) {
     if (!selectedTrade || !selectedTrade.document_id) return;
     try {
       toast.loading("Re-running Trade Engine analysis...", { id: "rerun-engine" });
-      const res = await fetch(`/api/trades/process-document/${selectedTrade.document_id}`, {
+      const res = await apiFetch(`/api/trades/process-document/${selectedTrade.document_id}`, {
         method: "POST"
       });
       if (!res.ok) throw new Error("Failed to process document");
@@ -1172,31 +1180,44 @@ export default function TradeEngine({ workbenchId }) {
 
             {/* Bottom Actions Bar */}
             <div className="p-4.5 border-t border-white/5 bg-[#0A0A0A] flex items-center justify-between sticky bottom-0 z-20">
-              <button 
-                onClick={() => handleSaveTrade("Draft")}
-                className="flex items-center space-x-2 px-5 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-gray-300 hover:text-white font-bold text-xs transition-all shadow-sm active:scale-95"
-              >
-                <BsSave />
-                <span>Save Draft</span>
-              </button>
+              {!canEdit ? (
+                <div className="w-full flex items-center justify-center gap-2 text-xs text-gray-400">
+                  <BsExclamationTriangleFill className="text-amber-400" />
+                  <span>
+                    Read-only access{role ? ` — your role is ${ROLE_LABELS[role] || role}` : ""}. You can view this trade but not edit or execute it.
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={() => handleSaveTrade("Draft")}
+                    className="flex items-center space-x-2 px-5 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-gray-300 hover:text-white font-bold text-xs transition-all shadow-sm active:scale-95"
+                  >
+                    <BsSave />
+                    <span>Save Draft</span>
+                  </button>
 
-              <div className="flex items-center space-x-3.5">
-                <button 
-                  onClick={() => handleSaveTrade("Rejected")}
-                  className="flex items-center space-x-2 px-5 py-2.5 rounded-xl border border-rose-500/20 hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 font-bold text-xs transition-all shadow-sm active:scale-95"
-                >
-                  <BsXCircle />
-                  <span>Reject</span>
-                </button>
+                  <div className="flex items-center space-x-3.5">
+                    <button
+                      onClick={() => handleSaveTrade("Rejected")}
+                      className="flex items-center space-x-2 px-5 py-2.5 rounded-xl border border-rose-500/20 hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 font-bold text-xs transition-all shadow-sm active:scale-95"
+                    >
+                      <BsXCircle />
+                      <span>Reject</span>
+                    </button>
 
-                <button 
-                  onClick={handleApproveExecute}
-                  className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-teal-400 text-black hover:opacity-90 font-extrabold text-xs transition-all shadow-md active:scale-95"
-                >
-                  <BsCheck2 />
-                  <span>Approve & Execute</span>
-                </button>
-              </div>
+                    <button
+                      onClick={handleApproveExecute}
+                      disabled={!canExecute}
+                      title={canExecute ? "" : "Your role cannot execute trades"}
+                      className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-teal-400 text-black hover:opacity-90 font-extrabold text-xs transition-all shadow-md active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <BsCheck2 />
+                      <span>Approve &amp; Execute</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
           </div>

@@ -5,10 +5,12 @@ from fastapi import APIRouter, HTTPException, Depends
 from supabase_client import supabase
 from services.ruleset_service import ruleset_service
 from services.ledger_service import LedgerService
+from services import plan_service
+from auth import require_permission, require_membership, P
 
 router = APIRouter()
 
-@router.get("/workbench/{workbench_id}")
+@router.get("/workbench/{workbench_id}", dependencies=[Depends(require_membership())])
 async def list_workbench_rulesets(workbench_id: str):
     try:
         # Fetch all rulesets
@@ -35,7 +37,7 @@ async def list_workbench_rulesets(workbench_id: str):
         print(f"[ERROR] list_workbench_rulesets: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{ruleset_id}")
+@router.get("/{ruleset_id}", dependencies=[Depends(require_membership())])
 async def get_ruleset(ruleset_id: str):
     try:
         res = supabase.table("rulesets").select("*").eq("id", ruleset_id).single().execute()
@@ -52,7 +54,7 @@ async def get_ruleset(ruleset_id: str):
         print(f"[ERROR] get_ruleset: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("")
+@router.post("", dependencies=[Depends(require_permission(P.WRITE_RULESET))])
 async def create_ruleset(payload: Dict):
     try:
         workbench_id = payload.get("workbench_id")
@@ -65,6 +67,9 @@ async def create_ruleset(payload: Dict):
         
         if not workbench_id or not name or not document_type:
             raise HTTPException(status_code=400, detail="Missing required parameters: workbench_id, name, document_type")
+
+        # Plan gate (Module 12): custom rulesets require Pro or above.
+        plan_service.require_feature(workbench_id, "custom_rulesets", "Custom rulesets")
 
         # If trying to make active, verify no other active ruleset exists for this doc type
         if status == "Active":
@@ -107,7 +112,7 @@ async def create_ruleset(payload: Dict):
         print(f"[ERROR] create_ruleset: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.put("/{ruleset_id}")
+@router.put("/{ruleset_id}", dependencies=[Depends(require_permission(P.WRITE_RULESET))])
 async def update_ruleset(ruleset_id: str, payload: Dict):
     try:
         # Check if ruleset exists
@@ -159,7 +164,7 @@ async def update_ruleset(ruleset_id: str, payload: Dict):
         print(f"[ERROR] update_ruleset: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/{ruleset_id}/version")
+@router.post("/{ruleset_id}/version", dependencies=[Depends(require_permission(P.WRITE_RULESET))])
 async def create_ruleset_version(ruleset_id: str, payload: Dict):
     try:
         check_res = supabase.table("rulesets").select("*").eq("id", ruleset_id).single().execute()
@@ -196,7 +201,7 @@ async def create_ruleset_version(ruleset_id: str, payload: Dict):
         print(f"[ERROR] create_ruleset_version: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/generate-logic")
+@router.post("/generate-logic", dependencies=[Depends(require_permission(P.WRITE_RULESET))])
 async def generate_logic(payload: Dict):
     try:
         prompt = payload.get("prompt")
@@ -217,7 +222,7 @@ async def generate_logic(payload: Dict):
         print(f"[ERROR] generate_logic endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/simulate")
+@router.post("/simulate", dependencies=[Depends(require_permission(P.WRITE_RULESET))])
 async def simulate_ruleset(payload: Dict):
     try:
         ruleset_id = payload.get("ruleset_id")

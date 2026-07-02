@@ -14,6 +14,7 @@ import {
   BsPlusLg
 } from "react-icons/bs";
 import { toast } from "react-hot-toast";
+import { apiFetch } from "../../../lib/apiClient";
 
 export default function PartyModal({ isOpen, onClose, workbenchId, onSuccess, initialMode = "party", initialParty = null }) {
   const [loading, setLoading] = useState(false);
@@ -65,7 +66,7 @@ export default function PartyModal({ isOpen, onClose, workbenchId, onSuccess, in
 
     try {
       setLoading(true);
-      const res = await fetch("/api/ops/parties", {
+      const res = await apiFetch("/api/ops/parties", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -96,7 +97,7 @@ export default function PartyModal({ isOpen, onClose, workbenchId, onSuccess, in
 
     try {
       setLoading(true);
-      const res = await fetch("/api/ops/entities", {
+      const res = await apiFetch("/api/ops/entities", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

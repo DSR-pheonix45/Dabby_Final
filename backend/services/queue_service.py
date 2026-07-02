@@ -406,9 +406,13 @@ async def queue_worker():
     while True:
         try:
             doc_id = None
-            
-            # 1. Try pulling from Redis first if available
-            if is_redis_available():
+
+            # 1. Try pulling from Redis first if available.
+            # NOTE: the availability ping is blocking (socket connect), so run it
+            # in the executor — calling it directly here starves the event loop and
+            # makes HTTP requests time out whenever Redis is offline.
+            redis_up = await loop.run_in_executor(None, is_redis_available)
+            if redis_up:
                 try:
                     doc_id = await loop.run_in_executor(None, pop_from_redis)
                 except Exception as e:

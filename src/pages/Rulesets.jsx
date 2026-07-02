@@ -16,12 +16,19 @@ import {
 import { supabase } from "../lib/supabase";
 import { toast } from "react-hot-toast";
 import { motion } from "framer-motion";
+import { apiFetch } from "../lib/apiClient";
+import { useWorkbenchRole } from "../hooks/useWorkbenchRole";
+import { PERM } from "../lib/permissions";
 
 export default function Rulesets({ workbenchId }) {
   const navigate = useNavigate();
   const [rulesets, setRulesets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // RBAC (Module 11): only owner/accountant may author rulesets
+  const { can } = useWorkbenchRole(workbenchId);
+  const canWrite = can(PERM.WRITE_RULESET);
 
   useEffect(() => {
     fetchRulesets();
@@ -30,7 +37,7 @@ export default function Rulesets({ workbenchId }) {
   const fetchRulesets = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/rulesets/workbench/${workbenchId}`);
+      const res = await apiFetch(`/api/rulesets/workbench/${workbenchId}`);
       if (!res.ok) throw new Error("Failed to fetch rulesets");
       const data = await res.json();
       setRulesets(data || []);
@@ -64,7 +71,7 @@ export default function Rulesets({ workbenchId }) {
         status: "Draft"
       };
 
-      const res = await fetch("/api/rulesets", {
+      const res = await apiFetch("/api/rulesets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -96,7 +103,7 @@ export default function Rulesets({ workbenchId }) {
         status: "Draft"
       };
 
-      const res = await fetch("/api/rulesets", {
+      const res = await apiFetch("/api/rulesets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -114,7 +121,7 @@ export default function Rulesets({ workbenchId }) {
     const newStatus = r.status === "Active" ? "Disabled" : "Active";
     try {
       toast.loading(`Setting status to ${newStatus}...`, { id: "ruleset-status" });
-      const res = await fetch(`/api/rulesets/${r.id}`, {
+      const res = await apiFetch(`/api/rulesets/${r.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus })
@@ -136,7 +143,7 @@ export default function Rulesets({ workbenchId }) {
     if (!window.confirm("Are you sure you want to delete this ruleset playbook?")) return;
     try {
       toast.loading("Deleting ruleset...", { id: "ruleset-del" });
-      const res = await fetch(`/api/rulesets/${rulesetId}`, {
+      const res = await apiFetch(`/api/rulesets/${rulesetId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ is_deleted: true })
@@ -173,13 +180,15 @@ export default function Rulesets({ workbenchId }) {
           </div>
         </div>
 
-        <button 
-          onClick={handleCreateNew}
-          className="flex items-center space-x-2 px-6 py-3 bg-[#81E6D9] text-black rounded-2xl text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-[#81E6D9]/10"
-        >
-          <BsPlusLg size={16} />
-          <span>New Ruleset</span>
-        </button>
+        {canWrite && (
+          <button
+            onClick={handleCreateNew}
+            className="flex items-center space-x-2 px-6 py-3 bg-[#81E6D9] text-black rounded-2xl text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-[#81E6D9]/10"
+          >
+            <BsPlusLg size={16} />
+            <span>New Ruleset</span>
+          </button>
+        )}
       </div>
 
       {/* Search bar */}
@@ -208,12 +217,14 @@ export default function Rulesets({ workbenchId }) {
               <h3 className="text-sm font-bold text-white">No Ruleset Playbooks</h3>
               <p className="text-xs text-gray-500 leading-relaxed">Create a visual ruleset playbook to specify mapping logic for uploaded organization documents.</p>
             </div>
-            <button 
-              onClick={handleCreateNew}
-              className="px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl text-xs font-bold transition-all text-gray-300"
-            >
-              Configure First Playbook
-            </button>
+            {canWrite && (
+              <button
+                onClick={handleCreateNew}
+                className="px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl text-xs font-bold transition-all text-gray-300"
+              >
+                Configure First Playbook
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -255,27 +266,33 @@ export default function Rulesets({ workbenchId }) {
 
                 <div className="flex justify-between items-center border-t border-white/5 pt-4">
                   <div className="flex items-center space-x-2">
-                    <button 
-                      onClick={() => handleToggleStatus(r)}
-                      title={r.status === 'Active' ? 'Disable ruleset' : 'Activate ruleset'}
-                      className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all"
-                    >
-                      {r.status === 'Active' ? <BsStopFill size={14} /> : <BsPlayFill size={14} />}
-                    </button>
-                    <button 
-                      onClick={() => handleDuplicate(r)}
-                      title="Duplicate playbook"
-                      className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all"
-                    >
-                      <BsFiles size={14} />
-                    </button>
-                    <button 
-                      onClick={() => handleDelete(r.id)}
-                      title="Delete playbook"
-                      className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500 hover:text-black text-red-400 transition-all border border-red-500/10"
-                    >
-                      <BsTrash size={14} />
-                    </button>
+                    {canWrite ? (
+                      <>
+                        <button
+                          onClick={() => handleToggleStatus(r)}
+                          title={r.status === 'Active' ? 'Disable ruleset' : 'Activate ruleset'}
+                          className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all"
+                        >
+                          {r.status === 'Active' ? <BsStopFill size={14} /> : <BsPlayFill size={14} />}
+                        </button>
+                        <button
+                          onClick={() => handleDuplicate(r)}
+                          title="Duplicate playbook"
+                          className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all"
+                        >
+                          <BsFiles size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(r.id)}
+                          title="Delete playbook"
+                          className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500 hover:text-black text-red-400 transition-all border border-red-500/10"
+                        >
+                          <BsTrash size={14} />
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-[10px] text-gray-600 uppercase tracking-widest font-black">Read-only</span>
+                    )}
                   </div>
 
                   <button 

@@ -29,6 +29,7 @@ import { toast } from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import LinkDocumentModal from "../ops/LinkDocumentModal";
 import { useNavigate } from "react-router-dom";
+import { apiFetch } from "../../../lib/apiClient";
 
 const DOC_TYPES = [
   { id: 'all', label: 'All', color: 'bg-teal-500/10 text-teal-400 font-bold border border-teal-500/20' },
@@ -198,7 +199,7 @@ export default function DocVault({ workbenchId }) {
   const handleTriggerProcess = async (doc) => {
     try {
       toast.loading("Queuing for analysis...", { id: `proc-${doc.id}` });
-      const response = await fetch(`/api/ops/documents/process/${doc.id}`, { method: 'POST' });
+      const response = await apiFetch(`/api/ops/documents/process/${doc.id}`, { method: 'POST' });
       if (!response.ok) throw new Error("Server error");
       toast.success("Added to processing queue", { id: `proc-${doc.id}` });
       fetchDocumentsSilent();

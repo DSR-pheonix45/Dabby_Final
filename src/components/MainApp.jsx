@@ -17,6 +17,9 @@ import { backendService } from "../services/backendService";
 import { contextService } from "../services/contextService";
 import { supabase } from "../lib/supabase";
 import { BsRocketTakeoff, BsChevronRight } from "react-icons/bs";
+import { apiFetch } from "../lib/apiClient";
+import { consumeAiMessage } from "../lib/plans";
+import { toast } from "react-hot-toast";
 
 export default function MainApp() {
   useTheme(); // Theme context is used for side effects
@@ -492,7 +495,7 @@ Based on the Profit & Loss statement provided, the business shows stable operati
             if (!error && data) {
               setActiveWorkbench({ ...data, active: true });
               // Initialize Self party for this workbench
-              fetch(`/api/ops/parties/initialize-self/${id}`, { method: "POST" })
+              apiFetch(`/api/ops/parties/initialize-self/${id}`, { method: "POST" })
                 .catch(err => console.error("Error initializing self party:", err));
             }
           } catch (err) {
@@ -539,6 +542,17 @@ Based on the Profit & Loss statement provided, the business shows stable operati
       llmQuery = `I have uploaded these files: ${fileNames}. Please acknowledge receipt and ask how you can help. Do not analyze them yet.`;
     } else if (!message.trim() && !hasFiles) {
       // Should not happen due to disabled button, but safe guard
+      return;
+    }
+
+    // Plan gate (Module 12): meter this AI consultant message for the user.
+    // Fails open on infra errors; hard-blocks only when the daily limit is reached.
+    const chatWorkbenchId = options.workbenchId || activeWorkbench?.id || null;
+    const meter = await consumeAiMessage(chatWorkbenchId);
+    if (meter && meter.allowed === false) {
+      toast.error(
+        `Daily AI limit reached (${meter.limit} messages on the ${meter.plan || "current"} plan). Upgrade to keep chatting.`
+      );
       return;
     }
 

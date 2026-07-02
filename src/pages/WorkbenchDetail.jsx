@@ -32,6 +32,7 @@ import WorkbenchSettings from "../components/Workbenches/WorkbenchSettings";
 import TransactionModal from "../components/Workbenches/ledger/TransactionModal";
 import Rulesets from "./Rulesets";
 import TradeEngine from "./TradeEngine";
+import PlanUsageBadge from "../components/Workbenches/PlanUsageBadge";
 
 import { WorkbenchProvider } from "../context/WorkbenchContext";
 
@@ -155,7 +156,8 @@ export default function WorkbenchDetail() {
             ))}
           </nav>
 
-          <div className="p-4 border-t border-white/5">
+          <div className="p-4 border-t border-white/5 space-y-3">
+             <PlanUsageBadge workbenchId={id} />
              <div className="p-4 rounded-2xl bg-gradient-to-br from-teal-500/10 to-cyan-500/10 border border-teal-500/20">
                 <div className="flex items-center space-x-2 mb-2">
                    <BsStars className="text-teal-400" />

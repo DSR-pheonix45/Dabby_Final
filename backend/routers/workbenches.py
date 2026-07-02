@@ -1,10 +1,20 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 from supabase_client import supabase
 from services.coa_seeder import seed_coa
+from auth import get_current_user, get_workbench_role
 
 router = APIRouter()
+
+
+@router.get("/{workbench_id}/my-role")
+async def get_my_role(workbench_id: str, user: dict = Depends(get_current_user)):
+    """Returns the authenticated caller's role in this workbench (drives UI gating)."""
+    role = get_workbench_role(workbench_id, user["id"])
+    if not role:
+        raise HTTPException(status_code=403, detail="You are not a member of this workbench")
+    return {"role": role, "user_id": user["id"]}
 
 class WorkbenchCreate(BaseModel):
     owner_user_id: str
