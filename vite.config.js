@@ -11,7 +11,14 @@ export default defineConfig({
   server: {
     port: 5174,
     open: true, // Automatically open browser
-    host: true  // Allow external connections
+    host: true,  // Allow external connections
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   },
   resolve: {
     alias: {

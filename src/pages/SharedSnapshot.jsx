@@ -16,7 +16,7 @@ export default function SharedSnapshot() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`http://localhost:8000/api/investor/shared/${shareId}`, {
+      const response = await fetch(`/api/investor/shared/${shareId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password })

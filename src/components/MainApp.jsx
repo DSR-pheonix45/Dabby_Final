@@ -492,7 +492,7 @@ Based on the Profit & Loss statement provided, the business shows stable operati
             if (!error && data) {
               setActiveWorkbench({ ...data, active: true });
               // Initialize Self party for this workbench
-              fetch(`http://localhost:8000/api/ops/parties/initialize-self/${id}`, { method: "POST" })
+              fetch(`/api/ops/parties/initialize-self/${id}`, { method: "POST" })
                 .catch(err => console.error("Error initializing self party:", err));
             }
           } catch (err) {

@@ -105,7 +105,7 @@ export const backendService = {
       console.log('Document successfully registered in workbench_documents:', data);
 
       // Trigger background processing on backend asynchronously
-      fetch(`http://localhost:8000/api/ops/documents/process/${data.id}`, { method: 'POST' }).catch(err => {
+      fetch(`/api/ops/documents/process/${data.id}`, { method: 'POST' }).catch(err => {
         console.warn('Failed to call process document endpoint:', err);
       });
 
@@ -156,7 +156,7 @@ export const backendService = {
 
       // 1.5. Auto-seed Chart of Accounts labels/ontology
       try {
-        await fetch(`http://localhost:8000/api/ledger/labels/seed/${workbench.id}`, {
+        await fetch(`/api/ledger/labels/seed/${workbench.id}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" }
         });
@@ -220,7 +220,7 @@ export const backendService = {
   },
 
   async aiCategorize(description, labels) {
-    const response = await fetch('http://localhost:8000/api/ai/categorize-transaction', {
+    const response = await fetch('/api/ai/categorize-transaction', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ description, labels })
@@ -314,7 +314,7 @@ export const backendService = {
    * Lists all transactions for a workbench
    */
   async listTransactions(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/ledger/transactions/${workbenchId}`);
+    const response = await fetch(`/api/ledger/transactions/${workbenchId}`);
     if (!response.ok) throw new Error('Failed to fetch transactions');
     return await response.json();
   },
@@ -418,7 +418,7 @@ export const backendService = {
   // --- Inventory System ---
 
   async createInventoryItem(itemData) {
-    const response = await fetch('http://localhost:8000/api/inventory/items', {
+    const response = await fetch('/api/inventory/items', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(itemData)
@@ -431,7 +431,7 @@ export const backendService = {
   },
 
   async recordStockPurchase(purchaseData) {
-    const response = await fetch('http://localhost:8000/api/inventory/purchase', {
+    const response = await fetch('/api/inventory/purchase', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(purchaseData)
@@ -444,7 +444,7 @@ export const backendService = {
   },
 
   async recordStockSale(saleData) {
-    const response = await fetch('http://localhost:8000/api/inventory/sale', {
+    const response = await fetch('/api/inventory/sale', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(saleData)
@@ -459,13 +459,13 @@ export const backendService = {
   // --- AR System ---
 
   async listInvoices(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/ops/invoices/${workbenchId}`);
+    const response = await fetch(`/api/ops/invoices/${workbenchId}`);
     if (!response.ok) throw new Error('Failed to fetch invoices');
     return await response.json();
   },
 
   async createInvoice(invoiceData) {
-    const response = await fetch('http://localhost:8000/api/ops/invoices', {
+    const response = await fetch('/api/ops/invoices', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(invoiceData)
@@ -478,7 +478,7 @@ export const backendService = {
   },
 
   async scanInvoice(docId) {
-    const response = await fetch(`http://localhost:8000/api/ops/invoices/scan/${docId}`, {
+    const response = await fetch(`/api/ops/invoices/scan/${docId}`, {
       method: 'POST'
     });
     if (!response.ok) throw new Error('AI scanning failed');
@@ -486,7 +486,7 @@ export const backendService = {
   },
 
   async recordPayment(invoiceId, paymentData) {
-    const response = await fetch(`http://localhost:8000/api/ops/invoices/${invoiceId}/payment`, {
+    const response = await fetch(`/api/ops/invoices/${invoiceId}/payment`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(paymentData)
@@ -496,7 +496,7 @@ export const backendService = {
   },
 
   async getARMetrics(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/ops/metrics/ar/${workbenchId}`);
+    const response = await fetch(`/api/ops/metrics/ar/${workbenchId}`);
     if (!response.ok) throw new Error('Failed to fetch AR metrics');
     return await response.json();
   },
@@ -504,13 +504,13 @@ export const backendService = {
   // --- AP System ---
 
   async listBills(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/ops/bills/${workbenchId}`);
+    const response = await fetch(`/api/ops/bills/${workbenchId}`);
     if (!response.ok) throw new Error('Failed to fetch bills');
     return await response.json();
   },
 
   async createBill(billData) {
-    const response = await fetch('http://localhost:8000/api/ops/bills', {
+    const response = await fetch('/api/ops/bills', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(billData)
@@ -523,7 +523,7 @@ export const backendService = {
   },
 
   async recordBillPayment(billId, paymentData) {
-    const response = await fetch(`http://localhost:8000/api/ops/bills/${billId}/payment`, {
+    const response = await fetch(`/api/ops/bills/${billId}/payment`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(paymentData)
@@ -533,7 +533,7 @@ export const backendService = {
   },
 
   async getAPMetrics(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/ops/metrics/ap/${workbenchId}`);
+    const response = await fetch(`/api/ops/metrics/ap/${workbenchId}`);
     if (!response.ok) throw new Error('Failed to fetch AP metrics');
     return await response.json();
   },
@@ -586,13 +586,13 @@ export const backendService = {
   // --- Task Management ---
 
   async listTasks(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/tasks/${workbenchId}`);
+    const response = await fetch(`/api/tasks/${workbenchId}`);
     if (!response.ok) throw new Error('Failed to fetch tasks');
     return await response.json();
   },
 
   async createTask(taskData) {
-    const response = await fetch('http://localhost:8000/api/tasks/', {
+    const response = await fetch('/api/tasks/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(taskData)
@@ -602,7 +602,7 @@ export const backendService = {
   },
 
   async updateTask(taskId, updateData) {
-    const response = await fetch(`http://localhost:8000/api/tasks/${taskId}`, {
+    const response = await fetch(`/api/tasks/${taskId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updateData)
@@ -612,7 +612,7 @@ export const backendService = {
   },
 
   async deleteTask(taskId) {
-    const response = await fetch(`http://localhost:8000/api/tasks/${taskId}`, {
+    const response = await fetch(`/api/tasks/${taskId}`, {
       method: 'DELETE'
     });
     if (!response.ok) throw new Error('Failed to delete task');
@@ -620,13 +620,13 @@ export const backendService = {
   },
 
   async listWorkbenchMembers(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/tasks/${workbenchId}/members`);
+    const response = await fetch(`/api/tasks/${workbenchId}/members`);
     if (!response.ok) throw new Error('Failed to fetch members');
     return await response.json();
   },
 
   async listWorkbenchEntities(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/ops/entities/workbench/${workbenchId}`);
+    const response = await fetch(`/api/ops/entities/workbench/${workbenchId}`);
     if (!response.ok) throw new Error('Failed to fetch entities');
     return await response.json();
   },
@@ -634,13 +634,13 @@ export const backendService = {
   // --- Budgets ---
 
   async getBudgetPerformance(workbenchId) {
-    const response = await fetch(`http://localhost:8000/api/budgets/${workbenchId}/performance`);
+    const response = await fetch(`/api/budgets/${workbenchId}/performance`);
     if (!response.ok) throw new Error('Failed to fetch budget performance');
     return await response.json();
   },
 
   async getBudgetTransactions(workbenchId, category) {
-    const response = await fetch(`http://localhost:8000/api/budgets/${workbenchId}/transactions/${encodeURIComponent(category)}`);
+    const response = await fetch(`/api/budgets/${workbenchId}/transactions/${encodeURIComponent(category)}`);
     if (!response.ok) throw new Error('Failed to fetch clubbed transactions');
     return await response.json();
   }

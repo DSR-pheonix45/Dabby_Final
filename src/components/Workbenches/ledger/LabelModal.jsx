@@ -25,8 +25,8 @@ export default function LabelModal({ isOpen, onClose, workbenchId, onSuccess }) 
     try {
       setLoadingLookups(true);
       const [accsRes, subsRes] = await Promise.all([
-        fetch("http://localhost:8000/api/ledger/master-accounts"),
-        fetch("http://localhost:8000/api/ledger/master-sub-accounts")
+        fetch("/api/ledger/master-accounts"),
+        fetch("/api/ledger/master-sub-accounts")
       ]);
       if (!accsRes.ok || !subsRes.ok) throw new Error("Failed to fetch account definitions");
       
@@ -106,7 +106,7 @@ export default function LabelModal({ isOpen, onClose, workbenchId, onSuccess }) 
 
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:8000/api/ledger/labels", {
+      const response = await fetch("/api/ledger/labels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

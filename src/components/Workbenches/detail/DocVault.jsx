@@ -198,7 +198,7 @@ export default function DocVault({ workbenchId }) {
   const handleTriggerProcess = async (doc) => {
     try {
       toast.loading("Queuing for analysis...", { id: `proc-${doc.id}` });
-      const response = await fetch(`http://localhost:8000/api/ops/documents/process/${doc.id}`, { method: 'POST' });
+      const response = await fetch(`/api/ops/documents/process/${doc.id}`, { method: 'POST' });
       if (!response.ok) throw new Error("Server error");
       toast.success("Added to processing queue", { id: `proc-${doc.id}` });
       fetchDocumentsSilent();

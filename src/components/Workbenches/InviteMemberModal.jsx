@@ -19,7 +19,7 @@ export default function InviteMemberModal({ isOpen, onClose, workbenchId }) {
 
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:8000/api/investor/invite/${workbenchId}`, {
+      const response = await fetch(`/api/investor/invite/${workbenchId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, role })

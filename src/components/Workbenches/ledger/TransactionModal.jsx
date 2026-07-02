@@ -42,7 +42,7 @@ export default function TransactionModal({ isOpen, onClose, workbenchId, onSucce
 
   const fetchParties = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/ops/parties/${workbenchId}`);
+      const response = await fetch(`/api/ops/parties/${workbenchId}`);
       if (!response.ok) throw new Error("Failed to fetch parties");
       const data = await response.json();
       setParties(data || []);
@@ -88,7 +88,7 @@ export default function TransactionModal({ isOpen, onClose, workbenchId, onSucce
         status: "Draft"
       };
 
-      const response = await fetch("http://localhost:8000/api/trades", {
+      const response = await fetch("/api/trades", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -114,7 +114,7 @@ export default function TransactionModal({ isOpen, onClose, workbenchId, onSucce
           
           if (docRes && docRes.id) {
             // Link document to the trade
-            await fetch(`http://localhost:8000/api/trades/${result.id}`, {
+            await fetch(`/api/trades/${result.id}`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ document_id: docRes.id })

@@ -53,11 +53,11 @@ export default function InvestorView({ workbenchId, workbenchName, shareId, shar
   const fetchIntelligence = async () => {
     try {
       setLoading(true);
-      let url = `http://localhost:8000/api/investor/intelligence/${workbenchId}`;
+      let url = `/api/investor/intelligence/${workbenchId}`;
       let options = {};
 
       if (shareId && sharePassword) {
-        url = `http://localhost:8000/api/investor/shared/${shareId}`;
+        url = `/api/investor/shared/${shareId}`;
         options = {
           method: "POST",
           headers: { "Content-Type": "application/json" },

@@ -30,7 +30,7 @@ export default function Rulesets({ workbenchId }) {
   const fetchRulesets = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`http://localhost:8000/api/rulesets/workbench/${workbenchId}`);
+      const res = await fetch(`/api/rulesets/workbench/${workbenchId}`);
       if (!res.ok) throw new Error("Failed to fetch rulesets");
       const data = await res.json();
       setRulesets(data || []);
@@ -64,7 +64,7 @@ export default function Rulesets({ workbenchId }) {
         status: "Draft"
       };
 
-      const res = await fetch("http://localhost:8000/api/rulesets", {
+      const res = await fetch("/api/rulesets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -96,7 +96,7 @@ export default function Rulesets({ workbenchId }) {
         status: "Draft"
       };
 
-      const res = await fetch("http://localhost:8000/api/rulesets", {
+      const res = await fetch("/api/rulesets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -114,7 +114,7 @@ export default function Rulesets({ workbenchId }) {
     const newStatus = r.status === "Active" ? "Disabled" : "Active";
     try {
       toast.loading(`Setting status to ${newStatus}...`, { id: "ruleset-status" });
-      const res = await fetch(`http://localhost:8000/api/rulesets/${r.id}`, {
+      const res = await fetch(`/api/rulesets/${r.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus })
@@ -136,7 +136,7 @@ export default function Rulesets({ workbenchId }) {
     if (!window.confirm("Are you sure you want to delete this ruleset playbook?")) return;
     try {
       toast.loading("Deleting ruleset...", { id: "ruleset-del" });
-      const res = await fetch(`http://localhost:8000/api/rulesets/${rulesetId}`, {
+      const res = await fetch(`/api/rulesets/${rulesetId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ is_deleted: true })

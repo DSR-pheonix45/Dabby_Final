@@ -33,7 +33,7 @@ export const WorkbenchProvider = ({ children, workbenchId }) => {
             
             // 1. Try fetching from backend API
             try {
-                const response = await fetch(`http://localhost:8000/api/context/${workbenchId}`);
+                const response = await fetch(`/api/context/${workbenchId}`);
                 if (response.ok) {
                     const contextData = await response.json();
                     setData({

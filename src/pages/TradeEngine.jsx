@@ -100,7 +100,7 @@ export default function TradeEngine({ workbenchId }) {
     if (!selectedWorkbenchId) return;
     try {
       setLoading(true);
-      const url = `http://localhost:8000/api/trades/workbench/${selectedWorkbenchId}`;
+      const url = `/api/trades/workbench/${selectedWorkbenchId}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch trades");
       const data = await res.json();
@@ -132,7 +132,7 @@ export default function TradeEngine({ workbenchId }) {
   const fetchLabels = useCallback(async () => {
     if (!selectedWorkbenchId) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/ledger/labels/${selectedWorkbenchId}`);
+      const res = await fetch(`/api/ledger/labels/${selectedWorkbenchId}`);
       if (!res.ok) throw new Error("Failed to fetch labels");
       const data = await res.json();
       setLabels(data || []);
@@ -155,7 +155,7 @@ export default function TradeEngine({ workbenchId }) {
       try {
         setLoading(true);
         // Fetch all trades for the workbench to find the one matching documentId
-        const url = `http://localhost:8000/api/trades/workbench/${selectedWorkbenchId}`;
+        const url = `/api/trades/workbench/${selectedWorkbenchId}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to fetch trades");
         const data = await res.json();
@@ -167,7 +167,7 @@ export default function TradeEngine({ workbenchId }) {
         } else {
           // If no trade exists yet, let's process it now!
           toast.loading("Initializing Trade Engine for document...", { id: "proc-trade" });
-          const procRes = await fetch(`http://localhost:8000/api/trades/process-document/${docId}`, {
+          const procRes = await fetch(`/api/trades/process-document/${docId}`, {
             method: "POST"
           });
           if (procRes.ok) {
@@ -244,7 +244,7 @@ export default function TradeEngine({ workbenchId }) {
 
     // FETCH ACTIVITIES
     try {
-      const actRes = await fetch(`http://localhost:8000/api/trades/${trade.id}/activities`);
+      const actRes = await fetch(`/api/trades/${trade.id}/activities`);
       if (actRes.ok) {
         const actData = await actRes.json();
         setActivities(actData || []);
@@ -255,7 +255,7 @@ export default function TradeEngine({ workbenchId }) {
 
     // FETCH AUDIT TRAIL
     try {
-      const auditRes = await fetch(`http://localhost:8000/api/trades/${trade.id}/audit-trail`);
+      const auditRes = await fetch(`/api/trades/${trade.id}/audit-trail`);
       if (auditRes.ok) {
         const auditData = await auditRes.json();
         setAuditTrail(auditData || []);
@@ -332,7 +332,7 @@ export default function TradeEngine({ workbenchId }) {
         payload.status = newStatus;
       }
 
-      const res = await fetch(`http://localhost:8000/api/trades/${selectedTrade.id}`, {
+      const res = await fetch(`/api/trades/${selectedTrade.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -344,7 +344,7 @@ export default function TradeEngine({ workbenchId }) {
       toast.success(newStatus ? `Trade status updated to ${newStatus}` : "Trade draft saved successfully");
       
       // Re-fetch trade details to update validation sidebars
-      const freshRes = await fetch(`http://localhost:8000/api/trades/${selectedTrade.id}`);
+      const freshRes = await fetch(`/api/trades/${selectedTrade.id}`);
       if (freshRes.ok) {
         const freshData = await freshRes.json();
         setSelectedTrade(freshData);
@@ -364,7 +364,7 @@ export default function TradeEngine({ workbenchId }) {
       toast.loading("Executing operational activities...", { id: "exec-trade" });
       
       // 1. Save activities updates first
-      const saveActRes = await fetch(`http://localhost:8000/api/trades/${selectedTrade.id}/save-activities`, {
+      const saveActRes = await fetch(`/api/trades/${selectedTrade.id}/save-activities`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ activities })
@@ -383,7 +383,7 @@ export default function TradeEngine({ workbenchId }) {
         // Do NOT set status here — the /execute endpoint owns the status transition
       };
 
-      const saveRes = await fetch(`http://localhost:8000/api/trades/${selectedTrade.id}`, {
+      const saveRes = await fetch(`/api/trades/${selectedTrade.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -391,7 +391,7 @@ export default function TradeEngine({ workbenchId }) {
       if (!saveRes.ok) throw new Error("Failed to save trade details");
 
       // 3. Trigger activity execution (Stages 10-12)
-      const execRes = await fetch(`http://localhost:8000/api/trades/${selectedTrade.id}/execute`, {
+      const execRes = await fetch(`/api/trades/${selectedTrade.id}/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: user?.id })
@@ -427,7 +427,7 @@ export default function TradeEngine({ workbenchId }) {
     if (!selectedTrade || !selectedTrade.document_id) return;
     try {
       toast.loading("Re-running Trade Engine analysis...", { id: "rerun-engine" });
-      const res = await fetch(`http://localhost:8000/api/trades/process-document/${selectedTrade.document_id}`, {
+      const res = await fetch(`/api/trades/process-document/${selectedTrade.document_id}`, {
         method: "POST"
       });
       if (!res.ok) throw new Error("Failed to process document");

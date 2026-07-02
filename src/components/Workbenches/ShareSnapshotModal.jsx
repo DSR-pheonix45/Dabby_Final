@@ -17,7 +17,7 @@ export default function ShareSnapshotModal({ isOpen, onClose, workbenchId }) {
 
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:8000/api/investor/share/${workbenchId}`, {
+      const response = await fetch(`/api/investor/share/${workbenchId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password })

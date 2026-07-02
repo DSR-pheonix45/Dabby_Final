@@ -39,7 +39,7 @@ export default function AcceptInvite() {
         setError(null);
 
         try {
-            const response = await fetch(`http://localhost:8000/api/investor/invite/accept/${token}`, {
+            const response = await fetch(`/api/investor/invite/accept/${token}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ user_id: user.id })

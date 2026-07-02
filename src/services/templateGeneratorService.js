@@ -354,7 +354,7 @@ function extractJSON(text) {
 async function callGroq(systemPrompt, userPrompt, model = MODEL) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
-  const endpoint = "http://localhost:8000/api/ai/generate-template";
+  const endpoint = "/api/ai/generate-template";
 
   const res = await fetch(endpoint, {
     method: "POST",

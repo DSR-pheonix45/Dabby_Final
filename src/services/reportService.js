@@ -113,7 +113,7 @@ export const reportService = {
     },
 
     async fetchDataRoomData(workbenchId) {
-        const response = await fetch(`http://localhost:8000/api/investor/statements/${workbenchId}`);
+        const response = await fetch(`/api/investor/statements/${workbenchId}`);
         if (!response.ok) throw new Error("Failed to fetch data room content");
         return await response.json();
     },

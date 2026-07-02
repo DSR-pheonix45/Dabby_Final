@@ -172,8 +172,8 @@ export default function COASetupModal({ isOpen, onClose, workbench, onSuccess })
     try {
       setLoadingLookups(true);
       const [accsRes, subsRes] = await Promise.all([
-        fetch("http://localhost:8000/api/ledger/master-accounts"),
-        fetch("http://localhost:8000/api/ledger/master-sub-accounts")
+        fetch("/api/ledger/master-accounts"),
+        fetch("/api/ledger/master-sub-accounts")
       ]);
       if (!accsRes.ok || !subsRes.ok) throw new Error("Failed to load schema groups");
       
@@ -246,7 +246,7 @@ export default function COASetupModal({ isOpen, onClose, workbench, onSuccess })
     }
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/ledger/labels/seed/${workbench.id}`, {
+      const res = await fetch(`/api/ledger/labels/seed/${workbench.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -282,7 +282,7 @@ export default function COASetupModal({ isOpen, onClose, workbench, onSuccess })
 
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:8000/api/ledger/labels", {
+      const response = await fetch("/api/ledger/labels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -340,7 +340,7 @@ export default function COASetupModal({ isOpen, onClose, workbench, onSuccess })
         const { master_id, sub_id } = findOntologyIds(item.type, item.sub_account);
         if (!master_id || !sub_id) continue;
 
-        const response = await fetch("http://localhost:8000/api/ledger/labels", {
+        const response = await fetch("/api/ledger/labels", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

@@ -65,7 +65,7 @@ export default function PartyModal({ isOpen, onClose, workbenchId, onSuccess, in
 
     try {
       setLoading(true);
-      const res = await fetch("http://localhost:8000/api/ops/parties", {
+      const res = await fetch("/api/ops/parties", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -96,7 +96,7 @@ export default function PartyModal({ isOpen, onClose, workbenchId, onSuccess, in
 
     try {
       setLoading(true);
-      const res = await fetch("http://localhost:8000/api/ops/entities", {
+      const res = await fetch("/api/ops/entities", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
