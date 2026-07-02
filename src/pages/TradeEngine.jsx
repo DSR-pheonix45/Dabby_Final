@@ -22,6 +22,8 @@ import { useAuth } from "../hooks/useAuth";
 import { backendService } from "../services/backendService";
 import Card from "../components/shared/Card";
 import { toast } from "react-hot-toast";
+import TradeResolveModal from "../components/Workbenches/TradeResolveModal";
+
 
 const TRADE_STATUS_TABS = [
   { id: "All", label: "All Trades" },
@@ -87,6 +89,11 @@ export default function TradeEngine({ workbenchId }) {
   const [entityModalPartyId, setEntityModalPartyId] = useState("");
   const [newEntityName, setNewEntityName] = useState("");
   const [newEntityType, setNewEntityType] = useState("bank");
+
+  // Error Resolution Modal states
+  const [showResolveModal, setShowResolveModal] = useState(false);
+  const [resolveError, setResolveError] = useState(null);
+
 
   // Fetch trades whenever workbench changes
   const fetchTrades = useCallback(async () => {
@@ -404,12 +411,15 @@ export default function TradeEngine({ workbenchId }) {
       window.dispatchEvent(new Event('refresh-ledger-data'));
     } catch (err) {
       console.error("Execution error:", err);
+      setResolveError(err.message);
+      setShowResolveModal(true);
       if (err.message.includes("activities") || err.message.includes("save") || err.message.includes("execute")) {
         toast.error("Execution failed: Please copy and run the DDL schema commands from backend/migrations/006_financial_engine.sql inside the Supabase SQL Editor first!", { id: "exec-trade", duration: 8000 });
       } else {
         toast.error(`Execution failed: ${err.message}`, { id: "exec-trade" });
       }
     }
+
   };
 
   // Re-run Trade Engine / OCR extraction
@@ -1432,9 +1442,34 @@ export default function TradeEngine({ workbenchId }) {
               </button>
             </div>
           </div>
-        </div>
+      )}
+
+      {/* Guided Error Resolution Modal */}
+      {showResolveModal && (
+        <TradeResolveModal
+          trade={selectedTrade}
+          errorMessage={resolveError}
+          onClose={() => setShowResolveModal(false)}
+          onRetry={async () => {
+            setShowResolveModal(false);
+            await handleApproveExecute();
+          }}
+          onOpenCoa={() => {
+            setShowResolveModal(false);
+            window.dispatchEvent(
+              new CustomEvent("change-workbench-tab", {
+                detail: { tab: "COA" },
+              })
+            );
+          }}
+          onRerun={async () => {
+            setShowResolveModal(false);
+            await handleReRunEngine();
+          }}
+        />
       )}
 
     </div>
   );
 }
+
