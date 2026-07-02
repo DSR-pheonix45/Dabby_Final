@@ -14,7 +14,7 @@ const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 // Groq Free Tier has strict TPM (tokens per minute) limits. 1 token ~= 4 chars.
 // Llama 3.3 70b approx 6000 tokens limit = ~24,000 chars total for system + history + user + context.
 const PROVIDER_LIMITS = {
-  groq: 15000,      // Reduced to keep within 6k TPM limits safely
+  groq: 30000,      // Increased to allow full document vault and label context
 };
 
 
@@ -35,8 +35,7 @@ function getTruncatedContext(context, provider) {
 // FREE Models on Groq (super fast!)
 // Reference: https://console.groq.com/docs/models
 const FREE_MODELS = [
-  "llama-3.1-70b-versatile", // Stable fallback
-  "llama-3.3-70b-versatile", // Flagship
+  "llama-3.3-70b-versatile", // Flagship (Current recommended model)
   "mixtral-8x7b-32768",      // Reliable Mixtral
   "mistral-saba-24b",        // New high-performance
   "llama-3.1-8b-instant",    // Super fast

@@ -43,99 +43,114 @@ class ActivityExecutor:
             
             # 2. Mutate operational state based on activity type
             if activity_type == "CREATE_RECEIVABLE":
-                # Create invoice record for customer
+                # Create invoice record for customer — idempotent
                 party_id = activity.get("party_id") or trade.get("party_id")
                 invoice_number = trade.get("invoice_number") or f"INV-{trade_id[:8]}"
-                
-                # Check duplicate invoice in invoices table
+
+                # Idempotency: if invoice already exists, reuse it
                 dup_check = supabase.table("invoices").select("id").eq("workbench_id", workbench_id).eq("invoice_number", invoice_number).execute()
                 if dup_check.data:
-                    raise ValueError(f"Invoice number {invoice_number} already exists in workbench invoices")
-                
-                # Insert invoice
-                inv_data = {
-                    "workbench_id": workbench_id,
-                    "party_id": party_id,
-                    "invoice_number": invoice_number,
-                    "amount": amount,
-                    "balance_due": amount,
-                    "issue_date": trade.get("invoice_date") or datetime.utcnow().date().isoformat(),
-                    "due_date": trade.get("due_date"),
-                    "status": "sent",
-                    "description": trade.get("description")
-                }
-                
-                # Map resolved labels if any
-                try:
-                    labels_res = supabase.table("trade_labels").select("label_id, role").eq("trade_id", trade_id).execute()
-                    for label in (labels_res.data or []):
-                        if label["role"] == "revenue":
-                            inv_data["revenue_label_id"] = label["label_id"]
-                        elif label["role"] == "asset":
-                            inv_data["ar_label_id"] = label["label_id"]
-                except Exception:
-                    pass
-                
-                inv_res = supabase.table("invoices").insert(inv_data).execute()
-                new_state["invoice"] = inv_res.data[0] if inv_res.data else {}
+                    print(f"[INFO] Invoice {invoice_number} already exists — reusing existing record (idempotent retry)")
+                    new_state["invoice"] = {"id": dup_check.data[0]["id"], "reused": True}
+                else:
+                    inv_data = {
+                        "workbench_id": workbench_id,
+                        "party_id": party_id,
+                        "invoice_number": invoice_number,
+                        "amount": amount,
+                        "balance_due": amount,
+                        "issue_date": trade.get("invoice_date") or datetime.utcnow().date().isoformat(),
+                        "due_date": trade.get("due_date"),
+                        "status": "sent",
+                        "description": trade.get("description")
+                    }
+                    try:
+                        labels_res = supabase.table("trade_labels").select("label_id, role").eq("trade_id", trade_id).execute()
+                        for label in (labels_res.data or []):
+                            if label["role"] == "revenue":
+                                inv_data["revenue_label_id"] = label["label_id"]
+                            elif label["role"] == "asset":
+                                inv_data["ar_label_id"] = label["label_id"]
+                    except Exception:
+                        pass
+                    inv_res = supabase.table("invoices").insert(inv_data).execute()
+                    new_state["invoice"] = inv_res.data[0] if inv_res.data else {}
                 
             elif activity_type == "CREATE_PAYABLE":
-                # Create bill record for vendor
+                # Create bill record for vendor — idempotent
                 party_id = activity.get("party_id") or trade.get("party_id")
                 bill_number = trade.get("invoice_number") or f"BILL-{trade_id[:8]}"
-                
-                # Check duplicate bill in bills table
+
+                # Idempotency: if bill already exists, reuse it instead of failing
                 dup_check = supabase.table("bills").select("id").eq("workbench_id", workbench_id).eq("bill_number", bill_number).execute()
                 if dup_check.data:
-                    raise ValueError(f"Bill number {bill_number} already exists in workbench bills")
-                
-                # Insert bill
-                bill_data = {
-                    "workbench_id": workbench_id,
-                    "party_id": party_id,
-                    "bill_number": bill_number,
-                    "amount": amount,
-                    "balance_due": amount,
-                    "issue_date": trade.get("invoice_date") or datetime.utcnow().date().isoformat(),
-                    "due_date": trade.get("due_date"),
-                    "status": "unpaid",
-                    "category": "expense",
-                    "description": trade.get("description")
-                }
-                
-                try:
-                    labels_res = supabase.table("trade_labels").select("label_id, role").eq("trade_id", trade_id).execute()
-                    for label in (labels_res.data or []):
-                        if label["role"] == "expense":
-                            bill_data["expense_label_id"] = label["label_id"]
-                        elif label["role"] == "liability":
-                            bill_data["ap_label_id"] = label["label_id"]
-                except Exception:
-                    pass
-                        
-                bill_res = supabase.table("bills").insert(bill_data).execute()
-                new_state["bill"] = bill_res.data[0] if bill_res.data else {}
+                    print(f"[INFO] Bill {bill_number} already exists — reusing existing record (idempotent retry)")
+                    new_state["bill"] = {"id": dup_check.data[0]["id"], "reused": True}
+                else:
+                    bill_data = {
+                        "workbench_id": workbench_id,
+                        "party_id": party_id,
+                        "bill_number": bill_number,
+                        "amount": amount,
+                        "balance_due": amount,
+                        "issue_date": trade.get("invoice_date") or datetime.utcnow().date().isoformat(),
+                        "due_date": trade.get("due_date"),
+                        "status": "unpaid",
+                        "category": "expense",
+                        "description": trade.get("description")
+                    }
+                    try:
+                        labels_res = supabase.table("trade_labels").select("label_id, role").eq("trade_id", trade_id).execute()
+                        for label in (labels_res.data or []):
+                            if label["role"] == "expense":
+                                bill_data["expense_label_id"] = label["label_id"]
+                            elif label["role"] == "liability":
+                                bill_data["ap_label_id"] = label["label_id"]
+                    except Exception:
+                        pass
+                    bill_res = supabase.table("bills").insert(bill_data).execute()
+                    new_state["bill"] = bill_res.data[0] if bill_res.data else {}
 
             elif activity_type in ("INCREASE_LABEL", "DECREASE_LABEL", "ADD_EXPENSE", "ADD_REVENUE", "ADD_INPUT_GST", "ADD_OUTPUT_GST"):
-                label_id = activity.get("entity_id") or activity.get("target_id") # Map to label_id
+                label_id = activity.get("target_id") or activity.get("entity_id")
                 if not label_id:
-                    # Try fetching from trade_labels
-                    tl_res = supabase.table("trade_labels").select("label_id").eq("trade_id", trade_id).execute()
-                    if tl_res.data:
-                        label_id = tl_res.data[0]["label_id"]
+                    # Try fetching from trade_labels (may not exist)
+                    try:
+                        tl_res = supabase.table("trade_labels").select("label_id").eq("trade_id", trade_id).execute()
+                        if tl_res.data:
+                            label_id = tl_res.data[0]["label_id"]
+                    except Exception:
+                        pass
                 
                 if not label_id:
-                    raise ValueError("No label ID resolved for balance update")
+                    # Last resort: find a default expense/revenue account in the workbench
+                    accs = supabase.table("workbench_accounts").select("id, full_account_name, master_accounts(account_name)").eq("workbench_id", workbench_id).eq("is_active", True).execute()
+                    for acc in (accs.data or []):
+                        master_name = (acc.get("master_accounts") or {}).get("account_name", "").lower()
+                        if activity_type in ("ADD_EXPENSE", "ADD_INPUT_GST") and "exp" in master_name:
+                            label_id = acc["id"]
+                            break
+                        elif activity_type in ("ADD_REVENUE", "ADD_OUTPUT_GST") and "rev" in master_name:
+                            label_id = acc["id"]
+                            break
+                
+                if not label_id:
+                    print(f"[WARNING] No label resolved for {activity_type}, skipping balance update")
+                    new_state["skipped"] = {"type": activity_type, "reason": "no_label_id"}
+                else:
+                    l_res = supabase.table("workbench_accounts").select("current_amount").eq("id", label_id).single().execute()
+                    prev_val = float(l_res.data.get("current_amount") or 0.0)
+                    previous_state["label_balance"] = {"label_id": label_id, "balance": prev_val}
                     
-                l_res = supabase.table("workbench_accounts").select("current_amount").eq("id", label_id).single().execute()
-                prev_val = float(l_res.data.get("current_amount") or 0.0)
-                previous_state["label_balance"] = {"label_id": label_id, "balance": prev_val}
-                
-                change = amount if activity_type == "INCREASE_LABEL" else -amount
-                new_val = prev_val + change
-                
-                supabase.table("workbench_accounts").update({"current_amount": new_val}).eq("id", label_id).execute()
-                new_state["label_balance"] = {"label_id": label_id, "balance": new_val}
+                    # Determine direction: INCREASE/ADD = positive, DECREASE = negative
+                    if activity_type in ("INCREASE_LABEL", "ADD_EXPENSE", "ADD_INPUT_GST", "ADD_REVENUE", "ADD_OUTPUT_GST"):
+                        change = amount
+                    else:
+                        change = -amount
+                    new_val = prev_val + change
+                    
+                    supabase.table("workbench_accounts").update({"current_amount": new_val}).eq("id", label_id).execute()
+                    new_state["label_balance"] = {"label_id": label_id, "balance": new_val}
                 
             elif activity_type == "CREATE_ASSET":
                 label_id = activity.get("entity_id") or activity.get("target_id")

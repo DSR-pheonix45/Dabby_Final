@@ -91,8 +91,9 @@ const ExpandableSection = ({
   children,
   badge = null,
   isCollapsed = false,
+  "data-tour": dataTour,
 }) => (
-  <div className="mb-2">
+  <div className="mb-2" data-tour={dataTour}>
     <button
       onClick={onToggle}
       className={`relative w-full flex items-center transition-all duration-300 text-gray-400 hover:bg-white/5 hover:text-white rounded-xl group ${isCollapsed ? "justify-center px-0 h-12" : "justify-between px-4 py-3"}`}
@@ -294,6 +295,7 @@ export default function Sidebar({
             onToggle={() => toggleSection("workbenches")}
             badge={workbenches.length}
             isCollapsed={isCollapsed}
+            data-tour="workbenches-section"
           >
             {workbenches.map((wb) => (
               <div

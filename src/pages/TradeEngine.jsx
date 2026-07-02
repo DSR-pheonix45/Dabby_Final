@@ -373,7 +373,7 @@ export default function TradeEngine({ workbenchId }) {
         net_amount: formData.net_amount !== "" ? parseFloat(formData.net_amount) : null,
         invoice_date: formData.invoice_date || null,
         due_date: formData.due_date || null,
-        status: "Approved"
+        // Do NOT set status here — the /execute endpoint owns the status transition
       };
 
       const saveRes = await fetch(`http://localhost:8000/api/trades/${selectedTrade.id}`, {
@@ -383,7 +383,7 @@ export default function TradeEngine({ workbenchId }) {
       });
       if (!saveRes.ok) throw new Error("Failed to save trade details");
 
-      // 3. Trigger activity execution
+      // 3. Trigger activity execution (Stages 10-12)
       const execRes = await fetch(`http://localhost:8000/api/trades/${selectedTrade.id}/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -395,9 +395,13 @@ export default function TradeEngine({ workbenchId }) {
         throw new Error(errData.detail || "Operational execution failed");
       }
 
-      toast.success("Operational activities executed successfully!", { id: "exec-trade" });
+      toast.success("Trade committed and ledger updated!", { id: "exec-trade" });
       setSelectedTrade(null);
       fetchTrades();
+
+      // Stage 12: Tell the COA page to re-read transaction_entries from Supabase
+      // This is what actually makes the COA balances update in real time.
+      window.dispatchEvent(new Event('refresh-ledger-data'));
     } catch (err) {
       console.error("Execution error:", err);
       if (err.message.includes("activities") || err.message.includes("save") || err.message.includes("execute")) {

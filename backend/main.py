@@ -16,7 +16,7 @@ else:
     load_dotenv(env_path)
 
 
-from routers import workbenches, ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, trades, assets
+from routers import workbenches, ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, trades, assets, rulesets
 
 app = FastAPI(title="Datalis API", description="FastAPI Backend for Datalis", version="1.0.0")
 
@@ -49,6 +49,7 @@ app.include_router(tasks.router, prefix="/api/tasks", tags=["Tasks"])
 app.include_router(budgets.router, prefix="/api/budgets", tags=["Budgets"])
 app.include_router(trades.router, prefix="/api/trades", tags=["Trades"])
 app.include_router(assets.router, prefix="/api/assets", tags=["Assets"])
+app.include_router(rulesets.router, prefix="/api/rulesets", tags=["Rulesets"])
 
 @app.get("/health")
 def health_check():

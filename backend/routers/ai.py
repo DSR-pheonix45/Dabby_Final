@@ -69,12 +69,16 @@ async def generate_template(request: TemplateGenRequest):
         
         raise HTTPException(status_code=500, detail=str(e))
 
+from typing import Optional
+
 class CategorizeRequest(BaseModel):
     description: str
-    accounts: list  # List of workbench_accounts
+    labels: Optional[list] = None
+    accounts: Optional[list] = None
 
 @router.post("/categorize-transaction")
 async def categorize_transaction(request: CategorizeRequest):
     from services.ai_service import ai_service
-    res = await ai_service.categorize_transaction(request.description, request.accounts)
+    accs = request.labels if request.labels is not None else (request.accounts or [])
+    res = await ai_service.categorize_transaction(request.description, accs)
     return res

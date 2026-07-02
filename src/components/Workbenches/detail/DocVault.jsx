@@ -209,9 +209,9 @@ export default function DocVault({ workbenchId }) {
 
   const filteredDocs = documents.filter(doc => {
     const matchesStage = 
-      activeStage === 'uploaded' ? (doc.status === 'uploaded' || doc.status === 'failed' || !doc.status) :
+      activeStage === 'uploaded' ? (doc.status === 'uploaded' || doc.status === 'failed' || doc.status === 'Needs Ruleset' || doc.status === 'Needs Review' || !doc.status) :
       activeStage === 'processing' ? doc.status === 'processing' :
-      activeStage === 'analyzed' ? doc.status === 'analyzed' : false;
+      activeStage === 'analyzed' ? (doc.status === 'analyzed' || doc.status === 'processed') : false;
 
     const matchesSearch = doc.filename?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           doc.metadata?.extracted_invoice?.parties?.vendor_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -220,9 +220,9 @@ export default function DocVault({ workbenchId }) {
     return matchesStage && matchesSearch;
   });
 
-  const countUploaded = documents.filter(d => d.status === 'uploaded' || d.status === 'failed' || !d.status).length;
+  const countUploaded = documents.filter(d => d.status === 'uploaded' || d.status === 'failed' || d.status === 'Needs Ruleset' || d.status === 'Needs Review' || !d.status).length;
   const countProcessing = documents.filter(d => d.status === 'processing').length;
-  const countAnalyzed = documents.filter(d => d.status === 'analyzed').length;
+  const countAnalyzed = documents.filter(d => d.status === 'analyzed' || d.status === 'processed').length;
 
   const stats = {
     total: documents.length,
@@ -393,9 +393,38 @@ export default function DocVault({ workbenchId }) {
                                   Analyzed
                                 </span>
                               )}
+                              {doc.status === 'processed' && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.dispatchEvent(new CustomEvent('change-workbench-tab', { detail: { tab: 'TradeEngine' } }));
+                                  }}
+                                  className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500 hover:text-black transition-all cursor-pointer"
+                                  title="Click to view trade in Trade Engine"
+                                >
+                                  Processed
+                                </button>
+                              )}
+                              {doc.status === 'Needs Review' && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.dispatchEvent(new CustomEvent('change-workbench-tab', { detail: { tab: 'TradeEngine' } }));
+                                  }}
+                                  className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-300 border border-amber-500/20 hover:bg-amber-500 hover:text-black transition-all cursor-pointer"
+                                  title="Click to review trade in Trade Engine"
+                                >
+                                  Needs Review
+                                </button>
+                              )}
                               {doc.status === 'failed' && (
                                 <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20" title={doc.metadata?.error || "Processing failed"}>
                                   Failed
+                                </span>
+                              )}
+                              {doc.status === 'Needs Ruleset' && (
+                                <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-300 border border-amber-500/20" title="This document does not have an active ruleset. Configure a playbook to auto-process.">
+                                  Needs Ruleset
                                 </span>
                               )}
                             </div>
@@ -472,7 +501,7 @@ export default function DocVault({ workbenchId }) {
                                   <BsArrowRight size={14} />
                                </button>
                              )}
-                             {doc.status === 'analyzed' && doc.metadata?.extracted_invoice && (
+                             {(doc.status === 'analyzed' || doc.status === 'processed') && doc.metadata?.extracted_invoice && (
                                 <div className="flex space-x-1">
                                   <button 
                                     onClick={(e) => {
@@ -485,27 +514,15 @@ export default function DocVault({ workbenchId }) {
                                   >
                                      <BsStars size={14} />
                                   </button>
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      window.dispatchEvent(new CustomEvent('change-workbench-tab', {
-                                        detail: { tab: 'TradeEngine', documentId: doc.id }
-                                      }));
-                                    }}
-                                    title="Open in Trade Engine"
-                                    className="p-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500 hover:text-black transition-all"
-                                  >
-                                     <BsArrowRight size={14} />
-                                  </button>
                                 </div>
                               )}
-                             {(doc.status === 'uploaded' || doc.status === 'failed' || !doc.status) && (
+                             {(doc.status === 'uploaded' || doc.status === 'failed' || doc.status === 'Needs Ruleset' || doc.status === 'processed' || doc.status === 'Needs Review' || !doc.status) && (
                                <button 
                                  onClick={async (e) => {
                                    e.stopPropagation();
                                    handleTriggerProcess(doc);
                                  }}
-                                 title="Process / Retry Document"
+                                 title="Process / Re-run Ruleset matching"
                                  className="p-1.5 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500 hover:text-black transition-all"
                                >
                                   <BsMagic size={14} />

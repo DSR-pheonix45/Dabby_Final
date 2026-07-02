@@ -30,6 +30,7 @@ import ReportGenerationModal from "../components/Workbenches/ReportGenerationMod
 import InventoryView from "../components/Workbenches/detail/InventoryView";
 import WorkbenchSettings from "../components/Workbenches/WorkbenchSettings";
 import TransactionModal from "../components/Workbenches/ledger/TransactionModal";
+import Rulesets from "./Rulesets";
 import TradeEngine from "./TradeEngine";
 
 import { WorkbenchProvider } from "../context/WorkbenchContext";
@@ -99,9 +100,9 @@ export default function WorkbenchDetail() {
 
   const navItems = [
     { id: "COA", label: "Chart of Accounts", icon: BsShieldCheck },
-    { id: "DocVault", label: "Doc Vault", icon: BsFolder2 },
     { id: "TradeEngine", label: "Trade Engine", icon: BsArrowLeftRight },
-    { id: "Ops", label: "Ops", icon: BsLightningCharge },
+    { id: "Rulesets", label: "Rulesets", icon: BsStars },
+    { id: "DocVault", label: "Doc Vault", icon: BsFolder2 },
     { id: "Investor", label: "Investor View", icon: BsArrowUpRight },
     ...(showInventory ? [{ id: "Inventory", label: "Inventory & Stock", icon: BsBoxSeam }] : []),
     { id: "Settings", label: "Settings", icon: BsGear },
@@ -133,7 +134,7 @@ export default function WorkbenchDetail() {
             </div>
           </div>
 
-          <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
+          <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar" data-tour="workbench-sidebar">
             <div className="px-4 py-2">
               <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Architecture</span>
             </div>
@@ -146,7 +147,7 @@ export default function WorkbenchDetail() {
                   activeTab === item.id 
                     ? "bg-teal-500/10 text-teal-400 border border-teal-500/20 shadow-lg shadow-teal-500/5" 
                     : "text-gray-500 hover:text-gray-300 hover:bg-white/5 border border-transparent"
-                }`}
+                  }`}
               >
                 <item.icon className={`text-lg transition-transform duration-200 ${activeTab === item.id ? "scale-110" : "group-hover:scale-110"}`} />
                 <span className="font-bold text-sm">{item.label}</span>
@@ -165,17 +166,18 @@ export default function WorkbenchDetail() {
           </div>
         </div>
 
-        {/* Content Area */}
+        {/* Content Container */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <header className="h-16 flex items-center justify-between px-8 border-b border-white/5 bg-[#0a0a0a]/50 backdrop-blur-md z-10">
-            <div className="flex items-center space-x-4">
-              <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{activeTab}</span>
+          <header className="h-16 border-b border-white/5 bg-[#0a0a0a] px-8 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <span className="text-[10px] text-gray-500 uppercase tracking-widest font-black">Active Workbench:</span>
+              <span className="text-xs font-bold text-white uppercase">{workbench?.name}</span>
             </div>
 
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               <button 
-                 onClick={() => setIsReportModalOpen(true)}
-                 className="flex items-center space-x-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-gray-300 hover:text-white hover:bg-white/10 transition-all"
+                onClick={() => setIsReportModalOpen(true)}
+                className="flex items-center space-x-2 px-4 py-2 border border-white/10 rounded-xl text-xs font-bold text-gray-300 hover:text-white transition-all hover:bg-white/5"
               >
                 <BsStars className="text-teal-400" />
                 <span>Invoice & Reports</span>
@@ -191,10 +193,10 @@ export default function WorkbenchDetail() {
             </div>
           </header>
 
-          <main className="flex-grow flex flex-col min-h-0 relative overflow-hidden">
+          <main className="flex-grow flex flex-col min-h-0 relative overflow-hidden" data-tour="workbench-content">
             {activeTab === "COA" && <COAView workbenchId={id} />}
             {activeTab === "TradeEngine" && <TradeEngine workbenchId={id} />}
-            {activeTab === "Ops" && <OperationsView workbenchId={id} />}
+            {activeTab === "Rulesets" && <Rulesets workbenchId={id} />}
             {activeTab === "Investor" && <div className="p-8 overflow-auto h-full custom-scrollbar"><InvestorView workbenchId={id} workbenchName={workbench?.name} /></div>}
             {activeTab === "DocVault" && <DocVault workbenchId={id} />}
             {activeTab === "Inventory" && <InventoryView workbenchId={id} />}

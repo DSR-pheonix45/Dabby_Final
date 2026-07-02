@@ -56,6 +56,7 @@ const Onboarding = lazy(() => import("./pages/Onboarding"));
 const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
 const DataIngestionPage = lazy(() => import("./pages/DataIngestion"));
 const SharedSnapshot = lazy(() => import("./pages/SharedSnapshot"));
+const RulesetEditor = lazy(() => import("./pages/RulesetEditor"));
 
 
 // Loading Component
@@ -169,6 +170,11 @@ function App() {
                 <Route path="/auth/callback" element={<OAuthCallback />} />
                 <Route path="/invite/:token" element={<AcceptInvite />} />
                 <Route path="/share/:shareId" element={<SharedSnapshot />} />
+                <Route path="/ruleset/editor/:id" element={
+                  <ProtectedRoute>
+                    <RulesetEditor />
+                  </ProtectedRoute>
+                } />
 
 
                 {/* Protected Dashboard Routes */}

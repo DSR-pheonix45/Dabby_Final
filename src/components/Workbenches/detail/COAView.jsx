@@ -11,7 +11,9 @@ import {
   BsHash,
   BsArrowRepeat,
   BsJournalText,
-  BsArrowRight
+  BsArrowRight,
+  BsUpload,
+  BsCheckCircleFill
 } from "react-icons/bs";
 import { toast } from "react-hot-toast";
 import TransactionModal from "../ledger/TransactionModal";
@@ -19,7 +21,8 @@ import LabelModal from "../ledger/LabelModal";
 import { useWorkbench } from "../../../context/WorkbenchContext";
 import { supabase } from "../../../lib/supabase";
 import COASetupModal from "./COASetupModal";
-import { BsCheck } from "react-icons/bs";
+import { backendService } from "../../../services/backendService";
+
 
 
 
@@ -30,6 +33,115 @@ export default function COAView({ workbenchId }) {
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
   const [isCOASetupModalOpen, setIsCOASetupModalOpen] = useState(false);
+
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState(null); // null, 'uploading', 'processing', 'success', 'error'
+  const [understoodMessage, setUnderstoodMessage] = useState("");
+  const [processingFiles, setProcessingFiles] = useState([]);
+  const fileInputRef = React.useRef(null);
+
+  useEffect(() => {
+    if (processingFiles.length === 0) return;
+
+    let isSubscribed = true;
+    const interval = setInterval(async () => {
+      try {
+        const { data, error } = await supabase
+          .from("workbench_documents")
+          .select("id, status, filename")
+          .in("id", processingFiles.map(f => f.id));
+
+        if (error) throw error;
+
+        if (data) {
+          const allFinished = data.every(d => d.status === "analyzed" || d.status === "failed" || d.status === "processed");
+          
+          // Update details
+          setProcessingFiles(prev => prev.map(f => {
+            const match = data.find(d => d.id === f.id);
+            return match ? { ...f, status: match.status } : f;
+          }));
+
+          if (allFinished && isSubscribed) {
+            clearInterval(interval);
+            setUploadStatus("success");
+            setUnderstoodMessage("We've understood your documents.");
+            setProcessingFiles([]);
+            refreshContext();
+            
+            // Clear message after 6 seconds
+            setTimeout(() => {
+              if (isSubscribed) {
+                setUnderstoodMessage("");
+                setUploadStatus(null);
+              }
+            }, 6000);
+          }
+        }
+      } catch (err) {
+        console.error("Error polling document status:", err);
+      }
+    }, 2000);
+
+    return () => {
+      isSubscribed = false;
+      clearInterval(interval);
+    };
+  }, [processingFiles, refreshContext]);
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+    
+    await uploadAndProcessFiles(files);
+  };
+
+  const handleFileSelect = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    
+    await uploadAndProcessFiles(files);
+  };
+
+  const uploadAndProcessFiles = async (files) => {
+    try {
+      setUploadStatus("uploading");
+      setUnderstoodMessage("");
+      toast.loading("Uploading documents...", { id: "coa-upload" });
+
+      const uploadedDocs = [];
+      for (const file of files) {
+        // Upload each file (auto-detect document type on backend)
+        const doc = await backendService.uploadDocument(workbenchId, file, "sales_invoice");
+        uploadedDocs.push({
+          id: doc.id,
+          filename: file.name,
+          status: "uploaded"
+        });
+      }
+
+      toast.success("Upload finished, starting analysis...", { id: "coa-upload" });
+      setUploadStatus("processing");
+      setProcessingFiles(uploadedDocs);
+    } catch (err) {
+      console.error("Upload failed:", err);
+      setUploadStatus("error");
+      toast.error("Upload failed: " + err.message, { id: "coa-upload" });
+    }
+  };
+
 
   useEffect(() => {
     if (!loading && labels.length === 0) {
@@ -323,14 +435,82 @@ export default function COAView({ workbenchId }) {
           </div>
         </div>
 
-        {/* Right Container: Recent Activity */}
+        {/* Right Container: Recent Activity & Ingestion */}
         <div className="flex-[2] bg-white/[0.01] border border-white/5 rounded-[2.5rem] overflow-hidden flex flex-col shadow-2xl">
           <div className="bg-white/[0.02] border-b border-white/5 px-8 py-5 flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <BsStars className="text-teal-400" />
-              <span className="text-xs font-black text-white uppercase tracking-widest">Recent Activity</span>
+              <span className="text-xs font-black text-white uppercase tracking-widest">Journal Entries</span>
             </div>
-            <button className="text-[10px] font-bold text-gray-500 hover:text-white transition-colors">VIEW ALL</button>
+          </div>
+
+          {/* Upload Zone */}
+          <div className="p-6 border-b border-white/5">
+            <div 
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-3xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center space-y-3 ${
+                isDragging 
+                  ? "border-teal-400 bg-teal-500/5 shadow-[0_0_15px_rgba(20,184,166,0.1)]" 
+                  : "border-white/10 hover:border-white/20 hover:bg-white/[0.01]"
+              }`}
+            >
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileSelect} 
+                multiple 
+                accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.zip" 
+                className="hidden" 
+              />
+              
+              {uploadStatus === "uploading" ? (
+                <>
+                  <div className="w-8 h-8 border-2 border-teal-500/20 border-t-teal-500 rounded-full animate-spin" />
+                  <p className="text-xs font-bold text-teal-400 uppercase tracking-widest animate-pulse">Uploading...</p>
+                </>
+              ) : uploadStatus === "processing" ? (
+                <>
+                  <div className="w-8 h-8 border-2 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+                  <p className="text-xs font-bold text-amber-400 uppercase tracking-widest animate-pulse">
+                    Dabby is understanding your documents...
+                  </p>
+                  <div className="flex flex-col space-y-1 w-full max-w-xs mt-2">
+                    {processingFiles.map(f => (
+                      <div key={f.id} className="flex justify-between items-center text-[10px] text-gray-500">
+                        <span className="truncate max-w-[150px]">{f.filename}</span>
+                        <span className={`uppercase font-black ${f.status === 'analyzed' || f.status === 'processed' ? 'text-teal-400' : 'text-amber-500 animate-pulse'}`}>
+                          {f.status === 'analyzed' || f.status === 'processed' ? 'Done' : 'Processing'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : understoodMessage ? (
+                <motion.div 
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="flex flex-col items-center space-y-2 p-3 bg-teal-500/10 border border-teal-500/20 rounded-2xl w-full"
+                >
+                  <BsCheckCircleFill className="text-teal-400 text-2xl animate-bounce" />
+                  <p className="text-sm font-bold text-teal-400 tracking-wide text-center">
+                    {understoodMessage}
+                  </p>
+                </motion.div>
+              ) : (
+                <>
+                  <div className="p-3 bg-white/5 rounded-2xl text-gray-400 group-hover:text-teal-400 transition-colors">
+                    <BsUpload size={20} />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-gray-200">Drop PDF, Excel, Images, or ZIP here</p>
+                    <p className="text-[10px] text-gray-500">Or click to select files to update company memory</p>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
           
           <div className="flex-1 overflow-auto custom-scrollbar p-2">

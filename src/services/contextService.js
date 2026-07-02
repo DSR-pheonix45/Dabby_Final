@@ -32,7 +32,7 @@ export const contextService = {
   formatForLLM(intel) {
     if (!intel || !intel.workbench) return "No workbench context available.";
 
-    const { workbench, balances, transactions, inventory, parties, labels } = intel;
+    const { workbench, balances, transactions, inventory, parties, labels, documents } = intel;
 
     let context = `### REAL-TIME BUSINESS CONTEXT: ${workbench.name} ###\n`;
     context += `Report Generated: ${new Date().toLocaleString()}\n\n`;
@@ -110,6 +110,41 @@ export const contextService = {
       context += `## 5. INVENTORY & STOCK\n`;
       inventory.slice(0, 5).forEach(i => {
         context += `- ${i.name}: ${i.stock_level} ${i.unit} (Price: ₹${i.price || 0})\n`;
+      });
+      context += `\n`;
+    }
+
+    // 6. Complete list of Chart of Accounts Labels
+    if (labels && labels.length > 0) {
+      context += `## 6. ALL CHART OF ACCOUNTS LABELS\n`;
+      labels.forEach(l => {
+        context += `- Label: "${l.name}" | Type: ${l.type} | Sub-Account: ${l.sub_account}\n`;
+      });
+      context += `\n`;
+    }
+
+    // 7. Documents & Extracted OCR Metadata (Doc Vault)
+    if (documents && documents.length > 0) {
+      context += `## 7. DOCUMENT VAULT (Uploaded Documents & AI Analysis Notes)\n`;
+      documents.forEach(doc => {
+        context += `- File: ${doc.filename} | Type: ${doc.document_type || 'Uncategorized'} | Status: ${doc.status}\n`;
+        const analysis = doc.metadata?.extracted_invoice;
+        if (analysis) {
+          context += `  - Extracted Analysis:\n`;
+          context += `    * Vendor: ${analysis.parties?.vendor_name || 'N/A'} | Customer: ${analysis.parties?.customer_name || 'N/A'}\n`;
+          if (analysis.references?.invoice_number) context += `    * Invoice/Bill #: ${analysis.references.invoice_number}\n`;
+          if (analysis.document_metadata?.document_date) context += `    * Issue Date: ${analysis.document_metadata.document_date}\n`;
+          if (analysis.financials?.total_amount) context += `    * Total Amount: ${analysis.document_metadata?.currency || 'INR'} ${analysis.financials.total_amount.toLocaleString()}\n`;
+          if (analysis.line_items && analysis.line_items.length > 0) {
+            context += `    * Line Items:\n`;
+            analysis.line_items.slice(0, 5).forEach(item => {
+              context += `      - ${item.description}: Qty ${item.quantity || 1} @ ${(item.unit_price || 0).toLocaleString()} = ${(item.amount || 0).toLocaleString()}\n`;
+            });
+            if (analysis.line_items.length > 5) {
+              context += `      - ... and ${analysis.line_items.length - 5} more items\n`;
+            }
+          }
+        }
       });
       context += `\n`;
     }

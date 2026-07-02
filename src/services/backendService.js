@@ -154,6 +154,17 @@ export const backendService = {
         throw new Error(wbError.message || 'Failed to create workbench');
       }
 
+      // 1.5. Auto-seed Chart of Accounts labels/ontology
+      try {
+        await fetch(`http://localhost:8000/api/ledger/labels/seed/${workbench.id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" }
+        });
+        console.log(`[DEBUG] Automatically seeded Chart of Accounts for workbench: ${workbench.id}`);
+      } catch (seedErr) {
+        console.error("[WARNING] Auto-seeding labels failed:", seedErr);
+      }
+
       // 2. Insert into workbench_members table
       const { error: memError } = await supabase
         .from('workbench_members')
