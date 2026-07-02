@@ -1,12 +1,9 @@
 {
-    "experimentalServices": {
-        "frontend": {
-            "routePrefix": "/",
-            "framework": "vite"
-        },
-        "backend": {
-            "entrypoint": "backend/main.py",
-            "routePrefix": "/_/backend"
-        }
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://REPLACE-WITH-YOUR-RAILWAY-URL.up.railway.app/api/:path*"
     }
+  ]
 }

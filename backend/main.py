@@ -20,7 +20,12 @@ from routers import workbenches, ai, coa, ledger, ops, context, inventory, inves
 
 app = FastAPI(title="Datalis API", description="FastAPI Backend for Datalis", version="1.0.0")
 
-# Configure CORS
+# Configure CORS.
+# In production the frontend calls /api/* on its own origin (Vercel) and Vercel
+# rewrites that server-side to this backend, so CORS usually isn't triggered.
+# We still allow localhost (dev) + any *.vercel.app + an optional FRONTEND_ORIGIN
+# (comma-separated) for direct browser calls / previews.
+_extra_origins = [o.strip() for o in os.environ.get("FRONTEND_ORIGIN", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -29,9 +34,9 @@ app.add_middleware(
         "http://localhost:5174",
         "http://localhost:5173",
         "http://127.0.0.1:5174",
-        "http://127.0.0.1:5173"
-    ],
-
+        "http://127.0.0.1:5173",
+    ] + _extra_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
