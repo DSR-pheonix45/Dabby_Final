@@ -1442,6 +1442,7 @@ export default function TradeEngine({ workbenchId }) {
               </button>
             </div>
           </div>
+        </div>
       )}
 
       {/* Guided Error Resolution Modal */}
