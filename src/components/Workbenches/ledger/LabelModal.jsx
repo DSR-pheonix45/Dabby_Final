@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BsX, BsTag, BsGrid } from "react-icons/bs";
 import { toast } from "react-hot-toast";
+import { apiFetch } from "../../../lib/apiClient";
 
 export default function LabelModal({ isOpen, onClose, workbenchId, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -25,8 +26,8 @@ export default function LabelModal({ isOpen, onClose, workbenchId, onSuccess }) 
     try {
       setLoadingLookups(true);
       const [accsRes, subsRes] = await Promise.all([
-        fetch("/api/ledger/master-accounts"),
-        fetch("/api/ledger/master-sub-accounts")
+        apiFetch("/api/ledger/master-accounts"),
+        apiFetch("/api/ledger/master-sub-accounts")
       ]);
       if (!accsRes.ok || !subsRes.ok) throw new Error("Failed to fetch account definitions");
       
@@ -106,7 +107,7 @@ export default function LabelModal({ isOpen, onClose, workbenchId, onSuccess }) 
 
     try {
       setLoading(true);
-      const response = await fetch("/api/ledger/labels", {
+      const response = await apiFetch("/api/ledger/labels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

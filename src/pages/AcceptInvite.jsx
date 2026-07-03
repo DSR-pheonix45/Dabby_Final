@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabase";
 import { BsCheckCircleFill, BsExclamationTriangleFill, BsBuilding } from "react-icons/bs";
 import Button from "../components/shared/Button";
 import Card from "../components/shared/Card";
+import { apiFetch } from "../lib/apiClient";
 
 export default function AcceptInvite() {
     const { token } = useParams();
@@ -39,7 +40,7 @@ export default function AcceptInvite() {
         setError(null);
 
         try {
-            const response = await fetch(`/api/investor/invite/accept/${token}`, {
+            const response = await apiFetch(`/api/investor/invite/accept/${token}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ user_id: user.id })

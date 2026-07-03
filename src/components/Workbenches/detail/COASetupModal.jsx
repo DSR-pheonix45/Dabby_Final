@@ -16,6 +16,7 @@ import {
   BsBookHalf as IconBookHalf
 } from "react-icons/bs";
 import { toast } from "react-hot-toast";
+import { apiFetch } from "../../../lib/apiClient";
 
 const INDUSTRY_COA_TEMPLATES = {
   services: {
@@ -172,8 +173,8 @@ export default function COASetupModal({ isOpen, onClose, workbench, onSuccess })
     try {
       setLoadingLookups(true);
       const [accsRes, subsRes] = await Promise.all([
-        fetch("/api/ledger/master-accounts"),
-        fetch("/api/ledger/master-sub-accounts")
+        apiFetch("/api/ledger/master-accounts"),
+        apiFetch("/api/ledger/master-sub-accounts")
       ]);
       if (!accsRes.ok || !subsRes.ok) throw new Error("Failed to load schema groups");
       
@@ -246,7 +247,7 @@ export default function COASetupModal({ isOpen, onClose, workbench, onSuccess })
     }
     setLoading(true);
     try {
-      const res = await fetch(`/api/ledger/labels/seed/${workbench.id}`, {
+      const res = await apiFetch(`/api/ledger/labels/seed/${workbench.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -282,7 +283,7 @@ export default function COASetupModal({ isOpen, onClose, workbench, onSuccess })
 
     setLoading(true);
     try {
-      const response = await fetch("/api/ledger/labels", {
+      const response = await apiFetch("/api/ledger/labels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -340,7 +341,7 @@ export default function COASetupModal({ isOpen, onClose, workbench, onSuccess })
         const { master_id, sub_id } = findOntologyIds(item.type, item.sub_account);
         if (!master_id || !sub_id) continue;
 
-        const response = await fetch("/api/ledger/labels", {
+        const response = await apiFetch("/api/ledger/labels", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

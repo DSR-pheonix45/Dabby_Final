@@ -3,6 +3,7 @@ import { BsX, BsEnvelope, BsShieldLock, BsClipboard, BsCheck2, BsPeople, BsPerso
 
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
+import { apiFetch } from "../../lib/apiClient";
 
 export default function InviteMemberModal({ isOpen, onClose, workbenchId }) {
   const [email, setEmail] = useState("");
@@ -19,7 +20,7 @@ export default function InviteMemberModal({ isOpen, onClose, workbenchId }) {
 
     try {
       setLoading(true);
-      const response = await fetch(`/api/investor/invite/${workbenchId}`, {
+      const response = await apiFetch(`/api/investor/invite/${workbenchId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, role })

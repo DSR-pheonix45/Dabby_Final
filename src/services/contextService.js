@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import { apiFetch } from "../lib/apiClient";
 
 /**
  * Context Service
@@ -12,7 +13,7 @@ export const contextService = {
    */
   async getWorkbenchIntelligence(workbenchId) {
     try {
-      const response = await fetch(`/api/context/${workbenchId}`);
+      const response = await apiFetch(`/api/context/${workbenchId}`);
       if (!response.ok) throw new Error("Failed to fetch workbench intelligence");
       
       const data = await response.json();

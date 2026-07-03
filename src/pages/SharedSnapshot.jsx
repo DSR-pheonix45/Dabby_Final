@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { BsShieldLock, BsArrowRight, BsStars } from "react-icons/bs";
 import InvestorView from "../components/Workbenches/InvestorView";
 import toast from "react-hot-toast";
+import { apiFetch } from "../lib/apiClient";
 
 export default function SharedSnapshot() {
   const { shareId } = useParams();
@@ -16,7 +17,7 @@ export default function SharedSnapshot() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/investor/shared/${shareId}`, {
+      const response = await apiFetch(`/api/investor/shared/${shareId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password })

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
+import { apiFetch } from "../lib/apiClient";
 
 const WorkbenchContext = createContext();
 
@@ -33,7 +34,7 @@ export const WorkbenchProvider = ({ children, workbenchId }) => {
             
             // 1. Try fetching from backend API
             try {
-                const response = await fetch(`/api/context/${workbenchId}`);
+                const response = await apiFetch(`/api/context/${workbenchId}`);
                 if (response.ok) {
                     const contextData = await response.json();
                     setData({

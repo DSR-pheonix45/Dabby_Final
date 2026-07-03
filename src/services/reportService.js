@@ -1,6 +1,7 @@
 import { supabase } from "../lib/supabase";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { apiFetch } from "../lib/apiClient";
 
 /**
  * Report Service - Professional Edition
@@ -113,7 +114,7 @@ export const reportService = {
     },
 
     async fetchDataRoomData(workbenchId) {
-        const response = await fetch(`/api/investor/statements/${workbenchId}`);
+        const response = await apiFetch(`/api/investor/statements/${workbenchId}`);
         if (!response.ok) throw new Error("Failed to fetch data room content");
         return await response.json();
     },
