@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AuthContext } from './AuthContextBase';
 import { signOut, getCurrentUser, onAuthStateChange, supabase } from '../lib/supabase';
 
@@ -6,6 +6,10 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Tracks the currently-authenticated user id so we can ignore background
+  // token refreshes (fired on every tab refocus) that would otherwise churn
+  // the whole tree and reset multi-step forms/modals.
+  const currentUserIdRef = useRef(null);
 
   /**
    * Fetch user profile safely
@@ -50,6 +54,7 @@ export function AuthProvider({ children }) {
         }
 
         if (user) {
+          currentUserIdRef.current = user.id;
           setUser(user);
           await fetchUserProfile(user.id);
         } else {
@@ -67,17 +72,21 @@ export function AuthProvider({ children }) {
 
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         if (session?.user) {
-          // If we already have a user, this is likely a background refresh
-          // Don't trigger the global loading state to prevent unmounting protected routes
+          // Ignore background refreshes for the SAME user (fired on every tab
+          // refocus). Re-setting user/profile here changes object identity and
+          // re-renders/remounts the tree, resetting open modals & multi-step
+          // forms to step 1. Only update when the user actually changes.
+          if (currentUserIdRef.current === session.user.id) {
+            return;
+          }
+          currentUserIdRef.current = session.user.id;
           setUser(session.user);
-          
-          // Only set loading if it's the first time we're getting a user
-          // (but usually initAuth handles this, so we might not even need it here)
           fetchUserProfile(session.user.id);
         }
       }
 
       if (event === 'SIGNED_OUT') {
+        currentUserIdRef.current = null;
         setUser(null);
         setProfile(null);
         setLoading(false);
