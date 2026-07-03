@@ -126,28 +126,41 @@ export const backendService = {
       if (!user) throw new Error("Not authenticated");
 
       // 1. Insert into workbenches table
-      const { data: workbench, error: wbError } = await supabase
+      const baseRow = {
+        name: name.trim(),
+        owner_user_id: user.id,
+        books_start_date: booksStartDate,
+        description: description || `Workbench for ${name.trim()}`,
+        location: extraData.location || 'India',
+        currency: extraData.currency || 'INR',
+        industry: extraData.industry || null,
+        sector: extraData.sector || null,
+        business_type: extraData.business_type || null,
+        legal_name: extraData.legal_name || null,
+        pan: extraData.pan || null,
+        gstin: extraData.gstin || null,
+        incorporation_date: extraData.incorporation_date || null,
+        fy_start: extraData.fy_start || 'April',
+        status: 'active',
+      };
+
+      let { data: workbench, error: wbError } = await supabase
         .from('workbenches')
-        .insert({
-          name: name.trim(),
-          owner_user_id: user.id,
-          books_start_date: booksStartDate,
-          description: description || `Workbench for ${name.trim()}`,
-          location: extraData.location || 'India',
-          currency: extraData.currency || 'INR',
-          industry: extraData.industry || null,
-          sector: extraData.sector || null,
-          business_type: extraData.business_type || null,
-          legal_name: extraData.legal_name || null,
-          pan: extraData.pan || null,
-          gstin: extraData.gstin || null,
-          incorporation_date: extraData.incorporation_date || null,
-          fy_start: extraData.fy_start || 'April',
-          status: 'active',
-          settings: extraData.settings || {},
-        })
+        .insert({ ...baseRow, settings: extraData.settings || {} })
         .select()
         .single();
+
+      // Resilience: some databases predate the optional `settings` jsonb column
+      // ("Could not find the 'settings' column"). Retry without it so workbench
+      // creation still succeeds. Run migration 009 to persist settings properly.
+      if (wbError && /settings|schema cache|column/i.test(wbError.message || '')) {
+        console.warn("workbenches.settings column missing — retrying insert without settings");
+        ({ data: workbench, error: wbError } = await supabase
+          .from('workbenches')
+          .insert(baseRow)
+          .select()
+          .single());
+      }
 
       if (wbError) {
         console.error('Supabase workbench insert error:', wbError);
