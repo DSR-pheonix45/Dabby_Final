@@ -42,7 +42,7 @@ export default function FinalCTA() {
     <section ref={sectionRef} className="relative overflow-hidden">
       {/* Background */}
       <div
-        className={`relative py-20 md:py-28 px-6 md:px-10 ${isDark ? "bg-[#0a0a0a]" : "bg-[#f0f0f0]"
+        className={`relative py-20 md:py-28 px-6 md:px-10 ${isDark ? "bg-[#0a0a0a]" : "bg-transparent"
           }`}
       >
         {/* Left diagonal panels */}
@@ -172,9 +172,9 @@ export default function FinalCTA() {
           >
             <a
               href="/waitlist"
-              className={`w-full sm:w-auto inline-block px-8 md:px-10 py-3.5 md:py-4 text-base md:text-lg font-semibold text-black bg-[#81E6D9] rounded-full border border-[#81E6D9] hover:bg-transparent transition-all duration-200 ${isDark
-                  ? "hover:text-white hover:border-white"
-                  : "hover:text-[#1a1a1a] hover:border-[#1a1a1a]"
+              className={`w-full sm:w-auto inline-block px-8 md:px-10 py-3.5 md:py-4 text-base md:text-lg font-semibold rounded-full border transition-all duration-200 ${isDark
+                  ? "text-black bg-[#81E6D9] border-[#81E6D9] hover:bg-transparent hover:text-white hover:border-white"
+                  : "text-white bg-black border-black hover:bg-transparent hover:text-black hover:border-black"
                 }`}
             >
               Join Waitlist

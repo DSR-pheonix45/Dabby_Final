@@ -73,7 +73,7 @@ function LandingLayout({ children }) {
   const { theme } = useTheme();
   // Ensure we are not in dashboard
   return (
-    <div className={`min-h-screen font-dm-sans ${theme === "dark" ? "bg-black text-[#f8fafc]" : "bg-[#f0f0f0] text-[#1e293b]"}`}>
+    <div className={`min-h-screen font-dm-sans ${theme === "dark" ? "bg-black text-[#f8fafc]" : "bg-transparent text-[#111111]"}`}>
       <Suspense fallback={null}>
         <Navbar />
       </Suspense>

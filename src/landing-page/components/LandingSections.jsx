@@ -92,7 +92,7 @@ export function HowItWorks() {
                 <motion.div {...fadeUp()} className="text-center mb-14">
                     <Pill isDark={isDark}>The Operations Engine</Pill>
                     <H2 isDark={isDark}>
-                        From Raw Data to <span className="text-[#81E6D9]">Financial Command</span>
+                        From Raw Data to <span className={isDark ? "text-[#81E6D9]" : "text-[#0D9488]"}>Financial Command</span>
                     </H2>
                 </motion.div>
 
@@ -185,14 +185,14 @@ export function WhatYouCanGenerate() {
     const isDark = theme === "dark";
 
     return (
-        <section className={`py-20 md:py-28 px-4 sm:px-6 md:px-12 ${isDark ? "bg-white/[0.02]" : "bg-gray-50/70"}`}>
+        <section className={`py-20 md:py-28 px-4 sm:px-6 md:px-12 ${isDark ? "bg-white/[0.02]" : "bg-transparent"}`}>
             <div className="max-w-6xl mx-auto">
                 <motion.div {...fadeUp()} className="text-center mb-12">
                     <Pill isDark={isDark}>Template Gallery</Pill>
                     <H2 isDark={isDark}>
                         AI Financial Templates for
                         <br className="hidden sm:block" />
-                        <span className="text-[#81E6D9]"> Everyday Business Tasks</span>
+                        <span className={isDark ? "text-[#81E6D9]" : "text-[#0D9488]"}> Everyday Business Tasks</span>
                     </H2>
                 </motion.div>
 
@@ -347,7 +347,7 @@ export function TheWorkspace() {
                         <H2 isDark={isDark} className="mb-4">
                             Stop managing finance
                             <br />
-                            <span className="text-[#81E6D9]">in email threads and sheets.</span>
+                            <span className={isDark ? "text-[#81E6D9]" : "text-[#0D9488]"}>in email threads and sheets.</span>
                         </H2>
                         <p className={`text-base leading-relaxed mb-8 ${isDark ? "text-[#787878]" : "text-gray-500"}`}>
                             Dabby replaces disconnected tools and manual checklists. Your team gets a centralized, secure general ledger with role-based controls, so analysts, founders, and CAs stay aligned without data fragmentation.
@@ -374,7 +374,7 @@ export function TheWorkspace() {
                             </div>
                         </div>
 
-                        <Link to="/waitlist" className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-black bg-[#81E6D9] rounded-xl hover:bg-[#5fd3c7] transition-colors duration-200">
+                        <Link to="/waitlist" className={`inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold rounded-xl transition-all duration-200 ${isDark ? "text-black bg-[#81E6D9] hover:bg-[#5fd3c7]" : "text-white bg-black border border-black hover:bg-transparent hover:text-black"}`}>
                             Join the Waitlist
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                         </Link>
@@ -422,12 +422,12 @@ export function AIIntelligence() {
     const isDark = theme === "dark";
 
     return (
-        <section className={`py-20 md:py-28 px-4 sm:px-6 md:px-12 ${isDark ? "bg-white/[0.02]" : "bg-gray-50/70"}`}>
+        <section className={`py-20 md:py-28 px-4 sm:px-6 md:px-12 ${isDark ? "bg-white/[0.02]" : "bg-transparent"}`}>
             <div className="max-w-5xl mx-auto">
                 <motion.div {...fadeUp()} className="text-center mb-12">
                     <Pill isDark={isDark}>AI Intelligence</Pill>
                     <H2 isDark={isDark}>
-                        AI That <span className="text-[#81E6D9]">Understands Business Data</span>
+                        AI That <span className={isDark ? "text-[#81E6D9]" : "text-[#0D9488]"}>Understands Business Data</span>
                     </H2>
                 </motion.div>
 
@@ -494,7 +494,7 @@ export function DataToDecisions() {
                 <motion.div {...fadeUp()} className="text-center mb-14">
                     <Pill isDark={isDark}>Data to Decisions</Pill>
                     <H2 isDark={isDark}>
-                        From Raw Data to <span className="text-[#81E6D9]">Business Insights</span>
+                        From Raw Data to <span className={isDark ? "text-[#81E6D9]" : "text-[#0D9488]"}>Business Insights</span>
                     </H2>
                 </motion.div>
 
@@ -600,12 +600,12 @@ export function PricingSection() {
     const isDark = theme === "dark";
 
     return (
-        <section className={`py-20 md:py-28 px-4 sm:px-6 md:px-12 ${isDark ? "bg-white/[0.02]" : "bg-gray-50/70"}`}>
+        <section className={`py-20 md:py-28 px-4 sm:px-6 md:px-12 ${isDark ? "bg-white/[0.02]" : "bg-transparent"}`}>
             <div className="max-w-5xl mx-auto">
                 <motion.div {...fadeUp()} className="text-center mb-14">
                     <Pill isDark={isDark}>Pricing</Pill>
                     <H2 isDark={isDark}>
-                        <span className="text-[#81E6D9]">Simple</span> Pricing
+                        <span className={isDark ? "text-[#81E6D9]" : "text-[#0D9488]"}>Simple</span> Pricing
                     </H2>
                     <Sub isDark={isDark}>Start free. Scale as your team grows. No hidden fees.</Sub>
                 </motion.div>
@@ -653,10 +653,12 @@ export function PricingSection() {
                                 </ul>
 
                                 <Link to="/waitlist" className={`w-full py-3 rounded-xl text-sm font-semibold text-center transition-all duration-200 ${plan.popular
-                                    ? "text-black bg-[#81E6D9] hover:bg-[#5fd3c7]"
+                                    ? isDark 
+                                        ? "text-black bg-[#81E6D9] hover:bg-[#5fd3c7]" 
+                                        : "text-white bg-black hover:bg-neutral-950"
                                     : isDark
                                         ? "text-white border border-white/20 hover:bg-white/8"
-                                        : "text-[#1a1a1a] border border-gray-200 hover:bg-gray-50"
+                                        : "text-[#1a1a1a] border border-neutral-200 hover:bg-neutral-50"
                                     }`}>
                                     {plan.cta}
                                 </Link>
@@ -705,7 +707,7 @@ export function FinalCTASection() {
                         <h2 className={`font-display text-4xl sm:text-5xl md:text-[3.25rem] font-bold leading-[1.05] tracking-tight mb-4 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>
                             Stop Reconciling Bank
                             <br />
-                            <span className="text-[#81E6D9]">Statements Manually</span>
+                            <span className={isDark ? "text-[#81E6D9]" : "text-[#0D9488]"}>Statements Manually</span>
                         </h2>
 
                         <p className={`text-base md:text-lg max-w-xl mx-auto mb-10 ${isDark ? "text-[#787878]" : "text-gray-500"}`}>
@@ -713,10 +715,10 @@ export function FinalCTASection() {
                         </p>
 
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                            <Link to="/waitlist" className="px-8 py-3.5 text-sm font-bold text-black bg-[#81E6D9] rounded-full hover:bg-[#5fd3c7] transition-colors duration-200">
+                            <Link to="/waitlist" className={`px-8 py-3.5 text-sm font-bold rounded-full border transition-all duration-200 ${isDark ? "text-black bg-[#81E6D9] hover:bg-[#5fd3c7]" : "text-white bg-black border-black hover:bg-transparent hover:text-black hover:border-black"}`}>
                                 Join the Waitlist
                             </Link>
-                            <Link to="/waitlist" className={`px-8 py-3.5 text-sm font-semibold rounded-full border transition-colors duration-200 ${isDark ? "text-white border-white/20 hover:bg-white/8" : "text-[#1a1a1a] border-gray-300 hover:bg-gray-100"
+                            <Link to="/waitlist" className={`px-8 py-3.5 text-sm font-semibold rounded-full border transition-colors duration-200 ${isDark ? "text-white border-white/20 hover:bg-white/8" : "text-[#1a1a1a] border-neutral-300 hover:bg-neutral-100"
                                 }`}>
                                 Request Early Access
                             </Link>
@@ -765,12 +767,12 @@ export function WhatDabbyUnderstands() {
     ];
 
     return (
-        <section className={`py-20 md:py-28 px-4 sm:px-6 md:px-12 ${isDark ? "bg-[#0b0b0b]" : "bg-gray-50"}`}>
+        <section className={`py-20 md:py-28 px-4 sm:px-6 md:px-12 ${isDark ? "bg-[#0b0b0b]" : "bg-transparent"}`}>
             <div className="max-w-6xl mx-auto">
                 <motion.div {...fadeUp()} className="text-center mb-16">
                     <Pill isDark={isDark}>Document Ingestion</Pill>
                     <H2 isDark={isDark}>
-                        What Dabby <span className="text-[#81E6D9]">Understands</span>
+                        What Dabby <span className={isDark ? "text-[#81E6D9]" : "text-[#0D9488]"}>Understands</span>
                     </H2>
                     <Sub isDark={isDark}>Dabby's parser extracts key metadata fields from a wide variety of commercial documents.</Sub>
                 </motion.div>
@@ -851,21 +853,21 @@ export function PrivacySecuritySection() {
     ];
 
     return (
-        <section className={`py-20 md:py-28 px-4 sm:px-6 md:px-12 ${isDark ? "bg-[#0b0b0b]" : "bg-white"}`}>
+        <section className={`py-20 md:py-28 px-4 sm:px-6 md:px-12 ${isDark ? "bg-[#0b0b0b]" : "bg-transparent"}`}>
             <div className="max-w-6xl mx-auto">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
                     <motion.div {...fadeUp()}>
                         <Pill isDark={isDark}>Enterprise Security</Pill>
                         <H2 isDark={isDark}>
-                            Trust, Security, and <span className="text-[#81E6D9]">DPDP Compliance</span>
+                            Trust, Security, and <span className={isDark ? "text-[#81E6D9]" : "text-[#0D9488]"}>DPDP Compliance</span>
                         </H2>
                         <p className={`text-base leading-relaxed mt-4 mb-8 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
                             Dabby is built from the ground up for high compliance workspaces. Your financial base data is processed securely, respecting user data consent and Indian data privacy standards.
                         </p>
-                        <div className="flex gap-4 p-4 rounded-2xl border border-dashed border-[#81E6D9]/30 bg-[#81E6D9]/5">
+                        <div className={`flex gap-4 p-4 rounded-2xl border border-dashed ${isDark ? "border-[#81E6D9]/30 bg-[#81E6D9]/5" : "border-[#0D9488]/30 bg-[#0D9488]/5"}`}>
                             <span className="text-2xl">🇮🇳</span>
                             <div className="space-y-1">
-                                <h4 className="text-xs font-bold uppercase tracking-wider text-[#81E6D9]">Compliance Contact</h4>
+                                <h4 className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-[#81E6D9]" : "text-[#0D9488]"}`}>Compliance Contact</h4>
                                 <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
                                     Have data auditing questions? Reach our grievance desk at <span className="font-semibold text-white">medhanshk02@gmail.com</span>.
                                 </p>
@@ -918,12 +920,12 @@ export function ReportingAnalyticsSection() {
     ];
 
     return (
-        <section className={`py-20 md:py-28 px-4 sm:px-6 md:px-12 ${isDark ? "bg-[#0f0f0f]" : "bg-gray-50/50"}`}>
+        <section className={`py-20 md:py-28 px-4 sm:px-6 md:px-12 ${isDark ? "bg-[#0f0f0f]" : "bg-transparent"}`}>
             <div className="max-w-6xl mx-auto">
                 <motion.div {...fadeUp()} className="text-center mb-16">
                     <Pill isDark={isDark}>Reporting & Analytics</Pill>
                     <H2 isDark={isDark}>
-                        Advanced <span className="text-[#81E6D9]">Financial Diagnostics</span>
+                        Advanced <span className={isDark ? "text-[#81E6D9]" : "text-[#0D9488]"}>Financial Diagnostics</span>
                     </H2>
                     <Sub isDark={isDark}>Monitor run rate margins, KPI trends, and spend metrics in real time.</Sub>
                 </motion.div>

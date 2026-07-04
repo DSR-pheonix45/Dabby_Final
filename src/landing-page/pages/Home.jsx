@@ -30,9 +30,9 @@ export default function Home() {
 
   return (
     <div
-      className={`min-h-screen relative ${theme === "dark" ? "bg-[#0a0a0a]" : "bg-[#f0f0f0]"}`}
+      className={`min-h-screen relative ${theme === "dark" ? "bg-[#0a0a0a]" : "bg-transparent"}`}
       style={{
-        backgroundImage: `url('/${theme === "dark" ? "bg-pattern.png" : "Basic Set (3).png"}')`,
+        backgroundImage: theme === "dark" ? "url('/bg-pattern.png')" : "none",
         backgroundSize: bgSize,
         backgroundPosition: "top center",
         backgroundRepeat: "no-repeat",

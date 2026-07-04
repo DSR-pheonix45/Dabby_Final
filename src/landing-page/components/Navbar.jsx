@@ -183,9 +183,9 @@ export default function Navbar() {
                 </Link>
                 <Link
                   to="/waitlist"
-                  className={`px-6 py-2 text-base font-mono font-medium text-black bg-[#81E6D9] rounded-full border border-[#81E6D9] hover:bg-transparent transition-all duration-200 ${theme === "dark"
-                    ? "hover:text-white hover:border-white"
-                    : "hover:text-[#1a1a1a] hover:border-[#1a1a1a]"
+                  className={`px-6 py-2 text-base font-mono font-medium rounded-full border transition-all duration-200 ${theme === "dark"
+                    ? "text-black bg-[#81E6D9] border-[#81E6D9] hover:bg-transparent hover:text-white hover:border-white"
+                    : "text-white bg-black border-black hover:bg-transparent hover:text-black hover:border-black"
                     }`}
                 >
                   Join Waitlist

@@ -93,7 +93,7 @@ export default function Product() {
     const isDark = theme === "dark";
 
     return (
-        <div className={`min-h-screen ${isDark ? "bg-[#0a0a0a]" : "bg-[#f0f0f0]"}`}>
+        <div className={`min-h-screen ${isDark ? "bg-[#0a0a0a]" : "bg-transparent"}`}>
             {/* Hero Section */}
             <section ref={heroRef} className="pt-32 pb-20 px-6 md:px-10">
                 <div className="max-w-7xl mx-auto">

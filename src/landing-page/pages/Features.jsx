@@ -623,7 +623,7 @@ const FeatureSection = ({ feature, index, isDark }) => {
 
     return (
         <>
-            <section ref={sectionRef} className={`py-10 md:py-16 px-6 md:px-10 ${index % 2 === 0 ? (isDark ? "bg-[#0a0a0a]" : "bg-[#e8e8e8]") : (isDark ? "bg-[#0f0f0f]" : "bg-[#f0f0f0]")}`}>
+            <section ref={sectionRef} className={`py-10 md:py-16 px-6 md:px-10 ${index % 2 === 0 ? (isDark ? "bg-[#0a0a0a]" : "bg-[#f5f5f7]") : (isDark ? "bg-[#0f0f0f]" : "bg-transparent")}`}>
                 <div className="max-w-7xl mx-auto">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
                         <motion.div
@@ -679,7 +679,7 @@ export default function Features() {
     const heroInView = useInView(heroRef, { once: true, margin: "-100px" });
 
     return (
-        <div className={`min-h-screen ${isDark ? "bg-[#0a0a0a]" : "bg-[#e8e8e8]"}`}>
+        <div className={`min-h-screen ${isDark ? "bg-[#0a0a0a]" : "bg-transparent"}`}>
             <section ref={heroRef} className="pt-24 pb-8 px-6 md:px-10">
                 <div className="max-w-4xl mx-auto text-center">
                     <motion.span initial={{ opacity: 0, y: 20 }} animate={heroInView ? { opacity: 1, y: 0 } : {}} className="inline-block px-4 py-1.5 text-xs font-semibold uppercase tracking-wider rounded-full mb-6 bg-[#81E6D9]/10 text-[#81E6D9] border border-[#81E6D9]/20">Features</motion.span>
@@ -688,13 +688,13 @@ export default function Features() {
                 </div>
             </section>
             {featuresData.map((feature, index) => (<FeatureSection key={feature.id} feature={feature} index={index} isDark={isDark} />))}
-            <section className={`py-20 px-6 md:px-10 ${isDark ? "bg-[#0f0f0f]" : "bg-[#e0e0e0]"}`}>
+            <section className={`py-20 px-6 md:px-10 ${isDark ? "bg-[#0f0f0f]" : "bg-[#f5f5f7]"} border-t ${isDark ? "border-white/5" : "border-gray-200/50"}`}>
                 <div className="max-w-4xl mx-auto text-center">
                     <h2 className={`text-3xl md:text-4xl font-bold mb-6 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>Ready to transform your financial analysis?</h2>
-                    <p className={`text-lg mb-8 ${isDark ? "text-gray-400" : "text-gray-600"}`}>Start your free trial today. No credit card required.</p>
+                    <p className={`text-lg mb-8 ${isDark ? "text-gray-400" : "text-gray-600"}`}>Join our early cohort group and audit expenses in seconds.</p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                        <button className={`px-8 py-4 bg-[#81E6D9] text-black font-semibold rounded-full border border-[#81E6D9] hover:bg-transparent transition-colors ${isDark ? "hover:text-white hover:border-white" : "hover:text-[#1a1a1a] hover:border-[#1a1a1a]"}`}>Start Free Trial</button>
-                        <button className={`px-8 py-4 font-semibold rounded-full border ${isDark ? "border-white/20 text-white hover:bg-white/5" : "border-gray-400 text-[#1a1a1a] hover:bg-gray-200"} transition-colors`}>Schedule Demo</button>
+                        <Link to="/waitlist" className={`px-8 py-4 font-semibold rounded-full border text-center inline-block transition-all duration-200 ${isDark ? "text-black bg-[#81E6D9] border-[#81E6D9] hover:bg-transparent hover:text-white hover:border-white" : "text-white bg-black border-black hover:bg-transparent hover:text-black hover:border-black"}`}>Join Waitlist</Link>
+                        <Link to="/docs" className={`px-8 py-4 font-semibold rounded-full border text-center inline-block transition-colors ${isDark ? "border-white/20 text-white hover:bg-white/5" : "border-neutral-400 text-[#1a1a1a] hover:bg-neutral-100"}`}>View Documentation</Link>
                     </div>
                 </div>
             </section>

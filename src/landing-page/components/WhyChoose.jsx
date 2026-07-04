@@ -62,7 +62,7 @@ export default function WhyChoose() {
   return (
     <section
       ref={sectionRef}
-      className={`py-20 md:py-32 px-6 md:px-10 ${theme === "dark" ? "bg-[#0a0a0a]" : "bg-[#f0f0f0]"
+      className={`py-20 md:py-32 px-6 md:px-10 ${theme === "dark" ? "bg-[#0a0a0a]" : "bg-transparent"
         }`}
     >
       <div className="max-w-7xl mx-auto">

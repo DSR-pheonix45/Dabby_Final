@@ -50,7 +50,7 @@ export default function Pay() {
   };
 
   return (
-    <div className={`min-h-screen ${isDark ? "bg-black" : "bg-[#f0f0f0]"} px-6 py-12`}>
+    <div className={`min-h-screen ${isDark ? "bg-black" : "bg-transparent"} px-6 py-12`}>
       <div className="max-w-lg mx-auto">
         <div className="flex justify-center mb-8">
           <BrandLogo iconSize={48} label="Dabby" />

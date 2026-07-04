@@ -10,7 +10,7 @@ export default function PricingPage() {
   const isDark = theme === "dark";
 
   return (
-    <div className={`min-h-screen ${isDark ? "bg-[#0a0a0a]" : "bg-[#f0f0f0]"}`}>
+    <div className={`min-h-screen ${isDark ? "bg-[#0a0a0a]" : "bg-transparent"}`}>
       {/* Simple Header for Pricing Page */}
       <div className="pt-12 pb-6 px-6 flex justify-center">
         <Link to="/">

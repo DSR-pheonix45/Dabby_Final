@@ -36,6 +36,13 @@ body {
   overscroll-behavior: none;
 }
 
+html:not(.dark) body {
+  background-color: #f7f7f8;
+  background-image: linear-gradient(to right, rgba(0, 0, 0, 0.035) 1px, transparent 1px);
+  background-size: 120px 100%;
+  background-position: center top;
+}
+
 * {
   box-sizing: border-box;
 }

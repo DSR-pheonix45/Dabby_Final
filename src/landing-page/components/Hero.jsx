@@ -642,7 +642,7 @@ Return ONLY valid JSON.
             Stop wasting 3 days a month
             <br />
             on{" "}
-            <span className="relative inline-block overflow-hidden align-bottom text-[#81E6D9] min-w-[280px] sm:min-w-[480px] justify-center sm:justify-start">
+            <span className={`relative inline-block overflow-hidden align-bottom min-w-[280px] sm:min-w-[480px] justify-center sm:justify-start ${isDark ? "text-[#81E6D9]" : "text-[#0d9488]"}`}>
               <AnimatePresence mode="wait">
                 <motion.span
                   key={titleIndex}
