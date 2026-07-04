@@ -227,6 +227,8 @@ export default function Hero() {
     localStorage.setItem("dabby_pending_mri_report", JSON.stringify(reportData));
     if (type === "signup") {
       navigate("/signup");
+    } else if (type === "waitlist") {
+      navigate("/waitlist");
     } else {
       navigate("/login");
     }
@@ -1206,15 +1208,15 @@ Return ONLY valid JSON.
                               Unlock Complete Business MRI
                             </h3>
                             <p className={`text-xs leading-relaxed mb-6 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                              Dabby has generated opex audits and opex cost optimizations from your P&L sheet. Log in or create a free account to unlock these recommendations and start an interactive AI chat session with this document.
+                              Dabby has generated opex audits and opex cost optimizations from your P&L sheet. Log in or join the waitlist to unlock these recommendations and start an interactive AI chat session with this document.
                             </p>
 
                             <div className="flex flex-col sm:flex-row gap-3">
                               <button
-                                onClick={() => handleRedirectToAuth("signup")}
+                                onClick={() => handleRedirectToAuth("waitlist")}
                                 className="flex-grow py-3 rounded-xl font-bold text-xs text-black bg-[#81E6D9] hover:bg-[#5fd3c7] transition-all hover:scale-[1.02] active:scale-[0.98]"
                               >
-                                Sign Up to Unlock
+                                Join Waitlist to Unlock
                               </button>
                               <button
                                 onClick={() => handleRedirectToAuth("login")}
