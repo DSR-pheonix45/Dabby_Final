@@ -6,23 +6,16 @@ from typing import Dict, List, Optional
 from groq import Groq
 from supabase_client import supabase
 from services.ledger_service import LedgerService
+from services.groq_pool import GroqPool
 
 class RulesetService:
     def __init__(self):
-        groq_key = os.environ.get("VITE_GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
-        if groq_key:
-            sanitized_key = groq_key.strip().strip('"').strip("'")
-            self.groq_client = Groq(api_key=sanitized_key)
-        else:
-            self.groq_client = None
+        pass
 
     async def generate_ruleset_logic(self, prompt: str, doc_type: str, available_variables: List[str], active_accounts: List[Dict]) -> Dict:
         """
         Uses AI (Groq/Llama) to translate a natural language ruleset description into structured execution logic JSON.
         """
-        if not self.groq_client:
-            raise ValueError("GROQ_API_KEY not configured on backend")
-
         # Compile account choices context
         account_choices = "\n".join([
             f"- Account Name: \"{acc['full_account_name']}\" (Type: {acc['type']}, Sub-account: {acc['sub_account']})"
@@ -65,13 +58,15 @@ class RulesetService:
         """
 
         try:
-            completion = self.groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"User Prompt:\n{prompt}"}
-                ],
-                response_format={"type": "json_object"}
+            completion = GroqPool.execute(
+                lambda client: client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": f"User Prompt:\n{prompt}"}
+                    ],
+                    response_format={"type": "json_object"}
+                )
             )
             structured_logic = json.loads(completion.choices[0].message.content)
             return structured_logic

@@ -16,7 +16,7 @@ else:
     load_dotenv(env_path)
 
 
-from routers import workbenches, ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, trades, assets, rulesets, plans
+from routers import workbenches, ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, trades, assets, rulesets, plans, superadmin
 
 app = FastAPI(title="Datalis API", description="FastAPI Backend for Datalis", version="1.0.0")
 
@@ -56,6 +56,7 @@ app.include_router(trades.router, prefix="/api/trades", tags=["Trades"])
 app.include_router(assets.router, prefix="/api/assets", tags=["Assets"])
 app.include_router(rulesets.router, prefix="/api/rulesets", tags=["Rulesets"])
 app.include_router(plans.router, prefix="/api/plans", tags=["Plans"])
+app.include_router(superadmin.router, prefix="/api/superadmin", tags=["Superadmin"])
 
 @app.get("/health")
 def health_check():
@@ -66,6 +67,23 @@ async def startup_event():
     from services import queue_service
     queue_service.start_worker()
     print("[STARTUP] Document processing queue worker launched successfully")
+    
+    # Auto-seed Groq API Key if table is empty
+    try:
+        from supabase_client import supabase
+        res = supabase.table("groq_api_keys").select("id").limit(1).execute()
+        if not res.data:
+            env_key = os.environ.get("VITE_GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
+            if env_key:
+                sanitized = env_key.strip().strip('"').strip("'")
+                supabase.table("groq_api_keys").insert({
+                    "api_key": sanitized,
+                    "label": "Primary Env Key",
+                    "status": "active"
+                }).execute()
+                print("[STARTUP] Successfully seeded primary Groq API key from environment variables into database.")
+    except Exception as e:
+        print(f"[STARTUP] Warning: Could not seed Groq key (table may not exist yet): {e}")
 
 if __name__ == "__main__":
     import uvicorn

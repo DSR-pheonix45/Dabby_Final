@@ -86,6 +86,27 @@ export default function Signup() {
       setLoading(true);
       setError('');
       
+      // Check if email is on the approved waitlist first
+      try {
+        const checkRes = await fetch(`/api/plans/check-waitlist?email=${encodeURIComponent(trimmedEmail)}`);
+        if (checkRes.ok) {
+          const checkData = await checkRes.json();
+          if (!checkData.approved) {
+            if (checkData.status === "pending") {
+              setError("Your waitlist request is still pending approval. You will receive an email once approved.");
+            } else if (checkData.status === "rejected") {
+              setError("Your waitlist request was rejected.");
+            } else {
+              setError("This email is not on our approved waitlist. Please join the waitlist first.");
+            }
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Waitlist check bypass (backend down):", err);
+      }
+      
       const { data, error } = await supabase.auth.signUp({
         email: trimmedEmail,
         password,
@@ -146,7 +167,7 @@ export default function Signup() {
   return (
     <div className="fixed inset-0 z-[100] flex min-h-screen items-center justify-center px-4 py-8 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="absolute inset-0" onClick={() => navigate('/')} /> {/* Click outside to close */}
-      <div className="relative z-10 w-full max-w-md space-y-6 bg-[#0a0a0a]/95 backdrop-blur-xl p-8 rounded-xl shadow-2xl border border-white/10 animate-in zoom-in-95 duration-200">
+      <div className="relative z-10 w-full max-w-md space-y-4 bg-[#0a0a0a]/95 backdrop-blur-xl p-6 rounded-xl shadow-2xl border border-white/10 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
         <button
           onClick={() => navigate('/')}
           className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
@@ -156,33 +177,33 @@ export default function Signup() {
           </svg>
         </button>
         <div className="text-center">
-          <div className="mb-6 flex justify-center">
+          <div className="mb-3 flex justify-center">
             <Link to="/" className="inline-block">
               <BrandLogo
                 label="Dabby"
-                iconSize={48}
-                textClassName="text-3xl font-semibold tracking-tight text-white"
+                iconSize={36}
+                textClassName="text-2xl font-semibold tracking-tight text-white"
                 iconClassName="text-[#00FFD1]"
               />
             </Link>
           </div>
 
-          <h2 className="mt-6 text-2xl font-bold tracking-tight text-white">
+          <h2 className="mt-3 text-xl font-bold tracking-tight text-white">
             Create your account
           </h2>
-          <p className="mt-2 text-sm text-gray-400">
+          <p className="mt-1.5 text-xs text-gray-400">
             Join Dabby today and transform your data into insights.
           </p>
         </div>
 
         {error && (
-          <div className="bg-red-900/30 border border-red-500 rounded-md p-3 flex items-center gap-3">
-            <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
-            <p className="text-sm text-red-400">{error}</p>
+          <div className="bg-red-900/30 border border-red-500 rounded-md p-2.5 flex items-center gap-3">
+            <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+            <p className="text-xs text-red-400">{error}</p>
           </div>
         )}
 
-        <form onSubmit={handleEmailSignup} className="mt-8 space-y-4">
+        <form onSubmit={handleEmailSignup} className="mt-6 space-y-3">
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1.5" htmlFor="email">
               Email Address
@@ -255,7 +276,7 @@ export default function Signup() {
           </div>
 
           {/* Consent Checkbox */}
-          <div className="flex items-start gap-2.5 pt-2">
+          <div className="flex items-start gap-2 pt-1.5">
             <input
               type="checkbox"
               id="consent-checkbox"
@@ -263,7 +284,7 @@ export default function Signup() {
               onChange={(e) => setConsentChecked(e.target.checked)}
               className="mt-0.5 rounded border-gray-700 text-[#00FFD1] focus:ring-[#00FFD1]/50 bg-transparent cursor-pointer"
             />
-            <label htmlFor="consent-checkbox" className="text-xs leading-relaxed cursor-pointer select-none text-gray-400">
+            <label htmlFor="consent-checkbox" className="text-[10px] leading-normal cursor-pointer select-none text-gray-400">
               I consent to Dabby processing my uploaded financial records in accordance with the{" "}
               <Link to="/privacy" target="_blank" className="text-[#00FFD1] hover:underline font-semibold">Privacy Policy</Link>{" "}
               and the{" "}
@@ -282,8 +303,8 @@ export default function Signup() {
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-400">
+        <div className="mt-3 text-center">
+          <p className="text-xs text-gray-400">
             Want early access?{" "}
             <Link to="/waitlist" className="font-medium text-[#00FFD1] hover:text-[#00FFD1]/80 hover:underline">
               Join the Waitlist
@@ -291,8 +312,8 @@ export default function Signup() {
           </p>
         </div>
 
-        <div className="mt-4 space-y-4">
-          <p className="text-center text-xs text-gray-500">
+        <div className="mt-2.5 space-y-2">
+          <p className="text-center text-[10px] text-gray-500">
             By creating an account, you agree to our{' '}
             <Link to="/terms" className="text-[#00FFD1] hover:underline">Terms of Service</Link>
             {' '}and{' '}
@@ -300,8 +321,8 @@ export default function Signup() {
           </p>
         </div>
 
-        <div className="text-center border-t border-white/10 pt-6">
-          <p className="text-sm text-gray-400">
+        <div className="text-center border-t border-white/10 pt-3">
+          <p className="text-xs text-gray-400">
             Already have an account?{' '}
             <Link to="/login" className="font-medium text-[#00FFD1] hover:text-[#00FFD1]/80">
               Sign in instead

@@ -657,5 +657,144 @@ export const backendService = {
     const response = await apiFetch(`/api/budgets/${workbenchId}/transactions/${encodeURIComponent(category)}`);
     if (!response.ok) throw new Error('Failed to fetch clubbed transactions');
     return await response.json();
+  },
+
+  // --- Superadmin Dashboard & Utilities ---
+
+  async getAuthHeaders() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      return {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      };
+    } catch (err) {
+      console.error('Failed to get auth session for headers:', err);
+      return { 'Content-Type': 'application/json' };
+    }
+  },
+
+  async getSuperadminStats() {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch('/api/superadmin/stats', {
+      headers
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.detail || 'Failed to fetch superadmin stats');
+    }
+    return await response.json();
+  },
+
+  async updateWaitlistStatus(email, status) {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch('/api/superadmin/waitlist/update-status', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ email, status })
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.detail || 'Failed to update waitlist status');
+    }
+    return await response.json();
+  },
+
+  async addWaitlistEmail(email, status = 'approved') {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch('/api/superadmin/waitlist/add', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ email, status })
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.detail || 'Failed to add waitlist email');
+    }
+    return await response.json();
+  },
+
+  async addGroqKey(apiKey, label) {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch('/api/superadmin/groq-keys/add', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ api_key: apiKey, label })
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.detail || 'Failed to add Groq key');
+    }
+    return await response.json();
+  },
+
+  async updateGroqKeyStatus(id, status) {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch('/api/superadmin/groq-keys/update-status', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ id, status })
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.detail || 'Failed to update Groq key status');
+    }
+    return await response.json();
+  },
+
+  async deleteGroqKey(id) {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch('/api/superadmin/groq-keys/delete', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ id })
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.detail || 'Failed to delete Groq key');
+    }
+    return await response.json();
+  },
+
+  async changeWorkbenchPlan(workbenchId, plan) {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch('/api/superadmin/workbench/set-plan', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ workbench_id: workbenchId, plan })
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.detail || 'Failed to change plan');
+    }
+    return await response.json();
+  },
+
+  async simulatePayment(workbenchId, email, amount, plan) {
+    const headers = await this.getAuthHeaders();
+    const response = await fetch('/api/superadmin/payments/simulate', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ workbench_id: workbenchId, email, amount, plan })
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.detail || 'Failed to simulate payment');
+    }
+    return await response.json();
+  },
+
+  async logPageView(path) {
+    try {
+      const headers = await this.getAuthHeaders();
+      await fetch('/api/plans/log-view', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ path })
+      });
+    } catch (e) {
+      console.warn("Could not log page view:", e);
+    }
   }
 };

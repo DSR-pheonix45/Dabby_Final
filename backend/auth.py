@@ -23,6 +23,7 @@ A valid user with no membership in the target workbench → 403.
 from typing import Optional, Callable
 from fastapi import Header, HTTPException, Request, Depends
 from supabase_client import supabase
+from datetime import datetime, timedelta
 
 
 # ─── Permission catalogue ──────────────────────────────────────────────────
@@ -88,10 +89,102 @@ def _extract_bearer(authorization: Optional[str]) -> Optional[str]:
     return authorization.strip()  # tolerate a bare token
 
 
-async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
+def get_client_ip(request: Request) -> str:
+    # Handle proxy headers (e.g. Vercel/Railway proxies)
+    x_forwarded_for = request.headers.get("x-forwarded-for")
+    if x_forwarded_for:
+        return x_forwarded_for.split(",")[0].strip()
+    x_real_ip = request.headers.get("x-real-ip")
+    if x_real_ip:
+        return x_real_ip.strip()
+    return request.client.host if request.client else "127.0.0.1"
+
+
+async def enforce_waitlist(email: str):
+    if not email:
+        return
+    email_lower = email.strip().lower()
+    
+    # Exempt superadmins from waitlist gating
+    try:
+        res = supabase.table("superadmins").select("id").eq("email", email_lower).execute()
+        if res.data:
+            return
+    except Exception:
+        pass
+
+    try:
+        res = supabase.table("waitlist").select("status").eq("email", email_lower).execute()
+        if not res.data:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: Your email is not on our approved waitlist. Please register at /waitlist."
+            )
+        
+        status = res.data[0].get("status") or "pending"
+        if status in ("pending", "rejected"):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Access denied: Your waitlist request is currently '{status}'. You will receive an email once approved."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Log and continue to prevent locking the app if table isn't created yet
+        print(f"[WAITLIST_CHECK] Warning: Waitlist check failed: {e}")
+
+
+async def enforce_ip_restrictions(user_id: str, ip_address: str, email: str):
+    if not email:
+        return
+    email_lower = email.strip().lower()
+    
+    # Exempt superadmins
+    try:
+        res = supabase.table("superadmins").select("id").eq("email", email_lower).execute()
+        if res.data:
+            return
+    except Exception:
+        pass
+
+    try:
+        # Upsert the client IP map
+        supabase.table("user_ip_logs").upsert({
+            "user_id": user_id,
+            "ip_address": ip_address,
+            "last_seen_at": datetime.utcnow().isoformat()
+        }, on_conflict="user_id,ip_address").execute()
+    except Exception as e:
+        print(f"[IP_RESTRICTIONS] Warning: Failed to log IP to user_ip_logs: {e}")
+        return
+
+    try:
+        # Check active IPs in last 24h
+        cutoff = (datetime.utcnow() - timedelta(hours=24)).isoformat()
+        res = supabase.table("user_ip_logs").select("ip_address")\
+            .eq("user_id", user_id)\
+            .gt("last_seen_at", cutoff).execute()
+            
+        active_ips = {row["ip_address"] for row in res.data} if res.data else set()
+        
+        MAX_DISTINCT_IPS = 2
+        # If user has more than 2 active IPs and current one isn't counted
+        if len(active_ips) > MAX_DISTINCT_IPS and ip_address not in active_ips:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Access denied: This account is being accessed from too many different devices or locations (IPs). "
+                       f"Max {MAX_DISTINCT_IPS} active devices allowed per 24 hours."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[IP_RESTRICTIONS] Error validating IP restrictions: {e}")
+
+
+async def get_current_user(request: Request, authorization: Optional[str] = Header(None)) -> dict:
     """
-    Verify the Supabase access token and return {id, email}.
-    Raises 401 on any missing/invalid/expired token. Never trusts a body user_id.
+    Verify the Supabase access token, enforce waitlist limits + IP restrictions,
+    and return the authenticated user {id, email}.
     """
     token = _extract_bearer(authorization)
     if not token:
@@ -103,7 +196,18 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
         raise HTTPException(status_code=401, detail=f"Invalid or expired session: {e}")
     if not user or not getattr(user, "id", None):
         raise HTTPException(status_code=401, detail="Invalid session token")
-    return {"id": user.id, "email": getattr(user, "email", None)}
+    
+    uid = user.id
+    email = getattr(user, "email", None)
+    
+    # 1. Enforce waitlist restrictions
+    await enforce_waitlist(email)
+    
+    # 2. Enforce IP restrictions (Account Sharing Prevention)
+    client_ip = get_client_ip(request)
+    await enforce_ip_restrictions(uid, client_ip, email)
+    
+    return {"id": uid, "email": email}
 
 
 # ─── Workbench-scoped role resolution ───────────────────────────────────────

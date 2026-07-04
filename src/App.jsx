@@ -5,6 +5,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import ScrollToTop from "./components/ScrollToTop";
 import ProtectedRoute from "./Auth/ProtectedRoute";
+import { backendService } from "./services/backendService";
 
 import ErrorBoundary from "./components/common/ErrorBoundary";
 
@@ -31,6 +32,7 @@ const PrivacyPolicy = lazy(() => import("./landing-page/pages/PrivacyPolicy"));
 const PaymentComingSoon = lazy(() => import("./landing-page/pages/PricingPage"));
 const Pay = lazy(() => import("./landing-page/pages/Pay"));
 const Waitlist = lazy(() => import("./landing-page/pages/Waitlist"));
+const SuperadminDashboard = lazy(() => import("./landing-page/pages/SuperadminDashboard"));
 const Navbar = lazy(() => import("./landing-page/components/Navbar"));
 const Footer = lazy(() => import("./landing-page/components/Footer"));
 
@@ -108,6 +110,15 @@ function HashRedirect() {
   return null;
 }
 
+function PageViewTracker() {
+  const location = useLocation();
+  useEffect(() => {
+    // Log the page view event for analytics
+    backendService.logPageView(location.pathname);
+  }, [location]);
+  return null;
+}
+
 function App() {
   return (
     <Router>
@@ -116,6 +127,7 @@ function App() {
           <ThemeProvider>
             <ScrollToTop />
             <HashRedirect />
+            <PageViewTracker />
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 {/* Public Landing Pages with Persistent Layout */}
@@ -173,6 +185,11 @@ function App() {
                 <Route path="/ruleset/editor/:id" element={
                   <ProtectedRoute>
                     <RulesetEditor />
+                  </ProtectedRoute>
+                } />
+                <Route path="/superadmin" element={
+                  <ProtectedRoute>
+                    <SuperadminDashboard />
                   </ProtectedRoute>
                 } />
 

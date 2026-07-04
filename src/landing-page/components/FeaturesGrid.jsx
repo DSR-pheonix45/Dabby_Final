@@ -179,11 +179,11 @@ export default function FeaturesGrid() {
             initial={{ opacity: 0, y: 20 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ delay: 0.2, duration: 0.5 }}
-            href="/signup"
+            href="/waitlist"
             className={`inline-flex items-center gap-2 font-medium transition-colors ${isDark ? "text-[#81E6D9] hover:text-[#4FD1C5]" : "text-[#0D9488] hover:text-[#14b8a6]"
               }`}
           >
-            Get started now
+            Join Waitlist
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
             </svg>
