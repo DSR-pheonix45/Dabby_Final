@@ -7,6 +7,17 @@
     {
       "source": "/api/:path*",
       "destination": "https://dabbyfinal-production.up.railway.app/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(bot|spider|crawl|slurp|facebookexternalhit|twitterbot|bingbot|chatgpt-user|gptbot|anthropic-ai|claude-bot).*"
+        }
+      ],
+      "destination": "https://service.prerender.io/https://www.datalis.in/$1?prerenderToken=Bf0mUPSUhwGSbC2tOR1V"
     }
   ]
 }
