@@ -36,6 +36,268 @@ const TRADE_STATUS_TABS = [
   { id: "Rejected", label: "Rejected" }
 ];
 
+function BankStatementTradeReview({ selectedTrade, parties, allEntities, onLinkBeneficiary }) {
+  const note = selectedTrade.document?.metadata?.bank_statement || {};
+  const transactions = note.transactions || [];
+  const summary = note.statement_summary || {};
+  const kpis = note.transaction_summary || {};
+
+  const getLinkageStatus = (name) => {
+    if (!name) return { linked: false, party: null, entity: null };
+    const cleanName = name.trim().toLowerCase();
+    
+    // First try checking entities table names (original beneficiary string mapped to party)
+    const entity = allEntities.find(e => e.name && e.name.trim().toLowerCase() === cleanName);
+    if (entity) {
+      const party = parties.find(p => p.id === entity.party_id);
+      return { linked: true, party, entity };
+    }
+    
+    // Fallback: check if party name matches directly
+    const party = parties.find(p => p.name && p.name.trim().toLowerCase() === cleanName);
+    if (party) {
+      const entityFallback = allEntities.find(e => e.party_id === party.id);
+      return { linked: !!entityFallback, party, entity: entityFallback };
+    }
+    
+    return { linked: false, party: null, entity: null };
+  };
+
+  // Group transactions by beneficiary name to create a mapping queue
+  const uniqueBeneficiaries = React.useMemo(() => {
+    const map = {};
+    transactions.forEach((tx) => {
+      const name = tx.beneficiary_name || "";
+      if (!name) return;
+      
+      const amt = tx.credit_amount || tx.debit_amount || 0;
+      if (!map[name]) {
+        map[name] = {
+          name,
+          count: 0,
+          totalAmount: 0,
+          bank: tx.beneficiary_bank || "",
+          type: tx.type || "Debit"
+        };
+      }
+      map[name].count += 1;
+      map[name].totalAmount += amt;
+    });
+    
+    return Object.values(map).map((b) => {
+      const linkage = getLinkageStatus(b.name);
+      return {
+        ...b,
+        linked: linkage.linked,
+        party: linkage.party,
+        entity: linkage.entity
+      };
+    });
+  }, [transactions, parties, allEntities]);
+
+  const unlinkedBeneficiaries = uniqueBeneficiaries.filter(b => !b.linked);
+
+  return (
+    <div className="space-y-6">
+      {/* Mini statement KPI bar */}
+      <div className="grid grid-cols-4 gap-4 p-4 bg-white/[0.02] border border-white/5 rounded-2xl text-xs">
+        <div>
+          <span className="text-gray-500 block font-bold mb-0.5">BANK</span>
+          <span className="font-bold text-white">{summary.bank_name || "—"}</span>
+        </div>
+        <div>
+          <span className="text-gray-500 block font-bold mb-0.5">NET CASH FLOW</span>
+          <span className={`font-black ${kpis.net_cash_flow >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+            ₹{Number(kpis.net_cash_flow || 0).toLocaleString()}
+          </span>
+        </div>
+        <div>
+          <span className="text-gray-500 block font-bold mb-0.5">TXN COUNT</span>
+          <span className="font-bold text-white">{transactions.length} transactions</span>
+        </div>
+        <div>
+          <span className="text-gray-500 block font-bold mb-0.5">VALIDATION</span>
+          <span className={`font-bold ${note.validation?.balance_verified ? "text-emerald-400" : "text-rose-400"}`}>
+            {note.validation?.balance_verified ? "✓ Verified" : "⚠ Mismatch"}
+          </span>
+        </div>
+      </div>
+
+      {/* Validation Mismatch Card */}
+      {!note.validation?.balance_verified && (
+        <div className="p-5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 space-y-3">
+          <div className="flex items-center space-x-2 font-black text-rose-400 uppercase tracking-widest text-[10px]">
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+            <span>Bank Statement Balance Mismatch Warning</span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2 border-t border-rose-500/10">
+            <div>
+              <span className="text-gray-400 block font-bold mb-0.5">Opening Balance</span>
+              <span className="font-bold text-white">₹{Number(summary.opening_balance || 0).toLocaleString()}</span>
+            </div>
+            <div>
+              <span className="text-gray-400 block font-bold mb-0.5">Closing Balance (Reported)</span>
+              <span className="font-bold text-white">₹{Number(summary.closing_balance || 0).toLocaleString()}</span>
+            </div>
+            <div>
+              <span className="text-gray-400 block font-bold mb-0.5">Expected Closing (Calculated)</span>
+              <span className="font-bold text-rose-400">₹{Number(note.validation?.expected_closing || 0).toLocaleString()}</span>
+            </div>
+            <div>
+              <span className="text-gray-400 block font-bold mb-0.5">Difference</span>
+              <span className="font-bold text-rose-400 font-black">₹{Number(note.validation?.difference || 0).toLocaleString()}</span>
+            </div>
+          </div>
+          {note.validation?.reported_credits !== undefined && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-rose-500/10">
+              <div>
+                <span className="text-gray-400 block font-bold mb-0.5">Total Credits (Reported)</span>
+                <span className="font-bold text-white">₹{Number(note.validation?.reported_credits || 0).toLocaleString()}</span>
+              </div>
+              <div>
+                <span className="text-gray-400 block font-bold mb-0.5">Total Credits (Calculated)</span>
+                <span className="font-bold text-white">₹{Number(note.validation?.calculated_credits || 0).toLocaleString()}</span>
+              </div>
+              <div>
+                <span className="text-gray-400 block font-bold mb-0.5">Total Debits (Reported)</span>
+                <span className="font-bold text-white">₹{Number(note.validation?.reported_debits || 0).toLocaleString()}</span>
+              </div>
+              <div>
+                <span className="text-gray-400 block font-bold mb-0.5">Total Debits (Calculated)</span>
+                <span className="font-bold text-white">₹{Number(note.validation?.calculated_debits || 0).toLocaleString()}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Mapping Queue Section */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-black uppercase tracking-widest text-gray-500 border-b border-white/5 pb-2">
+          Mapping Queue ({unlinkedBeneficiaries.length} Bunched Entities)
+        </h3>
+        
+        {unlinkedBeneficiaries.length === 0 ? (
+          <div className="p-6 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 text-center text-xs text-emerald-400 font-bold">
+            All bunched statement entities are mapped! 🎉
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {unlinkedBeneficiaries.map((b, idx) => (
+              <div key={idx} className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl flex items-center justify-between gap-4">
+                <div className="space-y-1 min-w-0">
+                  <span className="text-white font-bold block truncate" title={b.name}>{b.name}</span>
+                  <span className="text-[10px] text-gray-500 font-bold uppercase block">
+                    {b.count} transactions • ₹{b.totalAmount.toLocaleString()}
+                  </span>
+                </div>
+                <button
+                  onClick={() => onLinkBeneficiary(b.name, b.bank)}
+                  className="px-4 py-2 rounded-xl bg-teal-400 text-black hover:bg-teal-500 transition-all text-xs font-black uppercase tracking-wider whitespace-nowrap cursor-pointer"
+                >
+                  Map Entity
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-xs font-black uppercase tracking-widest text-gray-500 border-b border-white/5 pb-2">
+          Statement Transactions
+        </h3>
+
+        <div className="border border-white/5 rounded-2xl overflow-hidden bg-black/30 max-h-[500px] overflow-y-auto custom-scrollbar">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="sticky top-0 bg-[#141414] text-[9px] font-bold uppercase tracking-widest text-gray-500 border-b border-white/5 z-10 text-left">
+              <tr>
+                <th className="p-3">Row</th>
+                <th className="p-3">Date</th>
+                <th className="p-3">Narration / Particulars</th>
+                <th className="p-3">Mode</th>
+                <th className="p-3 text-right">Amount</th>
+                <th className="p-3">Beneficiary</th>
+                <th className="p-3">Link Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {transactions.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-12 text-center text-gray-500">
+                    No transactions found in this statement.
+                  </td>
+                </tr>
+              ) : (
+                transactions.map((tx, idx) => {
+                  const amt = tx.credit_amount || tx.debit_amount || 0;
+                  const isCr = !!tx.credit_amount;
+                  const linkage = getLinkageStatus(tx.beneficiary_name);
+
+                  return (
+                    <tr key={idx} className="hover:bg-white/[0.01] transition-colors">
+                      <td className="p-3 whitespace-nowrap text-gray-600 font-bold">{tx.row_number || idx + 1}</td>
+                      <td className="p-3 whitespace-nowrap text-gray-400 font-medium">{tx.date}</td>
+                      <td className="p-3 max-w-[200px] truncate" title={tx.raw_particulars}>
+                        <span className="text-white font-bold block truncate">{tx.raw_particulars}</span>
+                        {tx.category && (
+                          <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-white/5 text-gray-500 mt-1 inline-block">
+                            {tx.category}
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3 text-gray-400 font-medium">{tx.payment_mode || "—"}</td>
+                      <td className={`p-3 text-right font-black ${isCr ? "text-emerald-400" : "text-rose-400"}`}>
+                        {isCr ? "+" : "-"}₹{amt.toLocaleString()}
+                      </td>
+                      <td className="p-3 truncate max-w-[120px]" title={tx.beneficiary_name}>
+                        {tx.beneficiary_name ? (
+                          <>
+                            <span className="text-white font-bold block truncate">{tx.beneficiary_name}</span>
+                            {tx.beneficiary_bank && (
+                              <span className="text-[9px] text-gray-500 block">{tx.beneficiary_bank}</span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-gray-600 italic">No beneficiary</span>
+                        )}
+                      </td>
+                      <td className="p-3 whitespace-nowrap">
+                        {tx.beneficiary_name ? (
+                          linkage.linked ? (
+                            <div className="flex flex-col space-y-0.5">
+                              <span className="text-[10px] font-bold text-emerald-400">🟢 Linked</span>
+                              <span className="text-[9px] text-gray-500 max-w-[100px] truncate">
+                                {linkage.party?.name} ({linkage.entity?.name})
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col space-y-1 items-start">
+                              <span className="text-[10px] font-bold text-amber-400">🟠 Unlinked</span>
+                              <button
+                                onClick={() => onLinkBeneficiary(tx.beneficiary_name, tx.beneficiary_bank)}
+                                className="px-2 py-1 rounded bg-teal-400/10 border border-teal-500/20 text-teal-400 hover:bg-teal-400 hover:text-black transition-all text-[9px] font-black uppercase tracking-wider cursor-pointer"
+                              >
+                                Link Beneficiary
+                              </button>
+                            </div>
+                          )
+                        ) : (
+                          <span className="text-gray-600">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TradeEngine({ workbenchId }) {
   const { user } = useAuth();
   
@@ -102,6 +364,13 @@ export default function TradeEngine({ workbenchId }) {
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [resolveError, setResolveError] = useState(null);
 
+  // Beneficiary Linking state
+  const [allEntities, setAllEntities] = useState([]);
+  const [linkBeneficiaryData, setLinkBeneficiaryData] = useState(null);
+  const [linkOption, setLinkOption] = useState("existing"); // "existing" or "new"
+  const [selectedPartyId, setSelectedPartyId] = useState("");
+  const [vesselName, setVesselName] = useState("");
+  const [vesselType, setVesselType] = useState("bank_account");
 
   // Fetch trades whenever workbench changes
   const fetchTrades = useCallback(async () => {
@@ -109,7 +378,7 @@ export default function TradeEngine({ workbenchId }) {
     try {
       setLoading(true);
       const url = `/api/trades/workbench/${selectedWorkbenchId}`;
-      const res = await fetch(url);
+      const res = await apiFetch(url);
       if (!res.ok) throw new Error("Failed to fetch trades");
       const data = await res.json();
       setTrades(data || []);
@@ -137,6 +406,21 @@ export default function TradeEngine({ workbenchId }) {
     }
   }, [selectedWorkbenchId]);
 
+  // Fetch all entities for linkage checks
+  const fetchAllEntities = useCallback(async () => {
+    if (!selectedWorkbenchId) return;
+    try {
+      const { data, error } = await supabase
+        .from("entities")
+        .select("*, parties!inner(*)")
+        .eq("parties.workbench_id", selectedWorkbenchId);
+      if (error) throw error;
+      setAllEntities(data || []);
+    } catch (err) {
+      console.error("Error fetching all entities:", err);
+    }
+  }, [selectedWorkbenchId]);
+
   const fetchLabels = useCallback(async () => {
     if (!selectedWorkbenchId) return;
     try {
@@ -150,10 +434,85 @@ export default function TradeEngine({ workbenchId }) {
   }, [selectedWorkbenchId]);
 
   useEffect(() => {
+    if (linkBeneficiaryData) {
+      setVesselName(linkBeneficiaryData.beneficiaryName);
+      setNewPartyName(linkBeneficiaryData.beneficiaryName);
+      setVesselType("bank_account");
+      setLinkOption("existing");
+      setSelectedPartyId("");
+    }
+  }, [linkBeneficiaryData]);
+
+  const handleSaveLinkage = async () => {
+    let partyId = selectedPartyId;
+    
+    try {
+      toast.loading("Saving linkage...", { id: "link-beneficiary" });
+      
+      if (linkOption === "new") {
+        if (!newPartyName.trim()) throw new Error("Party name is required");
+        // Create new Party
+        const { data: newParty, error: partyErr } = await supabase
+          .from("parties")
+          .insert({
+            workbench_id: selectedWorkbenchId,
+            name: newPartyName,
+            category: "corporation",
+            is_self: false
+          })
+          .select()
+          .single();
+          
+        if (partyErr) throw partyErr;
+        partyId = newParty.id;
+      }
+      
+      if (!partyId) throw new Error("No party selected or created");
+      if (!vesselName.trim()) throw new Error("Vessel name is required");
+
+      // Create new Entity (Vessel)
+      const typeMap = {
+        bank_account: 'bank',
+        upi: 'upi',
+        cash: 'cash',
+        vendor: 'property',
+        customer: 'property',
+        vessel: 'property',
+        broker: 'property',
+        logistics: 'property',
+        other: 'property'
+      };
+      const dbType = typeMap[vesselType] || 'property';
+      
+      const { error: entityErr } = await supabase
+        .from("entities")
+        .insert({
+          party_id: partyId,
+          name: vesselName,
+          type: dbType,
+          metadata: { detailed_type: vesselType, resolved_bank: linkBeneficiaryData.beneficiaryBank }
+        });
+        
+      if (entityErr) throw entityErr;
+      
+      toast.success("Beneficiary vessel linked successfully!", { id: "link-beneficiary" });
+      
+      // Immediately refresh linkage lists
+      await fetchParties();
+      await fetchAllEntities();
+      setLinkBeneficiaryData(null);
+    } catch (err) {
+      console.error("Linkage save failed:", err);
+      toast.error("Failed to save linkage: " + err.message, { id: "link-beneficiary" });
+    }
+  };
+
+  useEffect(() => {
     fetchTrades();
     fetchParties();
     fetchLabels();
-  }, [selectedWorkbenchId, fetchTrades, fetchParties, fetchLabels]);
+    fetchAllEntities();
+  }, [selectedWorkbenchId, fetchTrades, fetchParties, fetchLabels, fetchAllEntities]);
 
   useEffect(() => {
     const handleTabChange = async (e) => {
@@ -164,7 +523,7 @@ export default function TradeEngine({ workbenchId }) {
         setLoading(true);
         // Fetch all trades for the workbench to find the one matching documentId
         const url = `/api/trades/workbench/${selectedWorkbenchId}`;
-        const res = await fetch(url);
+        const res = await apiFetch(url);
         if (!res.ok) throw new Error("Failed to fetch trades");
         const data = await res.json();
         setTrades(data || []);
@@ -659,431 +1018,440 @@ export default function TradeEngine({ workbenchId }) {
                   )}
                 </div>
               </div>
-
-              {/* Center Panel: Edit Form */}
+              {/* Center Panel: Edit Form or Bank Statement Transactions */}
               <div className="flex-1 border-r border-white/5 p-5 overflow-y-auto custom-scrollbar space-y-6">
                 
-                {/* Dynamic Summary Card */}
-                <div className="p-4.5 rounded-2xl bg-teal-500/[0.02] border border-teal-500/10 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-teal-500/10 text-teal-400 border border-teal-500/20">
-                      Summary Note
-                    </span>
-                    <span className="text-[10px] text-gray-500 font-bold">Confidence: {((selectedTrade.confidence || 0.98) * 100).toFixed(0)}%</span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 text-xs">
-                    <div>
-                      <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Event Detected</span>
-                      <span className="font-bold text-white text-sm">{formData.trade_type} ({formData.trade_direction})</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Counterparty</span>
-                      <span className="font-bold text-white text-sm">
-                        {parties.find(p => p.id === formData.party_id)?.name || "Unresolved Party"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Total Amount</span>
-                      <span className="font-black text-teal-400 text-sm">
-                        {formData.currency} {formData.amount ? Number(formData.amount).toLocaleString(undefined, { minimumFractionDigits: 2 }) : "—"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Invoice Date</span>
-                      <span className="font-bold text-white text-sm">{formData.invoice_date || "—"}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Edit Form */}
-                <div className="space-y-4">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-gray-500 border-b border-white/5 pb-2">Detected Parameters</h3>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Trade Type</label>
-                      <select
-                        value={formData.trade_type}
-                        onChange={(e) => setFormData(prev => ({ ...prev, trade_type: e.target.value }))}
-                        className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
-                      >
-                        <option value="Vendor Invoice">Vendor Invoice</option>
-                        <option value="Vendor Payment">Vendor Payment</option>
-                        <option value="Sales Invoice">Sales Invoice</option>
-                        <option value="Customer Payment">Customer Payment</option>
-                        <option value="Expense Receipt">Expense Receipt</option>
-                        <option value="Payroll">Payroll</option>
-                        <option value="Investment">Investment</option>
-                        <option value="Loan">Loan</option>
-                        <option value="Bank Statement">Bank Statement</option>
-                        <option value="Credit Note">Credit Note</option>
-                        <option value="Debit Note">Debit Note</option>
-                        <option value="Purchase Order">Purchase Order</option>
-                        <option value="Sales Order">Sales Order</option>
-                        <option value="Manual Trade">Manual Trade</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Trade Direction</label>
-                      <select
-                        value={formData.trade_direction}
-                        onChange={(e) => setFormData(prev => ({ ...prev, trade_direction: e.target.value }))}
-                        className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
-                      >
-                        <option value="PAYABLE">PAYABLE</option>
-                        <option value="RECEIVABLE">RECEIVABLE</option>
-                        <option value="IMMEDIATE_SETTLEMENT">IMMEDIATE_SETTLEMENT</option>
-                        <option value="TRANSFER">TRANSFER</option>
-                        <option value="NON_FINANCIAL">NON_FINANCIAL</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Party Dropdown */}
-                  <div className="grid grid-cols-1 gap-1">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">Party Resolution</label>
-                      <button 
-                        type="button"
-                        onClick={() => setShowAddPartyModal(true)}
-                        className="flex items-center space-x-1 text-[10px] text-teal-400 hover:text-teal-300 font-black uppercase tracking-wider"
-                      >
-                        <BsPlusLg size={8} />
-                        <span>Add Party</span>
-                      </button>
-                    </div>
-                    <select
-                      value={formData.party_id}
-                      onChange={(e) => handlePartyChange(e.target.value)}
-                      className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
-                    >
-                      <option value="">-- Choose Party --</option>
-                      {parties.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} {p.is_self ? "(Self)" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Entities Dropdowns */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
+                {selectedTrade.trade_type === "Bank Statement" ? (
+                  <BankStatementTradeReview 
+                    selectedTrade={selectedTrade}
+                    parties={parties}
+                    allEntities={allEntities}
+                    onLinkBeneficiary={(bName, bBank) => setLinkBeneficiaryData({ beneficiaryName: bName, beneficiaryBank: bBank })}
+                  />
+                ) : (
+                  <>
+                    {/* Dynamic Summary Card */}
+                    <div className="p-4.5 rounded-2xl bg-teal-500/[0.02] border border-teal-500/10 space-y-4">
                       <div className="flex items-center justify-between">
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Counterparty Entity</label>
-                        {formData.party_id && (
+                        <span className="px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                          Summary Note
+                        </span>
+                        <span className="text-[10px] text-gray-500 font-bold">Confidence: {((selectedTrade.confidence || 0.98) * 100).toFixed(0)}%</span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 text-xs">
+                        <div>
+                          <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Event Detected</span>
+                          <span className="font-bold text-white text-sm">{formData.trade_type} ({formData.trade_direction})</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Counterparty</span>
+                          <span className="font-bold text-white text-sm">
+                            {parties.find(p => p.id === formData.party_id)?.name || "Unresolved Party"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Total Amount</span>
+                          <span className="font-black text-teal-400 text-sm">
+                            {formData.currency} {formData.amount ? Number(formData.amount).toLocaleString(undefined, { minimumFractionDigits: 2 }) : "—"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Invoice Date</span>
+                          <span className="font-bold text-white text-sm">{formData.invoice_date || "—"}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Edit Form */}
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-gray-500 border-b border-white/5 pb-2">Detected Parameters</h3>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Trade Type</label>
+                          <select
+                            value={formData.trade_type}
+                            onChange={(e) => setFormData(prev => ({ ...prev, trade_type: e.target.value }))}
+                            className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
+                          >
+                            <option value="Vendor Invoice">Vendor Invoice</option>
+                            <option value="Vendor Payment">Vendor Payment</option>
+                            <option value="Sales Invoice">Sales Invoice</option>
+                            <option value="Customer Payment">Customer Payment</option>
+                            <option value="Expense Receipt">Expense Receipt</option>
+                            <option value="Payroll">Payroll</option>
+                            <option value="Investment">Investment</option>
+                            <option value="Loan">Loan</option>
+                            <option value="Bank Statement">Bank Statement</option>
+                            <option value="Credit Note">Credit Note</option>
+                            <option value="Debit Note">Debit Note</option>
+                            <option value="Purchase Order">Purchase Order</option>
+                            <option value="Sales Order">Sales Order</option>
+                            <option value="Manual Trade">Manual Trade</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Trade Direction</label>
+                          <select
+                            value={formData.trade_direction}
+                            onChange={(e) => setFormData(prev => ({ ...prev, trade_direction: e.target.value }))}
+                            className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
+                          >
+                            <option value="PAYABLE">PAYABLE</option>
+                            <option value="RECEIVABLE">RECEIVABLE</option>
+                            <option value="IMMEDIATE_SETTLEMENT">IMMEDIATE_SETTLEMENT</option>
+                            <option value="TRANSFER">TRANSFER</option>
+                            <option value="NON_FINANCIAL">NON_FINANCIAL</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Party Dropdown */}
+                      <div className="grid grid-cols-1 gap-1">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">Party Resolution</label>
                           <button 
                             type="button"
-                            onClick={() => {
-                              setEntityModalPartyId(formData.party_id);
-                              setShowAddEntityModal(true);
-                            }}
-                            className="text-[9px] text-teal-400 hover:text-teal-300 uppercase tracking-wider font-bold mb-1.5"
+                            onClick={() => setShowAddPartyModal(true)}
+                            className="flex items-center space-x-1 text-[10px] text-teal-400 hover:text-teal-300 font-black uppercase tracking-wider"
                           >
-                            + Add Entity
+                            <BsPlusLg size={8} />
+                            <span>Add Party</span>
                           </button>
-                        )}
+                        </div>
+                        <select
+                          value={formData.party_id}
+                          onChange={(e) => handlePartyChange(e.target.value)}
+                          className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
+                        >
+                          <option value="">-- Choose Party --</option>
+                          {parties.map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} {p.is_self ? "(Self)" : ""}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                      <select
-                        value={formData.entity_id}
-                        disabled={!formData.party_id}
-                        onChange={(e) => setFormData(prev => ({ ...prev, entity_id: e.target.value }))}
-                        className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-                      >
-                        <option value="">-- Leave Unresolved --</option>
-                        {counterpartyEntities.map(e => (
-                          <option key={e.id} value={e.id}>{e.name} ({e.type})</option>
-                        ))}
-                      </select>
-                    </div>
 
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Our Entity</label>
-                        {parties.find(p => p.is_self)?.id && (
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              setEntityModalPartyId(parties.find(p => p.is_self).id);
-                              setShowAddEntityModal(true);
-                            }}
-                            className="text-[9px] text-teal-400 hover:text-teal-300 uppercase tracking-wider font-bold mb-1.5"
-                          >
-                            + Add Entity
-                          </button>
-                        )}
-                      </div>
-                      <select
-                        value={formData.our_entity_id}
-                        onChange={(e) => setFormData(prev => ({ ...prev, our_entity_id: e.target.value }))}
-                        className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
-                      >
-                        <option value="">-- Leave Unresolved --</option>
-                        {ourEntities.map(e => (
-                          <option key={e.id} value={e.id}>{e.name} ({e.type})</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* COA Label Resolution */}
-                  <div className="grid grid-cols-1 gap-1">
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">COA Label Resolution</label>
-                    <select
-                      value={formData.label_id}
-                      onChange={(e) => setFormData(prev => ({ ...prev, label_id: e.target.value }))}
-                      className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
-                    >
-                      <option value="">-- Choose Label --</option>
-                      {labels.map(l => (
-                        <option key={l.id} value={l.id}>{l.name} ({l.type})</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Financial Fields */}
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="col-span-1">
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Gross Amount</label>
-                      <input
-                        type="number"
-                        value={formData.gross_amount}
-                        onChange={(e) => setFormData(prev => ({ ...prev, gross_amount: e.target.value, amount: e.target.value }))}
-                        placeholder="0.00"
-                        className="w-full bg-[#141414] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Tax Portion</label>
-                      <input
-                        type="number"
-                        value={formData.tax_amount}
-                        onChange={(e) => setFormData(prev => ({ ...prev, tax_amount: e.target.value }))}
-                        placeholder="0.00"
-                        className="w-full bg-[#141414] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Net Amount</label>
-                      <input
-                        type="number"
-                        value={formData.net_amount}
-                        onChange={(e) => setFormData(prev => ({ ...prev, net_amount: e.target.value }))}
-                        placeholder="0.00"
-                        className="w-full bg-[#141414] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Currency</label>
-                      <input
-                        type="text"
-                        value={formData.currency}
-                        onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
-                        className="w-full bg-[#141414] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Dates & Reference */}
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Invoice Number</label>
-                      <input
-                        type="text"
-                        value={formData.invoice_number}
-                        onChange={(e) => setFormData(prev => ({ ...prev, invoice_number: e.target.value }))}
-                        placeholder="INV-XXX"
-                        className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Invoice Date</label>
-                      <input
-                        type="date"
-                        value={formData.invoice_date}
-                        onChange={(e) => setFormData(prev => ({ ...prev, invoice_date: e.target.value }))}
-                        className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Due Date</label>
-                      <input
-                        type="date"
-                        value={formData.due_date}
-                        onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
-                        className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Description & Notes */}
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Description Summary</label>
-                      <textarea
-                        value={formData.description}
-                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                        rows={2}
-                        className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all custom-scrollbar"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Internal Notes</label>
-                      <textarea
-                        value={formData.notes}
-                        onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                        rows={2}
-                        className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all custom-scrollbar"
-                        placeholder="Add annotations or corrections..."
-                      />
-                    </div>
-                  </div>
-
-                  {/* Operational Financial Activities Section */}
-                  <div className="space-y-4 pt-6 border-t border-white/5">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-black uppercase tracking-widest text-gray-500">Operational Financial Activities Sequence</h3>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActivities(prev => [
-                            ...prev,
-                            {
-                              id: `temp-${Date.now()}`,
-                              sequence: prev.length + 1,
-                              activity_type: "INCREASE_LABEL",
-                              amount: 0,
-                              target_id: "",
-                              status: "Pending"
-                            }
-                          ])
-                        }}
-                        className="flex items-center space-x-1 text-[10px] text-teal-400 hover:text-teal-300 font-black uppercase tracking-wider"
-                      >
-                        <BsPlusLg size={8} />
-                        <span>Add Activity</span>
-                      </button>
-                    </div>
-
-                    {/* Timeline Tracker */}
-                    <div className="flex items-center space-x-2 overflow-x-auto py-2 px-1">
-                      {activities.map((act, index) => (
-                        <React.Fragment key={act.id}>
-                          {index > 0 && <span className="text-gray-600 text-xs shrink-0">➔</span>}
-                          <div className="flex flex-col items-center bg-white/[0.03] border border-white/5 px-2.5 py-1.5 rounded-lg shrink-0">
-                            <span className="text-[8px] text-teal-400 font-black uppercase">Seq {act.sequence}</span>
-                            <span className="text-[10px] text-white font-bold max-w-[120px] truncate">{act.activity_type}</span>
+                      {/* Entities Dropdowns */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Counterparty Entity</label>
+                            {formData.party_id && (
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  setEntityModalPartyId(formData.party_id);
+                                  setShowAddEntityModal(true);
+                                }}
+                                className="text-[9px] text-teal-400 hover:text-teal-300 uppercase tracking-wider font-bold mb-1.5"
+                              >
+                                + Add Entity
+                              </button>
+                            )}
                           </div>
-                        </React.Fragment>
-                      ))}
-                    </div>
+                          <select
+                            value={formData.entity_id}
+                            disabled={!formData.party_id}
+                            onChange={(e) => setFormData(prev => ({ ...prev, entity_id: e.target.value }))}
+                            className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                          >
+                            <option value="">-- Leave Unresolved --</option>
+                            {counterpartyEntities.map(e => (
+                              <option key={e.id} value={e.id}>{e.name} ({e.type})</option>
+                            ))}
+                          </select>
+                        </div>
 
-                    <div className="space-y-3">
-                      {activities.map((act, index) => (
-                        <div key={act.id} className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl space-y-3 relative group">
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Our Entity</label>
+                            {parties.find(p => p.is_self)?.id && (
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  setEntityModalPartyId(parties.find(p => p.is_self).id);
+                                  setShowAddEntityModal(true);
+                                }}
+                                className="text-[9px] text-teal-400 hover:text-teal-300 uppercase tracking-wider font-bold mb-1.5"
+                              >
+                                + Add Entity
+                              </button>
+                            )}
+                          </div>
+                          <select
+                            value={formData.our_entity_id}
+                            onChange={(e) => setFormData(prev => ({ ...prev, our_entity_id: e.target.value }))}
+                            className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
+                          >
+                            <option value="">-- Leave Unresolved --</option>
+                            {ourEntities.map(e => (
+                              <option key={e.id} value={e.id}>{e.name} ({e.type})</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* COA Label Resolution */}
+                      <div className="grid grid-cols-1 gap-1">
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">COA Label Resolution</label>
+                        <select
+                          value={formData.label_id}
+                          onChange={(e) => setFormData(prev => ({ ...prev, label_id: e.target.value }))}
+                          className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
+                        >
+                          <option value="">-- Choose Label --</option>
+                          {labels.map(l => (
+                            <option key={l.id} value={l.id}>{l.name} ({l.type})</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Financial Fields */}
+                      <div className="grid grid-cols-4 gap-4">
+                        <div className="col-span-1">
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Gross Amount</label>
+                          <input
+                            type="number"
+                            value={formData.gross_amount}
+                            onChange={(e) => setFormData(prev => ({ ...prev, gross_amount: e.target.value, amount: e.target.value }))}
+                            placeholder="0.00"
+                            className="w-full bg-[#141414] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Tax Portion</label>
+                          <input
+                            type="number"
+                            value={formData.tax_amount}
+                            onChange={(e) => setFormData(prev => ({ ...prev, tax_amount: e.target.value }))}
+                            placeholder="0.00"
+                            className="w-full bg-[#141414] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Net Amount</label>
+                          <input
+                            type="number"
+                            value={formData.net_amount}
+                            onChange={(e) => setFormData(prev => ({ ...prev, net_amount: e.target.value }))}
+                            placeholder="0.00"
+                            className="w-full bg-[#141414] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Currency</label>
+                          <input
+                            type="text"
+                            value={formData.currency}
+                            onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
+                            className="w-full bg-[#141414] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Dates & Reference */}
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Invoice Number</label>
+                          <input
+                            type="text"
+                            value={formData.invoice_number}
+                            onChange={(e) => setFormData(prev => ({ ...prev, invoice_number: e.target.value }))}
+                            placeholder="INV-XXX"
+                            className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Invoice Date</label>
+                          <input
+                            type="date"
+                            value={formData.invoice_date}
+                            onChange={(e) => setFormData(prev => ({ ...prev, invoice_date: e.target.value }))}
+                            className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Due Date</label>
+                          <input
+                            type="date"
+                            value={formData.due_date}
+                            onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
+                            className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Description & Notes */}
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Description Summary</label>
+                          <textarea
+                            value={formData.description}
+                            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                            rows={2}
+                            className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all custom-scrollbar"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Internal Notes</label>
+                          <textarea
+                            value={formData.notes}
+                            onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                            rows={2}
+                            className="w-full bg-[#141414] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all custom-scrollbar"
+                            placeholder="Add annotations or corrections..."
+                          />
+                        </div>
+                      </div>
+
+                      {/* Operational Financial Activities Section */}
+                      <div className="space-y-4 pt-6 border-t border-white/5">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xs font-black uppercase tracking-widest text-gray-500">Operational Financial Activities Sequence</h3>
                           <button
                             type="button"
                             onClick={() => {
-                              setActivities(prev => prev.filter(a => a.id !== act.id).map((a, i) => ({ ...a, sequence: i + 1 })));
+                              setActivities(prev => [
+                                ...prev,
+                                {
+                                  id: `temp-${Date.now()}`,
+                                  sequence: prev.length + 1,
+                                  activity_type: "INCREASE_LABEL",
+                                  amount: 0,
+                                  target_id: "",
+                                  status: "Pending"
+                                }
+                              ])
                             }}
-                            className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-300 text-xs transition-opacity font-bold uppercase tracking-wider"
+                            className="flex items-center space-x-1 text-[10px] text-teal-400 hover:text-teal-300 font-black uppercase tracking-wider"
                           >
-                            Delete
+                            <BsPlusLg size={8} />
+                            <span>Add Activity</span>
                           </button>
-
-                          <div className="grid grid-cols-3 gap-4">
-                            <div>
-                              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Activity Type</label>
-                              <select
-                                value={act.activity_type}
-                                onChange={(e) => {
-                                  const updated = [...activities];
-                                  updated[index].activity_type = e.target.value;
-                                  setActivities(updated);
-                                }}
-                                className="w-full bg-[#141414] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
-                              >
-                                <option value="CREATE_RECEIVABLE">CREATE_RECEIVABLE</option>
-                                <option value="CREATE_PAYABLE">CREATE_PAYABLE</option>
-                                <option value="INCREASE_LABEL">INCREASE_LABEL</option>
-                                <option value="DECREASE_LABEL">DECREASE_LABEL</option>
-                                <option value="CREATE_ASSET">CREATE_ASSET</option>
-                                <option value="UPDATE_STOCK">UPDATE_STOCK</option>
-                                <option value="CONSUME_BUDGET">CONSUME_BUDGET</option>
-                                <option value="UPDATE_PARTY">UPDATE_PARTY</option>
-                                <option value="UPDATE_ENTITY">UPDATE_ENTITY</option>
-                              </select>
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Target Account/Label</label>
-                              <select
-                                value={act.target_id || ""}
-                                onChange={(e) => {
-                                  const updated = [...activities];
-                                  updated[index].target_id = e.target.value;
-                                  setActivities(updated);
-                                }}
-                                className="w-full bg-[#141414] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
-                              >
-                                <option value="">-- Choose Label --</option>
-                                {labels.map(l => (
-                                  <option key={l.id} value={l.id}>{l.name} ({l.type})</option>
-                                ))}
-                              </select>
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Amount</label>
-                              <input
-                                type="number"
-                                value={act.amount}
-                                onChange={(e) => {
-                                  const updated = [...activities];
-                                  updated[index].amount = e.target.value;
-                                  setActivities(updated);
-                                }}
-                                className="w-full bg-[#141414] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500 transition-all"
-                              />
-                            </div>
-                          </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
 
-                  {/* Operational Balance Preview */}
-                  <div className="space-y-4 pt-6 border-t border-white/5">
-                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-500">Operational Balance Impact Preview</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      {activities.map(act => {
-                        const lbl = labels.find(l => l.id === act.target_id);
-                        if (!lbl) return null;
-                        const currentVal = parseFloat(lbl.current_amount || 0.0);
-                        const change = act.activity_type.startsWith("DECREASE") || act.activity_type.startsWith("SUBTRACT") || act.activity_type.startsWith("REMOVE") ? -parseFloat(act.amount || 0) : parseFloat(act.amount || 0);
-                        const predicted = currentVal + change;
-                        
-                        return (
-                          <div key={act.id} className="p-3 bg-white/[0.01] border border-white/5 rounded-2xl flex flex-col justify-between space-y-1">
-                            <div>
-                              <span className="font-extrabold text-white text-xs block truncate">{lbl.name}</span>
-                              <span className="text-[9px] text-gray-500 uppercase tracking-widest block">{act.activity_type}</span>
-                            </div>
-                            <div className="flex items-baseline justify-between pt-1 border-t border-white/5 mt-1">
-                              <span className="text-[10px] text-gray-400">₹{currentVal.toLocaleString()} ➔ <span className="font-black text-teal-400">₹{predicted.toLocaleString()}</span></span>
-                              <span className={`text-[10px] font-bold ${change >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                                {change >= 0 ? "+" : ""}₹{change.toLocaleString()}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                        {/* Timeline Tracker */}
+                        <div className="flex items-center space-x-2 overflow-x-auto py-2 px-1">
+                          {activities.map((act, index) => (
+                            <React.Fragment key={act.id}>
+                              {index > 0 && <span className="text-gray-600 text-xs shrink-0">➔</span>}
+                              <div className="flex flex-col items-center bg-white/[0.03] border border-white/5 px-2.5 py-1.5 rounded-lg shrink-0">
+                                <span className="text-[8px] text-teal-400 font-black uppercase">Seq {act.sequence}</span>
+                                <span className="text-[10px] text-white font-bold max-w-[120px] truncate">{act.activity_type}</span>
+                              </div>
+                            </React.Fragment>
+                          ))}
+                        </div>
 
-                </div>
+                        <div className="space-y-3">
+                          {activities.map((act, index) => (
+                            <div key={act.id} className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl space-y-3 relative group">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActivities(prev => prev.filter(a => a.id !== act.id).map((a, i) => ({ ...a, sequence: i + 1 })));
+                                }}
+                                className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-300 text-xs transition-opacity font-bold uppercase tracking-wider"
+                              >
+                                Delete
+                              </button>
+
+                              <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Activity Type</label>
+                                  <select
+                                    value={act.activity_type}
+                                    onChange={(e) => {
+                                      const updated = [...activities];
+                                      updated[index].activity_type = e.target.value;
+                                      setActivities(updated);
+                                    }}
+                                    className="w-full bg-[#141414] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
+                                  >
+                                    <option value="CREATE_RECEIVABLE">CREATE_RECEIVABLE</option>
+                                    <option value="CREATE_PAYABLE">CREATE_PAYABLE</option>
+                                    <option value="INCREASE_LABEL">INCREASE_LABEL</option>
+                                    <option value="DECREASE_LABEL">DECREASE_LABEL</option>
+                                    <option value="CREATE_ASSET">CREATE_ASSET</option>
+                                    <option value="UPDATE_STOCK">UPDATE_STOCK</option>
+                                    <option value="CONSUME_BUDGET">CONSUME_BUDGET</option>
+                                    <option value="UPDATE_PARTY">UPDATE_PARTY</option>
+                                    <option value="UPDATE_ENTITY">UPDATE_ENTITY</option>
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Target Account/Label</label>
+                                  <select
+                                    value={act.target_id || ""}
+                                    onChange={(e) => {
+                                      const updated = [...activities];
+                                      updated[index].target_id = e.target.value;
+                                      setActivities(updated);
+                                    }}
+                                    className="w-full bg-[#141414] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
+                                  >
+                                    <option value="">-- Choose Label --</option>
+                                    {labels.map(l => (
+                                      <option key={l.id} value={l.id}>{l.name} ({l.type})</option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Amount</label>
+                                  <input
+                                    type="number"
+                                    value={act.amount}
+                                    onChange={(e) => {
+                                      const updated = [...activities];
+                                      updated[index].amount = e.target.value;
+                                      setActivities(updated);
+                                    }}
+                                    className="w-full bg-[#141414] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500 transition-all"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Operational Balance Preview */}
+                      <div className="space-y-4 pt-6 border-t border-white/5">
+                        <h3 className="text-xs font-black uppercase tracking-widest text-gray-500">Operational Balance Impact Preview</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                          {activities.map(act => {
+                            const lbl = labels.find(l => l.id === act.target_id);
+                            if (!lbl) return null;
+                            const currentVal = parseFloat(lbl.current_amount || 0.0);
+                            const change = act.activity_type.startsWith("DECREASE") || act.activity_type.startsWith("SUBTRACT") || act.activity_type.startsWith("REMOVE") ? -parseFloat(act.amount || 0) : parseFloat(act.amount || 0);
+                            const predicted = currentVal + change;
+                            
+                            return (
+                              <div key={act.id} className="p-3 bg-white/[0.01] border border-white/5 rounded-2xl flex flex-col justify-between space-y-1">
+                                <div>
+                                  <span className="font-extrabold text-white text-xs block truncate">{lbl.name}</span>
+                                  <span className="text-[9px] text-gray-500 uppercase tracking-widest block">{act.activity_type}</span>
+                                </div>
+                                <div className="flex items-baseline justify-between pt-1 border-t border-white/5 mt-1">
+                                  <span className="text-[10px] text-gray-400">₹{currentVal.toLocaleString()} ➔ <span className="font-black text-teal-400">₹{predicted.toLocaleString()}</span></span>
+                                  <span className={`text-[10px] font-bold ${change >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                                    {change >= 0 ? "+" : ""}₹{change.toLocaleString()}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Right Panel: Validation Sidebar */}
@@ -1489,6 +1857,153 @@ export default function TradeEngine({ workbenchId }) {
             await handleReRunEngine();
           }}
         />
+      )}
+
+      {/* Link Beneficiary Modal */}
+      {linkBeneficiaryData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-[#141414] border border-white/10 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5">
+            <div className="flex justify-between items-center border-b border-white/5 pb-3">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-wider text-teal-400">
+                  Link Beneficiary Vessel
+                </h3>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">
+                  Resolve "{linkBeneficiaryData.beneficiaryName}" into a Party and Entity
+                </p>
+              </div>
+              <button 
+                onClick={() => setLinkBeneficiaryData(null)}
+                className="text-gray-500 hover:text-white p-1"
+              >
+                <BsXCircle size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Option Selection: Select Party vs Create Party */}
+              <div className="flex space-x-4 border-b border-white/5 pb-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLinkOption("existing");
+                    setSelectedPartyId("");
+                  }}
+                  className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-widest border-b-2 transition-all ${
+                    linkOption === "existing"
+                      ? "border-teal-400 text-teal-400"
+                      : "border-transparent text-gray-500 hover:text-gray-300"
+                  }`}
+                >
+                  Select Existing Party
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLinkOption("new");
+                    setNewPartyName(linkBeneficiaryData.beneficiaryName);
+                  }}
+                  className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-widest border-b-2 transition-all ${
+                    linkOption === "new"
+                      ? "border-teal-400 text-teal-400"
+                      : "border-transparent text-gray-500 hover:text-gray-300"
+                  }`}
+                >
+                  Create New Party
+                </button>
+              </div>
+
+              {linkOption === "existing" ? (
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                    Choose Party
+                  </label>
+                  <select
+                    value={selectedPartyId}
+                    onChange={(e) => setSelectedPartyId(e.target.value)}
+                    className="w-full bg-[#0A0A0A] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
+                  >
+                    <option value="">-- Choose Party --</option>
+                    {parties.filter(p => !p.is_self).map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.category})</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                    Party Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newPartyName}
+                    onChange={(e) => setNewPartyName(e.target.value)}
+                    placeholder="Party Name"
+                    className="w-full bg-[#0A0A0A] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all font-medium"
+                  />
+                </div>
+              )}
+
+              {/* Vessel/Entity Creation Details */}
+              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-4">
+                <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest block">
+                  Create/Link Vessel Details
+                </span>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                      Vessel Label
+                    </label>
+                    <input
+                      type="text"
+                      value={vesselName}
+                      onChange={(e) => setVesselName(e.target.value)}
+                      placeholder="e.g. Bank Account or Shipping Vessel"
+                      className="w-full bg-[#0A0A0A] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                      Vessel Type
+                    </label>
+                    <select
+                      value={vesselType}
+                      onChange={(e) => setVesselType(e.target.value)}
+                      className="w-full bg-[#0A0A0A] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500 transition-all cursor-pointer"
+                    >
+                      <option value="bank_account">Bank Account</option>
+                      <option value="upi">UPI ID</option>
+                      <option value="cash">Cash Box</option>
+                      <option value="vendor">Vendor Entity</option>
+                      <option value="customer">Customer Entity</option>
+                      <option value="vessel">Shipping Vessel</option>
+                      <option value="broker">Broker</option>
+                      <option value="logistics">Logistics Partner</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-3 border-t border-white/5">
+              <button 
+                onClick={() => setLinkBeneficiaryData(null)}
+                className="px-4 py-2 border border-white/10 rounded-xl text-gray-400 hover:text-white transition-all text-xs font-bold"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleSaveLinkage}
+                disabled={linkOption === "existing" ? !selectedPartyId : !newPartyName.trim() || !vesselName.trim()}
+                className="px-5 py-2 bg-teal-400 text-black font-extrabold rounded-xl hover:opacity-90 transition-all text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Save Linkage
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

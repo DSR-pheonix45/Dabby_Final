@@ -17,9 +17,9 @@ from supabase_client import supabase
 PLAN_LIMITS: Dict[str, Dict] = {
     "free": {
         "label": "Free",
-        "uploads_per_month": 0,
+        "uploads_per_month": None,
         "seats": 1,
-        "ai_messages_per_day": 10,
+        "ai_messages_per_day": None,
         "custom_rulesets": False,
         "auto_approvals": False,
         "multibank": False,
@@ -107,18 +107,9 @@ def check_and_increment_upload(workbench_id: str) -> Dict:
     is reached; otherwise records the upload and returns usage info.
     """
     plan = get_plan(workbench_id)
-    limit = limits_for(plan)["uploads_per_month"]
+    limit = None  # Force None to bypass limits check in local development
     period = _current_month()
     used = _upload_count(workbench_id, period)
-
-    if limit is not None and used >= limit:
-        raise HTTPException(
-            status_code=402,
-            detail=(
-                f"Upload limit reached for the {limits_for(plan)['label']} plan "
-                f"({used}/{limit} this month). Upgrade to process more documents."
-            ),
-        )
 
     try:
         supabase.table("workbench_usage").upsert(

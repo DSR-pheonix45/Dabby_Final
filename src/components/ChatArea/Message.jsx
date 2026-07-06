@@ -127,6 +127,70 @@ const DabbyChart = ({ jsonString }) => {
   }
 };
 
+const DabbyTableContainer = ({ children }) => {
+  const tableRef = React.useRef(null);
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = () => {
+    if (!tableRef.current) return;
+    
+    const table = tableRef.current.querySelector("table");
+    if (!table) return;
+
+    let rows = Array.from(table.querySelectorAll("tr"));
+    let tsvLines = [];
+
+    rows.forEach(row => {
+      let cells = Array.from(row.querySelectorAll("th, td"));
+      let cellTexts = cells.map(cell => {
+        let text = cell.innerText || cell.textContent || "";
+        text = text.replace(/\r?\n|\r/g, " ").replace(/\t/g, " ");
+        if (text.includes('"')) {
+          text = '"' + text.replace(/"/g, '""') + '"';
+        }
+        return text;
+      });
+      tsvLines.push(cellTexts.join("\t"));
+    });
+
+    const tsvText = tsvLines.join("\n");
+    navigator.clipboard.writeText(tsvText).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(err => {
+      console.error("Failed to copy table: ", err);
+    });
+  };
+
+  return (
+    <div ref={tableRef} className="relative group overflow-x-auto my-4 rounded-xl border border-white/5 bg-white/1">
+      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium text-black bg-[#00FFD1] hover:bg-[#00FFD1]/90 rounded shadow-md transition-all active:scale-95"
+        >
+          {copied ? (
+            <>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+              Copied!
+            </>
+          ) : (
+            <>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+              </svg>
+              Copy to Excel
+            </>
+          )}
+        </button>
+      </div>
+      <table className="min-w-full text-left">{children}</table>
+    </div>
+  );
+};
+
 const DabbyScenarioTable = ({ jsonString }) => {
   try {
     const config = JSON.parse(jsonString.trim());
@@ -137,20 +201,60 @@ const DabbyScenarioTable = ({ jsonString }) => {
 
     const [growth, setGrowth] = React.useState(0);
     const [opexSaving, setOpexSaving] = React.useState(0);
+    const tableRef = React.useRef(null);
+    const [copied, setCopied] = React.useState(false);
+
+    const handleCopy = () => {
+      if (!tableRef.current) return;
+      const table = tableRef.current.querySelector("table");
+      if (!table) return;
+
+      let rows = Array.from(table.querySelectorAll("tr"));
+      let tsvLines = [];
+
+      rows.forEach(row => {
+        let cells = Array.from(row.querySelectorAll("th, td"));
+        let cellTexts = cells.map(cell => {
+          let text = cell.innerText || cell.textContent || "";
+          text = text.replace(/\r?\n|\r/g, " ").replace(/\t/g, " ");
+          if (text.includes('"')) {
+            text = '"' + text.replace(/"/g, '""') + '"';
+          }
+          return text;
+        });
+        tsvLines.push(cellTexts.join("\t"));
+      });
+
+      const tsvText = tsvLines.join("\n");
+      navigator.clipboard.writeText(tsvText).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }).catch(err => {
+        console.error("Failed to copy scenario table: ", err);
+      });
+    };
 
     const calculateMetrics = (revMult, opexMult) => {
       const revenue = initRevenue * (1 + growth / 100) * revMult;
       const cogs = initCogs * (1 + growth / 100) * revMult;
       const opex = initOpex * (1 - opexSaving / 100) * opexMult;
-      const profit = revenue - cogs - opex;
+      
+      const profitBeforeTax = revenue - cogs - opex;
+      const taxRate = 0.25; // 25% corporate tax rate
+      const tax = profitBeforeTax > 0 ? profitBeforeTax * taxRate : 0;
+      const profit = profitBeforeTax - tax;
       const margin = (profit / revenue) * 100;
       
       const monthlyOpex = opex / 12;
       const monthlyCogs = cogs / 12;
       const monthlyRevenue = revenue / 12;
-      const monthlyBurn = (monthlyOpex + monthlyCogs) - monthlyRevenue;
+      const monthlyRevenuePostTax = monthlyRevenue - (tax / 12);
+      const monthlyBurn = (monthlyOpex + monthlyCogs) - monthlyRevenuePostTax;
 
-      let runway = "Infinity (Positive Flow)";
+      // Ratio relation between COGS + OPEX by revenue post taxes components removed
+      const ratio = ((monthlyOpex + monthlyCogs) / Math.max(1, monthlyRevenuePostTax)) * 100;
+
+      let runway = `Positive Flow (Ratio: ${ratio.toFixed(1)}%)`;
       if (monthlyBurn > 0) {
         runway = `${(initCash / monthlyBurn).toFixed(1)} Months`;
       }
@@ -170,7 +274,30 @@ const DabbyScenarioTable = ({ jsonString }) => {
     const pessimistic = calculateMetrics(0.85, 1.05);
 
     return (
-      <div className="w-full my-6 bg-white/2 border border-white/5 p-5 rounded-2xl space-y-5">
+      <div ref={tableRef} className="relative group w-full my-6 bg-white/2 border border-white/5 p-5 rounded-2xl space-y-5">
+        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium text-black bg-[#00FFD1] hover:bg-[#00FFD1]/90 rounded shadow-md transition-all active:scale-95"
+          >
+            {copied ? (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+                Copied!
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                </svg>
+                Copy to Excel
+              </>
+            )}
+          </button>
+        </div>
+
         <div className="space-y-1">
           <h5 className="text-xs font-bold uppercase tracking-wider text-teal-400/90">Interactive Scenario Workbench</h5>
           <p className="text-[10px] text-gray-400">Simulate changes in revenue growth and opex spending in real-time.</p>
@@ -218,14 +345,14 @@ const DabbyScenarioTable = ({ jsonString }) => {
                 <th className="px-4 py-3 font-semibold text-emerald-400">Optimistic Case (+15%)</th>
               </tr>
             </thead>
-            <tbody className="opacity-90">
+            <tbody>
               <tr className="border-b border-gray-800/30">
                 <td className="px-4 py-2.5 font-medium text-gray-400">Forecasted Revenue</td>
                 <td className="px-4 py-2.5 font-mono">{pessimistic.revenue}</td>
                 <td className="px-4 py-2.5 font-mono text-white font-bold">{base.revenue}</td>
                 <td className="px-4 py-2.5 font-mono">{optimistic.revenue}</td>
               </tr>
-              <tr className="border-b border-gray-800/30">
+              <tr className="border-b border-gray-800/30 bg-white/1">
                 <td className="px-4 py-2.5 font-medium text-gray-400">Cost of Goods (COGS)</td>
                 <td className="px-4 py-2.5 font-mono">{pessimistic.cogs}</td>
                 <td className="px-4 py-2.5 font-mono text-white font-bold">{base.cogs}</td>
@@ -439,7 +566,7 @@ const Message = ({ message, searchTerm }) => {
                                                          <code className={`${className} block bg-[#0D1117] p-4 rounded-lg overflow-x-auto text-sm leading-relaxed`} {...props}>{children}</code>
                                                      );
                                                  },
-                                                table: ({ children }) => <div className="overflow-x-auto my-4 rounded-xl border border-white/5"><table className="min-w-full text-left">{children}</table></div>,
+                                                table: ({ children }) => <DabbyTableContainer>{children}</DabbyTableContainer>,
                                                 thead: ({ children }) => <thead className="bg-[#1C2128] text-gray-200 border-b border-gray-700 font-bold">{children}</thead>,
                                                 th: ({ children }) => <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-teal-400/90">{children}</th>,
                                                 td: ({ children }) => <td className="px-4 py-3 border-b border-gray-800/50 text-sm opacity-90"><HighlightedText text={children} highlight={searchTerm} /></td>,

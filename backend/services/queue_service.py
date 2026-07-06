@@ -225,166 +225,388 @@ async def auto_record_ledger_from_ocr(doc_id: str, doc: dict, extracted: dict):
 
 async def process_queued_document(doc_id: str):
     """
-    Downloads file from Supabase storage, runs LLM / Vision OCR scan,
-    and records the extracted json note under metadata.
+    Parallel page-by-page worker task implementing a fault-tolerant processing pipeline.
     """
     print(f"[WORKER] Starting processing of document {doc_id}...")
+    import time
+    import hashlib
     try:
-        # 1. Fetch document metadata
+        # Fetch document metadata
         doc_res = supabase.table("workbench_documents").select("*").eq("id", doc_id).single().execute()
         doc = doc_res.data
         if not doc:
             print(f"[WORKER ERROR] Document {doc_id} not found in database")
             return
 
-        # Check if the document has already been OCR-scanned
-        metadata = doc.get("metadata") or {}
-        extracted = metadata.get("extracted_invoice")
-        doc_type = doc.get("document_type")
+        meta = doc.get("metadata") or {}
+        
+        # State: VALIDATING
+        meta["job_state"] = "VALIDATING"
+        supabase.table("workbench_documents").update({
+            "status": "VALIDATING",
+            "metadata": meta
+        }).eq("id", doc_id).execute()
 
-        # Update status to 'processing'
-        supabase.table("workbench_documents").update({"status": "processing"}).eq("id", doc_id).execute()
+        # Download file content from Storage
+        path = doc["file_path"]
+        file_data = supabase.storage.from_("Doc_vault_Raw").download(path)
 
-        if extracted and doc_type:
-            print(f"[WORKER] Document {doc_id} already has OCR data. Proceeding directly to Ruleset Engine.")
-        else:
-            # 2. Download file content from Storage
-            path = doc["file_path"]
-            file_data = supabase.storage.from_("Doc_vault_Raw").download(path)
+        # Generate SHA256 hash for duplicate check & caching
+        file_hash = hashlib.sha256(file_data).hexdigest()
+        meta["file_hash"] = file_hash
+
+        # Cache Check (Phase 13)
+        cache_res = supabase.table("workbench_documents")\
+            .select("*")\
+            .eq("workbench_id", doc["workbench_id"])\
+            .neq("id", doc_id)\
+            .in_("status", ["processed", "COMPLETED"])\
+            .eq("metadata->>file_hash", file_hash)\
+            .execute()
             
-            # Check if the document is a ZIP file
-            if doc.get("mime_type") == "application/zip" or doc["filename"].endswith(".zip"):
-                print(f"[WORKER] Found ZIP file: {doc['filename']}. Extracting files...")
-                workbench_id = doc["workbench_id"]
-                # Open Zip File
-                with zipfile.ZipFile(io.BytesIO(file_data)) as z:
-                    for file_info in z.infolist():
-                        if file_info.is_dir():
-                            continue
-                        
-                        filename = os.path.basename(file_info.filename)
-                        if not filename:
-                            continue
-                        
-                        # Read file content
-                        extracted_file_bytes = z.read(file_info)
-                        
-                        # Generate a unique path in Supabase storage
-                        file_ext = filename.split('.')[-1] if '.' in filename else ''
-                        random_name = f"{uuid.uuid4().hex}.{file_ext}" if file_ext else uuid.uuid4().hex
-                        filePath = f"{workbench_id}/{random_name}"
-                        
-                        # Upload to storage
-                        supabase.storage.from_("Doc_vault_Raw").upload(filePath, extracted_file_bytes)
-                        
-                        # Get mime type
-                        mime_type, _ = mimetypes.guess_type(filename)
-                        if not mime_type:
-                            mime_type = "application/octet-stream"
-                        
-                        # Insert doc payload
-                        doc_payload = {
-                            "workbench_id": workbench_id,
-                            "filename": filename,
-                            "file_path": filePath,
-                            "file_size": len(extracted_file_bytes),
-                            "mime_type": mime_type,
-                            "status": "uploaded",
-                            "metadata": {"parent_zip": doc_id}
-                        }
-                        
-                        new_doc_res = supabase.table("workbench_documents").insert(doc_payload).execute()
-                        if new_doc_res.data:
-                            new_doc_id = new_doc_res.data[0]["id"]
-                            await enqueue_document(new_doc_id)
-                
-                # Set parent ZIP status to processed
-                supabase.table("workbench_documents").update({
-                    "status": "analyzed",
-                    "metadata": {**doc.get("metadata", {}), "extracted": True, "message": "ZIP file extracted"}
-                }).eq("id", doc_id).execute()
-                
-                print(f"[WORKER] ZIP file {doc_id} extracted successfully")
-                return
+        if cache_res.data:
+            cached_doc = cache_res.data[0]
+            cached_meta = cached_doc.get("metadata") or {}
             
-            # 3. Run AI scanner
-            extracted = await ai_service.scan_document_vision(
-                file_bytes=file_data,
-                mime_type=doc.get("mime_type", "image/png"),
-                filename=doc["filename"]
-            )
+            meta["job_state"] = "COMPLETED"
+            meta["extracted_invoice"] = cached_meta.get("extracted_invoice")
+            meta["bank_statement"] = cached_meta.get("bank_statement")
+            meta["cached_from"] = cached_doc["id"]
             
-            print(f"[WORKER] Successfully scanned {doc['filename']}. Type={extracted.get('document_type')}")
-            
-            # 4. Update status, type, and record the json note under metadata
-            doc_type = extracted.get("document_type", doc.get("document_type", "expense_receipt"))
-            
-            # Calculate document hash to detect duplicates
-            import hashlib
-            file_hash = hashlib.md5(file_data).hexdigest()
-            
-            # Check for duplicates in the same workbench
-            dup_res = supabase.table("workbench_documents")\
-                .select("id, filename")\
-                .eq("workbench_id", doc["workbench_id"])\
-                .neq("id", doc_id)\
-                .eq("metadata->>file_hash", file_hash)\
-                .execute()
-                
-            is_duplicate = len(dup_res.data) > 0
-            override_duplicate = doc.get("metadata", {}).get("override_duplicate") == True
-            
-            updated_metadata = {
-                **doc.get("metadata", {}), 
-                "extracted_invoice": extracted,
-                "file_hash": file_hash
-            }
-            if is_duplicate:
-                updated_metadata["is_duplicate"] = True
-                
             supabase.table("workbench_documents").update({
-                "document_type": doc_type,
-                "metadata": updated_metadata
+                "status": "processed",
+                "document_type": cached_doc.get("document_type"),
+                "metadata": meta
             }).eq("id", doc_id).execute()
             
-            # OCR Confidence Check
-            confidence = float(extracted.get("confidence") or 1.0)
-            if confidence < 0.8:
-                supabase.table("workbench_documents").update({
-                    "status": "Needs Review",
-                    "metadata": {**updated_metadata, "error": f"Low OCR confidence ({confidence*100:.1f}%) below 80% threshold."}
-                }).eq("id", doc_id).execute()
-                print(f"[WORKER] Skipped execution for doc {doc_id}: low confidence")
-                return
+            print(f"[WORKER] Document {doc_id} matched cache: copied results from {cached_doc['id']}")
+            
+            from services.trade_service import trade_service
+            await trade_service.create_trade_from_document(doc_id)
+            return
 
-            # Duplicate check enforcement
-            if is_duplicate and not override_duplicate:
-                supabase.table("workbench_documents").update({
-                    "status": "Needs Review",
-                    "metadata": {**updated_metadata, "error": f"Duplicate document. Match found: {dup_res.data[0]['filename']}."}
-                }).eq("id", doc_id).execute()
-                print(f"[WORKER] Skipped execution for doc {doc_id}: duplicate detected")
-                return
+        # Check if the document is a ZIP file (keep existing ZIP logic)
+        if doc.get("mime_type") == "application/zip" or doc["filename"].endswith(".zip"):
+            print(f"[WORKER] Found ZIP file: {doc['filename']}. Extracting files...")
+            workbench_id = doc["workbench_id"]
+            with zipfile.ZipFile(io.BytesIO(file_data)) as z:
+                for file_info in z.infolist():
+                    if file_info.is_dir():
+                        continue
+                    
+                    filename = os.path.basename(file_info.filename)
+                    if not filename:
+                        continue
+                    
+                    extracted_file_bytes = z.read(file_info)
+                    file_ext = filename.split('.')[-1] if '.' in filename else ''
+                    random_name = f"{uuid.uuid4().hex}.{file_ext}" if file_ext else uuid.uuid4().hex
+                    filePath = f"{workbench_id}/{random_name}"
+                    
+                    supabase.storage.from_("Doc_vault_Raw").upload(filePath, extracted_file_bytes)
+                    
+                    mime_type, _ = mimetypes.guess_type(filename)
+                    if not mime_type:
+                        mime_type = "application/octet-stream"
+                    
+                    doc_payload = {
+                        "workbench_id": workbench_id,
+                        "filename": filename,
+                        "file_path": filePath,
+                        "file_size": len(extracted_file_bytes),
+                        "mime_type": mime_type,
+                        "status": "uploaded",
+                        "metadata": {"parent_zip": doc_id}
+                    }
+                    
+                    new_doc_res = supabase.table("workbench_documents").insert(doc_payload).execute()
+                    if new_doc_res.data:
+                        new_doc_id = new_doc_res.data[0]["id"]
+                        await enqueue_document(new_doc_id)
+            
+            supabase.table("workbench_documents").update({
+                "status": "analyzed",
+                "metadata": {**doc.get("metadata", {}), "extracted": True, "message": "ZIP file extracted"}
+            }).eq("id", doc_id).execute()
+            print(f"[WORKER] ZIP file {doc_id} extracted successfully")
+            return
 
-        # 5. Route to unified Trade Engine Pipeline (Stages 2-9)
+        # Duplicate check enforcement
+        dup_res = supabase.table("workbench_documents")\
+            .select("id, filename")\
+            .eq("workbench_id", doc["workbench_id"])\
+            .neq("id", doc_id)\
+            .eq("metadata->>file_hash", file_hash)\
+            .execute()
+            
+        is_duplicate = len(dup_res.data) > 0
+        override_duplicate = doc.get("metadata", {}).get("override_duplicate") == True
+        
+        if is_duplicate and not override_duplicate:
+            meta["is_duplicate"] = True
+            supabase.table("workbench_documents").update({
+                "status": "Needs Review",
+                "metadata": {**meta, "error": f"Duplicate document. Match found: {dup_res.data[0]['filename']}."}
+            }).eq("id", doc_id).execute()
+            print(f"[WORKER] Skipped execution for doc {doc_id}: duplicate detected")
+            return
+
+        # Phase 2 & 3: Detect PDF Type and Split Document
+        meta["job_state"] = "SPLITTING"
+        supabase.table("workbench_documents").update({
+            "status": "SPLITTING",
+            "metadata": meta
+        }).eq("id", doc_id).execute()
+
+        is_pdf = (doc.get("mime_type") == "application/pdf" or doc["filename"].lower().endswith(".pdf"))
+        
+        if is_pdf:
+            import fitz
+            pdf_doc = fitz.open(stream=file_data, filetype="pdf")
+            total_pages = pdf_doc.page_count
+        else:
+            total_pages = 1
+
+        meta["total_pages"] = total_pages
+        meta["completed_pages"] = meta.get("completed_pages", 0)
+        meta["failed_pages"] = meta.get("failed_pages", 0)
+        meta["errors"] = meta.get("errors", [])
+        
+        if "pages" not in meta:
+            meta["pages"] = {}
+
+        # Upload page splits or register them
+        for idx in range(total_pages):
+            page_num_str = str(idx + 1)
+            if page_num_str in meta["pages"] and meta["pages"][page_num_str].get("file_path"):
+                continue # Already split
+            
+            if is_pdf:
+                page = pdf_doc[idx]
+                text_content = page.get_text()
+                is_digital = len(text_content.strip()) > 50
+                
+                # Split page
+                page_pdf = fitz.open()
+                page_pdf.insert_pdf(pdf_doc, from_page=idx, to_page=idx)
+                page_bytes = page_pdf.write()
+                page_pdf.close()
+                
+                # Upload split
+                split_path = f"splits/{doc_id}/page_{page_num_str}.pdf"
+                supabase.storage.from_("Doc_vault_Raw").upload(split_path, page_bytes)
+                
+                meta["pages"][page_num_str] = {
+                    "status": "QUEUED",
+                    "file_path": split_path,
+                    "is_digital": is_digital,
+                    "page_text": text_content if is_digital else None,
+                    "retry_count": 0
+                }
+            else:
+                meta["pages"][page_num_str] = {
+                    "status": "QUEUED",
+                    "file_path": doc["file_path"],
+                    "is_digital": False,
+                    "page_text": None,
+                    "retry_count": 0
+                }
+                
+        # Save split status
+        supabase.table("workbench_documents").update({
+            "metadata": meta
+        }).eq("id", doc_id).execute()
+
+        if is_pdf:
+            pdf_doc.close()
+
+        # Phase 4 & 5: Configurable Parallel Processing with Semaphore
+        meta["job_state"] = "OCR_RUNNING"
+        supabase.table("workbench_documents").update({
+            "status": "OCR_RUNNING",
+            "metadata": meta
+        }).eq("id", doc_id).execute()
+
+        MAX_PAGE_CONCURRENCY = int(os.environ.get("MAX_PAGE_CONCURRENCY", 8))
+        semaphore = asyncio.Semaphore(MAX_PAGE_CONCURRENCY)
+        db_lock = asyncio.Lock()
+        
+        start_ocr_time = time.time()
+        if "ocr_start_time" not in meta:
+            meta["ocr_start_time"] = start_ocr_time
+
+        # Temporary helper function to save progress in DB
+        async def save_progress():
+            async with db_lock:
+                supabase.table("workbench_documents").update({
+                    "metadata": meta
+                }).eq("id", doc_id).execute()
+
+        # Single page worker task
+        async def process_page_task(page_num_str: str):
+            page_info = meta["pages"][page_num_str]
+            if page_info.get("status") == "COMPLETED":
+                return # Skip already completed page (resume support)
+
+            async with semaphore:
+                page_info["status"] = "PROCESSING"
+                await save_progress()
+                
+                max_retries = 3
+                attempt = 0
+                base_delay = 2.0
+                
+                page_file_path = page_info["file_path"]
+                is_digital = page_info.get("is_digital", False)
+                page_text = page_info.get("page_text")
+                inferred_type = doc.get("document_type") or "generic"
+                
+                # Fetch page content
+                if page_file_path != doc["file_path"]:
+                    page_bytes = supabase.storage.from_("Doc_vault_Raw").download(page_file_path)
+                else:
+                    page_bytes = file_data
+                    
+                while attempt < max_retries:
+                    try:
+                        # Structured single-page OCR with 30s timeout protection
+                        result = await asyncio.wait_for(
+                            ai_service.scan_document_page_raw(
+                                file_bytes=page_bytes,
+                                mime_type="application/pdf" if is_pdf else doc.get("mime_type", "image/png"),
+                                filename=f"page_{page_num_str}_{doc['filename']}",
+                                is_text=is_digital,
+                                page_text=page_text,
+                                doc_type=inferred_type
+                            ),
+                            timeout=30.0
+                        )
+                        
+                        page_info["status"] = "COMPLETED"
+                        page_info["result"] = result
+                        page_info["retry_count"] = attempt
+                        page_info["error"] = None
+                        
+                        meta["completed_pages"] = sum(1 for p in meta["pages"].values() if p.get("status") == "COMPLETED")
+                        
+                        # Phase 8: Incremental Aggregation
+                        if inferred_type == "bank_statement":
+                            agg = ai_service.aggregate_pages(meta["pages"])
+                            meta["bank_statement"] = {
+                                "statement_summary": agg["statement_summary"],
+                                "transactions": agg["transactions"]
+                            }
+                            # First page summary detection for doc-level mapping
+                            if page_num_str == "1":
+                                doc_type_detected = "bank_statement"
+                        else:
+                            agg = ai_service.aggregate_invoice_pages(meta["pages"])
+                            meta["extracted_invoice"] = agg
+                            
+                        # ETA / Stats estimation
+                        elapsed = time.time() - start_ocr_time
+                        done_count = meta["completed_pages"] + meta["failed_pages"]
+                        if done_count > 0:
+                            meta["average_time_per_page"] = round(elapsed / done_count, 2)
+                            remaining = total_pages - done_count
+                            meta["estimated_completion_time"] = round(meta["average_time_per_page"] * remaining, 2)
+                            
+                        await save_progress()
+                        print(f"[WORKER] Page {page_num_str} of doc {doc_id} COMPLETED on attempt {attempt}")
+                        return
+                        
+                    except Exception as e:
+                        attempt += 1
+                        print(f"[WORKER WARNING] Page {page_num_str} failed (attempt {attempt}/{max_retries}): {e}")
+                        if attempt < max_retries:
+                            sleep_time = base_delay * (2 ** attempt)
+                            await asyncio.sleep(sleep_time)
+                        else:
+                            # Mark page failed permanently
+                            page_info["status"] = "FAILED"
+                            page_info["error"] = str(e)
+                            page_info["retry_count"] = attempt
+                            
+                            meta["failed_pages"] = sum(1 for p in meta["pages"].values() if p.get("status") == "FAILED")
+                            meta["errors"].append({
+                                "page": page_num_str,
+                                "error": str(e)
+                            })
+                            await save_progress()
+                            print(f"[WORKER ERROR] Page {page_num_str} of doc {doc_id} permanently FAILED.")
+
+        # Run concurrent workers with document-level timeout protection
+        DOCUMENT_TIMEOUT = int(os.environ.get("DOCUMENT_TIMEOUT_SECONDS", 600)) # Default 10 minutes
+        page_tasks = [process_page_task(p_num) for p_num in meta["pages"].keys()]
+        try:
+            await asyncio.wait_for(asyncio.gather(*page_tasks), timeout=float(DOCUMENT_TIMEOUT))
+        except asyncio.TimeoutError:
+            print(f"[WORKER ERROR] Document {doc_id} execution exceeded time limit of {DOCUMENT_TIMEOUT} seconds. Terminating.")
+            # Mark all incomplete pages as FAILED
+            for p_num, p_info in meta["pages"].items():
+                if p_info.get("status") in ["QUEUED", "PROCESSING"]:
+                    p_info["status"] = "FAILED"
+                    p_info["error"] = "Document timeout exceeded"
+            meta["failed_pages"] = sum(1 for p in meta["pages"].values() if p.get("status") == "FAILED")
+            meta["errors"].append({
+                "document": "overall",
+                "error": f"Document processing timed out after {DOCUMENT_TIMEOUT} seconds."
+            })
+            await save_progress()
+            raise TimeoutError(f"Document processing timed out after {DOCUMENT_TIMEOUT} seconds.")
+
+        # Phase 11 & 16: Decoupled post-processing & normalisation
+        inferred_type = doc.get("document_type") or "generic"
+        
+        if inferred_type == "bank_statement":
+            meta["job_state"] = "NORMALIZING"
+            await save_progress()
+            
+            agg_raw = ai_service.aggregate_pages(meta["pages"])
+            
+            meta["job_state"] = "AGGREGATING"
+            await save_progress()
+            
+            final_res = await ai_service.post_process_bank_statement(agg_raw)
+            meta["bank_statement"] = final_res["bank_statement"]
+            doc_type = "bank_statement"
+        else:
+            meta["job_state"] = "NORMALIZING"
+            await save_progress()
+            
+            aggregated_invoice = ai_service.aggregate_invoice_pages(meta["pages"])
+            meta["extracted_invoice"] = aggregated_invoice
+            doc_type = aggregated_invoice.get("document_type") or "expense_receipt"
+
+        meta["job_state"] = "ANALYZING"
+        meta["ocr_time"] = round(time.time() - start_ocr_time, 2)
+        await save_progress()
+
+        # Route to unified Trade Engine Pipeline
         print(f"[WORKER] Routing document {doc_id} to 12-stage Trade Engine Pipeline...")
         from services.trade_service import trade_service
         trade = await trade_service.create_trade_from_document(doc_id)
         
-        # Link document's transaction status to match trade status
-        final_doc_status = "processed" if trade["status"] == "Ready" else "Needs Review"
-        supabase.table("workbench_documents").update({
-            "status": final_doc_status
-        }).eq("id", doc_id).execute()
+        meta["job_state"] = "COMPLETED"
+        final_doc_status = "processed" if (trade["status"] == "Ready" and meta.get("failed_pages", 0) == 0) else "Needs Review"
         
+        async with db_lock:
+            supabase.table("workbench_documents").update({
+                "document_type": doc_type,
+                "status": final_doc_status,
+                "metadata": meta
+            }).eq("id", doc_id).execute()
+            
         print(f"[WORKER] Finished processing doc {doc_id}. Trade ID: {trade['id']}, Trade Status: {trade['status']}, Doc Status: {final_doc_status}")
         
     except Exception as e:
         print(f"[WORKER ERROR] Processing of doc {doc_id} failed: {e}")
         try:
+            meta["job_state"] = "FAILED"
+            meta["error"] = str(e)
             supabase.table("workbench_documents").update({
                 "status": "failed",
-                "metadata": {**(doc.get("metadata") or {}), "error": str(e)}
+                "metadata": meta
             }).eq("id", doc_id).execute()
         except Exception as update_err:
             print(f"[WORKER ERROR] Failed to set status to failed: {update_err}")

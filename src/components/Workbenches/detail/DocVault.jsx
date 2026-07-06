@@ -124,7 +124,9 @@ export default function DocVault({ workbenchId }) {
   };
 
   useEffect(() => {
-    const hasProcessing = documents.some(d => d.status === 'uploaded' || d.status === 'processing');
+    const hasProcessing = documents.some(d => 
+      ['uploaded', 'processing', 'VALIDATING', 'SPLITTING', 'OCR_RUNNING', 'NORMALIZING', 'AGGREGATING', 'ANALYZING'].includes(d.status)
+    );
     if (!hasProcessing) return;
 
     const interval = setInterval(() => {
@@ -209,10 +211,11 @@ export default function DocVault({ workbenchId }) {
   };
 
   const filteredDocs = documents.filter(doc => {
+    const status = doc.status?.toLowerCase() || '';
     const matchesStage = 
-      activeStage === 'uploaded' ? (doc.status === 'uploaded' || doc.status === 'failed' || doc.status === 'Needs Ruleset' || doc.status === 'Needs Review' || !doc.status) :
-      activeStage === 'processing' ? doc.status === 'processing' :
-      activeStage === 'analyzed' ? (doc.status === 'analyzed' || doc.status === 'processed') : false;
+      activeStage === 'uploaded' ? (status === 'uploaded' || status === 'failed' || status === 'needs ruleset' || status === 'needs review' || !status) :
+      activeStage === 'processing' ? (status === 'processing' || ['validating', 'splitting', 'ocr_running', 'normalizing', 'aggregating', 'analyzing'].includes(status)) :
+      activeStage === 'analyzed' ? (status === 'analyzed' || status === 'processed') : false;
 
     const matchesSearch = doc.filename?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           doc.metadata?.extracted_invoice?.parties?.vendor_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -221,9 +224,18 @@ export default function DocVault({ workbenchId }) {
     return matchesStage && matchesSearch;
   });
 
-  const countUploaded = documents.filter(d => d.status === 'uploaded' || d.status === 'failed' || d.status === 'Needs Ruleset' || d.status === 'Needs Review' || !d.status).length;
-  const countProcessing = documents.filter(d => d.status === 'processing').length;
-  const countAnalyzed = documents.filter(d => d.status === 'analyzed' || d.status === 'processed').length;
+  const countUploaded = documents.filter(d => {
+    const s = d.status?.toLowerCase() || '';
+    return s === 'uploaded' || s === 'failed' || s === 'needs ruleset' || s === 'needs review' || !s;
+  }).length;
+  const countProcessing = documents.filter(d => {
+    const s = d.status?.toLowerCase() || '';
+    return s === 'processing' || ['validating', 'splitting', 'ocr_running', 'normalizing', 'aggregating', 'analyzing'].includes(s);
+  }).length;
+  const countAnalyzed = documents.filter(d => {
+    const s = d.status?.toLowerCase() || '';
+    return s === 'analyzed' || s === 'processed';
+  }).length;
 
   const stats = {
     total: documents.length,
@@ -378,23 +390,33 @@ export default function DocVault({ workbenchId }) {
                               {doc.filename}
                             </span>
                              <div className="flex items-center space-x-2 mt-1">
-                              {doc.status === 'uploaded' && (
+                              {doc.status?.toLowerCase() === 'uploaded' && (
                                 <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-blue-500/10 text-blue-400 border border-blue-500/20">
                                   Uploaded
                                 </span>
                               )}
-                              {doc.status === 'processing' && (
-                                <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse flex items-center">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping mr-1" />
-                                  Processing
-                                </span>
-                              )}
-                              {doc.status === 'analyzed' && (
+                               {['processing', 'validating', 'splitting', 'ocr_running', 'normalizing', 'aggregating', 'analyzing'].includes(doc.status?.toLowerCase()) && (
+                                 <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse flex items-center">
+                                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping mr-1" />
+                                   {doc.status?.toLowerCase() === 'processing' ? 'Processing' : 
+                                    doc.status?.toLowerCase() === 'validating' ? 'Validating' : 
+                                    doc.status?.toLowerCase() === 'splitting' ? 'Splitting Pages' : 
+                                    doc.status?.toLowerCase() === 'ocr_running' ? (
+                                      doc.metadata?.total_pages ? 
+                                      `OCR: ${(doc.metadata?.completed_pages || 0) + (doc.metadata?.failed_pages || 0)}/${doc.metadata.total_pages}` : 
+                                      'Running OCR'
+                                    ) : 
+                                    doc.status?.toLowerCase() === 'normalizing' ? 'Normalizing' : 
+                                    doc.status?.toLowerCase() === 'aggregating' ? 'Aggregating' : 
+                                    doc.status?.toLowerCase() === 'analyzing' ? 'Analyzing' : 'Processing'}
+                                 </span>
+                               )}
+                              {doc.status?.toLowerCase() === 'analyzed' && (
                                 <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-teal-500/10 text-teal-400 border border-teal-500/20">
                                   Analyzed
                                 </span>
                               )}
-                              {doc.status === 'processed' && (
+                              {(doc.status?.toLowerCase() === 'processed' || doc.status?.toLowerCase() === 'completed') && (
                                 <button 
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -406,7 +428,7 @@ export default function DocVault({ workbenchId }) {
                                   Processed
                                 </button>
                               )}
-                              {doc.status === 'Needs Review' && (
+                              {doc.status?.toLowerCase() === 'needs review' && (
                                 <button 
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -418,12 +440,12 @@ export default function DocVault({ workbenchId }) {
                                   Needs Review
                                 </button>
                               )}
-                              {doc.status === 'failed' && (
+                              {doc.status?.toLowerCase() === 'failed' && (
                                 <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20" title={doc.metadata?.error || "Processing failed"}>
                                   Failed
                                 </span>
                               )}
-                              {doc.status === 'Needs Ruleset' && (
+                              {doc.status?.toLowerCase() === 'needs ruleset' && (
                                 <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-300 border border-amber-500/20" title="This document does not have an active ruleset. Configure a playbook to auto-process.">
                                   Needs Ruleset
                                 </span>
@@ -614,7 +636,8 @@ function AnalysisNoteModal({ isOpen, onClose, doc }) {
   const [copied, setCopied] = useState(false);
   if (!isOpen || !doc) return null;
 
-  const note = doc.metadata?.extracted_invoice || {};
+  const isBankStatement = doc.document_type === 'bank_statement' || !!doc.metadata?.bank_statement;
+  const note = isBankStatement ? (doc.metadata?.bank_statement || {}) : (doc.metadata?.extracted_invoice || {});
 
   const handleCopy = () => {
     navigator.clipboard.writeText(JSON.stringify(note, null, 2));
@@ -625,7 +648,9 @@ function AnalysisNoteModal({ isOpen, onClose, doc }) {
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl animate-in fade-in duration-200">
-      <div className="bg-[#0a0a0a] border border-white/10 w-full max-w-3xl rounded-[32px] flex flex-col overflow-hidden max-h-[85vh] shadow-2xl">
+      <div className={`bg-[#0a0a0a] border border-white/10 w-full rounded-[32px] flex flex-col overflow-hidden max-h-[85vh] shadow-2xl ${
+        isBankStatement ? 'max-w-6xl' : 'max-w-3xl'
+      }`}>
         {/* Header */}
         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
           <div className="flex items-center space-x-3">
@@ -633,8 +658,12 @@ function AnalysisNoteModal({ isOpen, onClose, doc }) {
               <BsStars size={20} />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">AI Analysis Note</h3>
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Parsed document event schema</p>
+              <h3 className="text-base font-bold text-white">
+                {isBankStatement ? "Bank Statement Financial Dashboard" : "AI Analysis Note"}
+              </h3>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                {isBankStatement ? "Parsed Statement Analytics & Transactions" : "Parsed document event schema"}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-gray-500 hover:text-white">
@@ -644,71 +673,77 @@ function AnalysisNoteModal({ isOpen, onClose, doc }) {
 
         {/* Content */}
         <div className="flex-grow overflow-y-auto p-6 space-y-6 custom-scrollbar text-sm">
-          {/* Main Info */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Document Type</span>
-              <span className="text-xs font-black text-teal-400 uppercase tracking-tighter bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/20">
-                {note.document_type || doc.document_type || "Unknown"}
-              </span>
-            </div>
-            <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Confidence Score</span>
-              <span className="text-sm font-bold text-white">{(note.confidence ? note.confidence * 100 : 98).toFixed(0)}%</span>
-            </div>
-            <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Issue Date</span>
-              <span className="text-sm font-bold text-white">{note.document_metadata?.document_date || "—"}</span>
-            </div>
-          </div>
+          {isBankStatement ? (
+            <BankStatementDashboard note={note} />
+          ) : (
+            <>
+              {/* Main Info */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                  <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Document Type</span>
+                  <span className="text-xs font-black text-teal-400 uppercase tracking-tighter bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/20">
+                    {note.document_type || doc.document_type || "Unknown"}
+                  </span>
+                </div>
+                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                  <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Confidence Score</span>
+                  <span className="text-sm font-bold text-white">{(note.confidence ? note.confidence * 100 : 98).toFixed(0)}%</span>
+                </div>
+                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                  <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Issue Date</span>
+                  <span className="text-sm font-bold text-white">{note.document_metadata?.document_date || "—"}</span>
+                </div>
+              </div>
 
-          {/* Parties & Currency */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block">Parties Involved</span>
-              <div className="space-y-1 text-xs">
-                <div className="flex justify-between"><span className="text-gray-500">Vendor:</span> <span className="text-white font-bold">{note.parties?.vendor_name || "—"}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Customer:</span> <span className="text-white font-bold">{note.parties?.customer_name || "—"}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">GSTIN:</span> <span className="text-white font-bold">{note.parties?.gst_number || "—"}</span></div>
+              {/* Parties & Currency */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                  <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block">Parties Involved</span>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between"><span className="text-gray-500">Vendor:</span> <span className="text-white font-bold">{note.parties?.vendor_name || "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Customer:</span> <span className="text-white font-bold">{note.parties?.customer_name || "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">GSTIN:</span> <span className="text-white font-bold">{note.parties?.gst_number || "—"}</span></div>
+                  </div>
+                </div>
+                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                  <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block">References & Financials</span>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between"><span className="text-gray-500">Invoice #:</span> <span className="text-white font-bold">{note.references?.invoice_number || "—"}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Currency:</span> <span className="text-white font-bold">{note.document_metadata?.currency || "INR"}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Total Amt:</span> <span className="text-teal-400 font-bold">{note.financials?.total_amount ? `${note.document_metadata?.currency || 'INR'} ${note.financials.total_amount.toLocaleString()}` : "—"}</span></div>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block">References & Financials</span>
-              <div className="space-y-1 text-xs">
-                <div className="flex justify-between"><span className="text-gray-500">Invoice #:</span> <span className="text-white font-bold">{note.references?.invoice_number || "—"}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Currency:</span> <span className="text-white font-bold">{note.document_metadata?.currency || "INR"}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Total Amt:</span> <span className="text-teal-400 font-bold">{note.financials?.total_amount ? `${note.document_metadata?.currency || 'INR'} ${note.financials.total_amount.toLocaleString()}` : "—"}</span></div>
-              </div>
-            </div>
-          </div>
 
-          {/* Line Items */}
-          {note.line_items && note.line_items.length > 0 && (
-            <div className="space-y-2">
-              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block">Extracted Line Items</span>
-              <div className="border border-white/5 rounded-2xl overflow-hidden bg-black/40">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-white/5 text-[9px] font-bold uppercase tracking-widest text-gray-500">
-                    <tr>
-                      <th className="p-3">Description</th>
-                      <th className="p-3 text-right">Qty</th>
-                      <th className="p-3 text-right">Unit Price</th>
-                      <th className="p-3 text-right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {note.line_items.map((item, idx) => (
-                      <tr key={idx}>
-                        <td className="p-3 text-white font-bold">{item.description}</td>
-                        <td className="p-3 text-right text-gray-400">{item.quantity}</td>
-                        <td className="p-3 text-right text-gray-400">{item.unit_price?.toLocaleString()}</td>
-                        <td className="p-3 text-right text-teal-400 font-bold">{item.amount?.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+              {/* Line Items */}
+              {note.line_items && note.line_items.length > 0 && (
+                <div className="space-y-2">
+                  <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block">Extracted Line Items</span>
+                  <div className="border border-white/5 rounded-2xl overflow-hidden bg-black/40">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-white/5 text-[9px] font-bold uppercase tracking-widest text-gray-500">
+                        <tr>
+                          <th className="p-3">Description</th>
+                          <th className="p-3 text-right">Qty</th>
+                          <th className="p-3 text-right">Unit Price</th>
+                          <th className="p-3 text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {note.line_items.map((item, idx) => (
+                          <tr key={idx}>
+                            <td className="p-3 text-white font-bold">{item.description}</td>
+                            <td className="p-3 text-right text-gray-400">{item.quantity}</td>
+                            <td className="p-3 text-right text-gray-400">{item.unit_price?.toLocaleString()}</td>
+                            <td className="p-3 text-right text-teal-400 font-bold">{item.amount?.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Raw JSON View */}
@@ -736,6 +771,251 @@ function AnalysisNoteModal({ isOpen, onClose, doc }) {
           >
             Close Note
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BankStatementDashboard({ note }) {
+  const [search, setSearch] = useState("");
+  const summary = note.statement_summary || {};
+  const kpis = note.transaction_summary || {};
+  const validation = note.validation || {};
+  const paymentModes = note.payment_mode_summary || [];
+  const beneficiaries = note.beneficiary_summary || [];
+  const transactions = note.transactions || [];
+
+  const filteredTx = transactions.filter(t => {
+    const s = search.toLowerCase();
+    return (
+      (t.raw_particulars || "").toLowerCase().includes(s) ||
+      (t.beneficiary_name || "").toLowerCase().includes(s) ||
+      (t.beneficiary_bank || "").toLowerCase().includes(s) ||
+      (t.reference_number || "").toLowerCase().includes(s) ||
+      (t.category || "").toLowerCase().includes(s) ||
+      (t.date || "").toLowerCase().includes(s)
+    );
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Statement Summary Card */}
+      <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+        <div>
+          <span className="text-[10px] text-gray-500 uppercase tracking-widest block font-bold mb-1">Bank</span>
+          <span className="text-white font-bold text-sm">{summary.bank_name || "—"}</span>
+        </div>
+        <div>
+          <span className="text-[10px] text-gray-500 uppercase tracking-widest block font-bold mb-1">Account Holder</span>
+          <span className="text-white font-bold text-sm">{summary.account_holder_name || "—"}</span>
+        </div>
+        <div>
+          <span className="text-[10px] text-gray-500 uppercase tracking-widest block font-bold mb-1">Account Number</span>
+          <span className="text-white font-bold text-sm">{summary.account_number || "—"}</span>
+        </div>
+        <div>
+          <span className="text-[10px] text-gray-500 uppercase tracking-widest block font-bold mb-1">Statement Period</span>
+          <span className="text-white font-bold text-sm">
+            {summary.statement_start_date || "—"} to {summary.statement_end_date || "—"}
+            <span className="text-[10px] text-gray-500 block font-normal mt-0.5">({kpis.statement_duration || "—"} days)</span>
+          </span>
+        </div>
+      </div>
+
+      {/* Validation Card */}
+      <div className={`p-4.5 rounded-2xl border flex items-center justify-between ${
+        validation.balance_verified 
+          ? "bg-emerald-500/5 border-emerald-500/10 text-emerald-400" 
+          : "bg-rose-500/5 border-rose-500/10 text-rose-400"
+      }`}>
+        <div className="flex items-center space-x-3">
+          <span className="text-xl font-bold">{validation.balance_verified ? "✓" : "⚠"}</span>
+          <div>
+            <h4 className="font-extrabold text-sm uppercase tracking-wider">
+              {validation.balance_verified ? "Balance Verified" : "Balance Mismatch"}
+            </h4>
+            <p className="text-xs opacity-75">
+              {validation.balance_verified 
+                ? "Opening Balance + Credits - Debits exactly matches Closing Balance." 
+                : "OCR verification recommended. Mathematical mismatch detected between opening balance, transactions, and closing balance."}
+            </p>
+          </div>
+        </div>
+        <div className="text-right">
+          <span className="text-[10px] uppercase font-bold tracking-widest block opacity-75">Difference</span>
+          <span className="text-lg font-black">₹{Number(validation.difference || 0).toLocaleString()}</span>
+        </div>
+      </div>
+
+      {/* KPI Cards Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: "Opening Balance", val: kpis.opening_balance, color: "text-white" },
+          { label: "Closing Balance", val: kpis.closing_balance, color: "text-teal-400" },
+          { label: "Total Credits", val: kpis.credit_total, sub: `${kpis.credit_count} txn`, color: "text-emerald-400" },
+          { label: "Total Debits", val: kpis.debit_total, sub: `${kpis.debit_count} txn`, color: "text-rose-400" },
+          { label: "Net Cash Flow", val: kpis.net_cash_flow, color: kpis.net_cash_flow >= 0 ? "text-emerald-400" : "text-rose-400" },
+          { label: "Total Transactions", val: kpis.total_transactions, isRaw: true, color: "text-white" },
+          { label: "Active Days", val: kpis.active_transaction_days, isRaw: true, color: "text-white" },
+          { label: "Largest Credit", val: kpis.highest_credit, color: "text-emerald-400" },
+          { label: "Largest Debit", val: kpis.highest_debit, color: "text-rose-400" },
+          { label: "Average Credit", val: kpis.average_credit, color: "text-emerald-400" },
+          { label: "Average Debit", val: kpis.average_debit, color: "text-rose-400" },
+        ].map((card, i) => (
+          <div key={i} className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1 relative overflow-hidden group">
+            <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block">{card.label}</span>
+            <div className="flex items-baseline space-x-1.5">
+              <span className={`text-lg font-extrabold ${card.color}`}>
+                {card.isRaw ? card.val : `₹${Number(card.val || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+              </span>
+              {card.sub && <span className="text-[10px] text-gray-500 font-bold">({card.sub})</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Analyst Notes */}
+      <div className="p-5 rounded-2xl bg-teal-500/[0.02] border border-teal-500/10 space-y-3">
+        <h4 className="text-[10px] font-black text-teal-400 uppercase tracking-widest">Analyst Note Observations</h4>
+        <pre className="text-xs text-gray-300 font-sans whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto custom-scrollbar">
+          {note.analysis_note || "No observations generated."}
+        </pre>
+      </div>
+
+      {/* Summaries Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Payment Modes */}
+        <div className="space-y-2">
+          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block">Payment Mode Summary</span>
+          <div className="border border-white/5 rounded-2xl overflow-hidden bg-black/20">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-white/5 text-[9px] font-bold uppercase tracking-widest text-gray-500 border-b border-white/5">
+                <tr>
+                  <th className="p-3">Mode</th>
+                  <th className="p-3 text-right">Count</th>
+                  <th className="p-3 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {paymentModes.map((item, idx) => (
+                  <tr key={idx} className="hover:bg-white/[0.01]">
+                    <td className="p-3 text-white font-bold">{item.mode}</td>
+                    <td className="p-3 text-right text-gray-400 font-medium">{item.count}</td>
+                    <td className="p-3 text-right text-teal-400 font-black">₹{item.amount?.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Beneficiary Summary */}
+        <div className="space-y-2">
+          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block">Beneficiary Summary</span>
+          <div className="border border-white/5 rounded-2xl overflow-hidden bg-black/20">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-white/5 text-[9px] font-bold uppercase tracking-widest text-gray-500 border-b border-white/5">
+                <tr>
+                  <th className="p-3">Beneficiary</th>
+                  <th className="p-3 text-right">Txn (Dr/Cr)</th>
+                  <th className="p-3 text-right">Credits</th>
+                  <th className="p-3 text-right">Debits</th>
+                  <th className="p-3 text-right">Net</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {beneficiaries.map((item, idx) => (
+                  <tr key={idx} className="hover:bg-white/[0.01]">
+                    <td className="p-3 text-white font-bold truncate max-w-[120px]" title={item.beneficiary_name}>
+                      {item.beneficiary_name}
+                      {item.beneficiary_bank && <span className="text-[9px] text-gray-500 block font-normal">{item.beneficiary_bank}</span>}
+                    </td>
+                    <td className="p-3 text-right text-gray-400 font-medium">{item.debit_count}/{item.credit_count}</td>
+                    <td className="p-3 text-right text-emerald-400 font-bold">₹{item.total_credits?.toLocaleString()}</td>
+                    <td className="p-3 text-right text-rose-400 font-bold">₹{item.total_debits?.toLocaleString()}</td>
+                    <td className={`p-3 text-right font-black ${item.net_amount >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                      ₹{item.net_amount?.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Transactions Searchable Table */}
+      <div className="space-y-3">
+        <div className="flex justify-between items-center">
+          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block">Search Statement Transactions</span>
+          <div className="relative">
+            <input 
+              type="text"
+              placeholder="Search date, beneficiary, particulars..."
+              className="bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-teal-500 w-64 transition-all"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="border border-white/5 rounded-2xl overflow-hidden bg-black/40 max-h-96 overflow-y-auto custom-scrollbar">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="sticky top-0 bg-[#0A0A0A] text-[9px] font-bold uppercase tracking-widest text-gray-500 border-b border-white/5 z-10">
+              <tr>
+                <th className="p-3">Date</th>
+                <th className="p-3 text-right">Debit</th>
+                <th className="p-3 text-right">Credit</th>
+                <th className="p-3 text-right">Balance</th>
+                <th className="p-3">Mode</th>
+                <th className="p-3">Beneficiary</th>
+                <th className="p-3">Category</th>
+                <th className="p-3">Reference</th>
+                <th className="p-3">Raw Particulars</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {filteredTx.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="p-12 text-center text-gray-500">
+                    No transactions match search criteria.
+                  </td>
+                </tr>
+              ) : (
+                filteredTx.map((tx, idx) => (
+                  <tr key={idx} className="hover:bg-white/[0.01] transition-colors">
+                    <td className="p-3 text-white font-medium whitespace-nowrap">{tx.date}</td>
+                    <td className="p-3 text-right text-rose-400 font-bold">
+                      {tx.debit_amount ? `₹${tx.debit_amount.toLocaleString()}` : "—"}
+                    </td>
+                    <td className="p-3 text-right text-emerald-400 font-bold">
+                      {tx.credit_amount ? `₹${tx.credit_amount.toLocaleString()}` : "—"}
+                    </td>
+                    <td className="p-3 text-right text-teal-400 font-bold">
+                      {tx.balance ? `₹${tx.balance.toLocaleString()}` : "—"}
+                    </td>
+                    <td className="p-3 text-gray-400 font-medium">{tx.payment_mode || "—"}</td>
+                    <td className="p-3 text-white font-bold truncate max-w-[150px]" title={tx.beneficiary_name}>
+                      {tx.beneficiary_name || "—"}
+                      {tx.beneficiary_bank && <span className="text-[9px] text-gray-500 block font-normal">{tx.beneficiary_bank}</span>}
+                    </td>
+                    <td className="p-3">
+                      <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-white/5 text-gray-400">
+                        {tx.category || "Unknown"}
+                      </span>
+                    </td>
+                    <td className="p-3 text-gray-500 font-mono truncate max-w-[100px]" title={tx.reference_number || tx.cheque_number}>
+                      {tx.reference_number || tx.cheque_number || "—"}
+                    </td>
+                    <td className="p-3 text-gray-500 truncate max-w-[200px]" title={tx.raw_particulars}>
+                      {tx.raw_particulars}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

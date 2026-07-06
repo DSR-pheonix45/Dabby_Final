@@ -331,6 +331,46 @@ async def process_document(doc_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/documents/status/{doc_id}")
+async def get_document_status(doc_id: str):
+    """
+    Exposes detailed OCR progress, state machine transitions, and status metrics of a document.
+    """
+    try:
+        doc_res = supabase.table("workbench_documents").select("*").eq("id", doc_id).maybe_single().execute()
+        if not doc_res.data:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        doc = doc_res.data
+        meta = doc.get("metadata") or {}
+        
+        total_pages = meta.get("total_pages", 0)
+        completed_pages = meta.get("completed_pages", 0)
+        failed_pages = meta.get("failed_pages", 0)
+        
+        progress = 0.0
+        if total_pages > 0:
+            progress = round(((completed_pages + failed_pages) / total_pages) * 100.0, 2)
+            
+        return {
+            "id": doc_id,
+            "status": doc.get("status"),
+            "job_state": meta.get("job_state", doc.get("status")),
+            "total_pages": total_pages,
+            "completed_pages": completed_pages,
+            "failed_pages": failed_pages,
+            "progress_percentage": progress,
+            "average_time_per_page": meta.get("average_time_per_page", 0.0),
+            "estimated_completion_time": meta.get("estimated_completion_time"),
+            "ocr_time": meta.get("ocr_time", 0.0),
+            "errors": meta.get("errors", []),
+            "last_updated": doc.get("created_at")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/invoices/scan/{doc_id}")
 async def scan_invoice_doc(doc_id: str):
     try:
@@ -362,8 +402,17 @@ async def scan_invoice_doc(doc_id: str):
         
         # 4. Update document metadata with extracted info
         try:
+            doc_type = extracted.get("document_type", "expense_receipt")
+            metadata = doc.get("metadata") or {}
+            updated_metadata = {**metadata}
+            if doc_type == "bank_statement":
+                updated_metadata["bank_statement"] = extracted.get("bank_statement")
+            else:
+                updated_metadata["extracted_invoice"] = extracted
+
             supabase.table("workbench_documents").update({
-                "metadata": {**doc.get("metadata", {}), "extracted_invoice": extracted}
+                "document_type": doc_type,
+                "metadata": updated_metadata
             }).eq("id", doc_id).execute()
         except Exception as db_err:
             print(f"[WARNING] Failed to update document metadata: {db_err}")

@@ -3,6 +3,7 @@ Module 12: Plan status + usage metering endpoints.
 """
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
+from typing import Optional
 from supabase_client import supabase
 from auth import require_membership, require_permission, get_current_user, P
 from services import plan_service

@@ -258,11 +258,16 @@ class TradeService:
             pass
 
         metadata = doc.get("metadata") or {}
-        extracted = metadata.get("extracted_invoice") or {}
+        raw_doc_type = (doc.get("document_type") or "expense_receipt").lower()
+        if raw_doc_type == "bank_statement" or "bank_statement" in metadata:
+            extracted = metadata.get("bank_statement") or {}
+            raw_doc_type = "bank_statement"
+        else:
+            extracted = metadata.get("extracted_invoice") or {}
+            
         workbench_id = doc["workbench_id"]
 
         # ─── Stage 2: Detect business activity ───────────────────────────────
-        raw_doc_type = (extracted.get("document_type") or doc.get("document_type") or "expense_receipt").lower()
         trade_type = DOCUMENT_TYPE_TO_TRADE_TYPE.get(raw_doc_type, "Expense Receipt")
         trade_direction = TRADE_TYPE_TO_DIRECTION.get(trade_type, "IMMEDIATE_SETTLEMENT")
         confidence = float(extracted.get("confidence") or 0.95)
@@ -271,26 +276,37 @@ class TradeService:
         # NON_FINANCIAL types skip Stages 7 and 10-11 entirely.
         is_non_financial = trade_type in NON_FINANCIAL_TYPES
 
-        financials = extracted.get("financials") or {}
-        gross_amount = extracted.get("total") or financials.get("total_amount") or financials.get("total") or None
-        tax_amount   = extracted.get("tax")   or financials.get("tax_amount")   or financials.get("tax")   or 0.0
-        net_amount   = extracted.get("subtotal") or financials.get("subtotal") or financials.get("net_amount") or None
+        if raw_doc_type == "bank_statement":
+            stmt_summary = extracted.get("statement_summary") or {}
+            gross_amount = stmt_summary.get("closing_balance") or 0.0
+            tax_amount = 0.0
+            net_amount = gross_amount
+            currency = stmt_summary.get("currency") or "INR"
+            doc_meta = {}
+        else:
+            financials = extracted.get("financials") or {}
+            gross_amount = extracted.get("total") or financials.get("total_amount") or financials.get("total") or None
+            tax_amount   = extracted.get("tax")   or financials.get("tax_amount")   or financials.get("tax")   or 0.0
+            net_amount   = extracted.get("subtotal") or financials.get("subtotal") or financials.get("net_amount") or None
 
-        if gross_amount is None and net_amount is not None:
-            gross_amount = float(net_amount) + float(tax_amount or 0)
-        if gross_amount is None:
-            gross_amount = 0.0
-        if net_amount is None:
-            net_amount = float(gross_amount) - float(tax_amount)
+            if gross_amount is None and net_amount is not None:
+                gross_amount = float(net_amount) + float(tax_amount or 0)
+            if gross_amount is None:
+                gross_amount = 0.0
+            if net_amount is None:
+                net_amount = float(gross_amount) - float(tax_amount)
 
-        doc_meta = extracted.get("document_metadata") or {}
-        currency = doc_meta.get("currency") or "INR"
+            doc_meta = extracted.get("document_metadata") or {}
+            currency = doc_meta.get("currency") or "INR"
 
         # ─── Stage 4: Resolve parties ────────────────────────────────────────
         parties_data = extracted.get("parties") or {}
         our_company_party = self._resolve_our_company(workbench_id)
 
-        if trade_type in ("Vendor Invoice", "Expense Receipt", "Vendor Payment",
+        if raw_doc_type == "bank_statement":
+            stmt_summary = extracted.get("statement_summary") or {}
+            counterparty_name = stmt_summary.get("bank_name") or "Bank"
+        elif trade_type in ("Vendor Invoice", "Expense Receipt", "Vendor Payment",
                           "Debit Note", "Purchase Order", "Payroll", "Tax Document"):
             counterparty_name = parties_data.get("vendor_name")
         elif trade_type in ("Sales Invoice", "Customer Payment", "Sales Order",
@@ -405,31 +421,39 @@ class TradeService:
         converted_tax   = original_tax   * forex_rate
         converted_net   = original_net   * forex_rate
 
-        invoice_date_str = doc_meta.get("document_date") or doc_meta.get("date")
-        invoice_date = None
-        if invoice_date_str:
-            try:
-                invoice_date = datetime.strptime(invoice_date_str[:10], "%Y-%m-%d").date().isoformat()
-            except Exception:
-                invoice_date = None
+        if raw_doc_type == "bank_statement":
+            stmt_summary = extracted.get("statement_summary") or {}
+            invoice_date = stmt_summary.get("statement_end_date")
+            due_date = None
+            invoice_number = stmt_summary.get("account_number")
+            notes = f"Bank statement for {stmt_summary.get('account_holder_name')} at {stmt_summary.get('bank_name')}"
+            description = f"Bank Statement - {counterparty['name']}"
+        else:
+            invoice_date_str = doc_meta.get("document_date") or doc_meta.get("date")
+            invoice_date = None
+            if invoice_date_str:
+                try:
+                    invoice_date = datetime.strptime(invoice_date_str[:10], "%Y-%m-%d").date().isoformat()
+                except Exception:
+                    invoice_date = None
 
-        add_fields = extracted.get("additional_fields") or {}
-        due_date_str = add_fields.get("due_date") or add_fields.get("payment_due_date")
-        due_date = None
-        if due_date_str:
-            try:
-                due_date = datetime.strptime(due_date_str[:10], "%Y-%m-%d").date().isoformat()
-            except Exception:
-                due_date = None
+            add_fields = extracted.get("additional_fields") or {}
+            due_date_str = add_fields.get("due_date") or add_fields.get("payment_due_date")
+            due_date = None
+            if due_date_str:
+                try:
+                    due_date = datetime.strptime(due_date_str[:10], "%Y-%m-%d").date().isoformat()
+                except Exception:
+                    due_date = None
 
-        references = extracted.get("references") or {}
-        invoice_number = (references.get("invoice_number") or
-                          references.get("bill_number") or
-                          references.get("reference") or
-                          references.get("transaction_reference"))
+            references = extracted.get("references") or {}
+            invoice_number = (references.get("invoice_number") or
+                              references.get("bill_number") or
+                              references.get("reference") or
+                              references.get("transaction_reference"))
 
-        notes = extracted.get("description") or f"Automatically generated from {doc['filename']}"
-        description = f"{trade_type} - {counterparty['name']}"
+            notes = extracted.get("description") or f"Automatically generated from {doc['filename']}"
+            description = f"{trade_type} - {counterparty['name']}"
 
         metadata_dict = {
             "original_currency": currency,

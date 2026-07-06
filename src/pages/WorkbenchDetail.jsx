@@ -46,6 +46,11 @@ export default function WorkbenchDetail() {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
 
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [enteredPassword, setEnteredPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
   const fetchWorkbench = useCallback(async () => {
     if (authLoading || !user) return;
     try {
@@ -61,6 +66,9 @@ export default function WorkbenchDetail() {
         return;
       }
       setWorkbench(data);
+      const unlocked = sessionStorage.getItem(`workbench_unlocked_${id}`) === "true";
+      const hasPassword = !!data.settings?.workbench_password;
+      setIsUnlocked(!hasPassword || unlocked);
     } catch (err) {
       console.error("Error fetching workbench:", err);
       navigate("/dashboard/workbenches");
@@ -71,6 +79,16 @@ export default function WorkbenchDetail() {
 
   useEffect(() => {
     fetchWorkbench();
+  }, [fetchWorkbench]);
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchWorkbench();
+    };
+    window.addEventListener('refresh-workbench-detail', handleRefresh);
+    return () => {
+      window.removeEventListener('refresh-workbench-detail', handleRefresh);
+    };
   }, [fetchWorkbench]);
 
   useEffect(() => {
@@ -89,6 +107,18 @@ export default function WorkbenchDetail() {
       window.removeEventListener('change-workbench-tab', handleChangeTab);
     };
   }, []);
+
+  const handleUnlock = (e) => {
+    e.preventDefault();
+    const correctPassword = workbench?.settings?.workbench_password;
+    if (enteredPassword === correctPassword) {
+      setIsUnlocked(true);
+      sessionStorage.setItem(`workbench_unlocked_${id}`, "true");
+      setPasswordError("");
+    } else {
+      setPasswordError("Incorrect password. Please try again.");
+    }
+  };
 
   const showInventory = ['manufacturing', 'trading'].includes(workbench?.industry) && 
     workbench?.settings?.enable_inventory === true;
@@ -113,6 +143,69 @@ export default function WorkbenchDetail() {
     return (
       <div className="flex-1 flex items-center justify-center bg-[#0a0a0a]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
+      </div>
+    );
+  }
+
+  if (!loading && !isUnlocked) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-[#0a0a0a] px-4">
+        <div className="relative w-full max-w-md bg-white/[0.02] border border-white/5 p-8 rounded-[32px] shadow-2xl backdrop-blur-md space-y-6 text-center">
+          <div className="w-16 h-16 bg-teal-500/10 border border-teal-500/20 rounded-2xl flex items-center justify-center text-teal-400 mx-auto shadow-lg shadow-teal-500/5 animate-pulse">
+            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          
+          <div className="space-y-1">
+            <h3 className="text-xl font-bold text-white uppercase tracking-wider">{workbench?.name}</h3>
+            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Password Protected Workspace</p>
+          </div>
+
+          <form onSubmit={handleUnlock} className="space-y-4">
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter workspace password"
+                value={enteredPassword}
+                onChange={(e) => setEnteredPassword(e.target.value)}
+                className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-white focus:outline-none focus:border-teal-500/50 transition-all font-medium text-sm text-center"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+              >
+                {showPassword ? (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542 7z" /></svg>
+                )}
+              </button>
+            </div>
+
+            {passwordError && (
+              <p className="text-xs text-rose-500 font-medium">{passwordError}</p>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => navigate("/dashboard/workbenches")}
+                className="flex-1 py-3.5 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-2xl text-xs font-bold uppercase tracking-widest transition-all"
+              >
+                Go Back
+              </button>
+              <button
+                type="submit"
+                className="flex-1 py-3.5 bg-[#00FFD1] text-black rounded-2xl text-xs font-bold uppercase tracking-widest hover:shadow-lg hover:shadow-[#00FFD1]/20 transition-all hover:scale-[1.01]"
+              >
+                Unlock
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     );
   }
