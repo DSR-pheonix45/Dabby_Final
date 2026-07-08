@@ -4,6 +4,39 @@ from supabase_client import supabase
 
 
 class AccountingCompiler:
+    def compile_from_business_event(self, business_event_id: str, executed_by: Optional[str] = None) -> Dict:
+        """
+        Phase 2 Adapter: Compile from a Business Event instead of a legacy trade.
+        During the V2 transition phase, this relies on the parallel-run legacy_trade_id.
+        """
+        res = supabase.table("business_events").select("*").eq("id", business_event_id).single().execute()
+        event = res.data
+        if not event:
+            raise ValueError(f"Business Event {business_event_id} not found")
+
+        legacy_trade_id = event.get("legacy_trade_id")
+        if not legacy_trade_id:
+            raise NotImplementedError(
+                "Pure V2 accounting compilation (without legacy_trade_id) is not yet implemented. "
+                "Ensure TRADE_ENGINE_V2 runs in parallel mode to generate legacy trades."
+            )
+        
+        # Mark event as compiled
+        supabase.table("business_events").update({
+            "compiled_at": datetime.now().isoformat()
+        }).eq("id", business_event_id).execute()
+
+        # Delegate to existing logic
+        result = self.compile_trade_activities(legacy_trade_id, [], executed_by)
+        
+        # Backlink transaction_id
+        if result.get("transaction_id"):
+            supabase.table("business_events").update({
+                "transaction_id": result["transaction_id"]
+            }).eq("id", business_event_id).execute()
+            
+        return result
+
     def compile_trade_activities(
         self,
         trade_id: str,

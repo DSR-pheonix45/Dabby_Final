@@ -10,6 +10,24 @@ import io
 import uuid
 import mimetypes
 
+# ── Phase 1: New pipeline services ────────────────────────────────────────────
+from services.document_classifier import DocumentClassifier
+from services.analysis_note_service import AnalysisNoteService
+from services.bank_statement_parser import BankStatementParser
+from services.groq_pool import GroqPool
+from services.trade_draft_service import trade_draft_service
+
+# Initialise pipeline services (injected with dependencies)
+_bank_parser = BankStatementParser(
+    gemini_model=ai_service.gemini_model,
+    groq_pool_execute=GroqPool.execute,
+)
+_document_classifier = DocumentClassifier(
+    groq_pool_execute=GroqPool.execute,
+    gemini_model=ai_service.gemini_model,
+)
+_analysis_note_service = AnalysisNoteService(bank_statement_parser=_bank_parser)
+
 
 # Redis connection details
 REDIS_HOST = os.environ.get("REDIS_HOST", "127.0.0.1")
@@ -555,50 +573,171 @@ async def process_queued_document(doc_id: str):
             await save_progress()
             raise TimeoutError(f"Document processing timed out after {DOCUMENT_TIMEOUT} seconds.")
 
-        # Phase 11 & 16: Decoupled post-processing & normalisation
+        # ── Phase 11 & 16: Decoupled post-processing & normalisation ──────────
         inferred_type = doc.get("document_type") or "generic"
-        
+
         if inferred_type == "bank_statement":
             meta["job_state"] = "NORMALIZING"
             await save_progress()
-            
+
             agg_raw = ai_service.aggregate_pages(meta["pages"])
-            
+
             meta["job_state"] = "AGGREGATING"
             await save_progress()
-            
+
             final_res = await ai_service.post_process_bank_statement(agg_raw)
             meta["bank_statement"] = final_res["bank_statement"]
+            aggregated_extraction = final_res
             doc_type = "bank_statement"
         else:
             meta["job_state"] = "NORMALIZING"
             await save_progress()
-            
-            aggregated_invoice = ai_service.aggregate_invoice_pages(meta["pages"])
-            meta["extracted_invoice"] = aggregated_invoice
-            doc_type = aggregated_invoice.get("document_type") or "expense_receipt"
 
-        meta["job_state"] = "ANALYZING"
-        meta["ocr_time"] = round(time.time() - start_ocr_time, 2)
+            aggregated_extraction = ai_service.aggregate_invoice_pages(meta["pages"])
+            meta["extracted_invoice"] = aggregated_extraction
+            doc_type = aggregated_extraction.get("document_type") or "expense_receipt"
+
+        # ── Phase 1: Document Classification ─────────────────────────────────
+        meta["job_state"] = "CLASSIFYING"
         await save_progress()
 
-        # Route to unified Trade Engine Pipeline
-        print(f"[WORKER] Routing document {doc_id} to 12-stage Trade Engine Pipeline...")
+        try:
+            # Build canonical OCR raw output
+            ocr_raw = ai_service.build_ocr_raw_output(
+                aggregated_extraction=aggregated_extraction,
+                pages_meta=meta["pages"],
+                extraction_method="aggregated",
+            )
+
+            # Run two-pass classifier
+            classification = _document_classifier.classify(
+                raw_text=ocr_raw["raw_text"],
+                filename=doc["filename"],
+                mime_type=doc.get("mime_type", ""),
+            )
+            doc_type = classification["document_type"]
+
+            # Store classification result
+            supabase.table("document_classifications").insert({
+                "document_id":           doc_id,
+                "workbench_id":          doc["workbench_id"],
+                "document_type":         doc_type,
+                "confidence":            classification["confidence"],
+                "reasoning":             classification.get("reasoning"),
+                "classification_signals":classification.get("classification_signals", []),
+                "classification_method": classification.get("classification_method", "heuristic"),
+            }).execute()
+
+            # Store OCR raw output
+            supabase.table("ocr_raw_output").insert({
+                "document_id":        doc_id,
+                "workbench_id":       doc["workbench_id"],
+                "raw_text":           (ocr_raw["raw_text"] or "")[:50000],  # cap storage
+                "tables":             ocr_raw.get("tables", []),
+                "entities":           ocr_raw.get("entities", {}),
+                "extraction_method":  ocr_raw.get("extraction_method", "aggregated"),
+                "page_count":         ocr_raw.get("page_count", 1),
+                "processing_time_ms": round(meta.get("ocr_time", 0) * 1000),
+            }).execute()
+
+            print(f"[WORKER] Document {doc_id} classified as '{doc_type}' "
+                  f"(confidence={classification['confidence']:.2f}, "
+                  f"method={classification.get('classification_method')})")
+
+        except Exception as clf_err:
+            print(f"[WORKER WARNING] Classification step failed: {clf_err}. "
+                  f"Using OCR-inferred type: {doc_type}")
+            classification = {
+                "document_type": doc_type,
+                "confidence":    0.30,
+                "reasoning":     f"Classification failed: {clf_err}",
+                "classification_method": "fallback",
+            }
+            ocr_raw = {
+                "raw_text":          "",
+                "tables":            [],
+                "entities":          {},
+                "confidence":        0.30,
+                "extraction_method": "fallback",
+                "page_count":        meta.get("total_pages", 1),
+            }
+
+        # ── Phase 1: Analysis Note Generation ────────────────────────────────
+        meta["job_state"] = "ANALYSING"
+        await save_progress()
+
+        analysis_note_id = None
+        try:
+            # Pass bank statement KPIs if available
+            pre_processed = meta.get("bank_statement") if doc_type == "bank_statement" else None
+
+            analysis_note = await _analysis_note_service.generate_and_store(
+                document_id=doc_id,
+                workbench_id=doc["workbench_id"],
+                ocr_output={**ocr_raw, "confidence": ocr_raw.get("confidence", 0.0)},
+                classification=classification,
+                existing_processed=pre_processed,
+            )
+            analysis_note_id = analysis_note["id"]
+            meta["analysis_note_id"] = analysis_note_id
+            print(f"[WORKER] Analysis Note {analysis_note_id} stored for doc {doc_id}")
+
+        except Exception as note_err:
+            print(f"[WORKER WARNING] Analysis Note generation failed: {note_err}")
+            traceback.print_exc()
+            # Non-fatal: pipeline continues to Trade Engine
+
+        # ── Check Feature Flags for Phase 2 Routing ──────────────────────────
+        v2_flag_str = os.getenv("TRADE_ENGINE_V2", "false").lower()
+        v2_types_str = os.getenv("TRADE_ENGINE_V2_TYPES", "")
+        
+        is_v2_enabled = v2_flag_str == "true"
+        if v2_flag_str != "true" and v2_types_str:
+            enabled_types = [t.strip() for t in v2_types_str.split(",") if t.strip()]
+            if doc_type in enabled_types:
+                is_v2_enabled = True
+
+        trade = None
+        trade_id = None
+        draft_id = None
+
+        # ── Route to Trade Engine (Legacy / Parallel) ───────────────────────
+        # During migration, we ALWAYS run legacy Trade Engine to maintain existing UI
+        print(f"[WORKER] Routing document {doc_id} to Legacy Trade Engine Pipeline...")
         from services.trade_service import trade_service
         trade = await trade_service.create_trade_from_document(doc_id)
-        
+        trade_id = trade.get("id")
+
+        if is_v2_enabled and analysis_note_id:
+            print(f"[WORKER] Routing Analysis Note {analysis_note_id} to V2 Trade Draft Service...")
+            try:
+                draft = await trade_draft_service.create_draft_from_analysis_note(analysis_note_id)
+                draft_id = draft.get("id")
+                # Backlink legacy trade_id for comparison
+                if trade_id and draft_id:
+                    await trade_draft_service.set_legacy_comparison_trade(draft_id, trade_id)
+            except Exception as draft_err:
+                print(f"[WORKER WARNING] Trade Draft generation failed: {draft_err}")
+                traceback.print_exc()
+
         meta["job_state"] = "COMPLETED"
-        final_doc_status = "processed" if (trade["status"] == "Ready" and meta.get("failed_pages", 0) == 0) else "Needs Review"
-        
+        final_doc_status = (
+            "processed"
+            if (trade and trade.get("status") == "Ready" and meta.get("failed_pages", 0) == 0)
+            else "Needs Review"
+        )
+
         async with db_lock:
             supabase.table("workbench_documents").update({
                 "document_type": doc_type,
-                "status": final_doc_status,
-                "metadata": meta
+                "status":        final_doc_status,
+                "metadata":      meta,
             }).eq("id", doc_id).execute()
-            
-        print(f"[WORKER] Finished processing doc {doc_id}. Trade ID: {trade['id']}, Trade Status: {trade['status']}, Doc Status: {final_doc_status}")
-        
+
+        print(f"[WORKER] Finished doc {doc_id}. "
+              f"Trade={trade_id}, Draft={draft_id}, "
+              f"AnalysisNote={analysis_note_id}, DocStatus={final_doc_status}")
+
     except Exception as e:
         print(f"[WORKER ERROR] Processing of doc {doc_id} failed: {e}")
         try:

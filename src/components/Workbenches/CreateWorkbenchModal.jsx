@@ -134,6 +134,7 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
     fy_start: 'April',
     books_start_date: new Date().toISOString().split('T')[0],
     enable_inventory: true,
+    team_size: '1-10',
   });
 
   if (!isOpen) return null;
@@ -209,14 +210,15 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
     setError(null);
 
     try {
-      const { name, books_start_date, enable_inventory, ...extraData } = formData;
+      const { name, books_start_date, enable_inventory, team_size, ...extraData } = formData;
       
       const payload = {
         ...extraData,
         settings: {
           enable_inventory: ['manufacturing', 'trading'].includes(formData.industry)
             ? enable_inventory !== false
-            : false
+            : false,
+          team_size: team_size
         }
       };
 
@@ -260,6 +262,7 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
       fy_start: 'April',
       books_start_date: new Date().toISOString().split('T')[0],
       enable_inventory: true,
+      team_size: '1-10',
     });
   };
 
@@ -328,7 +331,7 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
                     <option value="others">Others</option>
                   </select>
                 </div>
-                <div className="form-group span-2">
+                <div className="form-group">
                   <label>Business Type</label>
                   <select name="business_type" value={formData.business_type} onChange={handleChange}>
                     <option value="proprietorship">Proprietorship</option>
@@ -336,6 +339,16 @@ const CreateWorkbenchModal = ({ isOpen, onClose, onSuccess }) => {
                     <option value="pvt_ltd">Private Limited (Pvt Ltd)</option>
                     <option value="llp">LLP</option>
                     <option value="public_ltd">Public Limited</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Team Members Count</label>
+                  <select name="team_size" value={formData.team_size} onChange={handleChange}>
+                    <option value="1-10">1-10</option>
+                    <option value="11-50">11-50</option>
+                    <option value="51-200">51-200</option>
+                    <option value="201-500">201-500</option>
+                    <option value="500+">500+</option>
                   </select>
                 </div>
                 {['manufacturing', 'trading'].includes(formData.industry) && (

@@ -46,8 +46,7 @@ const DOC_TYPES = [
   { id: 'investment_agreement', label: 'Investment', color: 'bg-violet-500/10 text-violet-400' },
   { id: 'tax_document', label: 'Tax Doc', color: 'bg-orange-500/10 text-orange-400' },
   { id: 'purchase_order', label: 'Purchase Order', color: 'bg-sky-500/10 text-sky-400' },
-  { id: 'sales_order', label: 'Sales Order', color: 'bg-lime-500/10 text-lime-400' },
-  { id: 'manual_journal', label: 'Manual Journal', color: 'bg-zinc-500/10 text-zinc-400' }
+  { id: 'sales_order', label: 'Sales Order', color: 'bg-lime-500/10 text-lime-400' }
 ];
 
 

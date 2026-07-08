@@ -1274,8 +1274,150 @@ class AIService:
                 
         if confidences:
             aggregated["confidence"] = round(sum(confidences) / len(confidences), 2)
-            
+
+        aggregated["extraction_method"] = "aggregated"
         return aggregated
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Phase 1: Canonical OCR Raw Output Contract
+    # New method — additive, does not change existing methods.
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def build_ocr_raw_output(
+        self,
+        aggregated_extraction: Dict,
+        pages_meta: dict,
+        extraction_method: str = "aggregated",
+    ) -> Dict:
+        """
+        Builds the canonical OCR raw output contract from an aggregated extraction result.
+
+        This is the stable input contract for:
+          - DocumentClassifier
+          - AnalysisNoteService
+
+        Output:
+        {
+            "raw_text":   str,             # concatenated text from all pages
+            "tables":     list,            # extracted table structures [{headers, rows}]
+            "entities":   {                # named entities found
+                "dates":         list,
+                "amounts":       list,
+                "organizations": list,
+                "gstin_numbers": list,
+                "bank_accounts": list,
+            },
+            "confidence":         float,   # from extraction
+            "extraction_method":  str,     # gemini_vision | groq_text | aggregated | fallback
+            "page_count":         int,
+        }
+
+        Does NOT:
+          - Generate journal entries
+          - Suggest accounting accounts
+          - Infer document type (that is the classifier's job)
+        """
+        import re
+
+        # ── Raw text: collect from pages ───────────────────────
+        raw_text_parts = []
+        page_count = 0
+        for page_num in sorted(pages_meta.keys(), key=lambda x: int(x)):
+            page = pages_meta[page_num]
+            if page.get("status") != "COMPLETED":
+                continue
+            page_count += 1
+            page_text = page.get("page_text") or ""
+            if page_text:
+                raw_text_parts.append(page_text)
+
+        # Fallback: use the text embedded in the aggregated extraction
+        if not raw_text_parts and aggregated_extraction:
+            # Try to reconstruct from line items and metadata
+            meta_text = ""
+            if aggregated_extraction.get("document_metadata"):
+                meta_text = json.dumps(aggregated_extraction["document_metadata"])
+            if aggregated_extraction.get("parties"):
+                meta_text += " " + json.dumps(aggregated_extraction["parties"])
+            raw_text_parts.append(meta_text)
+
+        raw_text = "\n".join(raw_text_parts)
+
+        # ── Entity extraction (deterministic regex, no AI) ──────
+        entities = self._extract_entities_from_text(raw_text)
+
+        # ── Tables: stubbed — AI-extracted tables would go here ─
+        # In future, Gemini structured table extraction can populate this.
+        tables = []
+
+        return {
+            "raw_text":          raw_text,
+            "tables":            tables,
+            "entities":          entities,
+            "confidence":        float(aggregated_extraction.get("confidence", 0.0)),
+            "extraction_method": extraction_method,
+            "page_count":        page_count or 1,
+        }
+
+    @staticmethod
+    def _extract_entities_from_text(text: str) -> Dict:
+        """
+        Deterministic regex-based entity extraction. No AI.
+        Extracts: dates, amounts, organizations (basic), GSTIN, account numbers.
+        """
+        import re
+
+        if not text:
+            return {
+                "dates":         [],
+                "amounts":       [],
+                "organizations": [],
+                "gstin_numbers": [],
+                "bank_accounts": [],
+            }
+
+        # Dates: DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY, DD Mon YYYY
+        date_patterns = [
+            r'\b\d{2}[/-]\d{2}[/-]\d{4}\b',
+            r'\b\d{4}-\d{2}-\d{2}\b',
+            r'\b\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\b',
+        ]
+        dates = []
+        for p in date_patterns:
+            dates.extend(re.findall(p, text, re.IGNORECASE))
+
+        # Amounts: ₹ or Rs or numbers with commas/decimals
+        amount_patterns = [
+            r'₹\s*[\d,]+(?:\.\d{1,2})?',
+            r'Rs\.?\s*[\d,]+(?:\.\d{1,2})?',
+            r'\b\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?\b',
+        ]
+        amounts = []
+        for p in amount_patterns:
+            amounts.extend(re.findall(p, text))
+
+        # GSTIN: 15-char alphanumeric pattern
+        gstin_numbers = re.findall(
+            r'\b\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}[Z]{1}[A-Z\d]{1}\b', text
+        )
+
+        # Bank account numbers: 9-18 digit sequences
+        bank_accounts = re.findall(r'\b\d{9,18}\b', text)
+
+        # Organizations: lines with "Ltd", "Pvt", "Inc", "LLP", "Co.", etc.
+        org_patterns = re.findall(
+            r'[A-Z][A-Za-z\s&,\.]+(?:Ltd|Pvt|Inc|LLP|Co\.|Corp|Private Limited|Limited)\.?',
+            text
+        )
+
+        return {
+            "dates":         list(set(dates))[:20],
+            "amounts":       list(set(amounts))[:20],
+            "organizations": [o.strip() for o in list(set(org_patterns))[:10]],
+            "gstin_numbers": list(set(gstin_numbers)),
+            "bank_accounts": list(set(bank_accounts))[:5],
+        }
+
 
 ai_service = AIService()
 
