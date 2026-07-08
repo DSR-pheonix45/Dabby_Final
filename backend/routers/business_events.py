@@ -41,7 +41,7 @@ async def get_event_settlements(event_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/{event_id}/compile", dependencies=[Depends(require_permission(P.MANAGE_WORKBENCH))])
+@router.post("/{event_id}/compile", dependencies=[Depends(require_permission(P.EXECUTE_TRADE))])
 async def compile_business_event(event_id: str, user=Depends(require_membership())):
     """Trigger Accounting Compiler for this Business Event."""
     try:

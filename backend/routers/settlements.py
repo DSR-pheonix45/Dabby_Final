@@ -30,7 +30,7 @@ async def list_settlements(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/recalculate/{workbench_id}", dependencies=[Depends(require_permission(P.MANAGE_WORKBENCH))])
+@router.post("/recalculate/{workbench_id}", dependencies=[Depends(require_permission(P.EXECUTE_TRADE))])
 async def recalculate_settlements(workbench_id: str):
     """Re-run settlement engine for all OPEN events."""
     try:
