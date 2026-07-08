@@ -33,6 +33,7 @@ const ChatInput = forwardRef(function ChatInput(
     initialMessage = "",
     webSearchEnabled = false,
     uploadedFiles = [],
+    workbenchContext = null,
     availableWorkbenches = [],
     onToggleWorkbenchContext = null,
     onWebSearchToggle = null,
