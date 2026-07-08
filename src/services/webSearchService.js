@@ -49,11 +49,11 @@ export const WebSearchService = {
             // Add search results
             if (data.results && data.results.length > 0) {
                 results.push('\nSearch Results:');
-                data.results.slice(0, 3).forEach((result, index) => {
+                data.results.slice(0, 5).forEach((result, index) => {
                     results.push(`\n${index + 1}. ${result.title}`);
                     results.push(`   ${result.url}`);
                     if (result.content) {
-                        results.push(`   ${result.content.substring(0, 150)}...`);
+                        results.push(`   ${result.content}`);
                     }
                 });
             }

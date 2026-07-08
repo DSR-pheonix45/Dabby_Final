@@ -266,8 +266,8 @@ const ChatInput = forwardRef(function ChatInput(
               </button>
             </div>
 
-            {/* Web Search Toggle - Hidden on very small screens */}
-            <div className="hidden xs:flex items-center gap-1 px-1">
+            {/* Web Search Toggle */}
+            <div className="flex items-center gap-1 px-1">
               <button
                 type="button"
                 onClick={() => setWebEnabled((v) => !v)}
