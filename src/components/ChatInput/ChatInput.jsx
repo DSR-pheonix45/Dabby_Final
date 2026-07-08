@@ -33,9 +33,9 @@ const ChatInput = forwardRef(function ChatInput(
     initialMessage = "",
     webSearchEnabled = false,
     uploadedFiles = [],
-    workbenchContext = null,
     availableWorkbenches = [],
     onToggleWorkbenchContext = null,
+    onWebSearchToggle = null,
   },
   ref
 ) {
@@ -270,7 +270,11 @@ const ChatInput = forwardRef(function ChatInput(
             <div className="flex items-center gap-1 px-1">
               <button
                 type="button"
-                onClick={() => setWebEnabled((v) => !v)}
+                onClick={() => {
+                  const newVal = !webEnabled;
+                  setWebEnabled(newVal);
+                  if (onWebSearchToggle) onWebSearchToggle(newVal);
+                }}
                 disabled={disabled || isLoading}
                 title={webEnabled ? "Web Search: ON" : "Web Search: OFF"}
                 className={`group/btn relative p-2 sm:p-2.5 rounded-lg sm:rounded-xl transition-all duration-200 ${webEnabled

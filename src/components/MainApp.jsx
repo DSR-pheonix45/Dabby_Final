@@ -769,6 +769,8 @@ Based on the Profit & Loss statement provided, the business shows stable operati
                     workbenchContext={activeWorkbench}
                     availableWorkbenches={availableWorkbenches}
                     onToggleWorkbenchContext={handleToggleWorkbenchContext}
+                    webSearchEnabled={webSearchEnabled}
+                    onWebSearchToggle={setWebSearchEnabled}
                   />
                 ) : (
                   <>
@@ -811,6 +813,7 @@ Based on the Profit & Loss statement provided, the business shows stable operati
               workbenchContext={activeWorkbench}
               availableWorkbenches={availableWorkbenches}
               onToggleWorkbenchContext={handleToggleWorkbenchContext}
+              onWebSearchToggle={setWebSearchEnabled}
             />
           )}
 

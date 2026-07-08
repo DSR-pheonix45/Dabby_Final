@@ -10,6 +10,8 @@ const ChatArea = ({
   workbenchContext,
   availableWorkbenches,
   onToggleWorkbenchContext,
+  webSearchEnabled,
+  onWebSearchToggle,
 }) => {
   const [searchTerm, setSearchTerm] = React.useState("");
   // Map MainApp messages to ChatArea format (preserve role property)
@@ -48,6 +50,8 @@ const ChatArea = ({
         workbenchContext={workbenchContext}
         availableWorkbenches={availableWorkbenches}
         onToggleWorkbenchContext={onToggleWorkbenchContext}
+        webSearchEnabled={webSearchEnabled}
+        onWebSearchToggle={onWebSearchToggle}
       />
     </div>
   );
