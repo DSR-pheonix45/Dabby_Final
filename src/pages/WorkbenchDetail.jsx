@@ -46,7 +46,7 @@ import SettlementsView from "../components/Workbenches/detail/SettlementsView";
 import CashFlowView from "../components/Workbenches/detail/CashFlowView";
 import LedgerView from "../components/Workbenches/detail/LedgerView";
 import DiagnosticsView from "../components/Workbenches/detail/DiagnosticsView";
-import PlanUsageBadge from "../components/Workbenches/PlanUsageBadge";
+
 
 import { WorkbenchProvider } from "../context/WorkbenchContext";
 
