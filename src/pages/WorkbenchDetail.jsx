@@ -12,7 +12,12 @@ import {
   BsBoxSeam,
   BsGear,
   BsPlusLg,
-  BsArrowLeftRight
+  BsArrowLeftRight,
+  BsCheckCircle,
+  BsListUl,
+  BsWrench,
+  BsGraphUp,
+  BsJournalText
 } from "react-icons/bs";
 import { useAuth } from "../hooks/useAuth";
 import { supabase } from "../lib/supabase";
@@ -31,7 +36,16 @@ import InventoryView from "../components/Workbenches/detail/InventoryView";
 import WorkbenchSettings from "../components/Workbenches/WorkbenchSettings";
 import TransactionModal from "../components/Workbenches/ledger/TransactionModal";
 import Rulesets from "./Rulesets";
-import TradeEngine from "./TradeEngine";
+import PlanUsageBadge from "../components/Workbenches/PlanUsageBadge";
+
+// Phase 3 Views
+import BusinessHealthView from "../components/Workbenches/detail/BusinessHealthView";
+import RealityReviewView from "../components/Workbenches/detail/RealityReviewView";
+import BusinessEventsView from "../components/Workbenches/detail/BusinessEventsView";
+import SettlementsView from "../components/Workbenches/detail/SettlementsView";
+import CashFlowView from "../components/Workbenches/detail/CashFlowView";
+import LedgerView from "../components/Workbenches/detail/LedgerView";
+import DiagnosticsView from "../components/Workbenches/detail/DiagnosticsView";
 import PlanUsageBadge from "../components/Workbenches/PlanUsageBadge";
 
 import { WorkbenchProvider } from "../context/WorkbenchContext";
@@ -42,7 +56,7 @@ export default function WorkbenchDetail() {
   const { user, loading: authLoading } = useAuth();
   const [workbench, setWorkbench] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("COA");
+  const [activeTab, setActiveTab] = useState("BusinessHealth");
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
 
@@ -129,14 +143,39 @@ export default function WorkbenchDetail() {
     }
   }, [activeTab, showInventory, workbench]);
 
-  const navItems = [
-    { id: "COA", label: "Chart of Accounts", icon: BsShieldCheck },
-    { id: "TradeEngine", label: "Trade Engine", icon: BsArrowLeftRight },
-    // { id: "Rulesets", label: "Rulesets", icon: BsStars }, // Hidden per user request
-    { id: "DocVault", label: "Doc Vault", icon: BsFolder2 },
-    { id: "Investor", label: "Investor View", icon: BsArrowUpRight },
-    ...(showInventory ? [{ id: "Inventory", label: "Inventory & Stock", icon: BsBoxSeam }] : []),
-    { id: "Settings", label: "Settings", icon: BsGear },
+  const navGroups = [
+    {
+      title: "FINANCIAL DATA ROOM",
+      items: [
+        { id: "BusinessHealth", label: "Business Health", icon: BsGraphUp },
+        { id: "RealityReview", label: "Reality Review", icon: BsCheckCircle },
+        { id: "BusinessEvents", label: "Business Events", icon: BsListUl },
+        { id: "Settlements", label: "Settlements", icon: BsArrowLeftRight },
+        { id: "CashFlow", label: "Cash Flow", icon: BsLightningCharge },
+      ]
+    },
+    {
+      title: "REPORTING",
+      items: [
+        { id: "Investor", label: "Reports", icon: BsArrowUpRight },
+        { id: "DocVault", label: "Documents", icon: BsFolder2 },
+      ]
+    },
+    {
+      title: "ACCOUNTING",
+      items: [
+        { id: "Ledger", label: "Ledger", icon: BsJournalText },
+        { id: "COA", label: "Chart of Accounts", icon: BsShieldCheck },
+        ...(showInventory ? [{ id: "Inventory", label: "Inventory & Stock", icon: BsBoxSeam }] : []),
+      ]
+    },
+    {
+      title: "SYSTEM",
+      items: [
+        { id: "Settings", label: "Settings", icon: BsGear },
+        { id: "Diagnostics", label: "Diagnostics", icon: BsWrench },
+      ]
+    }
   ];
 
   if (loading) {
@@ -228,24 +267,27 @@ export default function WorkbenchDetail() {
             </div>
           </div>
 
-          <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar" data-tour="workbench-sidebar">
-            <div className="px-4 py-2">
-              <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Architecture</span>
-            </div>
-            
-            {navItems.map(item => (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
-                  activeTab === item.id 
-                    ? "bg-teal-500/10 text-teal-400 border border-teal-500/20 shadow-lg shadow-teal-500/5" 
-                    : "text-gray-500 hover:text-gray-300 hover:bg-white/5 border border-transparent"
-                  }`}
-              >
-                <item.icon className={`text-lg transition-transform duration-200 ${activeTab === item.id ? "scale-110" : "group-hover:scale-110"}`} />
-                <span className="font-bold text-sm">{item.label}</span>
-              </button>
+          <nav className="flex-1 p-4 space-y-6 overflow-y-auto custom-scrollbar" data-tour="workbench-sidebar">
+            {navGroups.map((group, groupIdx) => (
+              <div key={groupIdx} className="space-y-2">
+                <div className="px-4 py-1">
+                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">{group.title}</span>
+                </div>
+                {group.items.map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+                      activeTab === item.id 
+                        ? "bg-teal-500/10 text-teal-400 border border-teal-500/20 shadow-lg shadow-teal-500/5" 
+                        : "text-gray-500 hover:text-gray-300 hover:bg-white/5 border border-transparent"
+                      }`}
+                  >
+                    <item.icon className={`text-lg transition-transform duration-200 ${activeTab === item.id ? "scale-110" : "group-hover:scale-110"}`} />
+                    <span className="font-bold text-sm">{item.label}</span>
+                  </button>
+                ))}
+              </div>
             ))}
           </nav>
 
@@ -289,8 +331,14 @@ export default function WorkbenchDetail() {
           </header>
 
           <main className="flex-grow flex flex-col min-h-0 relative overflow-hidden" data-tour="workbench-content">
+            {activeTab === "BusinessHealth" && <BusinessHealthView workbenchId={id} />}
+            {activeTab === "RealityReview" && <RealityReviewView workbenchId={id} />}
+            {activeTab === "BusinessEvents" && <BusinessEventsView workbenchId={id} />}
+            {activeTab === "Settlements" && <SettlementsView workbenchId={id} />}
+            {activeTab === "CashFlow" && <CashFlowView workbenchId={id} />}
+            {activeTab === "Ledger" && <LedgerView workbenchId={id} />}
+            {activeTab === "Diagnostics" && <DiagnosticsView workbenchId={id} />}
             {activeTab === "COA" && <COAView workbenchId={id} />}
-            {activeTab === "TradeEngine" && <TradeEngine workbenchId={id} />}
             {activeTab === "Rulesets" && <Rulesets workbenchId={id} />}
             {activeTab === "Investor" && <div className="p-8 overflow-auto h-full custom-scrollbar"><InvestorView workbenchId={id} workbenchName={workbench?.name} /></div>}
             {activeTab === "DocVault" && <DocVault workbenchId={id} />}
