@@ -839,13 +839,14 @@ class AIService:
            - POTENTIAL RISK FLAGS
         """
         
-        user_msg = f"Bank Statement Metrics:\n{json.dumps({
+        data_to_dump = {
             'statement_summary': kpis_data['statement_summary'],
             'transaction_summary': kpis_data['transaction_summary'],
             'payment_mode_summary': kpis_data['payment_mode_summary'],
             'beneficiary_summary': kpis_data['beneficiary_summary'],
             'validation': kpis_data['validation']
-        }, indent=2)}"
+        }
+        user_msg = f"Bank Statement Metrics:\n{json.dumps(data_to_dump, indent=2)}"
         
         try:
             response = self.gemini_model.generate_content(

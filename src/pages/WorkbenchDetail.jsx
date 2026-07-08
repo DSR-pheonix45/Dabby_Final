@@ -132,7 +132,7 @@ export default function WorkbenchDetail() {
   const navItems = [
     { id: "COA", label: "Chart of Accounts", icon: BsShieldCheck },
     { id: "TradeEngine", label: "Trade Engine", icon: BsArrowLeftRight },
-    { id: "Rulesets", label: "Rulesets", icon: BsStars },
+    // { id: "Rulesets", label: "Rulesets", icon: BsStars }, // Hidden per user request
     { id: "DocVault", label: "Doc Vault", icon: BsFolder2 },
     { id: "Investor", label: "Investor View", icon: BsArrowUpRight },
     ...(showInventory ? [{ id: "Inventory", label: "Inventory & Stock", icon: BsBoxSeam }] : []),
