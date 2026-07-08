@@ -8,3 +8,4 @@ groq
 redis
 google-generativeai
 pypdf
+PyMuPDF
