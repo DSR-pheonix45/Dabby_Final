@@ -91,7 +91,7 @@ export default function RealityReviewView({ workbenchId }) {
             <div className="space-y-6">
               <div>
                 <p className="text-[10px] font-bold text-teal-500 uppercase tracking-widest mb-1">Business Intent</p>
-                <p className="text-lg font-bold text-white">{selectedDraft.event_type.replace(/_/g, ' ')}</p>
+                <p className="text-lg font-bold text-white">{selectedDraft.event_type?.replace(/_/g, ' ')}</p>
               </div>
               
               <div className="bg-white/[0.02] border border-white/5 p-4 rounded-xl space-y-4">
@@ -176,7 +176,7 @@ export default function RealityReviewView({ workbenchId }) {
             <div key={draft.id} className="bg-[#0d1117] border border-white/10 rounded-2xl p-5 hover:border-teal-500/30 transition-all group flex flex-col">
               <div className="flex justify-between items-start mb-4">
                 <span className="px-2 py-1 bg-teal-500/10 text-teal-400 text-[10px] font-bold uppercase tracking-widest rounded-lg border border-teal-500/20">
-                  {draft.event_type.replace(/_/g, ' ')}
+                  {draft.event_type?.replace(/_/g, ' ')}
                 </span>
                 <span className="text-xs text-gray-500">{new Date(draft.created_at).toLocaleDateString()}</span>
               </div>

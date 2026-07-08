@@ -81,7 +81,7 @@ export default function SettlementsView({ workbenchId }) {
                 
                 {/* Event A (E.g., Invoice) */}
                 <div className="flex-1 bg-white/5 rounded-xl p-4 border border-white/5">
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{s.event_a?.event_type.replace(/_/g, ' ')}</span>
+                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{s.event_a?.event_type?.replace(/_/g, ' ')}</span>
                   <p className="text-lg font-bold text-white mt-1">{s.event_a?.counterparty || "Unknown"}</p>
                   <p className="text-sm font-mono text-gray-400">{formatCurrency(s.event_a?.amount)}</p>
                   <p className="text-xs text-gray-500 mt-2">Ref: {s.event_a?.settlement_key || "None"}</p>
@@ -95,7 +95,7 @@ export default function SettlementsView({ workbenchId }) {
                     <BsExclamationTriangleFill className="text-amber-500 text-2xl mb-2" />
                   )}
                   <p className="text-[10px] font-bold text-white uppercase tracking-widest bg-white/10 px-3 py-1 rounded-full whitespace-nowrap">
-                    {s.settlement_status.replace(/_/g, ' ')}
+                    {s.settlement_status?.replace(/_/g, ' ')}
                   </p>
                   <p className="text-xs text-teal-400 mt-2 font-bold bg-teal-500/10 px-2 py-1 rounded-md">
                     Matched: {formatCurrency(s.settled_amount)}
@@ -105,7 +105,7 @@ export default function SettlementsView({ workbenchId }) {
 
                 {/* Event B (E.g., Payment) */}
                 <div className="flex-1 bg-white/5 rounded-xl p-4 border border-white/5">
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{s.event_b?.event_type.replace(/_/g, ' ')}</span>
+                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{s.event_b?.event_type?.replace(/_/g, ' ')}</span>
                   <p className="text-lg font-bold text-white mt-1">{s.event_b?.counterparty || "Unknown"}</p>
                   <p className="text-sm font-mono text-gray-400">{formatCurrency(s.event_b?.amount)}</p>
                   <p className="text-xs text-gray-500 mt-2">Ref: {s.event_b?.settlement_key || "None"}</p>

@@ -84,11 +84,11 @@ export default function BusinessEventsView({ workbenchId }) {
               <div key={event.id} className="bg-[#0d1117] border border-white/10 rounded-2xl p-6 flex flex-col hover:border-teal-500/30 transition-all">
                 <div className="flex justify-between items-start mb-6">
                   <div>
-                    <h3 className="text-white font-bold text-lg mb-1">{event.event_type.replace(/_/g, ' ')}</h3>
+                    <h3 className="text-white font-bold text-lg mb-1">{event.event_type?.replace(/_/g, ' ')}</h3>
                     <p className="text-xs text-gray-500">Event ID: {event.id.split('-')[0]} • {new Date(event.event_date || event.created_at).toLocaleDateString()}</p>
                   </div>
                   <span className={`px-3 py-1 rounded-xl text-[10px] font-bold uppercase tracking-widest border ${getStatusColor(event.event_status)}`}>
-                    {event.event_status.replace(/_/g, ' ')}
+                    {event.event_status?.replace(/_/g, ' ')}
                   </span>
                 </div>
                 
