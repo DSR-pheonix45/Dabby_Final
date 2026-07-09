@@ -264,7 +264,7 @@ export default function OnboardingTour({ isOpen, onComplete }) {
   const [targetRect, setTargetRect] = useState(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [firstWorkbenchId, setFirstWorkbenchId] = useState(null);
+  const [firstUserId, setFirstUserId] = useState(null);
   const [loadingWorkbenches, setLoadingWorkbenches] = useState(true);
 
   // Detect mobile device
@@ -286,13 +286,13 @@ export default function OnboardingTour({ isOpen, onComplete }) {
         if (!user) return;
         
         const { data, error } = await supabase
-          .from("workbench_members")
-          .select("workbench_id")
+          .from("user_members")
+          .select("user_id")
           .eq("user_id", user.id)
           .limit(1);
           
         if (!error && data && data.length > 0) {
-          setFirstWorkbenchId(data[0].workbench_id);
+          setFirstUserId(data[0].user_id);
         }
       } catch (err) {
         console.error("Failed to load first workbench for tour:", err);
@@ -391,20 +391,20 @@ export default function OnboardingTour({ isOpen, onComplete }) {
   };
 
   const handleStartWorkbenchTour = () => {
-    if (firstWorkbenchId) {
+    if (firstUserId) {
       setTourPart("workbench");
       setCurrentStep(0);
-      navigate(`/dashboard/workbenches/${firstWorkbenchId}`);
+      navigate(`/dashboard/users/${firstUserId}`);
     } else {
       alert("No active workbenches found. Please create a workbench first or start with the Dashboard Tour!");
     }
   };
 
   const handleStartFirstTrade = () => {
-    if (firstWorkbenchId) {
+    if (firstUserId) {
       setTourPart("firstTrade");
       setCurrentStep(0);
-      navigate(`/dashboard/workbenches/${firstWorkbenchId}`);
+      navigate(`/dashboard/users/${firstUserId}`);
     } else {
       alert("No active workbenches found. Please create a workbench first!");
     }
@@ -413,7 +413,7 @@ export default function OnboardingTour({ isOpen, onComplete }) {
   const handleNext = useCallback(() => {
     if (step?.isPart1Complete) {
       // Prompt user to switch to workbench tour
-      if (firstWorkbenchId) {
+      if (firstUserId) {
         handleStartWorkbenchTour();
       } else {
         onComplete?.();
@@ -423,7 +423,7 @@ export default function OnboardingTour({ isOpen, onComplete }) {
     } else {
       setCurrentStep((prev) => prev + 1);
     }
-  }, [isLastStep, step, firstWorkbenchId, onComplete]);
+  }, [isLastStep, step, firstUserId, onComplete]);
 
   const handlePrev = useCallback(() => {
     if (!isFirstStep) {
@@ -648,7 +648,7 @@ export default function OnboardingTour({ isOpen, onComplete }) {
             onClick={handleNext}
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white rounded-lg transition-all shadow-md bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-400 hover:to-cyan-500"
           >
-            {step?.isPart1Complete ? (firstWorkbenchId ? "Start Workbench Tour" : "Finish") : (isLastStep ? "Finish" : "Continue")}
+            {step?.isPart1Complete ? (firstUserId ? "Start Workbench Tour" : "Finish") : (isLastStep ? "Finish" : "Continue")}
             {isLastStep || step?.isPart1Complete ? (
               <BsCheck2 className="text-sm" />
             ) : (

@@ -2,27 +2,27 @@ import os
 from typing import Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from supabase_client import supabase
-from auth import require_permission, require_membership, P
+from auth import verify_user_access
 from services.business_event_registry import business_event_registry
 from services.settlement_engine import settlement_engine
 from services.accounting_compiler import accounting_compiler
 
 router = APIRouter()
 
-@router.get("/workbench/{workbench_id}", dependencies=[Depends(require_membership())])
+@router.get("/user/{user_id}", dependencies=[Depends(verify_user_access)])
 async def list_business_events(
-    workbench_id: str,
+    user_id: str,
     status: Optional[str] = None,
     event_type: Optional[str] = None,
     limit: int = 50,
     offset: int = 0
 ):
     try:
-        return await business_event_registry.list_for_workbench(workbench_id, status, event_type, limit, offset)
+        return await business_event_registry.list_for_workbench(user_id, status, event_type, limit, offset)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{event_id}", dependencies=[Depends(require_membership())])
+@router.get("/{event_id}", dependencies=[Depends(verify_user_access)])
 async def get_business_event(event_id: str):
     try:
         event = await business_event_registry.get_event(event_id)
@@ -34,15 +34,15 @@ async def get_business_event(event_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{event_id}/settlements", dependencies=[Depends(require_membership())])
+@router.get("/{event_id}/settlements", dependencies=[Depends(verify_user_access)])
 async def get_event_settlements(event_id: str):
     try:
         return await settlement_engine.get_settlements_for_event(event_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/{event_id}/compile", dependencies=[Depends(require_permission(P.EXECUTE_TRADE))])
-async def compile_business_event(event_id: str, user=Depends(require_membership())):
+@router.post("/{event_id}/compile", dependencies=[Depends(verify_user_access)])
+async def compile_business_event(event_id: str, user=Depends(verify_user_access)):
     """Trigger Accounting Compiler for this Business Event."""
     try:
         user_id = user.get("id") if isinstance(user, dict) else None
@@ -57,7 +57,7 @@ async def compile_business_event(event_id: str, user=Depends(require_membership(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/{event_id}/cancel", dependencies=[Depends(require_permission(P.EDIT_DRAFT))])
+@router.post("/{event_id}/cancel", dependencies=[Depends(verify_user_access)])
 async def cancel_business_event(event_id: str, payload: dict = {}):
     try:
         reason = payload.get("reason")

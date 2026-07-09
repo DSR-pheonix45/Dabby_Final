@@ -1,8 +1,8 @@
 -- 1. Create trades table
 CREATE TABLE IF NOT EXISTS trades (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    workbench_id UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
-    document_id UUID REFERENCES workbench_documents(id) ON DELETE SET NULL,
+    user_id UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
+    document_id UUID REFERENCES user_documents(id) ON DELETE SET NULL,
     analysis_note_id TEXT,
     trade_type TEXT CHECK (trade_type IN (
         'Vendor Invoice', 'Vendor Payment', 'Sales Invoice', 'Customer Payment',
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS trades (
 );
 
 -- Indices for performance
-CREATE INDEX IF NOT EXISTS idx_trades_workbench ON trades(workbench_id);
+CREATE INDEX IF NOT EXISTS idx_trades_workbench ON trades(user_id);
 CREATE INDEX IF NOT EXISTS idx_trades_document ON trades(document_id);
 
 -- 2. Create trade_parties table
@@ -75,19 +75,19 @@ ALTER TABLE trade_labels ENABLE ROW LEVEL SECURITY;
 -- Add RLS Policies
 DROP POLICY IF EXISTS "Users can manage trades in their workbenches" ON trades;
 CREATE POLICY "Users can manage trades in their workbenches" ON trades
-    FOR ALL USING (EXISTS (SELECT 1 FROM workbenches WHERE id = trades.workbench_id));
+    FOR ALL USING (EXISTS (SELECT 1 FROM workbenches WHERE id = trades.user_id));
 
 DROP POLICY IF EXISTS "Users can manage trade parties in their trades" ON trade_parties;
 CREATE POLICY "Users can manage trade parties in their trades" ON trade_parties
-    FOR ALL USING (EXISTS (SELECT 1 FROM trades WHERE id = trade_parties.trade_id AND EXISTS (SELECT 1 FROM workbenches WHERE id = trades.workbench_id)));
+    FOR ALL USING (EXISTS (SELECT 1 FROM trades WHERE id = trade_parties.trade_id AND EXISTS (SELECT 1 FROM workbenches WHERE id = trades.user_id)));
 
 DROP POLICY IF EXISTS "Users can manage trade entities in their trades" ON trade_entities;
 CREATE POLICY "Users can manage trade entities in their trades" ON trade_entities
-    FOR ALL USING (EXISTS (SELECT 1 FROM trades WHERE id = trade_entities.trade_id AND EXISTS (SELECT 1 FROM workbenches WHERE id = trades.workbench_id)));
+    FOR ALL USING (EXISTS (SELECT 1 FROM trades WHERE id = trade_entities.trade_id AND EXISTS (SELECT 1 FROM workbenches WHERE id = trades.user_id)));
 
 DROP POLICY IF EXISTS "Users can manage trade labels in their trades" ON trade_labels;
 CREATE POLICY "Users can manage trade labels in their trades" ON trade_labels
-    FOR ALL USING (EXISTS (SELECT 1 FROM trades WHERE id = trade_labels.trade_id AND EXISTS (SELECT 1 FROM workbenches WHERE id = trades.workbench_id)));
+    FOR ALL USING (EXISTS (SELECT 1 FROM trades WHERE id = trade_labels.trade_id AND EXISTS (SELECT 1 FROM workbenches WHERE id = trades.user_id)));
 
 
 -- ==========================================

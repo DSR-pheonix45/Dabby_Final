@@ -7,7 +7,7 @@ from datetime import date
 router = APIRouter()
 
 class TaskCreate(BaseModel):
-    workbench_id: str
+    user_id: str
     title: str
     description: Optional[str] = None
     assigned_to: Optional[str] = None
@@ -22,11 +22,11 @@ class TaskUpdate(BaseModel):
     priority: Optional[str] = None
     due_date: Optional[date] = None
 
-@router.get("/{workbench_id}")
-async def list_tasks(workbench_id: str):
+@router.get("/{user_id}")
+async def list_tasks(user_id: str):
     try:
         # 1. Fetch tasks
-        tasks_res = supabase.table("workbench_tasks").select("*").eq("workbench_id", workbench_id).order("created_at", desc=True).execute()
+        tasks_res = supabase.table("workbench_tasks").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
         tasks = tasks_res.data
         if not tasks:
             return []
@@ -39,7 +39,7 @@ async def list_tasks(workbench_id: str):
             users_res = supabase.table("users").select("id, name").in_("id", user_ids).execute()
             user_map = {u["id"]: u["name"] for u in users_res.data}
             
-            members_res = supabase.table("workbench_members").select("user_id, role").eq("workbench_id", workbench_id).in_("user_id", user_ids).execute()
+            members_res = supabase.table("user_members").select("user_id, role").eq("user_id", user_id).in_("user_id", user_ids).execute()
             role_map = {m["user_id"]: m["role"] for m in members_res.data}
 
         # 3. Merge names and roles into task objects
@@ -99,11 +99,11 @@ async def delete_task(task_id: str):
         print(f"[ERROR] delete_task: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{workbench_id}/members")
-async def list_workbench_members(workbench_id: str):
+@router.get("/{user_id}/members")
+async def list_user_members(user_id: str):
     try:
         # 1. Fetch members
-        res = supabase.table("workbench_members").select("*").eq("workbench_id", workbench_id).execute()
+        res = supabase.table("user_members").select("*").eq("user_id", user_id).execute()
         members = res.data
         if not members:
             return []
@@ -121,5 +121,5 @@ async def list_workbench_members(workbench_id: str):
             
         return members
     except Exception as e:
-        print(f"[ERROR] list_workbench_members: {e}")
+        print(f"[ERROR] list_user_members: {e}")
         raise HTTPException(status_code=500, detail=str(e))

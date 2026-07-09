@@ -7,7 +7,6 @@ import {
   BsStars,
   BsChevronDown,
   BsChevronRight,
-  BsBuilding,
   BsClockHistory,
   BsPlusLg
 } from "react-icons/bs";
@@ -145,7 +144,6 @@ export default function Sidebar({
 
   const [expandedSections, setExpandedSections] = useState({
     history: false,
-    workbenches: true,
   });
 
   const toggleSection = (section) => {
@@ -158,38 +156,7 @@ export default function Sidebar({
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState([]);
-  const [workbenches, setWorkbenches] = useState([]);
 
-  const fetchWorkbenches = useCallback(async () => {
-    if (!user) return;
-    try {
-      // Fetch memberships first to avoid schema cache join errors
-      const { data: memberships, error: memError } = await supabase
-        .from("workbench_members")
-        .select("workbench_id")
-        .eq("user_id", user.id);
-
-      if (memError) throw memError;
-
-      if (!memberships || memberships.length === 0) {
-        setWorkbenches([]);
-        return;
-      }
-
-      const workbenchIds = memberships.map(m => m.workbench_id);
-
-      const { data, error } = await supabase
-        .from("workbenches")
-        .select("*")
-        .in("id", workbenchIds)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setWorkbenches(data || []);
-    } catch (err) {
-      console.error("Error fetching workbenches:", err);
-    }
-  }, [user]);
 
   const fetchChatHistory = useCallback(async () => {
     if (!user) return;
@@ -214,7 +181,6 @@ export default function Sidebar({
 
   useEffect(() => {
     fetchChatHistory();
-    fetchWorkbenches();
 
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
@@ -231,7 +197,7 @@ export default function Sidebar({
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("chatHistoryUpdated", handleChatHistoryUpdate);
     };
-  }, [user, fetchChatHistory, fetchWorkbenches]);
+  }, [user, fetchChatHistory]);
 
   const loadChatSession = async (sessionId) => {
     try {
@@ -288,33 +254,7 @@ export default function Sidebar({
 
         {/* Navigation Sections */}
         <div className="flex-1 space-y-2">
-          <ExpandableSection
-            title="Workbenches"
-            icon={BsBuilding}
-            isExpanded={expandedSections.workbenches}
-            onToggle={() => toggleSection("workbenches")}
-            badge={workbenches.length}
-            isCollapsed={isCollapsed}
-            data-tour="workbenches-section"
-          >
-            {workbenches.map((wb) => (
-              <div
-                key={wb.id}
-                onClick={() => navigate(`/dashboard/workbenches/${wb.id}`)}
-                className="group flex items-center justify-between px-3 py-2 text-xs font-bold text-gray-500 hover:text-white hover:bg-white/5 rounded-lg transition-all cursor-pointer"
-              >
-                <span className="truncate flex-1">{wb.name}</span>
-                <BsChevronRight className="text-[8px] opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all" />
-              </div>
-            ))}
-            <button
-              onClick={() => navigate("/dashboard/workbenches")}
-              className="w-full flex items-center space-x-2 px-3 py-2 text-[10px] font-black text-teal-400 uppercase tracking-widest hover:text-teal-300 transition-colors"
-            >
-              <BsPlusLg className="text-[10px]" />
-              <span>View all</span>
-            </button>
-          </ExpandableSection>
+
 
           <ExpandableSection
             title="History"

@@ -2,14 +2,14 @@ import os
 from typing import Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from supabase_client import supabase
-from auth import require_permission, require_membership, P
+from auth import verify_user_access
 from services.settlement_engine import settlement_engine
 
 router = APIRouter()
 
-@router.get("/workbench/{workbench_id}", dependencies=[Depends(require_membership())])
+@router.get("/user/{user_id}", dependencies=[Depends(verify_user_access)])
 async def list_settlements(
-    workbench_id: str,
+    user_id: str,
     status: Optional[str] = None,
     limit: int = 50,
     offset: int = 0
@@ -18,7 +18,7 @@ async def list_settlements(
         q = (
             supabase.table("event_settlements")
                     .select("*, event_a:event_id_a(*), event_b:event_id_b(*)")
-                    .eq("workbench_id", workbench_id)
+                    .eq("user_id", user_id)
                     .order("created_at", desc=True)
                     .limit(limit)
                     .offset(offset)
@@ -30,11 +30,11 @@ async def list_settlements(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/recalculate/{workbench_id}", dependencies=[Depends(require_permission(P.EXECUTE_TRADE))])
-async def recalculate_settlements(workbench_id: str):
+@router.post("/recalculate/{user_id}", dependencies=[Depends(verify_user_access)])
+async def recalculate_settlements(user_id: str):
     """Re-run settlement engine for all OPEN events."""
     try:
-        result = await settlement_engine.recalculate_workbench(workbench_id)
+        result = await settlement_engine.recalculate_user_ledger(user_id)
         return {"message": "Settlement recalculation complete", "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

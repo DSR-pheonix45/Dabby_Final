@@ -5,7 +5,7 @@ REST API for the Phase 1 Analysis Note pipeline.
 
 Endpoints:
   GET  /api/ingestion/analysis-notes/{document_id}         → Fetch note for a document
-  GET  /api/ingestion/analysis-notes/workbench/{wb_id}     → List notes for workbench
+  GET  /api/ingestion/analysis-notes/user/{wb_id}     → List notes for workbench
   POST /api/ingestion/analysis-notes/{note_id}/review      → Update review_status
   GET  /api/ingestion/analysis-notes/{wb_id}/settlement/{key} → Find linked notes by key
   POST /api/ingestion/reanalyse/{document_id}              → Trigger re-analysis
@@ -51,9 +51,9 @@ async def get_analysis_note(document_id: str):
     return note
 
 
-@router.get("/analysis-notes/workbench/{workbench_id}")
+@router.get("/analysis-notes/user/{user_id}")
 async def list_analysis_notes(
-    workbench_id: str,
+    user_id: str,
     review_status: Optional[str] = Query(None, description="Filter by review_status"),
     limit:  int = Query(50,  ge=1, le=200),
     offset: int = Query(0,   ge=0),
@@ -63,7 +63,7 @@ async def list_analysis_notes(
     Optionally filter by review_status: DRAFT | UNDER_REVIEW | APPROVED | REJECTED | SUPERSEDED
     """
     notes = await _analysis_note_service.list_for_workbench(
-        workbench_id=workbench_id,
+        user_id=user_id,
         review_status=review_status,
         limit=limit,
         offset=offset,
@@ -93,14 +93,14 @@ async def update_review_status(note_id: str, body: ReviewStatusUpdate):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/analysis-notes/{workbench_id}/settlement/{settlement_key}")
-async def find_by_settlement_key(workbench_id: str, settlement_key: str):
+@router.get("/analysis-notes/{user_id}/settlement/{settlement_key}")
+async def find_by_settlement_key(user_id: str, settlement_key: str):
     """
     Find all Analysis Notes in a workbench that share a settlement key.
     This is the cross-document linkage endpoint (invoice ↔ payment matching).
     """
     notes = await _analysis_note_service.find_linked_by_settlement_key(
-        workbench_id=workbench_id,
+        user_id=user_id,
         settlement_key=settlement_key,
     )
     return {"settlement_key": settlement_key, "linked_notes": notes, "count": len(notes)}
@@ -162,10 +162,10 @@ async def reanalyse_document(document_id: str):
             "classification_method": clf_res.data[0].get("classification_method", "heuristic"),
         }
 
-        # Fetch document info for workbench_id
+        # Fetch document info for user_id
         doc_res = (
-            supabase.table("workbench_documents")
-                    .select("workbench_id")
+            supabase.table("user_documents")
+                    .select("user_id")
                     .eq("id", document_id)
                     .single()
                     .execute()
@@ -173,12 +173,12 @@ async def reanalyse_document(document_id: str):
         if not doc_res.data:
             raise HTTPException(status_code=404, detail=f"Document {document_id} not found")
 
-        workbench_id = doc_res.data["workbench_id"]
+        user_id = doc_res.data["user_id"]
 
         # Re-generate Analysis Note
         new_note = await _analysis_note_service.generate_and_store(
             document_id=document_id,
-            workbench_id=workbench_id,
+            user_id=user_id,
             ocr_output=ocr_raw,
             classification=classification,
         )

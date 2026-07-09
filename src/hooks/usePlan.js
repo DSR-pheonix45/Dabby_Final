@@ -4,22 +4,22 @@ import { fetchPlanStatus } from "../lib/plans";
 /**
  * Loads a workbench's plan tier + current usage (Module 12) for UI display.
  *
- *   const { plan, limits, usage, loading, refresh } = usePlan(workbenchId);
+ *   const { plan, limits, usage, loading, refresh } = usePlan(userId);
  */
-export function usePlan(workbenchId) {
+export function usePlan(userId) {
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(!!workbenchId);
+  const [loading, setLoading] = useState(!!userId);
   const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
-    if (!workbenchId) {
+    if (!userId) {
       setData(null);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const res = await fetchPlanStatus(workbenchId);
+      const res = await fetchPlanStatus(userId);
       setData(res);
       setError(null);
     } catch (e) {
@@ -27,7 +27,7 @@ export function usePlan(workbenchId) {
     } finally {
       setLoading(false);
     }
-  }, [workbenchId]);
+  }, [userId]);
 
   useEffect(() => { load(); }, [load]);
 

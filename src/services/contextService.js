@@ -11,9 +11,9 @@ export const contextService = {
   /**
    * Fetches the complete state of a workbench from the central context API
    */
-  async getWorkbenchIntelligence(workbenchId) {
+  async getWorkbenchIntelligence(userId) {
     try {
-      const response = await apiFetch(`/api/context/${workbenchId}`);
+      const response = await apiFetch(`/api/context/${userId}`);
       if (!response.ok) throw new Error("Failed to fetch workbench intelligence");
       
       const data = await response.json();

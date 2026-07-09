@@ -735,7 +735,7 @@ export default function SuperadminDashboard() {
                         stats.payments.map((p, idx) => (
                           <tr key={idx} className="border-b border-white/5 hover:bg-white/5 transition-all">
                             <td className="py-3 px-4 font-mono font-semibold text-white">{p.razorpay_payment_id}</td>
-                            <td className="py-3 px-4 font-mono text-gray-400 truncate max-w-[120px]">{p.workbench_id}</td>
+                            <td className="py-3 px-4 font-mono text-gray-400 truncate max-w-[120px]">{p.user_id}</td>
                             <td className="py-3 px-4 font-mono text-gray-300">{p.email}</td>
                             <td className="py-3 px-4 font-semibold text-white">₹{p.amount}</td>
                             <td className="py-3 px-4 text-[#00FFD1] uppercase font-bold">{p.plan}</td>

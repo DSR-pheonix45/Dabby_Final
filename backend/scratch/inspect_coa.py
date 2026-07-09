@@ -18,7 +18,7 @@ supabase: Client = create_client(URL, KEY)
 
 print(f"[DEBUG] Supabase client initialized for {URL}")
 
-for table in ["coa_accounts", "labels", "workbenches"]:
+for table in ["coa_accounts", "labels", "users"]:
     try:
         res = supabase.table(table).select("*").limit(1).execute()
         if res.data:

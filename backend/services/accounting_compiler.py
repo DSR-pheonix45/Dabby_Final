@@ -51,7 +51,7 @@ class AccountingCompiler:
         This is the ONLY place that writes to transactions / transaction_entries.
         Idempotent: if a transaction already exists for this trade, skips the insert
         and jumps straight to Stage 12 recompute.
-        After this returns, workbench_accounts.current_amount will be up to date.
+        After this returns, user_accounts.current_amount will be up to date.
         """
         # ─── Stage 10: Fetch trade and resolve label map ───────────────────────
         trade_res = supabase.table("trades").select("*").eq("id", trade_id).single().execute()
@@ -59,19 +59,19 @@ class AccountingCompiler:
         if not trade:
             raise ValueError(f"Trade {trade_id} not found for accounting compilation")
 
-        workbench_id = trade["workbench_id"]
+        user_id = trade["user_id"]
 
         # ─── Idempotency guard: check if transaction already exists ────────────
         # Prevents duplicate ledger entries when /execute is retried after Stage 12 failure.
         doc_id = trade.get("document_id")
         if doc_id:
-            existing_doc = supabase.table("workbench_documents").select("transaction_id").eq("id", doc_id).execute()
+            existing_doc = supabase.table("user_documents").select("transaction_id").eq("id", doc_id).execute()
             if existing_doc.data and existing_doc.data[0].get("transaction_id"):
                 existing_tx_id = existing_doc.data[0]["transaction_id"]
                 print(f"[INFO] Transaction {existing_tx_id} already exists for trade {trade_id}. Skipping ledger insert, running Stage 12 only.")
                 try:
                     from services.trade_service import trade_service
-                    recompute_result = trade_service.recompute_coa_balances(workbench_id)
+                    recompute_result = trade_service.recompute_coa_balances(user_id)
                 except Exception as e:
                     recompute_result = {"status": "error", "message": str(e)}
                 return {
@@ -114,9 +114,9 @@ class AccountingCompiler:
         ar_label_id: Optional[str] = None
 
         try:
-            wa_res = supabase.table("workbench_accounts")\
+            wa_res = supabase.table("user_accounts")\
                 .select("id, full_account_name, master_accounts(account_name)")\
-                .eq("workbench_id", workbench_id)\
+                .eq("user_id", user_id)\
                 .eq("is_active", True)\
                 .execute()
 
@@ -216,7 +216,7 @@ class AccountingCompiler:
             else:
                 print(f"[WARNING] Compiler: activity '{activity_type}' dropped — "
                       f"no label resolved (action={action}, label_id={label_id}). "
-                      f"Trade type: {trade.get('trade_type')}, workbench: {workbench_id}")
+                      f"Trade type: {trade.get('trade_type')}, workbench: {user_id}")
 
         if not debit_postings and not credit_postings:
             print("[WARNING] No accounting postings generated for trade activities")
@@ -238,9 +238,9 @@ class AccountingCompiler:
 
             if not suspense_id:
                 try:
-                    sus_res = supabase.table("workbench_accounts")\
+                    sus_res = supabase.table("user_accounts")\
                         .select("id")\
-                        .eq("workbench_id", workbench_id)\
+                        .eq("user_id", user_id)\
                         .ilike("full_account_name", "%suspense%")\
                         .execute()
                     if sus_res.data:
@@ -260,9 +260,9 @@ class AccountingCompiler:
                 # Last resort: any account in the workbench that's not already posted
                 already_used = {p["label_id"] for p in debit_postings + credit_postings}
                 try:
-                    any_res = supabase.table("workbench_accounts")\
+                    any_res = supabase.table("user_accounts")\
                         .select("id")\
-                        .eq("workbench_id", workbench_id)\
+                        .eq("user_id", user_id)\
                         .eq("is_active", True)\
                         .execute()
                     for row in (any_res.data or []):
@@ -312,7 +312,7 @@ class AccountingCompiler:
         # ─── Stage 11: Commit to immutable ledger ─────────────────────────────
         # Insert transaction header
         tx_header = {
-            "workbench_id": workbench_id,
+            "user_id": user_id,
             "description": trade.get("description") or f"Journal for {trade.get('trade_type')}",
             "transaction_date": trade.get("invoice_date") or datetime.utcnow().date().isoformat(),
             "source_party_id": trade.get("party_id"),
@@ -345,7 +345,7 @@ class AccountingCompiler:
         doc_id = trade.get("document_id")
         if doc_id:
             try:
-                supabase.table("workbench_documents").update({
+                supabase.table("user_documents").update({
                     "transaction_id": tx_id,
                     "status": "RECORD_CREATED"
                 }).eq("id", doc_id).execute()
@@ -357,7 +357,7 @@ class AccountingCompiler:
         # COA will show stale balances even though ledger rows are correct.
         try:
             from services.trade_service import trade_service
-            recompute_result = trade_service.recompute_coa_balances(workbench_id)
+            recompute_result = trade_service.recompute_coa_balances(user_id)
             print(f"[Stage 12] Recompute result: {recompute_result}")
         except Exception as stage12_err:
             # Non-fatal — ledger is already committed, flag but don't rollback
@@ -368,7 +368,7 @@ class AccountingCompiler:
         try:
             from services.trade_service import trade_service
             trade_service.emit_audit_log(
-                workbench_id=workbench_id,
+                user_id=user_id,
                 trade_id=trade_id,
                 transaction_ids=[tx_id],
                 executed_by=executed_by,
@@ -380,7 +380,7 @@ class AccountingCompiler:
         # Mark document as fully processed
         if doc_id:
             try:
-                supabase.table("workbench_documents").update({
+                supabase.table("user_documents").update({
                     "status": "PROCESSED"
                 }).eq("id", doc_id).execute()
             except Exception:

@@ -129,12 +129,12 @@ class RulesetService:
         Evaluates active ruleset version on document and returns simulation details or triggers trade creation.
         """
         # 1. Fetch document and analysis note metadata
-        doc_res = supabase.table("workbench_documents").select("*").eq("id", doc_id).single().execute()
+        doc_res = supabase.table("user_documents").select("*").eq("id", doc_id).single().execute()
         doc = doc_res.data
         if not doc:
             raise ValueError(f"Document {doc_id} not found")
 
-        workbench_id = doc["workbench_id"]
+        user_id = doc["user_id"]
         metadata = doc.get("metadata") or {}
         extracted = metadata.get("extracted_invoice") or {}
         if not extracted:
@@ -173,7 +173,7 @@ class RulesetService:
 
         # 5. Fetch Chart of Accounts labels/accounts
         ledger_service = LedgerService(supabase)
-        accounts = await ledger_service.get_labels(workbench_id)
+        accounts = await ledger_service.get_labels(user_id)
         accounts_map = {acc["full_account_name"]: acc for acc in accounts}
 
         # 6. Parse Actions
@@ -222,8 +222,8 @@ class RulesetService:
                 "logic": logic
             }
             
-        # Non-simulated path: Delegate to trade_service
-        # (This is handled inside create_trade_from_document, so we just return metadata)
+        # Non-simulated path: Return metadata for downstream processing
+        # (This is handled by downstream systems)
         return {
             "status": "Matched",
             "event_name": event_name,

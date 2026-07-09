@@ -4,10 +4,10 @@ from supabase_client import supabase
 
 router = APIRouter()
 
-@router.get("/workbench/{workbench_id}")
-async def list_assets(workbench_id: str):
+@router.get("/user/{user_id}")
+async def list_assets(user_id: str):
     try:
-        res = supabase.table("assets").select("*, trades(invoice_number), workbench_accounts(full_account_name)").eq("workbench_id", workbench_id).execute()
+        res = supabase.table("assets").select("*, trades(invoice_number), user_accounts(full_account_name)").eq("user_id", user_id).execute()
         return res.data or []
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -15,7 +15,7 @@ async def list_assets(workbench_id: str):
 @router.get("/{asset_id}")
 async def get_asset(asset_id: str):
     try:
-        res = supabase.table("assets").select("*, trades(invoice_number), workbench_accounts(full_account_name)").eq("id", asset_id).single().execute()
+        res = supabase.table("assets").select("*, trades(invoice_number), user_accounts(full_account_name)").eq("id", asset_id).single().execute()
         return res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -14,16 +14,16 @@ class COAItem(BaseModel):
     is_system: bool
     display_order: int
 
-@router.get("/{workbench_id}")
-async def get_coa(workbench_id: str):
+@router.get("/{user_id}")
+async def get_coa(user_id: str):
     """
     Fetches the full COA hierarchy for a workbench.
     """
     try:
-        print(f"[DEBUG] Fetching COA for workbench: {workbench_id}")
+        print(f"[DEBUG] Fetching COA for workbench: {user_id}")
         response = supabase.table("coa_accounts") \
             .select("*") \
-            .eq("workbench_id", workbench_id) \
+            .eq("user_id", user_id) \
             .order("display_order") \
             .execute()
         

@@ -11,7 +11,7 @@ ledger_service = LedgerService(supabase)
 # --- Pydantic Models ---
 
 class LabelCreate(BaseModel):
-    workbench_id: str
+    user_id: str
     master_account_id: str
     master_sub_account_id: str
     full_account_name: str
@@ -27,7 +27,7 @@ class LabelUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 class TransactionCreate(BaseModel):
-    workbench_id: str
+    user_id: str
     from_label_id: str
     to_label_id: str
     amount: float
@@ -55,10 +55,10 @@ async def create_label(label: LabelCreate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/labels/{workbench_id}")
-async def get_labels(workbench_id: str):
+@router.get("/labels/{user_id}")
+async def get_labels(user_id: str):
     try:
-        return await ledger_service.get_labels(workbench_id)
+        return await ledger_service.get_labels(user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -76,11 +76,11 @@ async def delete_label(label_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/labels/seed/{workbench_id}")
-async def seed_labels(workbench_id: str, payload: Optional[CustomSeedPayload] = None):
+@router.post("/labels/seed/{user_id}")
+async def seed_labels(user_id: str, payload: Optional[CustomSeedPayload] = None):
     try:
         custom_labels = [l.dict() for l in payload.labels] if (payload and payload.labels) else None
-        return await ledger_service.seed_basic_labels(workbench_id, custom_labels)
+        return await ledger_service.seed_basic_labels(user_id, custom_labels)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -106,7 +106,7 @@ async def get_master_sub_accounts():
 async def create_transaction(tx: TransactionCreate):
     try:
         return await ledger_service.record_transaction(
-            workbench_id=tx.workbench_id,
+            user_id=tx.user_id,
             from_label_id=tx.from_label_id,
             to_label_id=tx.to_label_id,
             amount=tx.amount,
@@ -122,19 +122,19 @@ async def create_transaction(tx: TransactionCreate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/transactions/{workbench_id}")
-async def list_transactions(workbench_id: str):
+@router.get("/transactions/{user_id}")
+async def list_transactions(user_id: str):
     try:
-        return await ledger_service.get_transactions_list(workbench_id)
+        return await ledger_service.get_transactions_list(user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- Analytics Endpoints ---
 
-@router.get("/balances/{workbench_id}")
-async def get_balances(workbench_id: str):
+@router.get("/balances/{user_id}")
+async def get_balances(user_id: str):
     try:
-        return await ledger_service.get_balances(workbench_id)
+        return await ledger_service.get_balances(user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

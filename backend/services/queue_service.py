@@ -15,7 +15,6 @@ from services.document_classifier import DocumentClassifier
 from services.analysis_note_service import AnalysisNoteService
 from services.bank_statement_parser import BankStatementParser
 from services.groq_pool import GroqPool
-from services.trade_draft_service import trade_draft_service
 
 # Initialise pipeline services (injected with dependencies)
 _bank_parser = BankStatementParser(
@@ -57,7 +56,7 @@ async def enqueue_document(doc_id: str):
     """
     # 1. Update status to 'uploaded' initially
     try:
-        supabase.table("workbench_documents").update({"status": "uploaded"}).eq("id", doc_id).execute()
+        supabase.table("user_documents").update({"status": "uploaded"}).eq("id", doc_id).execute()
     except Exception as e:
         print(f"[QUEUE ERROR] Failed to update status to uploaded for doc {doc_id}: {e}")
 
@@ -79,168 +78,6 @@ async def enqueue_document(doc_id: str):
     print(f"[QUEUE] Redis offline. Enqueuing doc {doc_id} in-memory.")
     await memory_queue.put(doc_id)
 
-async def auto_record_ledger_from_ocr(doc_id: str, doc: dict, extracted: dict):
-    """
-    Directly extracts the business event type from document scanning and records a balanced
-    double-entry transaction using ledger_service, then creates an audit log of it.
-    """
-    try:
-        from services.ledger_service import LedgerService
-        ledger_service = LedgerService(supabase)
-        
-        workbench_id = doc["workbench_id"]
-        
-        # 1. Parse document type & map to Business Event Type
-        raw_doc_type = extracted.get("document_type") or doc.get("document_type") or "expense_receipt"
-        doc_type = raw_doc_type.lower()
-        
-        # Map to internal business event
-        # Invoice -> Customer Sale
-        # Bank Statement -> Customer Payment
-        # Payroll -> Salary Paid
-        # Expense -> Expense Paid
-        event_type = "Expense Paid"
-        if "invoice" in doc_type or "sales_invoice" in doc_type or "sales_order" in doc_type:
-            event_type = "Customer Sale"
-        elif "bank_statement" in doc_type or "customer_payment_receipt" in doc_type or "bank" in doc_type:
-            event_type = "Customer Payment"
-        elif "payroll" in doc_type or "salary" in doc_type:
-            event_type = "Salary Paid"
-        
-        # 2. Fetch all labels (COA accounts)
-        labels = await ledger_service.get_labels(workbench_id)
-        if not labels:
-            print(f"[WARNING] No COA labels found for workbench {workbench_id}. Cannot post ledger entries.")
-            return
-            
-        # Helper to find a label by criteria
-        def find_label(type_filter, keywords, sub_account_filter=None):
-            # 1. Try matching sub_account specifically if provided
-            if sub_account_filter:
-                for l in labels:
-                    if l["type"] == type_filter and l.get("sub_account") == sub_account_filter:
-                        return l
-            # 2. Try matching keywords in account name
-            for l in labels:
-                if l["type"] == type_filter:
-                    name_lower = l["name"].lower()
-                    if any(kw in name_lower for kw in keywords):
-                        return l
-            # 3. Fallback to any label of the target type
-            for l in labels:
-                if l["type"] == type_filter:
-                    return l
-            return None
-
-        # Resolve debit/credit labels based on event type
-        debit_label = None
-        credit_label = None
-        
-        cash_bank_label = find_label("asset", ["cash", "bank", "checking", "savings", "liquidity"], "Cash & Cash Equivalents") or find_label("asset", ["cash", "bank"])
-        revenue_label = find_label("revenue", ["operating", "sales", "revenue", "income"], "Operating Revenue") or find_label("revenue", ["revenue", "income"])
-        ar_label = find_label("asset", ["receivable", "ar"], "Accounts Receivable (AR)") or cash_bank_label
-        salaries_label = find_label("expense", ["salary", "wage", "payroll", "employee"], "Salaries & Wages") or find_label("expense", ["salary", "wage"])
-        expense_label = find_label("expense", ["expense", "purchase", "cogs", "utilities", "software"]) or find_label("expense", [])
-        
-        if event_type == "Customer Sale":
-            debit_label = cash_bank_label
-            credit_label = revenue_label
-        elif event_type == "Customer Payment":
-            debit_label = cash_bank_label
-            credit_label = ar_label
-        elif event_type == "Salary Paid":
-            debit_label = salaries_label
-            credit_label = cash_bank_label
-        else: # Expense Paid
-            debit_label = expense_label
-            credit_label = cash_bank_label
-
-        if not debit_label or not credit_label:
-            print(f"[WARNING] Could not resolve both debit and credit labels for {event_type}. Debit: {debit_label}, Credit: {credit_label}")
-            return
-
-        # 3. Extract financials
-        financials = extracted.get("financials") or {}
-        total_amount = financials.get("total_amount") or financials.get("total") or extracted.get("amount") or 0.0
-        try:
-            total_amount = float(total_amount)
-        except (ValueError, TypeError):
-            total_amount = 0.0
-            
-        if total_amount <= 0:
-            total_amount = 1000.0 # Fallback default
-
-        # 4. Extract metadata references
-        doc_meta = extracted.get("document_metadata") or {}
-        doc_date_str = doc_meta.get("document_date") or doc_meta.get("date")
-        tx_date = None
-        if doc_date_str:
-            try:
-                from datetime import datetime
-                tx_date = datetime.strptime(doc_date_str[:10], "%Y-%m-%d").date()
-            except Exception:
-                tx_date = None
-                
-        parties = extracted.get("parties") or {}
-        counterparty_name = parties.get("customer_name") or parties.get("vendor_name") or "Unknown"
-        
-        references = extracted.get("references") or {}
-        invoice_number = references.get("invoice_number") or references.get("reference") or ""
-        
-        # Format description
-        description = f"{event_type}"
-        if counterparty_name and counterparty_name != "Unknown":
-            description += f" - {counterparty_name}"
-        if invoice_number:
-            description += f" (Inv #{invoice_number})"
-        
-        # 5. Record strict double-entry transaction
-        tx_res = await ledger_service.record_transaction(
-            workbench_id=workbench_id,
-            from_label_id=credit_label["id"],
-            to_label_id=debit_label["id"],
-            amount=total_amount,
-            description=description,
-            transaction_date=tx_date,
-            invoice_id=doc_id
-        )
-        
-        tx_id = tx_res["transaction"]["id"]
-        
-        # 6. Update document's transaction link in supabase
-        supabase.table("workbench_documents").update({
-            "transaction_id": tx_id
-        }).eq("id", doc_id).execute()
-        
-        # 7. Create audit log
-        audit_payload = {
-            "trade_id": None,
-            "activity_id": None,
-            "user_id": None,
-            "action": "AUTO_DOCUMENT_INGESTION",
-            "old_value": {},
-            "new_value": {
-                "transaction_id": tx_id,
-                "event_type": event_type,
-                "amount": total_amount,
-                "debit_label": debit_label["name"],
-                "credit_label": credit_label["name"],
-                "counterparty": counterparty_name,
-                "invoice_number": invoice_number
-            },
-            "metadata": {
-                "message": f"Successfully processed {doc['filename']}: Created {event_type} journal entry. Debit {debit_label['name']} (+{total_amount}), Credit {credit_label['name']} (+{total_amount}).",
-                "counterparty": counterparty_name,
-                "reference": invoice_number
-            }
-        }
-        supabase.table("audit_logs").insert(audit_payload).execute()
-        print(f"[WORKER] Successfully auto-recorded ledger transaction {tx_id} for doc {doc_id}")
-        
-    except Exception as tx_err:
-        print(f"[WORKER ERROR] Failed to record ledger transaction: {tx_err}")
-        traceback.print_exc()
-
 async def process_queued_document(doc_id: str):
     """
     Parallel page-by-page worker task implementing a fault-tolerant processing pipeline.
@@ -250,7 +87,7 @@ async def process_queued_document(doc_id: str):
     import hashlib
     try:
         # Fetch document metadata
-        doc_res = supabase.table("workbench_documents").select("*").eq("id", doc_id).single().execute()
+        doc_res = supabase.table("user_documents").select("*").eq("id", doc_id).single().execute()
         doc = doc_res.data
         if not doc:
             print(f"[WORKER ERROR] Document {doc_id} not found in database")
@@ -260,7 +97,7 @@ async def process_queued_document(doc_id: str):
         
         # State: VALIDATING
         meta["job_state"] = "VALIDATING"
-        supabase.table("workbench_documents").update({
+        supabase.table("user_documents").update({
             "status": "VALIDATING",
             "metadata": meta
         }).eq("id", doc_id).execute()
@@ -274,9 +111,9 @@ async def process_queued_document(doc_id: str):
         meta["file_hash"] = file_hash
 
         # Cache Check (Phase 13)
-        cache_res = supabase.table("workbench_documents")\
+        cache_res = supabase.table("user_documents")\
             .select("*")\
-            .eq("workbench_id", doc["workbench_id"])\
+            .eq("user_id", doc["user_id"])\
             .neq("id", doc_id)\
             .in_("status", ["processed", "COMPLETED"])\
             .eq("metadata->>file_hash", file_hash)\
@@ -291,7 +128,7 @@ async def process_queued_document(doc_id: str):
             meta["bank_statement"] = cached_meta.get("bank_statement")
             meta["cached_from"] = cached_doc["id"]
             
-            supabase.table("workbench_documents").update({
+            supabase.table("user_documents").update({
                 "status": "processed",
                 "document_type": cached_doc.get("document_type"),
                 "metadata": meta
@@ -306,7 +143,7 @@ async def process_queued_document(doc_id: str):
         # Check if the document is a ZIP file (keep existing ZIP logic)
         if doc.get("mime_type") == "application/zip" or doc["filename"].endswith(".zip"):
             print(f"[WORKER] Found ZIP file: {doc['filename']}. Extracting files...")
-            workbench_id = doc["workbench_id"]
+            user_id = doc["user_id"]
             with zipfile.ZipFile(io.BytesIO(file_data)) as z:
                 for file_info in z.infolist():
                     if file_info.is_dir():
@@ -319,7 +156,7 @@ async def process_queued_document(doc_id: str):
                     extracted_file_bytes = z.read(file_info)
                     file_ext = filename.split('.')[-1] if '.' in filename else ''
                     random_name = f"{uuid.uuid4().hex}.{file_ext}" if file_ext else uuid.uuid4().hex
-                    filePath = f"{workbench_id}/{random_name}"
+                    filePath = f"{user_id}/{random_name}"
                     
                     supabase.storage.from_("Doc_vault_Raw").upload(filePath, extracted_file_bytes)
                     
@@ -328,7 +165,7 @@ async def process_queued_document(doc_id: str):
                         mime_type = "application/octet-stream"
                     
                     doc_payload = {
-                        "workbench_id": workbench_id,
+                        "user_id": user_id,
                         "filename": filename,
                         "file_path": filePath,
                         "file_size": len(extracted_file_bytes),
@@ -337,12 +174,12 @@ async def process_queued_document(doc_id: str):
                         "metadata": {"parent_zip": doc_id}
                     }
                     
-                    new_doc_res = supabase.table("workbench_documents").insert(doc_payload).execute()
+                    new_doc_res = supabase.table("user_documents").insert(doc_payload).execute()
                     if new_doc_res.data:
                         new_doc_id = new_doc_res.data[0]["id"]
                         await enqueue_document(new_doc_id)
             
-            supabase.table("workbench_documents").update({
+            supabase.table("user_documents").update({
                 "status": "analyzed",
                 "metadata": {**doc.get("metadata", {}), "extracted": True, "message": "ZIP file extracted"}
             }).eq("id", doc_id).execute()
@@ -350,9 +187,9 @@ async def process_queued_document(doc_id: str):
             return
 
         # Duplicate check enforcement
-        dup_res = supabase.table("workbench_documents")\
+        dup_res = supabase.table("user_documents")\
             .select("id, filename")\
-            .eq("workbench_id", doc["workbench_id"])\
+            .eq("user_id", doc["user_id"])\
             .neq("id", doc_id)\
             .eq("metadata->>file_hash", file_hash)\
             .execute()
@@ -362,7 +199,7 @@ async def process_queued_document(doc_id: str):
         
         if is_duplicate and not override_duplicate:
             meta["is_duplicate"] = True
-            supabase.table("workbench_documents").update({
+            supabase.table("user_documents").update({
                 "status": "Needs Review",
                 "metadata": {**meta, "error": f"Duplicate document. Match found: {dup_res.data[0]['filename']}."}
             }).eq("id", doc_id).execute()
@@ -371,7 +208,7 @@ async def process_queued_document(doc_id: str):
 
         # Phase 2 & 3: Detect PDF Type and Split Document
         meta["job_state"] = "SPLITTING"
-        supabase.table("workbench_documents").update({
+        supabase.table("user_documents").update({
             "status": "SPLITTING",
             "metadata": meta
         }).eq("id", doc_id).execute()
@@ -431,7 +268,7 @@ async def process_queued_document(doc_id: str):
                 }
                 
         # Save split status
-        supabase.table("workbench_documents").update({
+        supabase.table("user_documents").update({
             "metadata": meta
         }).eq("id", doc_id).execute()
 
@@ -440,7 +277,7 @@ async def process_queued_document(doc_id: str):
 
         # Phase 4 & 5: Configurable Parallel Processing with Semaphore
         meta["job_state"] = "OCR_RUNNING"
-        supabase.table("workbench_documents").update({
+        supabase.table("user_documents").update({
             "status": "OCR_RUNNING",
             "metadata": meta
         }).eq("id", doc_id).execute()
@@ -456,7 +293,7 @@ async def process_queued_document(doc_id: str):
         # Temporary helper function to save progress in DB
         async def save_progress():
             async with db_lock:
-                supabase.table("workbench_documents").update({
+                supabase.table("user_documents").update({
                     "metadata": meta
                 }).eq("id", doc_id).execute()
 
@@ -620,7 +457,7 @@ async def process_queued_document(doc_id: str):
             # Store classification result
             supabase.table("document_classifications").insert({
                 "document_id":           doc_id,
-                "workbench_id":          doc["workbench_id"],
+                "user_id":          doc["user_id"],
                 "document_type":         doc_type,
                 "confidence":            classification["confidence"],
                 "reasoning":             classification.get("reasoning"),
@@ -631,7 +468,7 @@ async def process_queued_document(doc_id: str):
             # Store OCR raw output
             supabase.table("ocr_raw_output").insert({
                 "document_id":        doc_id,
-                "workbench_id":       doc["workbench_id"],
+                "user_id":       doc["user_id"],
                 "raw_text":           (ocr_raw["raw_text"] or "")[:50000],  # cap storage
                 "tables":             ocr_raw.get("tables", []),
                 "entities":           ocr_raw.get("entities", {}),
@@ -673,7 +510,7 @@ async def process_queued_document(doc_id: str):
 
             analysis_note = await _analysis_note_service.generate_and_store(
                 document_id=doc_id,
-                workbench_id=doc["workbench_id"],
+                user_id=doc["user_id"],
                 ocr_output={**ocr_raw, "confidence": ocr_raw.get("confidence", 0.0)},
                 classification=classification,
                 existing_processed=pre_processed,
@@ -687,63 +524,24 @@ async def process_queued_document(doc_id: str):
             traceback.print_exc()
             # Non-fatal: pipeline continues to Trade Engine
 
-        # ── Check Feature Flags for Phase 2 Routing ──────────────────────────
-        v2_flag_str = os.getenv("TRADE_ENGINE_V2", "false").lower()
-        v2_types_str = os.getenv("TRADE_ENGINE_V2_TYPES", "")
-        
-        is_v2_enabled = v2_flag_str == "true"
-        if v2_flag_str != "true" and v2_types_str:
-            enabled_types = [t.strip() for t in v2_types_str.split(",") if t.strip()]
-            if doc_type in enabled_types:
-                is_v2_enabled = True
-
-        trade = None
-        trade_id = None
-        draft_id = None
-
-        # ── Route to Trade Engine (Legacy / Parallel) ───────────────────────
-        # During migration, we ALWAYS run legacy Trade Engine to maintain existing UI
-        print(f"[WORKER] Routing document {doc_id} to Legacy Trade Engine Pipeline...")
-        from services.trade_service import trade_service
-        trade = await trade_service.create_trade_from_document(doc_id)
-        trade_id = trade.get("id")
-
-        if is_v2_enabled and analysis_note_id:
-            print(f"[WORKER] Routing Analysis Note {analysis_note_id} to V2 Trade Draft Service...")
-            try:
-                draft = await trade_draft_service.create_draft_from_analysis_note(analysis_note_id)
-                draft_id = draft.get("id")
-                # Backlink legacy trade_id for comparison
-                if trade_id and draft_id:
-                    await trade_draft_service.set_legacy_comparison_trade(draft_id, trade_id)
-            except Exception as draft_err:
-                print(f"[WORKER WARNING] Trade Draft generation failed: {draft_err}")
-                traceback.print_exc()
-
         meta["job_state"] = "COMPLETED"
-        final_doc_status = (
-            "processed"
-            if (trade and trade.get("status") == "Ready" and meta.get("failed_pages", 0) == 0)
-            else "Needs Review"
-        )
+        final_doc_status = "analyzed"
 
         async with db_lock:
-            supabase.table("workbench_documents").update({
+            supabase.table("user_documents").update({
                 "document_type": doc_type,
                 "status":        final_doc_status,
                 "metadata":      meta,
             }).eq("id", doc_id).execute()
 
-        print(f"[WORKER] Finished doc {doc_id}. "
-              f"Trade={trade_id}, Draft={draft_id}, "
-              f"AnalysisNote={analysis_note_id}, DocStatus={final_doc_status}")
+        print(f"[WORKER] Finished doc {doc_id}. AnalysisNote={analysis_note_id}, DocStatus={final_doc_status}")
 
     except Exception as e:
         print(f"[WORKER ERROR] Processing of doc {doc_id} failed: {e}")
         try:
             meta["job_state"] = "FAILED"
             meta["error"] = str(e)
-            supabase.table("workbench_documents").update({
+            supabase.table("user_documents").update({
                 "status": "failed",
                 "metadata": meta
             }).eq("id", doc_id).execute()

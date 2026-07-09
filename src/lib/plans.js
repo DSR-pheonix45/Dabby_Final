@@ -19,11 +19,11 @@ export function nextPlan(plan) {
 }
 
 /** Meter one AI message for the current user. Returns {allowed, used, limit, remaining, plan}. */
-export async function consumeAiMessage(workbenchId) {
+export async function consumeAiMessage(userId) {
   try {
     return await apiJson("/api/plans/ai-usage/consume", {
       method: "POST",
-      body: JSON.stringify({ workbench_id: workbenchId || null }),
+      body: JSON.stringify({ user_id: userId || null }),
     });
   } catch {
     // Fail open on metering errors so the assistant never hard-breaks on infra hiccups.
@@ -32,8 +32,8 @@ export async function consumeAiMessage(workbenchId) {
 }
 
 /** Fetch plan + usage for a workbench (drives the usage badge). */
-export async function fetchPlanStatus(workbenchId) {
-  const res = await apiFetch(`/api/plans/status/${workbenchId}`);
+export async function fetchPlanStatus(userId) {
+  const res = await apiFetch(`/api/plans/status/${userId}`);
   if (!res.ok) throw new Error(`plan_status_${res.status}`);
   return res.json();
 }

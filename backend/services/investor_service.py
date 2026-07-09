@@ -19,21 +19,21 @@ class InvestorService:
 
 
 
-    async def get_intelligence(self, workbench_id: str) -> Dict[str, Any]:
+    async def get_intelligence(self, user_id: str) -> Dict[str, Any]:
         """
         Generates a compressed financial intelligence layer and saves a snapshot for AI context.
         """
         # 1. Fetch transactions + entries. transaction_entries reference
-        # workbench_accounts via label_id (there is NO `labels` table to embed),
+        # user_accounts via label_id (there is NO `labels` table to embed),
         # so resolve account metadata through a label map — the same pattern
         # get_balances() uses. Embedding labels(...) here raises PGRST200.
         from services.ledger_service import LedgerService
-        labels = await LedgerService(self.supabase).get_labels(workbench_id)
+        labels = await LedgerService(self.supabase).get_labels(user_id)
         label_map = {l["id"]: l for l in labels}
 
         res = self.supabase.table("transactions").select(
             "id, description, transaction_date, transaction_entries(amount, label_id)"
-        ).eq("workbench_id", workbench_id).execute()
+        ).eq("user_id", user_id).execute()
 
         transactions = res.data or []
 
@@ -86,7 +86,7 @@ class InvestorService:
                         ar_balance += amount
 
         # 3. Calculate Trust Metrics
-        doc_res = self.supabase.table("workbench_documents").select("id").eq("workbench_id", workbench_id).execute()
+        doc_res = self.supabase.table("user_documents").select("id").eq("user_id", user_id).execute()
         doc_count = len(doc_res.data or [])
         tx_count = len(transactions)
         completeness = (doc_count / tx_count * 100) if tx_count > 0 else 100
@@ -105,7 +105,7 @@ class InvestorService:
 
         intelligence_payload = {
             "meta": {
-                "workbench_id": workbench_id,
+                "user_id": user_id,
                 "timestamp": datetime.now().isoformat(),
                 "snapshot_id": f"snap_{int(datetime.now().timestamp())}"
             },
@@ -134,20 +134,20 @@ class InvestorService:
         }
 
         # 5. SAVE SNAPSHOT FOR AI CONSULTANT
-        self._save_snapshot(workbench_id, intelligence_payload)
+        self._save_snapshot(user_id, intelligence_payload)
 
         return intelligence_payload
 
-    async def get_financial_statements(self, workbench_id: str) -> Dict[str, Any]:
+    async def get_financial_statements(self, user_id: str) -> Dict[str, Any]:
         """
         Generates P&L, Balance Sheet, and MIS data based on the ledger.
         """
         # `labels` is not a real table — workbench accounts come via get_labels()
-        # (which maps type/name/sub_account off workbench_accounts + master tables).
+        # (which maps type/name/sub_account off user_accounts + master tables).
         from services.ledger_service import LedgerService
         ledger_service = LedgerService(self.supabase)
-        labels = await ledger_service.get_labels(workbench_id)
-        balances = await ledger_service.get_balances(workbench_id)
+        labels = await ledger_service.get_labels(user_id)
+        balances = await ledger_service.get_balances(user_id)
         
         # Initialize statement structures
         pl = {"revenue": [], "expenses": [], "total_revenue": 0, "total_expenses": 0, "net_profit": 0}
@@ -196,7 +196,7 @@ class InvestorService:
         pl["net_profit"] = pl["total_revenue"] - pl["total_expenses"]
         
         # Add Interpretation (from intelligence layer)
-        intel = await self.get_intelligence(workbench_id)
+        intel = await self.get_intelligence(user_id)
         interpretation = {
             "headline": intel["summary"]["headline"],
             "subtext": intel["summary"]["subtext"],
@@ -214,9 +214,9 @@ class InvestorService:
             "interpretation": interpretation
         }
 
-    def _save_snapshot(self, workbench_id: str, data: Dict[str, Any]):
+    def _save_snapshot(self, user_id: str, data: Dict[str, Any]):
         try:
-            filename = f"investor_snapshot_{workbench_id}.json"
+            filename = f"investor_snapshot_{user_id}.json"
             filepath = os.path.join(self.snapshot_dir, filename)
             
             with open(filepath, "w") as f:
@@ -226,14 +226,14 @@ class InvestorService:
         except Exception as e:
             print(f"[ERROR] Failed to save investor snapshot: {str(e)}")
 
-    async def create_share_link(self, workbench_id: str, password: str) -> str:
+    async def create_share_link(self, user_id: str, password: str) -> str:
         """
         Creates a shareable link ID and stores the password.
         """
         import uuid
         share_id = str(uuid.uuid4())
         share_data = {
-            "workbench_id": workbench_id,
+            "user_id": user_id,
             "password": password,
             "created_at": datetime.now().isoformat()
         }
@@ -258,10 +258,10 @@ class InvestorService:
         if share_data["password"] != password:
             raise Exception("Incorrect password")
             
-        workbench_id = share_data["workbench_id"]
-        return await self.get_intelligence(workbench_id)
+        user_id = share_data["user_id"]
+        return await self.get_intelligence(user_id)
 
-    async def create_invite(self, workbench_id: str, email: str, role: str) -> str:
+    async def create_invite(self, user_id: str, email: str, role: str) -> str:
         """
         Creates a unique invite token for a specific email and role.
         """
@@ -269,7 +269,7 @@ class InvestorService:
         token = str(uuid.uuid4())
         invite_data = {
             "token": token,
-            "workbench_id": workbench_id,
+            "user_id": user_id,
             "email": email,
             "role": role,
             "status": "pending",
@@ -284,7 +284,7 @@ class InvestorService:
 
     async def accept_invite(self, token: str, user_id: str) -> Dict[str, Any]:
         """
-        Processes the invite and adds the user to workbench_members.
+        Processes the invite and adds the user to user_members.
         """
         filepath = os.path.join(self.invite_dir, f"{token}.json")
         if not os.path.exists(filepath):
@@ -296,14 +296,14 @@ class InvestorService:
         if invite_data["status"] != "pending":
             raise Exception("Invitation already used or cancelled")
             
-        # Add to workbench_members
+        # Add to user_members
         member_data = {
-            "workbench_id": invite_data["workbench_id"],
+            "user_id": invite_data["user_id"],
             "user_id": user_id,
             "role": invite_data["role"]
         }
         
-        res = self.supabase.table("workbench_members").insert(member_data).execute()
+        res = self.supabase.table("user_members").insert(member_data).execute()
         if not res.data:
             raise Exception("Failed to join workbench")
             
@@ -315,6 +315,6 @@ class InvestorService:
         with open(filepath, "w") as f:
             json.dump(invite_data, f)
             
-        return {"workbench_id": invite_data["workbench_id"]}
+        return {"user_id": invite_data["user_id"]}
 
 

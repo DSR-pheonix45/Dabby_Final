@@ -298,15 +298,15 @@ function BankStatementTradeReview({ selectedTrade, parties, allEntities, onLinkB
   );
 }
 
-export default function TradeEngine({ workbenchId }) {
+export default function TradeEngine({ userId }) {
   const { user } = useAuth();
   
   // Workbench state
-  const selectedWorkbenchId = workbenchId;
+  const selectedUserId = userId;
   const workbenchLoading = false;
 
   // RBAC (Module 11): resolve caller's role; gate write actions
-  const { role, can } = useWorkbenchRole(selectedWorkbenchId);
+  const { role, can } = useWorkbenchRole(selectedUserId);
   const canEdit = can(PERM.EDIT_DRAFT);
   const canExecute = can(PERM.EXECUTE_TRADE);
 
@@ -374,10 +374,10 @@ export default function TradeEngine({ workbenchId }) {
 
   // Fetch trades whenever workbench changes
   const fetchTrades = useCallback(async () => {
-    if (!selectedWorkbenchId) return;
+    if (!selectedUserId) return;
     try {
       setLoading(true);
-      const url = `/api/trades/workbench/${selectedWorkbenchId}`;
+      const url = `/api/trades/user/${selectedUserId}`;
       const res = await apiFetch(url);
       if (!res.ok) throw new Error("Failed to fetch trades");
       const data = await res.json();
@@ -388,50 +388,50 @@ export default function TradeEngine({ workbenchId }) {
     } finally {
       setLoading(false);
     }
-  }, [selectedWorkbenchId]);
+  }, [selectedUserId]);
 
   // Fetch parties for workbench
   const fetchParties = useCallback(async () => {
-    if (!selectedWorkbenchId) return;
+    if (!selectedUserId) return;
     try {
       const { data, error } = await supabase
         .from("parties")
         .select("*")
-        .eq("workbench_id", selectedWorkbenchId)
+        .eq("user_id", selectedUserId)
         .order("name");
       if (error) throw error;
       setParties(data || []);
     } catch (err) {
       console.error("Error fetching parties:", err);
     }
-  }, [selectedWorkbenchId]);
+  }, [selectedUserId]);
 
   // Fetch all entities for linkage checks
   const fetchAllEntities = useCallback(async () => {
-    if (!selectedWorkbenchId) return;
+    if (!selectedUserId) return;
     try {
       const { data, error } = await supabase
         .from("entities")
         .select("*, parties!inner(*)")
-        .eq("parties.workbench_id", selectedWorkbenchId);
+        .eq("parties.user_id", selectedUserId);
       if (error) throw error;
       setAllEntities(data || []);
     } catch (err) {
       console.error("Error fetching all entities:", err);
     }
-  }, [selectedWorkbenchId]);
+  }, [selectedUserId]);
 
   const fetchLabels = useCallback(async () => {
-    if (!selectedWorkbenchId) return;
+    if (!selectedUserId) return;
     try {
-      const res = await apiFetch(`/api/ledger/labels/${selectedWorkbenchId}`);
+      const res = await apiFetch(`/api/ledger/labels/${selectedUserId}`);
       if (!res.ok) throw new Error("Failed to fetch labels");
       const data = await res.json();
       setLabels(data || []);
     } catch (err) {
       console.error("Error fetching labels:", err);
     }
-  }, [selectedWorkbenchId]);
+  }, [selectedUserId]);
 
   useEffect(() => {
     if (linkBeneficiaryData) {
@@ -455,7 +455,7 @@ export default function TradeEngine({ workbenchId }) {
         const { data: newParty, error: partyErr } = await supabase
           .from("parties")
           .insert({
-            workbench_id: selectedWorkbenchId,
+            user_id: selectedUserId,
             name: newPartyName,
             category: "corporation",
             is_self: false
@@ -512,17 +512,17 @@ export default function TradeEngine({ workbenchId }) {
     fetchParties();
     fetchLabels();
     fetchAllEntities();
-  }, [selectedWorkbenchId, fetchTrades, fetchParties, fetchLabels, fetchAllEntities]);
+  }, [selectedUserId, fetchTrades, fetchParties, fetchLabels, fetchAllEntities]);
 
   useEffect(() => {
     const handleTabChange = async (e) => {
       const docId = e.detail?.documentId;
-      if (!docId || !selectedWorkbenchId) return;
+      if (!docId || !selectedUserId) return;
       
       try {
         setLoading(true);
         // Fetch all trades for the workbench to find the one matching documentId
-        const url = `/api/trades/workbench/${selectedWorkbenchId}`;
+        const url = `/api/trades/user/${selectedUserId}`;
         const res = await apiFetch(url);
         if (!res.ok) throw new Error("Failed to fetch trades");
         const data = await res.json();
@@ -559,7 +559,7 @@ export default function TradeEngine({ workbenchId }) {
 
     window.addEventListener('change-workbench-tab', handleTabChange);
     return () => window.removeEventListener('change-workbench-tab', handleTabChange);
-  }, [selectedWorkbenchId, fetchTrades]);
+  }, [selectedUserId, fetchTrades]);
 
   // Fetch entities for a party
   const fetchEntities = async (partyId, isSelf) => {
@@ -584,8 +584,8 @@ export default function TradeEngine({ workbenchId }) {
 
   // Cache workbench selection
   const handleWorkbenchChange = (wbId) => {
-    setSelectedWorkbenchId(wbId);
-    localStorage.setItem("last_active_workbench_id", wbId);
+    setSelectedUserId(wbId);
+    localStorage.setItem("last_active_user_id", wbId);
     setSelectedTrade(null);
   };
 
@@ -830,7 +830,7 @@ export default function TradeEngine({ workbenchId }) {
       const { data, error } = await supabase
         .from("parties")
         .insert({
-          workbench_id: selectedWorkbenchId,
+          user_id: selectedUserId,
           name: newPartyName,
           category: newPartyCategory,
           is_self: false
@@ -943,7 +943,7 @@ export default function TradeEngine({ workbenchId }) {
           </div>
         </div>
 
-        {/* Workbench title placeholder (hidden since sidebar has it) */}
+        {/* User title placeholder (hidden since sidebar has it) */}
         <div className="flex items-center space-x-3">
         </div>
       </div>

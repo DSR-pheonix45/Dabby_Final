@@ -9,8 +9,6 @@ import ChatArea from "./ChatArea/ChatArea";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
 import Settings from "./Settings/Settings";
-import Workbenches from "../pages/Workbenches";
-import WorkbenchDetail from "../pages/WorkbenchDetail";
 import OnboardingTour from "./Onboarding/OnboardingTour";
 import FeedbackModal from "./ChatArea/FeedbackModal";
 import { backendService } from "../services/backendService";
@@ -32,8 +30,6 @@ export default function MainApp() {
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [currentContext, setCurrentContext] = useState("");
-  const [activeWorkbench, setActiveWorkbench] = useState(null);
-  const [availableWorkbenches, setAvailableWorkbenches] = useState([]);
   const [isInConversation, setIsInConversation] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showTour, setShowTour] = useState(false);
@@ -311,12 +307,11 @@ Based on the Profit & Loss statement provided, the business shows stable operati
     };
 
     const handleStartAIChat = (event) => {
-      const { query, workbenchId } = event.detail;
+      const { query } = event.detail;
       
       // Small delay to ensure any other UI actions complete
       setTimeout(() => {
         handleSendMessage(query, {
-          workbenchId: workbenchId,
           web: false,
           uploadedFiles: [],
           hasContext: true
@@ -360,18 +355,14 @@ Based on the Profit & Loss statement provided, the business shows stable operati
         (firstUserMsg.content.length > 50 ? "..." : "")
         : "Untitled Chat";
 
-      // Check for Workbench context
-      const currentPath = window.location.pathname;
-      const workbenchMatch = currentPath.match(/\/workbenches\/([^/]+)/);
-      const workbenchId = activeWorkbench?.active ? activeWorkbench.id : (workbenchMatch ? workbenchMatch[1] : null);
+      // Removed Workbench context check
 
       let sessionIdToUse = currentSessionId;
       let isNewSession = false;
 
       // 1. Create session if it doesn't exist
       if (!sessionIdToUse) {
-        console.log("[DEBUG] Persistence: Creating new chat session...");
-        const session = await backendService.createChatSession(title, workbenchId);
+        const session = await backendService.createChatSession(title);
         if (session && session.id) {
           sessionIdToUse = session.id;
           setCurrentSessionId(sessionIdToUse);
@@ -398,8 +389,7 @@ Based on the Profit & Loss statement provided, the business shows stable operati
         sessionIdToUse,
         "user",
         lastUserMessage.content,
-        userMetadata,
-        workbenchId
+        userMetadata
       );
 
       // 3. Save Assistant Message
@@ -414,8 +404,7 @@ Based on the Profit & Loss statement provided, the business shows stable operati
         sessionIdToUse,
         "assistant",
         lastAssistantMessage.content,
-        aiMetadata,
-        workbenchId
+        aiMetadata
       );
 
       console.log("[DEBUG] Full exchange persisted successfully to session:", sessionIdToUse);
@@ -432,92 +421,9 @@ Based on the Profit & Loss statement provided, the business shows stable operati
     }
   };
 
-  // Fetch all available workbenches for context selection
-  useEffect(() => {
-    const fetchAllWorkbenches = async () => {
-      if (authLoading || !user?.id) return;
+  // Fetch workbenches code removed
 
-      console.log("[DEBUG] MainApp: Fetching workbenches for user", user.id);
-      try {
-        // 1. Fetch the user's workbench memberships first
-        const { data: memberships, error: memError } = await supabase
-          .from("workbench_members")
-          .select("workbench_id")
-          .eq("user_id", user.id);
-
-        if (memError) throw memError;
-        
-        if (!memberships || memberships.length === 0) {
-          setAvailableWorkbenches([]);
-          return;
-        }
-
-        const workbenchIds = memberships.map(m => m.workbench_id);
-
-        // 2. Fetch the actual workbench details
-        const { data, error } = await supabase
-          .from("workbenches")
-          .select("id, name")
-          .in("id", workbenchIds)
-          .order("created_at", { ascending: false });
-
-        if (error) {
-          console.error("[DEBUG] MainApp: Error fetching workbenches:", error);
-        } else {
-          console.log("[DEBUG] MainApp: Workbenches response:", data);
-          setAvailableWorkbenches(data || []);
-        }
-      } catch (err) {
-        console.error("[DEBUG] MainApp: Unexpected error fetching workbenches:", err);
-      }
-    };
-    fetchAllWorkbenches();
-  }, [user?.id, authLoading]);
-
-  // Handle workbench context toggle from ChatInput
-  const handleToggleWorkbenchContext = (workbench = null) => {
-    if (workbench) {
-      // If a specific workbench is provided, set it as active
-      setActiveWorkbench({ ...workbench, active: true });
-    } else if (activeWorkbench) {
-      // Otherwise toggle the current active workbench
-      setActiveWorkbench(prev => ({ ...prev, active: !prev.active }));
-    }
-  };
-
-  // Sync activeWorkbench when navigating to/from workbench detail
-  useEffect(() => {
-    const workbenchMatch = location.pathname.match(/\/workbenches\/([^/]+)/);
-    if (workbenchMatch) {
-      const id = workbenchMatch[1];
-      // Fetch workbench details if we don't have them or it's a different workbench
-      if (!activeWorkbench || activeWorkbench.id !== id) {
-        const fetchWorkbench = async () => {
-          try {
-            const { data, error } = await supabase
-              .from("workbenches")
-              .select("id, name")
-              .eq("id", id)
-              .single();
-            if (!error && data) {
-              setActiveWorkbench({ ...data, active: true });
-              // Initialize Self party for this workbench
-              apiFetch(`/api/ops/parties/initialize-self/${id}`, { method: "POST" })
-                .catch(err => console.error("Error initializing self party:", err));
-            }
-          } catch (err) {
-            console.error("Error fetching workbench for chat context:", err);
-          }
-        };
-        fetchWorkbench();
-      }
-    } else {
-      // If we leave the workbench detail page, we might want to keep the context active 
-      // but allow the user to toggle it off. For now, let's keep it if it was active.
-      // Or we can clear it if you want context to be page-specific.
-      // setActiveWorkbench(null); 
-    }
-  }, [location.pathname, activeWorkbench]);
+  // handleToggleWorkbenchContext and useEffect removed
 
   const handleSendMessage = async (
     message,
@@ -553,9 +459,7 @@ Based on the Profit & Loss statement provided, the business shows stable operati
     }
 
     // Plan gate (Module 12): meter this AI consultant message for the user.
-    // Fails open on infra errors; hard-blocks only when the daily limit is reached.
-    const chatWorkbenchId = options.workbenchId || activeWorkbench?.id || null;
-    const meter = await consumeAiMessage(chatWorkbenchId);
+    const meter = await consumeAiMessage(null);
     if (meter && meter.allowed === false) {
       toast.error(
         `Daily AI limit reached (${meter.limit} messages on the ${meter.plan || "current"} plan). Upgrade to keep chatting.`
@@ -603,27 +507,23 @@ Based on the Profit & Loss statement provided, the business shows stable operati
     try {
       const { callLLMWithFallback } = await import("../services/llmService.js");
 
-      // Build real-time business context for workbench if active
-      let workbenchContextStr = "";
-      if (options.workbenchId) {
-        try {
-          console.log(`[DEBUG] Building real-time intelligence for workbench: ${options.workbenchId}`);
-          const intel = await contextService.getWorkbenchIntelligence(options.workbenchId);
-          workbenchContextStr = contextService.formatForLLM(intel);
-          console.log("[DEBUG] Real-time context built successfully.");
-        } catch (ctxError) {
-          console.error("[DEBUG] Error building workbench intelligence:", ctxError);
-          workbenchContextStr = "Error: Failed to fetch real-time workbench data.";
-        }
+      // Build real-time business context for user
+      let userContextStr = "";
+      try {
+        console.log(`[DEBUG] Building real-time intelligence for user`);
+        const intel = await contextService.getUserIntelligence();
+        userContextStr = contextService.formatForLLM(intel);
+      } catch (ctxError) {
+        console.error("[DEBUG] Error building user intelligence:", ctxError);
+        userContextStr = "Error: Failed to fetch real-time data.";
       }
 
       const llmResponse = await callLLMWithFallback({
         query: llmQuery, 
-        context: workbenchContextStr + (currentContext ? `\n\n=== ADDITIONAL HISTORY CONTEXT ===\n${currentContext}` : ""),
+        context: userContextStr + (currentContext ? `\n\n=== ADDITIONAL HISTORY CONTEXT ===\n${currentContext}` : ""),
         web_search: options.web || false,
         uploaded_files: options.uploadedFiles || [], 
-        history: messages,
-        workbench_id: options.workbenchId
+        history: messages
       });
 
       if (llmResponse.error) {
@@ -766,9 +666,6 @@ Based on the Profit & Loss statement provided, the business shows stable operati
                     chatContainerRef={chatContainerRef}
                     onSendMessage={handleSendMessage}
                     uploadedFiles={uploadedFiles}
-                    workbenchContext={activeWorkbench}
-                    availableWorkbenches={availableWorkbenches}
-                    onToggleWorkbenchContext={handleToggleWorkbenchContext}
                     webSearchEnabled={webSearchEnabled}
                     onWebSearchToggle={setWebSearchEnabled}
                   />
@@ -777,7 +674,6 @@ Based on the Profit & Loss statement provided, the business shows stable operati
                     <WelcomeSection />
                     <ActionCards
                       onQuestionCardClick={handleQuestionCardClick}
-                      activeWorkbench={activeWorkbench}
                     />
                   </>
                 )
@@ -790,14 +686,11 @@ Based on the Profit & Loss statement provided, the business shows stable operati
                   <WelcomeSection />
                   <ActionCards
                     onQuestionCardClick={handleQuestionCardClick}
-                    activeWorkbench={activeWorkbench}
                   />
                 </>
               }
             />
             <Route path="settings" element={<Settings />} />
-            <Route path="workbenches" element={<Workbenches />} />
-            <Route path="workbenches/:id" element={<WorkbenchDetail />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>
@@ -810,9 +703,6 @@ Based on the Profit & Loss statement provided, the business shows stable operati
               onSendMessage={handleSendMessage}
               webSearchEnabled={webSearchEnabled}
               uploadedFiles={uploadedFiles}
-              workbenchContext={activeWorkbench}
-              availableWorkbenches={availableWorkbenches}
-              onToggleWorkbenchContext={handleToggleWorkbenchContext}
               onWebSearchToggle={setWebSearchEnabled}
             />
           )}

@@ -19,6 +19,6 @@ def inspect_table(table_name):
 inspect_table("parties")
 inspect_table("entities")
 inspect_table("transactions")
-inspect_table("workbench_documents")
-inspect_table("workbenches")
+inspect_table("user_documents")
+inspect_table("users")
 inspect_table("workbench_records")

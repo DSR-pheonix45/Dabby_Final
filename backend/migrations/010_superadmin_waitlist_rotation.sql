@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS public.page_views (
 -- 6. Create payments table to log/monitor subscriptions
 CREATE TABLE IF NOT EXISTS public.payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    workbench_id UUID REFERENCES workbenches(id) ON DELETE SET NULL,
+    user_id UUID REFERENCES workbenches(id) ON DELETE SET NULL,
     user_id UUID,
     email TEXT,
     plan TEXT NOT NULL,
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS public.payments (
 -- 7. Create plan_history table to track upgrades/downgrades
 CREATE TABLE IF NOT EXISTS public.plan_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    workbench_id UUID REFERENCES workbenches(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES workbenches(id) ON DELETE CASCADE,
     previous_plan TEXT,
     new_plan TEXT NOT NULL,
     changed_by UUID, -- user who triggered change

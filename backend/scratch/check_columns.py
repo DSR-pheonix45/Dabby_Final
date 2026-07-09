@@ -4,7 +4,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from supabase_client import supabase
 
 def check_and_add_column():
-    table_name = "workbench_documents"
+    table_name = "user_documents"
     column_name = "transaction_id"
     
     print(f"Checking if column '{column_name}' exists in '{table_name}'...")

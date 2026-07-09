@@ -33,16 +33,12 @@ const ChatInput = forwardRef(function ChatInput(
     initialMessage = "",
     webSearchEnabled = false,
     uploadedFiles = [],
-    workbenchContext = null,
-    availableWorkbenches = [],
-    onToggleWorkbenchContext = null,
     onWebSearchToggle = null,
   },
   ref
 ) {
   const [message, setMessage] = useState(initialMessage);
   const [isFocused, setIsFocused] = useState(false);
-  const [showWorkbenchSelector, setShowWorkbenchSelector] = useState(false);
   const [webEnabled, setWebEnabled] = useState(webSearchEnabled);
   const [isLoading, setIsLoading] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState([]);
@@ -151,7 +147,7 @@ const ChatInput = forwardRef(function ChatInput(
 
   const sendMessage = async (customMessage = null) => {
     const messageToSend = customMessage !== null ? customMessage : message;
-    if ((messageToSend.trim() || attachedFiles.length > 0 || workbenchContext?.active) && !disabled && !isLoading) {
+    if ((messageToSend.trim() || attachedFiles.length > 0) && !disabled && !isLoading) {
       setIsLoading(true);
 
       try {
@@ -161,12 +157,9 @@ const ChatInput = forwardRef(function ChatInput(
             {
               web: webEnabled,
               uploadedFiles: attachedFiles,
-              workbenchId: workbenchContext?.active ? workbenchContext.id : null,
-              response: null,
               hasContext:
                 webEnabled ||
-                attachedFiles.length > 0 ||
-                workbenchContext?.active,
+                attachedFiles.length > 0,
             },
             false
           );
@@ -186,7 +179,7 @@ const ChatInput = forwardRef(function ChatInput(
   };
 
   const canRunInference = () => {
-    return webEnabled || attachedFiles.length > 0 || workbenchContext?.active;
+    return webEnabled || attachedFiles.length > 0;
   };
 
   useImperativeHandle(ref, () => ({
@@ -287,82 +280,11 @@ const ChatInput = forwardRef(function ChatInput(
               </button>
             </div>
 
-            {/* Workbench Context Toggle */}
-            <div className="flex items-center gap-1 px-1 relative">
-              <button
-                type="button"
-                onClick={() => {
-                  if (workbenchContext && !showWorkbenchSelector) {
-                    // Toggle current if one exists
-                    onToggleWorkbenchContext();
-                  } else {
-                    // Otherwise show selector (even if empty, to show the "No workbenches" message)
-                    setShowWorkbenchSelector(!showWorkbenchSelector);
-                  }
-                }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  if (availableWorkbenches.length > 0) {
-                    setShowWorkbenchSelector(!showWorkbenchSelector);
-                  }
-                }}
-                disabled={disabled || isLoading}
-                title={
-                  workbenchContext?.active
-                    ? `Using Context: ${workbenchContext.name} (Click to toggle, Right-click to change)`
-                    : availableWorkbenches.length > 0
-                      ? "Attach Workbench Context (Right-click for options)"
-                      : "Attach Workbench Context"
-                }
-                className={`group/btn relative p-2 sm:p-2.5 rounded-lg sm:rounded-xl transition-all duration-200 ${workbenchContext?.active
-                  ? "text-teal-400 bg-teal-500/10 shadow-[0_0_10px_rgba(20,184,166,0.1)]"
-                  : "text-gray-400 hover:text-teal-400 hover:bg-teal-500/10"
-                  }`}
-              >
-                <BsBriefcase className="text-base sm:text-lg" />
-              </button>
 
-              {/* Workbench Selector Dropdown */}
-              {showWorkbenchSelector && (
-                <div className="absolute bottom-full mb-2 left-0 w-64 bg-[#161B22] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-slide-up">
-                  <div className="px-3 py-2 border-b border-white/5 bg-white/5 flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Select Workbench</span>
-                    <button onClick={() => setShowWorkbenchSelector(false)} className="text-gray-500 hover:text-white">
-                      <BsX />
-                    </button>
-                  </div>
-                  <div className="max-h-48 overflow-y-auto custom-scrollbar">
-                    {availableWorkbenches.length > 0 ? (
-                      availableWorkbenches.map((wb) => (
-                        <button
-                          key={wb.id}
-                          onClick={() => {
-                            onToggleWorkbenchContext(wb);
-                            setShowWorkbenchSelector(false);
-                          }}
-                          className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-white/5 transition-all border-b border-white/5 last:border-0 ${workbenchContext?.id === wb.id ? "bg-teal-500/5 text-teal-400" : "text-gray-300"
-                            }`}
-                        >
-                          <BsBriefcase className="text-sm flex-shrink-0" />
-                          <span className="text-xs truncate font-medium">{wb.name}</span>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="px-4 py-6 text-center">
-                        <BsBriefcase className="text-gray-600 text-2xl mx-auto mb-2 opacity-20" />
-                        <p className="text-xs text-gray-500">No workbenches found.</p>
-                        <p className="text-[10px] text-gray-600 mt-1">Create one in the sidebar first.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
 
             {/* Main Text Input Area */}
             <div className="flex-1 relative py-2.5 sm:py-3 px-1 sm:px-2 min-w-0">
-              {/* Rotating Placeholder */}
-              {!message && !isFocused && (attachedFiles.length === 0 && !workbenchContext?.active) && (
+              {!message && !isFocused && attachedFiles.length === 0 && (
                 <span className="absolute left-1 sm:left-2 top-1/2 -translate-y-1/2 text-gray-500/50 pointer-events-none text-sm sm:text-[15px] animate-fade-in truncate max-w-[calc(100%-1rem)]">
                   {currentPlaceholder}
                 </span>
@@ -375,7 +297,7 @@ const ChatInput = forwardRef(function ChatInput(
                 onKeyDown={handleKeyDown}
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
-                placeholder={isFocused || attachedFiles.length > 0 || workbenchContext?.active ? placeholder : ""} // Default placeholder when focused
+                placeholder={isFocused || attachedFiles.length > 0 ? placeholder : ""} // Default placeholder when focused
                 disabled={disabled || isLoading}
                 className="w-full bg-transparent text-gray-100 placeholder-transparent resize-none focus:outline-none text-sm sm:text-[15px] leading-relaxed max-h-[80px] sm:max-h-[120px] overflow-y-auto"
                 style={{ scrollbarWidth: "none" }}
@@ -398,8 +320,8 @@ const ChatInput = forwardRef(function ChatInput(
 
               <button
                 type="submit"
-                disabled={(!message.trim() && attachedFiles.length === 0 && !workbenchContext?.active) || disabled || isLoading}
-                className={`p-2.5 sm:p-3 rounded-lg sm:rounded-xl transition-all duration-300 flex items-center justify-center min-w-[40px] sm:min-w-[44px] ${(message.trim() || attachedFiles.length > 0 || workbenchContext?.active) && !disabled && !isLoading
+                disabled={(!message.trim() && attachedFiles.length === 0) || disabled || isLoading}
+                className={`p-2.5 sm:p-3 rounded-lg sm:rounded-xl transition-all duration-300 flex items-center justify-center min-w-[40px] sm:min-w-[44px] ${(message.trim() || attachedFiles.length > 0) && !disabled && !isLoading
                   ? "bg-teal-500 text-black hover:bg-teal-400 shadow-[0_0_15px_rgba(20,184,166,0.3)] hover:shadow-[0_0_20px_rgba(20,184,166,0.5)] transform hover:-translate-y-0.5"
                   : "bg-white/5 text-gray-600 cursor-not-allowed"
                   }`}
@@ -412,33 +334,6 @@ const ChatInput = forwardRef(function ChatInput(
               </button>
             </div>
 
-            {/* Workbench Context Preview */}
-            {workbenchContext?.active && (
-              <div className="absolute bottom-full left-0 right-0 sm:right-auto mb-2 sm:mb-4 p-2 bg-[#161B22]/95 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-teal-500/30 shadow-2xl flex flex-col gap-2 sm:min-w-[250px] animate-slide-up z-30 mx-2 sm:mx-0">
-                <div className="px-2 py-1 flex justify-between items-center border-b border-white/5 mb-1">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Workbench Context</span>
-                  <span className="text-[10px] text-teal-400">Active</span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-lg bg-teal-500/5 border border-teal-500/10 group/workbench">
-                  <div className="flex items-center gap-2 sm:gap-3 overflow-hidden min-w-0">
-                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-teal-500/10 flex items-center justify-center text-teal-400 flex-shrink-0">
-                      <BsBriefcase className="text-xs sm:text-sm" />
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-xs text-gray-200 truncate font-medium">{workbenchContext.name}</span>
-                      <span className="text-[10px] text-gray-500 uppercase tracking-tighter">Financial Data Included</span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={onToggleWorkbenchContext}
-                    className="text-gray-500 hover:text-red-400 p-1 flex-shrink-0"
-                  >
-                    <BsX className="text-lg" />
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* File Preview Cards (Absolute above) - Mobile optimized */}
             {attachedFiles.length > 0 && (

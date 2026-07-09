@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useNavigate, useLocation } from "react-router-dom";
 import Maintenance from "./landing-page/pages/Maintenance";
 import { AuthProvider } from "./context/AuthContext";
+import { WorkbenchProvider } from "./context/WorkbenchContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import ScrollToTop from "./components/ScrollToTop";
 import ProtectedRoute from "./Auth/ProtectedRoute";
@@ -55,9 +56,7 @@ const OAuthCallback = lazy(() => import("./Auth/OAuthCallback"));
 const MainApp = lazy(() => import("./components/MainApp"));
 const Settings = lazy(() => import("./components/Settings/Settings"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
-const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
 const DataIngestionPage = lazy(() => import("./pages/DataIngestion"));
-const SharedSnapshot = lazy(() => import("./pages/SharedSnapshot"));
 const RulesetEditor = lazy(() => import("./pages/RulesetEditor"));
 
 
@@ -124,8 +123,9 @@ function App() {
     <Router>
       <ErrorBoundary>
         <AuthProvider>
-          <ThemeProvider>
-            <ScrollToTop />
+          <WorkbenchProvider>
+            <ThemeProvider>
+              <ScrollToTop />
             <HashRedirect />
             <PageViewTracker />
             <Suspense fallback={<PageLoader />}>
@@ -180,8 +180,6 @@ function App() {
                 </Route>
                 <Route path="/oauth/callback" element={<OAuthCallback />} />
                 <Route path="/auth/callback" element={<OAuthCallback />} />
-                <Route path="/invite/:token" element={<AcceptInvite />} />
-                <Route path="/share/:shareId" element={<SharedSnapshot />} />
                 <Route path="/ruleset/editor/:id" element={
                   <ProtectedRoute>
                     <RulesetEditor />
@@ -211,7 +209,8 @@ function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Suspense>
-          </ThemeProvider>
+            </ThemeProvider>
+          </WorkbenchProvider>
         </AuthProvider>
       </ErrorBoundary>
     </Router>

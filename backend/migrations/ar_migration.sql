@@ -4,9 +4,9 @@ ALTER TABLE items ADD COLUMN IF NOT EXISTS hsn_code TEXT;
 -- Create Invoices table
 CREATE TABLE IF NOT EXISTS invoices (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    workbench_id UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
     party_id UUID NOT NULL REFERENCES parties(id),
-    doc_id UUID REFERENCES workbench_documents(id) ON DELETE SET NULL,
+    doc_id UUID REFERENCES user_documents(id) ON DELETE SET NULL,
     invoice_number TEXT NOT NULL,
     amount DECIMAL(15, 2) NOT NULL,
     balance_due DECIMAL(15, 2) NOT NULL,
@@ -27,6 +27,6 @@ CREATE TABLE IF NOT EXISTS invoices (
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL;
 
 -- Indices
-CREATE INDEX IF NOT EXISTS idx_invoices_workbench ON invoices(workbench_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_workbench ON invoices(user_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_party ON invoices(party_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_invoice ON transactions(invoice_id);

@@ -31,7 +31,7 @@ const OWNER = [
 ];
 const READ_ONLY = [PERM.VIEW, PERM.VIEW_ALL_DOCS];
 
-// Role names mirror what workbench_members actually stores (owner, founder,
+// Role names mirror what user_members actually stores (owner, founder,
 // editor, viewer) plus the spec's names as aliases. Keep in sync with backend/auth.py.
 export const ROLE_PERMISSIONS = {
   owner: OWNER,

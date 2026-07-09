@@ -20,24 +20,24 @@ import { apiFetch } from "../lib/apiClient";
 import { useWorkbenchRole } from "../hooks/useWorkbenchRole";
 import { PERM } from "../lib/permissions";
 
-export default function Rulesets({ workbenchId }) {
+export default function Rulesets({ userId }) {
   const navigate = useNavigate();
   const [rulesets, setRulesets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
   // RBAC (Module 11): only owner/accountant may author rulesets
-  const { can } = useWorkbenchRole(workbenchId);
+  const { can } = useWorkbenchRole(userId);
   const canWrite = can(PERM.WRITE_RULESET);
 
   useEffect(() => {
     fetchRulesets();
-  }, [workbenchId]);
+  }, [userId]);
 
   const fetchRulesets = async () => {
     try {
       setLoading(true);
-      const res = await apiFetch(`/api/rulesets/workbench/${workbenchId}`);
+      const res = await apiFetch(`/api/rulesets/user/${userId}`);
       if (!res.ok) throw new Error("Failed to fetch rulesets");
       const data = await res.json();
       setRulesets(data || []);
@@ -52,7 +52,7 @@ export default function Rulesets({ workbenchId }) {
   const handleCreateNew = async () => {
     try {
       const payload = {
-        workbench_id: workbenchId,
+        user_id: userId,
         name: "Untitled Ruleset",
         description: "Specify rules for document event mappings",
         document_type: "sales_invoice",
@@ -94,7 +94,7 @@ export default function Rulesets({ workbenchId }) {
     try {
       toast.loading("Duplicating ruleset...", { id: "ruleset-dup" });
       const payload = {
-        workbench_id: workbenchId,
+        user_id: userId,
         name: `${r.name} (Copy)`,
         description: r.description,
         document_type: r.document_type,

@@ -57,7 +57,7 @@ export default function InvoiceGenerator() {
     invoiceNumber: "INV-001",
     date: workbenchData.defaultDate || new Date().toISOString().split('T')[0],
     dueDate: "",
-    senderName: workbenchData.workbenchName || "", // Pre-fill from Workbench Name
+    senderName: workbenchData.userName || "", // Pre-fill from Workbench Name
     senderEmail: "",
     senderAddress: "",
     senderGstin: "",
@@ -570,8 +570,8 @@ export default function InvoiceGenerator() {
       }`}>
       <div className="max-w-4xl mx-auto">
         {workbenchData.fromWorkbench ? (
-          <Link to={`/dashboard/workbench/${workbenchData.workbenchId}`} className="flex items-center gap-2 text-[#81E6D9] mb-8 hover:underline">
-            <ArrowLeft className="w-4 h-4" /> Back to Workbench: {workbenchData.workbenchName}
+          <Link to={`/dashboard/user/${workbenchData.userId}`} className="flex items-center gap-2 text-[#81E6D9] mb-8 hover:underline">
+            <ArrowLeft className="w-4 h-4" /> Back to Workbench: {workbenchData.userName}
           </Link>
         ) : (
           <Link to="/templates" className="flex items-center gap-2 text-[#81E6D9] mb-8 hover:underline">

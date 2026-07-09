@@ -7,9 +7,9 @@ class LedgerService:
     def __init__(self, supabase: Client):
         self.supabase = supabase
 
-    # --- Label System (Workbench Accounts) ---
+    # --- Label System (User Accounts) ---
     
-    async def generate_unique_account_code(self, workbench_id: str, master_account_code: str, sub_account_code: str) -> str:
+    async def generate_unique_account_code(self, user_id: str, master_account_code: str, sub_account_code: str) -> str:
         """
         Generates a unique 4-character account code for a workbench.
         For example: Master Code 'A', Sub Code '01'. Base is 'A01'.
@@ -18,9 +18,9 @@ class LedgerService:
         if 'A001' exists, we can use a suffix or increment.
         """
         base_code = f"{master_account_code}{sub_account_code}"
-        res = self.supabase.table("workbench_accounts")\
+        res = self.supabase.table("user_accounts")\
             .select("account_code")\
-            .eq("workbench_id", workbench_id)\
+            .eq("user_id", user_id)\
             .like("account_code", f"{master_account_code}%")\
             .execute()
         
@@ -68,11 +68,11 @@ class LedgerService:
         sub_code = sub_res.data["sub_account_code"]
         
         # 3. Generate unique account code
-        account_code = await self.generate_unique_account_code(label_data["workbench_id"], master_code, sub_code)
+        account_code = await self.generate_unique_account_code(label_data["user_id"], master_code, sub_code)
         
         # 4. Insert workbench account
         insert_payload = {
-            "workbench_id": label_data["workbench_id"],
+            "user_id": label_data["user_id"],
             "master_account_id": master_id,
             "master_sub_account_id": sub_id,
             "account_code": account_code,
@@ -83,19 +83,19 @@ class LedgerService:
             "is_active": True
         }
         
-        response = self.supabase.table("workbench_accounts").insert(insert_payload).execute()
+        response = self.supabase.table("user_accounts").insert(insert_payload).execute()
         return response.data[0]
 
-    async def get_labels(self, workbench_id: str, include_deleted: bool = False):
+    async def get_labels(self, user_id: str, include_deleted: bool = False):
         """
         Fetches all workbench accounts (labels) for a workbench,
         joining master_accounts and master_sub_accounts to provide
         type and sub_account for frontend compatibility.
         """
         try:
-            query = self.supabase.table("workbench_accounts") \
+            query = self.supabase.table("user_accounts") \
                 .select("*, master_accounts(account_code, account_name), master_sub_accounts(sub_account_code, sub_account_name)") \
-                .eq("workbench_id", workbench_id)
+                .eq("user_id", user_id)
                 
             if not include_deleted:
                 query = query.eq("is_active", True)
@@ -121,7 +121,7 @@ class LedgerService:
                 
                 mapped_labels.append({
                     "id": item["id"],
-                    "workbench_id": item["workbench_id"],
+                    "user_id": item["user_id"],
                     "master_account_id": item["master_account_id"],
                     "master_sub_account_id": item["master_sub_account_id"],
                     "account_code": item["account_code"],
@@ -148,7 +148,7 @@ class LedgerService:
         """
         Updates an existing workbench account.
         """
-        response = self.supabase.table("workbench_accounts").update(update_data).eq("id", label_id).execute()
+        response = self.supabase.table("user_accounts").update(update_data).eq("id", label_id).execute()
         return response.data[0]
 
     async def delete_label(self, label_id: str, soft_delete: bool = True):
@@ -156,17 +156,17 @@ class LedgerService:
         Deletes a workbench account (soft delete by default).
         """
         if soft_delete:
-            response = self.supabase.table("workbench_accounts").update({"is_active": False}).eq("id", label_id).execute()
+            response = self.supabase.table("user_accounts").update({"is_active": False}).eq("id", label_id).execute()
         else:
-            response = self.supabase.table("workbench_accounts").delete().eq("id", label_id).execute()
+            response = self.supabase.table("user_accounts").delete().eq("id", label_id).execute()
         return response.data
 
-    async def seed_basic_labels(self, workbench_id: str, custom_labels: Optional[List] = None):
+    async def seed_basic_labels(self, user_id: str, custom_labels: Optional[List] = None):
         """
         Pre-seeds basic workbench accounts for a new workbench.
         """
         try:
-            wb_res = self.supabase.table("workbenches").select("*").eq("id", workbench_id).maybe_single().execute()
+            wb_res = self.supabase.table("users").select("*").eq("id", user_id).maybe_single().execute()
             if not wb_res.data:
                 raise ValueError("Workbench not found")
             wb = wb_res.data
@@ -195,7 +195,7 @@ class LedgerService:
                     subs_by_master[m_id].append(sub)
                 
                 # Fetch existing account codes for this workbench to prevent collisions
-                existing_res = self.supabase.table("workbench_accounts").select("account_code").eq("workbench_id", workbench_id).execute()
+                existing_res = self.supabase.table("user_accounts").select("account_code").eq("user_id", user_id).execute()
                 existing_codes = {row["account_code"] for row in existing_res.data}
                 used_codes_in_batch = set()
                 
@@ -224,7 +224,7 @@ class LedgerService:
                         if candidate not in existing_codes and candidate not in used_codes_in_batch:
                             return candidate
 
-                workbench_accounts_to_insert = []
+                user_accounts_to_insert = []
                 for item in custom_labels:
                     p_type = item.get("type", "expense").lower()
                     pillar_name = name_map.get(p_type, "EXPENSES")
@@ -245,8 +245,8 @@ class LedgerService:
                     account_code = get_unique_code(m_acc['account_code'], m_sub['sub_account_code'])
                     used_codes_in_batch.add(account_code)
                     
-                    workbench_accounts_to_insert.append({
-                        "workbench_id": workbench_id,
+                    user_accounts_to_insert.append({
+                        "user_id": user_id,
                         "master_account_id": m_acc["id"],
                         "master_sub_account_id": m_sub["id"],
                         "account_code": account_code,
@@ -256,15 +256,15 @@ class LedgerService:
                         "is_active": True
                     })
                     
-                if workbench_accounts_to_insert:
-                    self.supabase.table("workbench_accounts").insert(workbench_accounts_to_insert).execute()
-                return {"status": "success", "message": f"Seeded {len(workbench_accounts_to_insert)} custom accounts successfully"}
+                if user_accounts_to_insert:
+                    self.supabase.table("user_accounts").insert(user_accounts_to_insert).execute()
+                return {"status": "success", "message": f"Seeded {len(user_accounts_to_insert)} custom accounts successfully"}
             
             # Seeding default template
             from services.coa_seeder import seed_coa
             res = seed_coa(
                 self.supabase, 
-                workbench_id, 
+                user_id, 
                 wb.get("business_type") or "services", 
                 "small", 
                 wb.get("industry") or "others"
@@ -278,7 +278,7 @@ class LedgerService:
 
     # --- Transaction Engine ---
 
-    async def record_transaction(self, workbench_id: str, from_label_id: str, to_label_id: str, amount: float, description: str, transaction_date: Optional[date] = None, 
+    async def record_transaction(self, user_id: str, from_label_id: str, to_label_id: str, amount: float, description: str, transaction_date: Optional[date] = None, 
                                  source_party_id: Optional[str] = None, source_entity_id: Optional[str] = None, 
                                  destination_party_id: Optional[str] = None, destination_entity_id: Optional[str] = None,
                                  invoice_id: Optional[str] = None):
@@ -294,14 +294,14 @@ class LedgerService:
             raise ValueError("Amount must be positive. Use labels to indicate direction.")
 
         # Check if both workbench accounts exist and fetch their types
-        accounts_res = self.supabase.table("workbench_accounts").select("id, full_account_name, master_account_id").in_("id", [from_label_id, to_label_id]).eq("workbench_id", workbench_id).execute()
+        accounts_res = self.supabase.table("user_accounts").select("id, full_account_name, master_account_id").in_("id", [from_label_id, to_label_id]).eq("user_id", user_id).execute()
         existing_accounts = {a["id"]: a for a in accounts_res.data}
         
         if from_label_id not in existing_accounts:
-            print(f"[VALIDATION ERROR] Source account ID {from_label_id} not found in workbench {workbench_id}.")
+            print(f"[VALIDATION ERROR] Source account ID {from_label_id} not found in workbench {user_id}.")
             raise ValueError(f"Source account with ID {from_label_id} not found.")
         if to_label_id not in existing_accounts:
-            print(f"[VALIDATION ERROR] Destination account ID {to_label_id} not found in workbench {workbench_id}.")
+            print(f"[VALIDATION ERROR] Destination account ID {to_label_id} not found in workbench {user_id}.")
             raise ValueError(f"Destination account with ID {to_label_id} not found.")
 
         source_account_data = existing_accounts[from_label_id]
@@ -314,7 +314,7 @@ class LedgerService:
             
             # Check for sufficient funds if the source is an Asset account
             if is_asset:
-                current_balances = await self.get_balances(workbench_id)
+                current_balances = await self.get_balances(user_id)
                 source_balance_info = current_balances.get(from_label_id, {"net": 0.0})
                 # Handle cases where get_balances might return a direct float or a dict
                 source_balance = source_balance_info.get("net", 0.0) if isinstance(source_balance_info, dict) else source_balance_info
@@ -325,7 +325,7 @@ class LedgerService:
 
         # 1. Create Transaction Header
         transaction_header = {
-            "workbench_id": workbench_id,
+            "user_id": user_id,
             "description": description,
             "transaction_date": str(transaction_date) if transaction_date else str(date.today()),
             "source_party_id": source_party_id,
@@ -335,7 +335,7 @@ class LedgerService:
             "invoice_id": invoice_id
         }
         
-        print(f"[DEBUG] Recording transaction for workbench: {workbench_id}")
+        print(f"[DEBUG] Recording transaction for workbench: {user_id}")
         print(f"[DEBUG] Header: {transaction_header}")
         
         try:
@@ -380,7 +380,7 @@ class LedgerService:
 
     # --- Analytics & Lists ---
 
-    async def get_balances(self, workbench_id: str):
+    async def get_balances(self, user_id: str):
         """
         Computes SUM(amount) GROUP BY label_id for all labels in a workbench.
         """
@@ -392,7 +392,7 @@ class LedgerService:
         # We'll fetch all entries for the workbench's labels.
         
         # First, get all label IDs for this workbench
-        labels = await self.get_labels(workbench_id)
+        labels = await self.get_labels(user_id)
         label_ids = [l["id"] for l in labels]
         
         if not label_ids:
@@ -439,7 +439,7 @@ class LedgerService:
             
         return balances
 
-    async def get_transactions_list(self, workbench_id: str):
+    async def get_transactions_list(self, user_id: str):
         """
         Returns a list of transactions with their entries and labels.
         Uses in-memory joins to bypass potential PostgREST foreign key relationship failures.
@@ -448,7 +448,7 @@ class LedgerService:
             # 1. Fetch transactions
             tx_res = self.supabase.table("transactions") \
                 .select("*") \
-                .eq("workbench_id", workbench_id) \
+                .eq("user_id", user_id) \
                 .order("transaction_date", desc=True) \
                 .execute()
                 
@@ -465,7 +465,7 @@ class LedgerService:
                 .execute()
                 
             # 3. Fetch all workbench accounts for the workbench to map names
-            labels = await self.get_labels(workbench_id)
+            labels = await self.get_labels(user_id)
             labels_map = {l["id"]: l for l in labels}
             
             # 4. Group entries by transaction_id and attach mapped account info
@@ -478,7 +478,7 @@ class LedgerService:
                 # Map label info to entry
                 lid = entry["label_id"]
                 if lid in labels_map:
-                    entry["workbench_accounts"] = {
+                    entry["user_accounts"] = {
                         "id": lid,
                         "full_account_name": labels_map[lid]["full_account_name"]
                     }
@@ -518,8 +518,8 @@ class LedgerService:
                 amount = 0
                 accounts_involved = []
                 for entry in tx_entries:
-                    if entry.get("workbench_accounts"):
-                        accounts_involved.append(entry["workbench_accounts"]["full_account_name"])
+                    if entry.get("user_accounts"):
+                        accounts_involved.append(entry["user_accounts"]["full_account_name"])
                     if entry["amount"] > 0:
                         amount = entry["amount"]
                         

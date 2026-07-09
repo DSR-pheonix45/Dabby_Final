@@ -16,14 +16,14 @@ async def main():
     # 1. Create a test workbench (or use an existing one)
     # We'll just generate a UUID for simulation if we don't want to create real records, 
     # but for true verification we need real records.
-    # Let's try to create one in 'workbenches' if it exists.
-    workbench_id = str(uuid.uuid4())
-    print(f"Using Workbench ID: {workbench_id}")
+    # Let's try to create one in 'users' if it exists.
+    user_id = str(uuid.uuid4())
+    print(f"Using Workbench ID: {user_id}")
 
     try:
         # Pre-seed labels
         print("\n--- Seeding Labels ---")
-        seeded = await ledger.seed_basic_labels(workbench_id)
+        seeded = await ledger.seed_basic_labels(user_id)
         for s in seeded:
             print(f"Seeded: {s['name']} ({s['type']}) - ID: {s['id']}")
         
@@ -36,7 +36,7 @@ async def main():
         # Case 1: Simple Expense (Bank -> Rent)
         print("\n--- Case 1: Simple Expense (Bank -> Rent) ---")
         tx1 = await ledger.record_transaction(
-            workbench_id=workbench_id,
+            user_id=user_id,
             from_label_id=bank_id,
             to_label_id=rent_id,
             amount=25000,
@@ -50,7 +50,7 @@ async def main():
         # First create a Customer label
         print("\n--- Case 2: Revenue (Customer -> Revenue) ---")
         customer_label = await ledger.create_label({
-            "workbench_id": workbench_id,
+            "user_id": user_id,
             "name": "Customer A",
             "type": "asset",
             "sub_account": "Accounts Receivable"
@@ -58,7 +58,7 @@ async def main():
         customer_id = customer_label['id']
         
         tx2 = await ledger.record_transaction(
-            workbench_id=workbench_id,
+            user_id=user_id,
             to_label_id=revenue_id,
             from_label_id=customer_id,
             amount=50000,
@@ -69,7 +69,7 @@ async def main():
         # Case 3: Multiple Transactions (Balance accumulation)
         print("\n--- Case 3: Multi-transaction ---")
         await ledger.record_transaction(
-            workbench_id=workbench_id,
+            user_id=user_id,
             from_label_id=bank_id,
             to_label_id=rent_id,
             amount=5000,
@@ -78,7 +78,7 @@ async def main():
 
         # Check Balances
         print("\n--- Final Balances ---")
-        balances = await ledger.get_balances(workbench_id)
+        balances = await ledger.get_balances(user_id)
         for lid, data in balances.items():
             print(f"{data['name']}: {data['balance']}")
 

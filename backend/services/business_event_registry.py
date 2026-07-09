@@ -125,12 +125,12 @@ class BusinessEventRegistry:
         # ── 4. Supersede existing open events for this document ─
         await self._supersede_existing_events(
             document_id=draft.get("document_id"),
-            workbench_id=draft["workbench_id"],
+            user_id=draft["user_id"],
         )
 
         # ── 5. Insert Business Event ───────────────────────────
         event_row = {
-            "workbench_id":      draft["workbench_id"],
+            "user_id":      draft["user_id"],
             "analysis_note_id":  draft["analysis_note_id"],
             "trade_draft_id":    trade_draft_id,
             "document_id":       draft.get("document_id"),
@@ -199,7 +199,7 @@ class BusinessEventRegistry:
 
     async def list_for_workbench(
         self,
-        workbench_id: str,
+        user_id: str,
         event_status: Optional[str] = None,
         event_type: Optional[str] = None,
         limit: int = 50,
@@ -208,7 +208,7 @@ class BusinessEventRegistry:
         q = (
             supabase.table("business_events")
                     .select("*")
-                    .eq("workbench_id", workbench_id)
+                    .eq("user_id", user_id)
                     .eq("is_superseded", False)
                     .order("event_date", desc=True, nullsfirst=False)
                     .limit(limit)
@@ -323,7 +323,7 @@ class BusinessEventRegistry:
     # ──────────────────────────────────────────────────────────────────────
 
     async def _supersede_existing_events(
-        self, document_id: Optional[str], workbench_id: str
+        self, document_id: Optional[str], user_id: str
     ) -> None:
         """Mark existing non-superseded events for this document as SUPERSEDED."""
         if not document_id:
@@ -332,7 +332,7 @@ class BusinessEventRegistry:
             supabase.table("business_events")
                     .select("id")
                     .eq("document_id", document_id)
-                    .eq("workbench_id", workbench_id)
+                    .eq("user_id", user_id)
                     .eq("is_superseded", False)
                     .neq("event_status", "CANCELLED")
                     .execute()

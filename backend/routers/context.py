@@ -7,15 +7,15 @@ from supabase_client import supabase
 router = APIRouter()
 ledger_service = LedgerService(supabase)
 
-@router.get("/{workbench_id}")
-async def get_workbench_context(workbench_id: str):
+@router.get("/{user_id}")
+async def get_workbench_context(user_id: str):
     """
     Consolidates all workbench data into a single response for fast initial load.
     """
     try:
         # 1. Fetch Workbench details
         try:
-            workbench_res = supabase.table("workbenches").select("*").eq("id", workbench_id).maybe_single().execute()
+            workbench_res = supabase.table("users").select("*").eq("id", user_id).maybe_single().execute()
             workbench_data = workbench_res.data
         except Exception as wb_err:
             print(f"[WARNING] Failed to fetch workbench details: {wb_err}")
@@ -26,7 +26,7 @@ async def get_workbench_context(workbench_id: str):
         
         # 2. Fetch COA Accounts
         try:
-            coa_res = supabase.table("coa_accounts").select("*").eq("workbench_id", workbench_id).order("display_order").execute()
+            coa_res = supabase.table("coa_accounts").select("*").eq("user_id", user_id).order("display_order").execute()
             coa_data = coa_res.data or []
         except Exception as coa_err:
             print(f"[WARNING] Failed to fetch COA: {coa_err}")
@@ -34,21 +34,21 @@ async def get_workbench_context(workbench_id: str):
         
         # 3. Fetch Ledger Labels
         try:
-            labels = await ledger_service.get_labels(workbench_id)
+            labels = await ledger_service.get_labels(user_id)
         except Exception as labels_err:
             print(f"[WARNING] Failed to fetch labels: {labels_err}")
             labels = []
         
         # 4. Fetch Balances
         try:
-            balances = await ledger_service.get_balances(workbench_id)
+            balances = await ledger_service.get_balances(user_id)
         except Exception as bal_err:
             print(f"[WARNING] Failed to fetch balances: {bal_err}")
             balances = {}
         
         # 5. Fetch Recent Transactions (Top 50)
         try:
-            transactions = await ledger_service.get_transactions_list(workbench_id)
+            transactions = await ledger_service.get_transactions_list(user_id)
             recent_transactions = transactions[:50]
         except Exception as tx_err:
             print(f"[WARNING] Failed to fetch transactions: {tx_err}")
@@ -56,7 +56,7 @@ async def get_workbench_context(workbench_id: str):
         
         # 6. Fetch Inventory Items
         try:
-            inventory_res = supabase.table("items").select("*").eq("workbench_id", workbench_id).eq("is_deleted", False).order("created_at", desc=True).execute()
+            inventory_res = supabase.table("items").select("*").eq("user_id", user_id).eq("is_deleted", False).order("created_at", desc=True).execute()
             items = inventory_res.data or []
             
             # Calculate current stock for each item
@@ -73,7 +73,7 @@ async def get_workbench_context(workbench_id: str):
         
         # 7. Fetch Parties & Entities
         try:
-            parties_res = supabase.table("parties").select("*, entities(*)").eq("workbench_id", workbench_id).execute()
+            parties_res = supabase.table("parties").select("*, entities(*)").eq("user_id", user_id).execute()
             parties_data = parties_res.data or []
             
             # 8. Ensure 'Self' identity exists (Party + Legal Entity)
@@ -81,7 +81,7 @@ async def get_workbench_context(workbench_id: str):
             if not self_party:
                 wb_name = workbench_data.get("name", "My Company")
                 p_res = supabase.table("parties").insert({
-                    "workbench_id": workbench_id,
+                    "user_id": user_id,
                     "name": wb_name,
                     "category": "corporation",
                     "is_self": True
@@ -104,7 +104,7 @@ async def get_workbench_context(workbench_id: str):
                     }).execute()
                     
                     # Refetch parties to include the new one and its entity
-                    parties_res = supabase.table("parties").select("*, entities(*)").eq("workbench_id", workbench_id).execute()
+                    parties_res = supabase.table("parties").select("*, entities(*)").eq("user_id", user_id).execute()
                     parties_data = parties_res.data or []
             elif not self_party.get("entities"):
                 # Party exists but has no entities, create the legal one
@@ -120,7 +120,7 @@ async def get_workbench_context(workbench_id: str):
                         "incorporation_date": workbench_data.get("incorporation_date")
                     }
                 }).execute()
-                parties_res = supabase.table("parties").select("*, entities(*)").eq("workbench_id", workbench_id).execute()
+                parties_res = supabase.table("parties").select("*, entities(*)").eq("user_id", user_id).execute()
                 parties_data = parties_res.data or []
         except Exception as party_err:
             print(f"[WARNING] Failed to fetch/initialize parties: {party_err}")
@@ -128,7 +128,7 @@ async def get_workbench_context(workbench_id: str):
         
         # 8. Fetch Documents
         try:
-            documents_res = supabase.table("workbench_documents").select("*").eq("workbench_id", workbench_id).order("created_at", desc=True).execute()
+            documents_res = supabase.table("user_documents").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
             documents = documents_res.data or []
         except Exception as doc_err:
             print(f"[WARNING] Failed to fetch documents: {doc_err}")

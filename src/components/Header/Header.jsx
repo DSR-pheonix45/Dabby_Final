@@ -7,15 +7,20 @@ import {
 } from "react-icons/bs";
 import { HiChevronDown } from "react-icons/hi";
 import { useAuth } from "../../hooks/useAuth";
+import { useWorkbench } from "../../context/WorkbenchContext";
 import { useNavigate } from "react-router-dom";
+import CreateWorkbenchModal from "../Workbenches/CreateWorkbenchModal";
 
 export default function Header({
   onMobileMenuClick,
 }) {
   const { signOut } = useAuth();
+  const { workbenches, activeWorkbench, changeActiveWorkbench, fetchWorkbenches } = useWorkbench();
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isWorkbenchDropdownOpen, setIsWorkbenchDropdownOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   return (
     <>
@@ -56,6 +61,52 @@ export default function Header({
 
           {/* Right Section - Controls */}
           <div className="flex items-center space-x-2 sm:space-x-4">
+            
+            {/* Workbench Selector */}
+            <div className="relative md:block">
+              <button
+                onClick={() => setIsWorkbenchDropdownOpen(!isWorkbenchDropdownOpen)}
+                className="flex items-center space-x-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white transition-all font-dm-sans"
+              >
+                <BsBuilding className="text-gray-400" />
+                <span className="text-sm font-medium max-w-[120px] truncate">
+                  {activeWorkbench ? activeWorkbench.name : "Select Workbench"}
+                </span>
+                <HiChevronDown className="text-gray-500" />
+              </button>
+
+              {isWorkbenchDropdownOpen && (
+                <div className="absolute top-full mt-2 w-56 right-0 bg-[#0a0a0a] rounded-lg shadow-xl border border-white/10 z-50 p-1">
+                  {workbenches.map((wb) => (
+                    <button
+                      key={wb.id}
+                      onClick={() => {
+                        changeActiveWorkbench(wb);
+                        setIsWorkbenchDropdownOpen(false);
+                      }}
+                      className="w-full flex items-center px-3 py-2 hover:bg-white/5 rounded-md transition-colors text-left"
+                    >
+                      <span className={`text-sm ${activeWorkbench?.id === wb.id ? 'text-teal-400 font-medium' : 'text-white'}`}>
+                        {wb.name}
+                      </span>
+                    </button>
+                  ))}
+                  
+                  <div className="h-px bg-white/10 my-1" />
+                  
+                  <button
+                    onClick={() => {
+                      setIsWorkbenchDropdownOpen(false);
+                      setIsCreateModalOpen(true);
+                    }}
+                    className="w-full flex items-center px-3 py-2 text-teal-400 hover:bg-white/5 rounded-md transition-colors text-left text-sm font-medium"
+                  >
+                    + Create New Workbench
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Unified Action Toolbar - Responsive */}
             <div className="hidden sm:flex items-center p-1 bg-white/5 border border-white/10 rounded-lg">
               {/* Agent Dropdown - Hidden on mobile */}
@@ -121,6 +172,15 @@ export default function Header({
           </div>
         </div>
       </div>
+
+      <CreateWorkbenchModal 
+        isOpen={isCreateModalOpen} 
+        onClose={() => setIsCreateModalOpen(false)} 
+        onSuccess={async (newWb) => {
+          await fetchWorkbenches();
+          changeActiveWorkbench(newWb);
+        }}
+      />
     </>
   );
 }

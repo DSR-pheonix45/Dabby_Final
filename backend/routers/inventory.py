@@ -11,7 +11,7 @@ inventory_service = InventoryService(supabase)
 # --- Pydantic Models ---
 
 class ItemCreate(BaseModel):
-    workbench_id: str
+    user_id: str
     name: str
     sku: Optional[str] = None
     category: Optional[str] = "General"
@@ -28,7 +28,7 @@ class ItemCreate(BaseModel):
     stock_level: Optional[float] = 0 
 
 class PurchaseRequest(BaseModel):
-    workbench_id: str
+    user_id: str
     item_id: str
     quantity: float
     unit_cost: float
@@ -37,7 +37,7 @@ class PurchaseRequest(BaseModel):
     transaction_date: Optional[date] = None
 
 class SaleRequest(BaseModel):
-    workbench_id: str
+    user_id: str
     item_id: str
     quantity: float
     selling_price: float
@@ -60,10 +60,10 @@ async def create_item(item: ItemCreate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/items/{workbench_id}")
-async def get_items(workbench_id: str):
+@router.get("/items/{user_id}")
+async def get_items(user_id: str):
     try:
-        return await inventory_service.get_items(workbench_id)
+        return await inventory_service.get_items(user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -81,7 +81,7 @@ async def get_item_stock(item_id: str):
 async def purchase_stock(req: PurchaseRequest):
     try:
         return await inventory_service.record_purchase(
-            workbench_id=req.workbench_id,
+            user_id=req.user_id,
             item_id=req.item_id,
             quantity=req.quantity,
             unit_cost=req.unit_cost,
@@ -98,7 +98,7 @@ async def purchase_stock(req: PurchaseRequest):
 async def sell_stock(req: SaleRequest):
     try:
         return await inventory_service.record_sale(
-            workbench_id=req.workbench_id,
+            user_id=req.user_id,
             item_id=req.item_id,
             quantity=req.quantity,
             selling_price=req.selling_price,

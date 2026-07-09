@@ -7,9 +7,6 @@ const ChatArea = ({
   messages: propMessages,
   onSendMessage,
   uploadedFiles,
-  workbenchContext,
-  availableWorkbenches,
-  onToggleWorkbenchContext,
   webSearchEnabled,
   onWebSearchToggle,
 }) => {
@@ -47,9 +44,6 @@ const ChatArea = ({
         onSendMessage={onSendMessage}
         uploadedFiles={uploadedFiles}
         placeholder="Ask Dabby Consultant anything..."
-        workbenchContext={workbenchContext}
-        availableWorkbenches={availableWorkbenches}
-        onToggleWorkbenchContext={onToggleWorkbenchContext}
         webSearchEnabled={webSearchEnabled}
         onWebSearchToggle={onWebSearchToggle}
       />

@@ -13,7 +13,7 @@ export default function DataIngestionPage() {
   const isDark = theme === "dark";
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const workbenchId = searchParams.get('workbench');
+  const userId = searchParams.get('workbench');
 
   const [step, setStep] = useState(1);
   const [file, setFile] = useState(null);
@@ -24,17 +24,17 @@ export default function DataIngestionPage() {
   const docId = searchParams.get('docId');
 
   React.useEffect(() => {
-    if (docId && workbenchId) {
+    if (docId && userId) {
       fetchVaultDocument();
     }
-  }, [docId, workbenchId]);
+  }, [docId, userId]);
 
   const fetchVaultDocument = async () => {
     try {
       setIsProcessing(true);
       // 1. Fetch doc metadata
       const { data: doc, error: docError } = await supabase
-        .from('workbench_documents')
+        .from('user_documents')
         .select('*')
         .eq('id', docId)
         .single();
@@ -87,7 +87,7 @@ export default function DataIngestionPage() {
 
     try {
       // Step 6: Begin real backend storage upload triggered by step 4 mapping
-      const result = await uploadCSVFile(file, mapping, workbenchId);
+      const result = await uploadCSVFile(file, mapping, userId);
       if (!result.success) throw new Error(result.error);
       
       setIngestionResult(result.dataset || result);
@@ -96,7 +96,7 @@ export default function DataIngestionPage() {
       if (docId) {
         try {
           await supabase
-            .from('workbench_documents')
+            .from('user_documents')
             .update({ 
               status: 'processed',
               metadata: { 

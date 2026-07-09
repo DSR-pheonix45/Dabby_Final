@@ -102,11 +102,11 @@ export default function RulesetEditor() {
       setVersions(data.versions || []);
       
       // Load docs available for simulation in this workbench
-      if (data.workbench_id) {
+      if (data.user_id) {
         const { data: docs } = await supabase
-          .from("workbench_documents")
+          .from("user_documents")
           .select("id, filename, status")
-          .eq("workbench_id", data.workbench_id)
+          .eq("user_id", data.user_id)
           .in("status", ["analyzed", "processed"]);
         setSimDocuments(docs || []);
         if (docs && docs.length > 0) {
@@ -219,7 +219,7 @@ export default function RulesetEditor() {
         body: JSON.stringify({
           prompt: promptInput,
           document_type: docType,
-          workbench_id: ruleset.workbench_id,
+          user_id: ruleset.user_id,
           available_variables: flatVars
         })
       });
@@ -340,7 +340,7 @@ export default function RulesetEditor() {
       <div className="w-80 border-r border-white/5 bg-[#0d1117]/50 flex flex-col flex-shrink-0">
         <div className="p-6 flex items-center space-x-3 border-b border-white/5">
           <button 
-            onClick={() => navigate(`/dashboard/workbenches/${ruleset?.workbench_id}`)}
+            onClick={() => navigate(`/dashboard/users/${ruleset?.user_id}`)}
             className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 transition-all"
           >
             <BsChevronLeft />

@@ -1,6 +1,6 @@
 import uuid
 
-def seed_coa(supabase_client, workbench_id: str, business_type: str = "services", size: str = "small", industry: str = "others"):
+def seed_coa(supabase_client, user_id: str, business_type: str = "services", size: str = "small", industry: str = "others"):
     """
     Seeds the 3-layer Chart of Accounts (Account -> Sub-account -> Label).
     Full taxonomy based on user's Universal Sub-accounts list.
@@ -158,7 +158,7 @@ def seed_coa(supabase_client, workbench_id: str, business_type: str = "services"
 
     # Seed to Supabase
     # New Schema: Use global master_accounts and master_sub_accounts
-    # Create workbench_accounts as instances for this workbench
+    # Create user_accounts as instances for this workbench
     try:
         # Fetch all master accounts and sub-accounts
         master_accs_res = supabase_client.table("master_accounts").select("*").eq("is_active", True).execute()
@@ -166,8 +166,8 @@ def seed_coa(supabase_client, workbench_id: str, business_type: str = "services"
         
         master_accounts = {acc["id"]: acc for acc in master_accs_res.data}
         
-        # Create workbench_accounts for each master_sub_account
-        workbench_accounts_to_insert = []
+        # Create user_accounts for each master_sub_account
+        user_accounts_to_insert = []
         for master_sub in master_subs_res.data:
             master_account_id = master_sub["master_account_id"]
             if master_account_id in master_accounts:
@@ -176,8 +176,8 @@ def seed_coa(supabase_client, workbench_id: str, business_type: str = "services"
                 # Generate account code as: Master Code + Sub Code (e.g., A001, L002)
                 account_code = f"{master_acc['account_code']}{master_sub['sub_account_code']}"
                 
-                workbench_accounts_to_insert.append({
-                    "workbench_id": workbench_id,
+                user_accounts_to_insert.append({
+                    "user_id": user_id,
                     "master_account_id": master_account_id,
                     "master_sub_account_id": master_sub["id"],
                     "account_code": account_code,
@@ -187,15 +187,15 @@ def seed_coa(supabase_client, workbench_id: str, business_type: str = "services"
                     "is_active": True
                 })
         
-        # Batch insert all workbench_accounts
-        if workbench_accounts_to_insert:
-            supabase_client.table("workbench_accounts").insert(workbench_accounts_to_insert).execute()
-            print(f"[DEBUG] Seeded {len(workbench_accounts_to_insert)} workbench accounts for workbench {workbench_id}")
+        # Batch insert all user_accounts
+        if user_accounts_to_insert:
+            supabase_client.table("user_accounts").insert(user_accounts_to_insert).execute()
+            print(f"[DEBUG] Seeded {len(user_accounts_to_insert)} workbench accounts for workbench {user_id}")
         
-        return {"status": "success", "message": f"Seeded {len(workbench_accounts_to_insert)} workbench accounts successfully"}
+        return {"status": "success", "message": f"Seeded {len(user_accounts_to_insert)} workbench accounts successfully"}
     except Exception as e:
         print(f"[ERROR] COA Seeding failed: {str(e)}")
         return {"status": "error", "message": str(e)}
 
-async def seed_default_coa(supabase_client, workbench_id: str):
-    return seed_coa(supabase_client, workbench_id)
+async def seed_default_coa(supabase_client, user_id: str):
+    return seed_coa(supabase_client, user_id)

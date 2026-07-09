@@ -7,7 +7,7 @@ from supabase_client import supabase
 router = APIRouter()
 
 class BudgetCreate(BaseModel):
-    workbench_id: str
+    user_id: str
     project_id: Optional[str] = None
     name: str
     start_date: date
@@ -26,23 +26,23 @@ async def create_budget(budget: BudgetCreate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{workbench_id}/performance")
-async def get_budget_performance(workbench_id: str):
+@router.get("/{user_id}/performance")
+async def get_budget_performance(user_id: str):
     try:
         # Instead of calculating in Python, we can just query the SQL view we created
-        response = supabase.table("view_budget_vs_actual").select("*").eq("workbench_id", workbench_id).execute()
+        response = supabase.table("view_budget_vs_actual").select("*").eq("user_id", user_id).execute()
         return response.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{workbench_id}/transactions/{category}")
-async def get_clubbed_transactions(workbench_id: str, category: str):
+@router.get("/{user_id}/transactions/{category}")
+async def get_clubbed_transactions(user_id: str, category: str):
     """
     Returns the individual fragmented transactions that were clubbed into a budget category.
     """
     try:
         # First, find the budget to get the date range
-        budget_res = supabase.table("budgets").select("*").eq("workbench_id", workbench_id).eq("name", category).execute()
+        budget_res = supabase.table("budgets").select("*").eq("user_id", user_id).eq("name", category).execute()
         
         if not budget_res.data:
             return []
@@ -55,7 +55,7 @@ async def get_clubbed_transactions(workbench_id: str, category: str):
             FROM transaction_entries te
             JOIN transactions t ON t.id = te.transaction_id
             JOIN labels l ON l.id = te.label_id
-            WHERE t.workbench_id = '{workbench_id}'
+            WHERE t.user_id = '{user_id}'
             AND l.sub_account = '{category}'
             AND t.transaction_date >= '{b['start_date']}'
             AND t.transaction_date <= '{b['end_date']}'
@@ -66,8 +66,8 @@ async def get_clubbed_transactions(workbench_id: str, category: str):
         # To avoid RPC, we fetch all relevant entries and filter
         
         # Fetch accounts in this sub-account category
-        # Note: Now we need to query workbench_accounts based on master_sub_account matching
-        accounts_res = supabase_client.table("workbench_accounts").select("id, full_account_name, master_sub_account_id").eq("workbench_id", workbench_id).execute()
+        # Note: Now we need to query user_accounts based on master_sub_account matching
+        accounts_res = supabase_client.table("user_accounts").select("id, full_account_name, master_sub_account_id").eq("user_id", user_id).execute()
         
         # Filter accounts that belong to this category by matching the master_sub_account
         # For simplicity, we'll match by searching the sub-account in the full_account_name

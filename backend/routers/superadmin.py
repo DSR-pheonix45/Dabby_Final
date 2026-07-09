@@ -53,11 +53,11 @@ class GroqKeyDelete(BaseModel):
     id: str
 
 class WorkbenchPlanChange(BaseModel):
-    workbench_id: str
+    user_id: str
     plan: str
 
 class PaymentSimulate(BaseModel):
-    workbench_id: str
+    user_id: str
     amount: float
     plan: str
     email: str
@@ -69,7 +69,7 @@ class PaymentSimulate(BaseModel):
 async def get_superadmin_stats():
     """
     Returns metrics and logs: waitlist signups, page views, Groq key health, payments,
-    and workbenches for plan overrides.
+    and users for plan overrides.
     """
     stats = {}
 
@@ -119,12 +119,12 @@ async def get_superadmin_stats():
     except Exception:
         stats["payments"] = []
 
-    # 5. Fetch workbenches & plans
+    # 5. Fetch users & plans
     try:
-        wb_res = supabase.table("workbenches").select("id", "name", "plan", "created_at", "owner_user_id").execute()
-        stats["workbenches"] = wb_res.data or []
+        wb_res = supabase.table("users").select("id", "name", "plan", "created_at", "owner_user_id").execute()
+        stats["users"] = wb_res.data or []
     except Exception:
-        stats["workbenches"] = []
+        stats["users"] = []
 
     return stats
 
@@ -186,25 +186,25 @@ async def delete_groq_key(payload: GroqKeyDelete):
         raise HTTPException(status_code=500, detail=f"Failed to delete key: {str(e)}")
 
 
-@router.post("/workbench/set-plan", dependencies=[Depends(require_superadmin)])
+@router.post("/user/set-plan", dependencies=[Depends(require_superadmin)])
 async def override_workbench_plan(payload: WorkbenchPlanChange, user: dict = Depends(get_current_user)):
-    wb_id = payload.workbench_id
+    wb_id = payload.user_id
     new_plan = payload.plan.strip().lower()
     
     # 1. Fetch current plan to log history
     try:
-        wb_res = supabase.table("workbenches").select("plan").eq("id", wb_id).single().execute()
+        wb_res = supabase.table("users").select("plan").eq("id", wb_id).single().execute()
         prev_plan = wb_res.data.get("plan") if wb_res.data else "free"
     except Exception:
         prev_plan = "free"
         
     try:
         # 2. Update workbench plan
-        supabase.table("workbenches").update({"plan": new_plan}).eq("id", wb_id).execute()
+        supabase.table("users").update({"plan": new_plan}).eq("id", wb_id).execute()
         
         # 3. Log into plan history
         supabase.table("plan_history").insert({
-            "workbench_id": wb_id,
+            "user_id": wb_id,
             "previous_plan": prev_plan,
             "new_plan": new_plan,
             "changed_by": user["id"]
@@ -223,7 +223,7 @@ async def simulate_payment(payload: PaymentSimulate):
     try:
         payment_id = f"pay_mock_{datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
         res = supabase.table("payments").insert({
-            "workbench_id": payload.workbench_id,
+            "user_id": payload.user_id,
             "user_id": payload.email, # placeholder for audit tracking
             "email": payload.email,
             "plan": payload.plan,

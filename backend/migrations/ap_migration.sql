@@ -1,9 +1,9 @@
 -- Create Bills table (Accounts Payable)
 CREATE TABLE IF NOT EXISTS bills (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    workbench_id UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
     party_id UUID NOT NULL REFERENCES parties(id), -- The Vendor
-    doc_id UUID REFERENCES workbench_documents(id) ON DELETE SET NULL, -- The scanned bill/receipt
+    doc_id UUID REFERENCES user_documents(id) ON DELETE SET NULL, -- The scanned bill/receipt
     bill_number TEXT NOT NULL,
     amount DECIMAL(15, 2) NOT NULL,
     balance_due DECIMAL(15, 2) NOT NULL,
@@ -25,6 +25,6 @@ CREATE TABLE IF NOT EXISTS bills (
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS bill_id UUID REFERENCES bills(id) ON DELETE SET NULL;
 
 -- Indices
-CREATE INDEX IF NOT EXISTS idx_bills_workbench ON bills(workbench_id);
+CREATE INDEX IF NOT EXISTS idx_bills_workbench ON bills(user_id);
 CREATE INDEX IF NOT EXISTS idx_bills_party ON bills(party_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_bill ON transactions(bill_id);

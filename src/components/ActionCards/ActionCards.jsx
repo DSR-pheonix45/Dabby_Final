@@ -14,12 +14,8 @@ import {
 } from "react-icons/bs";
 
 export default function ActionCards({
-  onQuestionCardClick,
-  activeWorkbench
+  onQuestionCardClick
 }) {
-  if (!activeWorkbench || !activeWorkbench.active) {
-    return null;
-  }
 
   const subCards = [
     // Top 3 - Exceptions/Warnings

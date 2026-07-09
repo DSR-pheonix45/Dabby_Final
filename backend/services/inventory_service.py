@@ -30,8 +30,8 @@ class InventoryService:
             
         return item
 
-    async def get_items(self, workbench_id: str):
-        response = self.supabase.table("items").select("*").eq("workbench_id", workbench_id).eq("is_deleted", False).execute()
+    async def get_items(self, user_id: str):
+        response = self.supabase.table("items").select("*").eq("user_id", user_id).eq("is_deleted", False).execute()
         return response.data
 
     async def get_item(self, item_id: str):
@@ -109,7 +109,7 @@ class InventoryService:
 
     # --- Core Flows ---
 
-    async def record_purchase(self, workbench_id: str, item_id: str, quantity: float, unit_cost: float, 
+    async def record_purchase(self, user_id: str, item_id: str, quantity: float, unit_cost: float, 
                               source_entity_id: str, description: str, transaction_date: Optional[date] = None):
         """
         Purchase Flow: +Stock, Debit Inventory Asset, Credit Source (Bank/AP)
@@ -129,7 +129,7 @@ class InventoryService:
         # 1. Financial Entry
         # Dr Inventory Asset, Cr Source Entity
         tx_res = await self.ledger_service.record_transaction(
-            workbench_id=workbench_id,
+            user_id=user_id,
             from_label_id=source_entity_id, # Source of money (Label ID for Bank/AP)
             to_label_id=item["inventory_label_id"], # Destination of value (Inventory Asset)
             amount=total_amount,
@@ -151,7 +151,7 @@ class InventoryService:
 
         return tx_res
 
-    async def record_sale(self, workbench_id: str, item_id: str, quantity: float, selling_price: float, 
+    async def record_sale(self, user_id: str, item_id: str, quantity: float, selling_price: float, 
                           destination_entity_id: str, description: str, transaction_date: Optional[date] = None):
         """
         Sale Flow: 
@@ -166,7 +166,7 @@ class InventoryService:
         # Step 1: Record Revenue
         total_revenue = quantity * selling_price
         rev_tx = await self.ledger_service.record_transaction(
-            workbench_id=workbench_id,
+            user_id=user_id,
             from_label_id=item["revenue_label_id"], # Source of value (Revenue account)
             to_label_id=destination_entity_id,     # Destination of money (Bank/AR)
             amount=total_revenue,
@@ -189,7 +189,7 @@ class InventoryService:
         # Step 3: Record COGS / Inventory Movement Financially
         # Dr COGS, Cr Inventory Asset
         cogs_tx = await self.ledger_service.record_transaction(
-            workbench_id=workbench_id,
+            user_id=user_id,
             from_label_id=item["inventory_label_id"], # Source of value (Inventory Asset)
             to_label_id=item["cogs_label_id"],      # Destination of value (COGS Expense)
             amount=total_cogs,
@@ -214,7 +214,7 @@ class InventoryService:
             "margin": total_revenue - total_cogs
         }
 
-    async def record_sale_impact(self, workbench_id: str, item_id: str, quantity: float, transaction_id: str, transaction_date: Optional[date] = None):
+    async def record_sale_impact(self, user_id: str, item_id: str, quantity: float, transaction_id: str, transaction_date: Optional[date] = None):
         """
         Records only the COGS and Stock side of a sale. 
         Used when the revenue part is already handled (e.g. in an Invoice).
@@ -238,7 +238,7 @@ class InventoryService:
         # 2. Record COGS / Inventory Movement Financially
         # Dr COGS, Cr Inventory Asset
         cogs_tx = await self.ledger_service.record_transaction(
-            workbench_id=workbench_id,
+            user_id=user_id,
             from_label_id=item["inventory_label_id"], # Source: Inventory Asset
             to_label_id=item["cogs_label_id"],      # Destination: COGS Expense
             amount=total_cogs,

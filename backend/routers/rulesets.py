@@ -6,15 +6,15 @@ from supabase_client import supabase
 from services.ruleset_service import ruleset_service
 from services.ledger_service import LedgerService
 from services import plan_service
-from auth import require_permission, require_membership, P
+from auth import verify_user_access
 
 router = APIRouter()
 
-@router.get("/workbench/{workbench_id}", dependencies=[Depends(require_membership())])
-async def list_workbench_rulesets(workbench_id: str):
+@router.get("/user/{user_id}", dependencies=[Depends(verify_user_access)])
+async def list_workbench_rulesets(user_id: str):
     try:
         # Fetch all rulesets
-        res = supabase.table("rulesets").select("*").eq("workbench_id", workbench_id).eq("is_deleted", False).order("updated_at", desc=True).execute()
+        res = supabase.table("rulesets").select("*").eq("user_id", user_id).eq("is_deleted", False).order("updated_at", desc=True).execute()
         rulesets = res.data or []
         
         # Attach version details
@@ -37,7 +37,7 @@ async def list_workbench_rulesets(workbench_id: str):
         print(f"[ERROR] list_workbench_rulesets: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{ruleset_id}", dependencies=[Depends(require_membership())])
+@router.get("/{ruleset_id}", dependencies=[Depends(verify_user_access)])
 async def get_ruleset(ruleset_id: str):
     try:
         res = supabase.table("rulesets").select("*").eq("id", ruleset_id).single().execute()
@@ -54,10 +54,10 @@ async def get_ruleset(ruleset_id: str):
         print(f"[ERROR] get_ruleset: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("", dependencies=[Depends(require_permission(P.WRITE_RULESET))])
+@router.post("", dependencies=[Depends(verify_user_access)])
 async def create_ruleset(payload: Dict):
     try:
-        workbench_id = payload.get("workbench_id")
+        user_id = payload.get("user_id")
         name = payload.get("name")
         description = payload.get("description", "")
         document_type = payload.get("document_type")
@@ -65,21 +65,21 @@ async def create_ruleset(payload: Dict):
         structured_logic = payload.get("structured_logic", {})
         status = payload.get("status", "Draft")
         
-        if not workbench_id or not name or not document_type:
-            raise HTTPException(status_code=400, detail="Missing required parameters: workbench_id, name, document_type")
+        if not user_id or not name or not document_type:
+            raise HTTPException(status_code=400, detail="Missing required parameters: user_id, name, document_type")
 
         # Plan gate (Module 12): custom rulesets require Pro or above.
-        plan_service.require_feature(workbench_id, "custom_rulesets", "Custom rulesets")
+        plan_service.require_feature(user_id, "custom_rulesets", "Custom rulesets")
 
         # If trying to make active, verify no other active ruleset exists for this doc type
         if status == "Active":
-            active_check = supabase.table("rulesets").select("id").eq("workbench_id", workbench_id).eq("document_type", document_type).eq("status", "Active").execute()
+            active_check = supabase.table("rulesets").select("id").eq("user_id", user_id).eq("document_type", document_type).eq("status", "Active").execute()
             if active_check.data:
                 raise HTTPException(status_code=400, detail=f"An active ruleset already exists for document type '{document_type}'. Please disable it first.")
 
         # Create ruleset
         ruleset_payload = {
-            "workbench_id": workbench_id,
+            "user_id": user_id,
             "name": name,
             "description": description,
             "document_type": document_type,
@@ -112,7 +112,7 @@ async def create_ruleset(payload: Dict):
         print(f"[ERROR] create_ruleset: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.put("/{ruleset_id}", dependencies=[Depends(require_permission(P.WRITE_RULESET))])
+@router.put("/{ruleset_id}", dependencies=[Depends(verify_user_access)])
 async def update_ruleset(ruleset_id: str, payload: Dict):
     try:
         # Check if ruleset exists
@@ -121,7 +121,7 @@ async def update_ruleset(ruleset_id: str, payload: Dict):
         if not ruleset:
             raise HTTPException(status_code=404, detail="Ruleset not found")
             
-        workbench_id = ruleset["workbench_id"]
+        user_id = ruleset["user_id"]
         doc_type = payload.get("document_type") or ruleset["document_type"]
         
         update_fields = {}
@@ -131,7 +131,7 @@ async def update_ruleset(ruleset_id: str, payload: Dict):
 
         # Prevent duplicate Active rulesets
         if update_fields.get("status") == "Active" or (update_fields.get("document_type") and ruleset.get("status") == "Active"):
-            active_check = supabase.table("rulesets").select("id").eq("workbench_id", workbench_id).eq("document_type", doc_type).eq("status", "Active").execute()
+            active_check = supabase.table("rulesets").select("id").eq("user_id", user_id).eq("document_type", doc_type).eq("status", "Active").execute()
             active_other = [r["id"] for r in (active_check.data or []) if r["id"] != ruleset_id]
             if active_other:
                 raise HTTPException(status_code=400, detail=f"An active ruleset already exists for document type '{doc_type}'. Please disable it first.")
@@ -141,21 +141,17 @@ async def update_ruleset(ruleset_id: str, payload: Dict):
 
         if update_fields.get("status") == "Active":
             try:
-                pending_docs = supabase.table("workbench_documents")\
+                pending_docs = supabase.table("user_documents")\
                     .select("id")\
-                    .eq("workbench_id", workbench_id)\
+                    .eq("user_id", user_id)\
                     .eq("document_type", doc_type)\
                     .eq("status", "Needs Ruleset")\
                     .execute()
                 
                 if pending_docs.data:
-                    from services.trade_service import trade_service
-                    import asyncio
-                    for doc in pending_docs.data:
-                        print(f"[RULESET ENGINE] Auto-processing pending doc {doc['id']} since ruleset is now Active")
-                        asyncio.create_task(trade_service.create_trade_from_document(doc["id"]))
+                    pass
             except Exception as auto_err:
-                print(f"[WARNING] Failed to auto-process pending documents: {auto_err}")
+                print(f"[WARNING] Auto-processing pending documents is disabled (Trade Engine removed).")
         
         return res.data[0] if res.data else ruleset
     except HTTPException:
@@ -164,7 +160,7 @@ async def update_ruleset(ruleset_id: str, payload: Dict):
         print(f"[ERROR] update_ruleset: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/{ruleset_id}/version", dependencies=[Depends(require_permission(P.WRITE_RULESET))])
+@router.post("/{ruleset_id}/version", dependencies=[Depends(verify_user_access)])
 async def create_ruleset_version(ruleset_id: str, payload: Dict):
     try:
         check_res = supabase.table("rulesets").select("*").eq("id", ruleset_id).single().execute()
@@ -201,20 +197,20 @@ async def create_ruleset_version(ruleset_id: str, payload: Dict):
         print(f"[ERROR] create_ruleset_version: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/generate-logic", dependencies=[Depends(require_permission(P.WRITE_RULESET))])
+@router.post("/generate-logic", dependencies=[Depends(verify_user_access)])
 async def generate_logic(payload: Dict):
     try:
         prompt = payload.get("prompt")
         doc_type = payload.get("document_type")
-        workbench_id = payload.get("workbench_id")
+        user_id = payload.get("user_id")
         available_variables = payload.get("available_variables", [])
         
-        if not prompt or not doc_type or not workbench_id:
-            raise HTTPException(status_code=400, detail="Missing required fields: prompt, document_type, workbench_id")
+        if not prompt or not doc_type or not user_id:
+            raise HTTPException(status_code=400, detail="Missing required fields: prompt, document_type, user_id")
 
         # Fetch Chart of Accounts labels for mapping options
         ledger_service = LedgerService(supabase)
-        accounts = await ledger_service.get_labels(workbench_id)
+        accounts = await ledger_service.get_labels(user_id)
 
         structured_logic = await ruleset_service.generate_ruleset_logic(prompt, doc_type, available_variables, accounts)
         return {"structured_logic": structured_logic}
@@ -222,7 +218,7 @@ async def generate_logic(payload: Dict):
         print(f"[ERROR] generate_logic endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/simulate", dependencies=[Depends(require_permission(P.WRITE_RULESET))])
+@router.post("/simulate", dependencies=[Depends(verify_user_access)])
 async def simulate_ruleset(payload: Dict):
     try:
         ruleset_id = payload.get("ruleset_id")

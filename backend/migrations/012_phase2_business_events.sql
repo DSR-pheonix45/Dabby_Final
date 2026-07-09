@@ -15,9 +15,9 @@
 CREATE TABLE IF NOT EXISTS business_events (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
-    workbench_id        UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
+    user_id        UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
     analysis_note_id    UUID REFERENCES analysis_notes(id) ON DELETE SET NULL,
-    document_id         UUID REFERENCES workbench_documents(id) ON DELETE SET NULL,
+    document_id         UUID REFERENCES user_documents(id) ON DELETE SET NULL,
 
     -- trade_draft_id populated after Phase 2 pipeline; NULL for V1 legacy events
     -- (circular FK resolved by adding constraint after trade_drafts is created)
@@ -90,12 +90,12 @@ ALTER TABLE business_events
     ADD CONSTRAINT fk_business_events_superseded_by
     FOREIGN KEY (superseded_by) REFERENCES business_events(id) ON DELETE SET NULL;
 
-CREATE INDEX IF NOT EXISTS idx_business_events_workbench     ON business_events(workbench_id);
+CREATE INDEX IF NOT EXISTS idx_business_events_workbench     ON business_events(user_id);
 CREATE INDEX IF NOT EXISTS idx_business_events_analysis_note ON business_events(analysis_note_id);
-CREATE INDEX IF NOT EXISTS idx_business_events_settlement_key ON business_events(workbench_id, settlement_key) WHERE settlement_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_business_events_settlement_key ON business_events(user_id, settlement_key) WHERE settlement_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_business_events_event_type    ON business_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_business_events_status        ON business_events(event_status);
-CREATE INDEX IF NOT EXISTS idx_business_events_counterparty  ON business_events(workbench_id, counterparty);
+CREATE INDEX IF NOT EXISTS idx_business_events_counterparty  ON business_events(user_id, counterparty);
 CREATE INDEX IF NOT EXISTS idx_business_events_event_date    ON business_events(event_date);
 
 
@@ -108,9 +108,9 @@ CREATE INDEX IF NOT EXISTS idx_business_events_event_date    ON business_events(
 CREATE TABLE IF NOT EXISTS trade_drafts (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
-    workbench_id        UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
+    user_id        UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
     analysis_note_id    UUID NOT NULL REFERENCES analysis_notes(id) ON DELETE CASCADE,
-    document_id         UUID REFERENCES workbench_documents(id) ON DELETE SET NULL,
+    document_id         UUID REFERENCES user_documents(id) ON DELETE SET NULL,
 
     -- ── Derived from Analysis Note (deterministic) ────────────
     event_type          TEXT NOT NULL,          -- from analysis_note.event_candidate.event_type
@@ -156,7 +156,7 @@ CREATE TABLE IF NOT EXISTS trade_drafts (
     created_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_trade_drafts_workbench      ON trade_drafts(workbench_id);
+CREATE INDEX IF NOT EXISTS idx_trade_drafts_workbench      ON trade_drafts(user_id);
 CREATE INDEX IF NOT EXISTS idx_trade_drafts_analysis_note  ON trade_drafts(analysis_note_id);
 CREATE INDEX IF NOT EXISTS idx_trade_drafts_status         ON trade_drafts(status);
 CREATE INDEX IF NOT EXISTS idx_trade_drafts_settlement_key ON trade_drafts(settlement_key);
@@ -182,7 +182,7 @@ CREATE INDEX IF NOT EXISTS idx_business_events_trade_draft ON business_events(tr
 CREATE TABLE IF NOT EXISTS event_settlements (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
-    workbench_id        UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
+    user_id        UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
 
     -- "Open" event being settled (e.g. sales_invoice → CUSTOMER_BILLED)
     event_id_a          UUID NOT NULL REFERENCES business_events(id) ON DELETE CASCADE,
@@ -219,7 +219,7 @@ CREATE TABLE IF NOT EXISTS event_settlements (
     created_at          TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_event_settlements_workbench ON event_settlements(workbench_id);
+CREATE INDEX IF NOT EXISTS idx_event_settlements_workbench ON event_settlements(user_id);
 CREATE INDEX IF NOT EXISTS idx_event_settlements_event_a   ON event_settlements(event_id_a);
 CREATE INDEX IF NOT EXISTS idx_event_settlements_event_b   ON event_settlements(event_id_b);
 CREATE INDEX IF NOT EXISTS idx_event_settlements_key       ON event_settlements(settlement_key);
@@ -264,15 +264,15 @@ ALTER TABLE feature_flags    ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Workbench members can manage trade_drafts" ON trade_drafts;
 CREATE POLICY "Workbench members can manage trade_drafts" ON trade_drafts
-    FOR ALL USING (EXISTS (SELECT 1 FROM workbenches WHERE id = trade_drafts.workbench_id));
+    FOR ALL USING (EXISTS (SELECT 1 FROM workbenches WHERE id = trade_drafts.user_id));
 
 DROP POLICY IF EXISTS "Workbench members can manage business_events" ON business_events;
 CREATE POLICY "Workbench members can manage business_events" ON business_events
-    FOR ALL USING (EXISTS (SELECT 1 FROM workbenches WHERE id = business_events.workbench_id));
+    FOR ALL USING (EXISTS (SELECT 1 FROM workbenches WHERE id = business_events.user_id));
 
 DROP POLICY IF EXISTS "Workbench members can manage event_settlements" ON event_settlements;
 CREATE POLICY "Workbench members can manage event_settlements" ON event_settlements
-    FOR ALL USING (EXISTS (SELECT 1 FROM workbenches WHERE id = event_settlements.workbench_id));
+    FOR ALL USING (EXISTS (SELECT 1 FROM workbenches WHERE id = event_settlements.user_id));
 
 DROP POLICY IF EXISTS "Anyone can read feature_flags" ON feature_flags;
 CREATE POLICY "Anyone can read feature_flags" ON feature_flags

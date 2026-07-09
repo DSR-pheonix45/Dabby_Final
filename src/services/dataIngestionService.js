@@ -17,10 +17,10 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
  *
  * @param {File} file - The CSV file to upload
  * @param {Object} mapping - Column map to apply during ingestion
- * @param {string} workbenchId - Optional context ID for dashboard metrics
+ * @param {string} userId - Optional context ID for dashboard metrics
  * @returns {Promise<{success: boolean, dataset?: object, error?: string}>}
  */
-export async function uploadCSVFile(file, mapping = {}, workbenchId = null) {
+export async function uploadCSVFile(file, mapping = {}, userId = null) {
   try {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !session) throw new Error("You must be logged in to upload files");
@@ -49,7 +49,7 @@ export async function uploadCSVFile(file, mapping = {}, workbenchId = null) {
         fileSize: file.size,
         contentType: file.type || "text/csv",
         mapping: mapping,
-        workbenchId: workbenchId,
+        userId: userId,
         timestamp: new Date().toISOString()
       }),
     });

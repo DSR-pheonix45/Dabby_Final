@@ -9,8 +9,8 @@ key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('VITE_SUPABASE_ANON_KE
 
 supabase = create_client(url, key)
 
-workbench_id = '0338e803-e024-4bae-bfcd-e0f88262770d'
+user_id = '0338e803-e024-4bae-bfcd-e0f88262770d'
 
-res = supabase.table('labels').select('id, name, type').eq('workbench_id', workbench_id).execute()
+res = supabase.table('labels').select('id, name, type').eq('user_id', user_id).execute()
 for label in res.data:
     print(f"ID: {label['id']} | Name: {label['name']} | Type: {label['type']}")

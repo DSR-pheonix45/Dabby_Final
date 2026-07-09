@@ -19,7 +19,7 @@ export default function GSTInvoiceGenerator() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [wbContext, setWbContext] = useState({ parties: [], labels: [], inventory: [], workbenches: [] });
-  const [activeWorkbenchId, setActiveWorkbenchId] = useState(location.state?.workbenchId || null);
+  const [activeUserId, setActiveUserId] = useState(location.state?.userId || null);
   
   // Detect Workbench Context
   const fromWorkbench = location.state?.fromWorkbench || !!user;
@@ -50,43 +50,43 @@ export default function GSTInvoiceGenerator() {
     footer: null,
   });
 
-  // Fetch Workbenches if logged in but no workbenchId
+  // Fetch Workbenches if logged in but no userId
   useEffect(() => {
-    if (user && !activeWorkbenchId) {
+    if (user && !activeUserId) {
       const fetchWorkbenches = async () => {
         const { data } = await supabase.from('workbenches').select('*');
         if (data && data.length > 0) {
           setWbContext(prev => ({ ...prev, workbenches: data }));
-          setActiveWorkbenchId(data[0].id); // Default to first workbench
+          setActiveUserId(data[0].id); // Default to first workbench
         }
       };
       fetchWorkbenches();
     }
-  }, [user, activeWorkbenchId]);
+  }, [user, activeUserId]);
 
   // Fetch Workbench Context (Parties, Labels, Inventory, Entities)
   useEffect(() => {
-    if (activeWorkbenchId) {
+    if (activeUserId) {
       const fetchContext = async () => {
         try {
           // 1. Fetch Items first to get IDs for stock ledger
           const { data: itemsData } = await supabase
             .from('items')
             .select('*')
-            .eq('workbench_id', activeWorkbenchId)
+            .eq('user_id', activeUserId)
             .eq('is_deleted', false);
             
           const itemIds = itemsData?.map(i => i.id) || [];
 
           // 2. Fetch everything else in parallel
           const [partyData, labelData, wbData, stockData, entityData] = await Promise.all([
-            supabase.from('parties').select('*').eq('workbench_id', activeWorkbenchId),
-            supabase.from('labels').select('*').eq('workbench_id', activeWorkbenchId),
-            supabase.from('workbenches').select('*').eq('id', activeWorkbenchId).single(),
+            supabase.from('parties').select('*').eq('user_id', activeUserId),
+            supabase.from('labels').select('*').eq('user_id', activeUserId),
+            supabase.from('workbenches').select('*').eq('id', activeUserId).single(),
             itemIds.length > 0 
               ? supabase.from('stock_ledger').select('item_id, quantity_change').in('item_id', itemIds)
               : Promise.resolve({ data: [] }),
-            backendService.listWorkbenchEntities(activeWorkbenchId)
+            backendService.listWorkbenchEntities(activeUserId)
           ]);
 
           const items = itemsData || [];
@@ -126,7 +126,7 @@ export default function GSTInvoiceGenerator() {
       };
       fetchContext();
     }
-  }, [activeWorkbenchId]);
+  }, [activeUserId]);
 
   // Pre-fill from AI or Scanned Doc
   useEffect(() => {
@@ -636,7 +636,7 @@ export default function GSTInvoiceGenerator() {
       const taxes = calculateTax();
 
       const payload = {
-        workbench_id: activeWorkbenchId,
+        user_id: activeUserId,
         party_id: invoiceData.party_id,
         invoice_number: invoiceData.invoiceNumber,
         amount: totalAmount,
@@ -688,8 +688,8 @@ export default function GSTInvoiceGenerator() {
                   <div className="mt-4 flex items-center gap-3">
                     <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Active Workbench:</span>
                     <select 
-                      value={activeWorkbenchId} 
-                      onChange={(e) => setActiveWorkbenchId(e.target.value)}
+                      value={activeUserId} 
+                      onChange={(e) => setActiveUserId(e.target.value)}
                       className={`px-3 py-1.5 rounded-lg border text-xs font-bold ${theme === "dark" ? "bg-white/5 border-white/10 text-teal-400" : "bg-gray-50 border-gray-200"}`}
                     >
                       {wbContext.workbenches.map(wb => <option key={wb.id} value={wb.id}>{wb.name}</option>)}
@@ -698,7 +698,7 @@ export default function GSTInvoiceGenerator() {
                 )}
               </div>
               <div className="flex flex-col md:flex-row items-center gap-4">
-                {activeWorkbenchId && (
+                {activeUserId && (
                   <button
                     onClick={handleFinalizeAR}
                     disabled={loading}
@@ -947,7 +947,7 @@ export default function GSTInvoiceGenerator() {
                 <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                   <div className="col-span-full md:col-span-4">
                     <label className="block text-xs font-medium mb-1 opacity-70">Description / Service</label>
-                    {activeWorkbenchId ? (
+                    {activeUserId ? (
                       <div className="flex flex-col gap-2">
                         <select
                           name="inventory_select"

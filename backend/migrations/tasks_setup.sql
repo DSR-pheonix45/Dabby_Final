@@ -1,7 +1,7 @@
 -- Migration: Create workbench_tasks table
 CREATE TABLE IF NOT EXISTS public.workbench_tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    workbench_id UUID NOT NULL REFERENCES public.workbenches(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.workbenches(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     description TEXT,
     assigned_to UUID REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.workbench_tasks (
 );
 
 -- Index for performance
-CREATE INDEX IF NOT EXISTS idx_workbench_tasks_workbench_id ON public.workbench_tasks(workbench_id);
+CREATE INDEX IF NOT EXISTS idx_workbench_tasks_user_id ON public.workbench_tasks(user_id);
 CREATE INDEX IF NOT EXISTS idx_workbench_tasks_assigned_to ON public.workbench_tasks(assigned_to);
 
 -- Enable RLS

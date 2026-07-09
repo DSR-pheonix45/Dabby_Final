@@ -16,7 +16,7 @@ else:
     load_dotenv(env_path)
 
 
-from routers import workbenches, ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, trades, assets, rulesets, plans, superadmin, ingestion, trade_drafts, business_events, settlements
+from routers import ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, assets, rulesets, plans, superadmin, ingestion, business_events, settlements
 
 app = FastAPI(title="Datalis API", description="FastAPI Backend for Datalis", version="1.0.0")
 
@@ -42,7 +42,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(workbenches.router, prefix="/api/workbenches", tags=["Workbenches"])
+
 app.include_router(ai.router, prefix="/api/ai", tags=["AI"])
 app.include_router(coa.router, prefix="/api/coa", tags=["COA"])
 app.include_router(ledger.router, prefix="/api/ledger", tags=["Ledger"])
@@ -52,13 +52,11 @@ app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"]
 app.include_router(investor.router, prefix="/api/investor", tags=["Investor"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["Tasks"])
 app.include_router(budgets.router, prefix="/api/budgets", tags=["Budgets"])
-app.include_router(trades.router, prefix="/api/trades", tags=["Trades"])
 app.include_router(assets.router, prefix="/api/assets", tags=["Assets"])
 app.include_router(rulesets.router, prefix="/api/rulesets", tags=["Rulesets"])
 app.include_router(plans.router, prefix="/api/plans", tags=["Plans"])
 app.include_router(superadmin.router, prefix="/api/superadmin", tags=["Superadmin"])
 app.include_router(ingestion.router, prefix="/api/ingestion", tags=["Ingestion"])
-app.include_router(trade_drafts.router, prefix="/api/trade-drafts", tags=["Trade Drafts"])
 app.include_router(business_events.router, prefix="/api/business-events", tags=["Business Events"])
 app.include_router(settlements.router, prefix="/api/settlements", tags=["Settlements"])
 

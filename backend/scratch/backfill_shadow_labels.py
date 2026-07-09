@@ -20,7 +20,7 @@ def backfill_shadow_labels():
                 print(f"[WARNING] Entity {entity['id']} has no linked party. Skipping.")
                 continue
                 
-            workbench_id = party["workbench_id"]
+            user_id = party["user_id"]
             
             # Determine Parenting Pillar
             parent_sub_name = "Bank Accounts" if party.get("is_self") else "Accounts Receivable (AR)"
@@ -29,7 +29,7 @@ def backfill_shadow_labels():
             # Find the parent sub-account ID
             parent_res = supabase.table("coa_accounts") \
                 .select("id") \
-                .eq("workbench_id", workbench_id) \
+                .eq("user_id", user_id) \
                 .eq("name", parent_sub_name) \
                 .eq("level", 2) \
                 .execute()
@@ -38,7 +38,7 @@ def backfill_shadow_labels():
             
             # Create the Shadow Label
             label_data = {
-                "workbench_id": workbench_id,
+                "user_id": user_id,
                 "name": f"{party['name']} - {entity['name']}",
                 "type": label_type,
                 "sub_account": parent_sub_name,

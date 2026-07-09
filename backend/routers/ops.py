@@ -6,14 +6,14 @@ from supabase_client import supabase
 from services.ledger_service import LedgerService
 from services.ai_service import ai_service
 from services import plan_service
-from auth import require_permission, P
+from auth import verify_user_access
 import uuid
 
 router = APIRouter()
 ledger_service = LedgerService(supabase)
 
 class PartyCreate(BaseModel):
-    workbench_id: str
+    user_id: str
     name: str
     category: str # individual, corporation, group
     email: Optional[str] = None
@@ -27,7 +27,7 @@ class EntityCreate(BaseModel):
     metadata: Dict = {}
 
 class InvoiceCreate(BaseModel):
-    workbench_id: str
+    user_id: str
     party_id: str
     invoice_number: str
     amount: float
@@ -49,7 +49,7 @@ class PaymentRequest(BaseModel):
 
 
 class BillCreate(BaseModel):
-    workbench_id: str
+    user_id: str
     party_id: str
     bill_number: str
     amount: float
@@ -79,33 +79,33 @@ async def create_party(party: PartyCreate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/parties/{workbench_id}")
-async def list_parties(workbench_id: str):
+@router.get("/parties/{user_id}")
+async def list_parties(user_id: str):
     try:
         # Fetch parties with their entities
-        response = supabase.table("parties").select("*, entities(*)").eq("workbench_id", workbench_id).execute()
+        response = supabase.table("parties").select("*, entities(*)").eq("user_id", user_id).execute()
         return response.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/parties/initialize-self/{workbench_id}")
-async def initialize_self_party(workbench_id: str):
+@router.post("/parties/initialize-self/{user_id}")
+async def initialize_self_party(user_id: str):
     """
     Ensures a 'Self' party exists for the workbench.
     """
     try:
         # Check if already exists
-        existing = supabase.table("parties").select("*").eq("workbench_id", workbench_id).eq("is_self", True).execute()
+        existing = supabase.table("parties").select("*").eq("user_id", user_id).eq("is_self", True).execute()
         if existing.data:
             return existing.data[0]
         
         # Create Self Party
         # Fetch workbench name to use as party name
-        wb = supabase.table("workbenches").select("name").eq("id", workbench_id).execute()
+        wb = supabase.table("users").select("name").eq("id", user_id).execute()
         wb_name = wb.data[0]["name"] if wb.data else "My Company"
         
         party_res = supabase.table("parties").insert({
-            "workbench_id": workbench_id,
+            "user_id": user_id,
             "name": wb_name,
             "category": "corporation",
             "is_self": True
@@ -162,12 +162,12 @@ async def create_entity(entity: EntityCreate):
         
         # Generate unique code
         account_code = await ledger_service.generate_unique_account_code(
-            party["workbench_id"], master_code, sub_account_code
+            party["user_id"], master_code, sub_account_code
         )
         
-        # Create the Shadow Label in workbench_accounts
+        # Create the Shadow Label in user_accounts
         label_data = {
-            "workbench_id": party["workbench_id"],
+            "user_id": party["user_id"],
             "master_account_id": master_account_id,
             "master_sub_account_id": sub_acc["id"],
             "account_code": account_code,
@@ -183,11 +183,11 @@ async def create_entity(entity: EntityCreate):
                 "is_shadow": True,
                 "vessel_id": new_entity["id"]
             }
-            label_res = supabase.table("workbench_accounts").insert(try_data).execute()
+            label_res = supabase.table("user_accounts").insert(try_data).execute()
         except Exception as insert_err:
             # If that fails (e.g. columns don't exist), fall back to standard fields
             print(f"[WARNING] Inserting shadow label with is_shadow/vessel_id failed, falling back: {insert_err}")
-            label_res = supabase.table("workbench_accounts").insert(label_data).execute()
+            label_res = supabase.table("user_accounts").insert(label_data).execute()
         
         # 3. Link back to Entity if label was created
         if label_res and label_res.data:
@@ -236,7 +236,7 @@ async def create_invoice(invoice: InvoiceCreate):
         
         # 2. Record Financial Transaction (Dr AR, Cr Revenue)
         tx_res = await ledger_service.record_transaction(
-            workbench_id=invoice.workbench_id,
+            user_id=invoice.user_id,
             from_label_id=invoice.revenue_label_id,
             to_label_id=invoice.ar_label_id,
             amount=invoice.amount,
@@ -259,7 +259,7 @@ async def create_invoice(invoice: InvoiceCreate):
                 if item_id and quantity > 0:
                     try:
                         await inventory_service.record_sale_impact(
-                            workbench_id=invoice.workbench_id,
+                            user_id=invoice.user_id,
                             item_id=item_id,
                             quantity=quantity,
                             transaction_id=transaction_id,
@@ -273,7 +273,7 @@ async def create_invoice(invoice: InvoiceCreate):
         if invoice.doc_id:
             try:
                 transaction_id = tx_res["transaction"]["id"]
-                supabase.table("workbench_documents").update({
+                supabase.table("user_documents").update({
                     "transaction_id": transaction_id
                 }).eq("id", invoice.doc_id).execute()
             except Exception as doc_err:
@@ -283,12 +283,12 @@ async def create_invoice(invoice: InvoiceCreate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/invoices/{workbench_id}")
-async def list_invoices(workbench_id: str):
+@router.get("/invoices/{user_id}")
+async def list_invoices(user_id: str):
     try:
         res = supabase.table("invoices") \
-            .select("*, parties(name), labels:workbench_accounts!revenue_label_id(full_account_name), ar_label:workbench_accounts!ar_label_id(full_account_name)") \
-            .eq("workbench_id", workbench_id) \
+            .select("*, parties(name), labels:user_accounts!revenue_label_id(full_account_name), ar_label:user_accounts!ar_label_id(full_account_name)") \
+            .eq("user_id", user_id) \
             .order("created_at", desc=True) \
             .execute()
             
@@ -309,7 +309,7 @@ async def list_invoices(workbench_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/documents/process/{doc_id}", dependencies=[Depends(require_permission(P.UPLOAD_DOCUMENT))])
+@router.post("/documents/process/{doc_id}", dependencies=[Depends(verify_user_access)])
 async def process_document(doc_id: str):
     """
     Enqueues a document for background processing.
@@ -317,12 +317,12 @@ async def process_document(doc_id: str):
     """
     try:
         from services import queue_service
-        doc_res = supabase.table("workbench_documents").select("*").eq("id", doc_id).single().execute()
+        doc_res = supabase.table("user_documents").select("*").eq("id", doc_id).single().execute()
         if not doc_res.data:
             raise HTTPException(status_code=404, detail="Document not found")
 
         # Plan gate: raises HTTP 402 when the monthly upload limit is hit.
-        plan_service.check_and_increment_upload(doc_res.data["workbench_id"])
+        plan_service.check_and_increment_upload(doc_res.data["user_id"])
 
         await queue_service.enqueue_document(doc_id)
         return {"status": "queued", "doc_id": doc_id}
@@ -337,7 +337,7 @@ async def get_document_status(doc_id: str):
     Exposes detailed OCR progress, state machine transitions, and status metrics of a document.
     """
     try:
-        doc_res = supabase.table("workbench_documents").select("*").eq("id", doc_id).maybe_single().execute()
+        doc_res = supabase.table("user_documents").select("*").eq("id", doc_id).maybe_single().execute()
         if not doc_res.data:
             raise HTTPException(status_code=404, detail="Document not found")
         
@@ -375,7 +375,7 @@ async def get_document_status(doc_id: str):
 async def scan_invoice_doc(doc_id: str):
     try:
         # 1. Fetch document metadata
-        doc_res = supabase.table("workbench_documents").select("*").eq("id", doc_id).single().execute()
+        doc_res = supabase.table("user_documents").select("*").eq("id", doc_id).single().execute()
         doc = doc_res.data
         if not doc:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -410,7 +410,7 @@ async def scan_invoice_doc(doc_id: str):
             else:
                 updated_metadata["extracted_invoice"] = extracted
 
-            supabase.table("workbench_documents").update({
+            supabase.table("user_documents").update({
                 "document_type": doc_type,
                 "metadata": updated_metadata
             }).eq("id", doc_id).execute()
@@ -447,7 +447,7 @@ async def record_payment(invoice_id: str, req: PaymentRequest):
         
         # 3. Record Financial Transaction (Dr Bank, Cr AR)
         tx_res = await ledger_service.record_transaction(
-            workbench_id=invoice["workbench_id"],
+            user_id=invoice["user_id"],
             from_label_id=req.ar_label_id,
             to_label_id=req.bank_label_id,
             amount=req.amount,
@@ -460,7 +460,7 @@ async def record_payment(invoice_id: str, req: PaymentRequest):
         # 4. Link Document if provided
         if req.doc_id:
             try:
-                supabase.table("workbench_documents").update({
+                supabase.table("user_documents").update({
                     "transaction_id": tx_res["transaction"]["id"]
                 }).eq("id", req.doc_id).execute()
             except Exception as doc_err:
@@ -471,11 +471,11 @@ async def record_payment(invoice_id: str, req: PaymentRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/metrics/ar/{workbench_id}")
-async def get_ar_metrics(workbench_id: str):
+@router.get("/metrics/ar/{user_id}")
+async def get_ar_metrics(user_id: str):
     try:
         # Fetch all non-paid invoices
-        res = supabase.table("invoices").select("*").eq("workbench_id", workbench_id).neq("status", "paid").execute()
+        res = supabase.table("invoices").select("*").eq("user_id", user_id).neq("status", "paid").execute()
         invoices = res.data
         
         total_receivable = sum(float(inv["balance_due"]) for inv in invoices)
@@ -501,10 +501,10 @@ async def get_ar_metrics(workbench_id: str):
             avg_days = 0
             
         # Gross Revenue Calculation from Ledger
-        labels = await ledger_service.get_labels(workbench_id)
+        labels = await ledger_service.get_labels(user_id)
         revenue_label_ids = [l["id"] for l in labels if l["type"] == "revenue"]
         
-        balances = await ledger_service.get_balances(workbench_id)
+        balances = await ledger_service.get_balances(user_id)
         total_sales_revenue = sum(balances.get(lid, {}).get("gross", 0) for lid in revenue_label_ids)
             
         return {
@@ -535,7 +535,7 @@ async def create_bill(bill: BillCreate):
         
         # 2. Record Financial Transaction (Dr Expense, Cr AP)
         await ledger_service.record_transaction(
-            workbench_id=bill.workbench_id,
+            user_id=bill.user_id,
             from_label_id=bill.ap_label_id,     # Source of obligation (Liability)
             to_label_id=bill.expense_label_id, # Destination of value (Expense)
             amount=bill.amount,
@@ -549,7 +549,7 @@ async def create_bill(bill: BillCreate):
         if bill.doc_id:
             try:
                 transaction_id = tx_res["transaction"]["id"]
-                supabase.table("workbench_documents").update({
+                supabase.table("user_documents").update({
                     "transaction_id": transaction_id
                 }).eq("id", bill.doc_id).execute()
             except Exception as doc_err:
@@ -559,12 +559,12 @@ async def create_bill(bill: BillCreate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/bills/{workbench_id}")
-async def list_bills(workbench_id: str):
+@router.get("/bills/{user_id}")
+async def list_bills(user_id: str):
     try:
         res = supabase.table("bills") \
-            .select("*, parties(name), labels:workbench_accounts!expense_label_id(full_account_name), ap_label:workbench_accounts!ap_label_id(full_account_name)") \
-            .eq("workbench_id", workbench_id) \
+            .select("*, parties(name), labels:user_accounts!expense_label_id(full_account_name), ap_label:user_accounts!ap_label_id(full_account_name)") \
+            .eq("user_id", user_id) \
             .order("created_at", desc=True) \
             .execute()
             
@@ -605,7 +605,7 @@ async def record_bill_payment(bill_id: str, req: BillPaymentRequest):
         
         # 3. Record Financial Transaction (Dr AP, Cr Bank)
         tx_res = await ledger_service.record_transaction(
-            workbench_id=bill["workbench_id"],
+            user_id=bill["user_id"],
             from_label_id=req.bank_label_id, # Source of value (Bank Asset)
             to_label_id=req.ap_label_id,    # Destination (Reducing Liability)
             amount=req.amount,
@@ -618,7 +618,7 @@ async def record_bill_payment(bill_id: str, req: BillPaymentRequest):
         # 4. Link Document if provided
         if req.doc_id:
             try:
-                supabase.table("workbench_documents").update({
+                supabase.table("user_documents").update({
                     "transaction_id": tx_res["transaction"]["id"]
                 }).eq("id", req.doc_id).execute()
             except Exception as doc_err:
@@ -629,11 +629,11 @@ async def record_bill_payment(bill_id: str, req: BillPaymentRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/metrics/ap/{workbench_id}")
-async def get_ap_metrics(workbench_id: str):
+@router.get("/metrics/ap/{user_id}")
+async def get_ap_metrics(user_id: str):
     try:
         # Fetch all non-paid bills
-        res = supabase.table("bills").select("*").eq("workbench_id", workbench_id).neq("status", "paid").execute()
+        res = supabase.table("bills").select("*").eq("user_id", user_id).neq("status", "paid").execute()
         bills = res.data
         
         total_payable = sum(float(b["balance_due"]) for b in bills)
@@ -656,10 +656,10 @@ async def get_ap_metrics(workbench_id: str):
             avg_days = 0
             
         # Gross Expense Calculation from Ledger
-        labels = await ledger_service.get_labels(workbench_id)
+        labels = await ledger_service.get_labels(user_id)
         expense_label_ids = [l["id"] for l in labels if l["type"] == "expense"]
         
-        balances = await ledger_service.get_balances(workbench_id)
+        balances = await ledger_service.get_balances(user_id)
         total_gross_expense = sum(balances.get(lid, {}).get("gross", 0) for lid in expense_label_ids)
             
         return {
@@ -671,13 +671,13 @@ async def get_ap_metrics(workbench_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/entities/workbench/{workbench_id}")
-async def list_workbench_entities(workbench_id: str):
+@router.get("/entities/user/{user_id}")
+async def list_workbench_entities(user_id: str):
     try:
         # Fetch all entities for the workbench
         res = supabase.table("entities") \
             .select("*, parties!inner(*)") \
-            .eq("parties.workbench_id", workbench_id) \
+            .eq("parties.user_id", user_id) \
             .execute()
         return res.data
     except Exception as e:

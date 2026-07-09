@@ -22,7 +22,7 @@ class ActivityExecutor:
         if not trade:
             raise ValueError(f"Trade {trade_id} not found for activity {activity_id}")
             
-        workbench_id = trade["workbench_id"]
+        user_id = trade["user_id"]
         
         # Create execution record
         exec_payload = {
@@ -48,13 +48,13 @@ class ActivityExecutor:
                 invoice_number = trade.get("invoice_number") or f"INV-{trade_id[:8]}"
 
                 # Idempotency: if invoice already exists, reuse it
-                dup_check = supabase.table("invoices").select("id").eq("workbench_id", workbench_id).eq("invoice_number", invoice_number).execute()
+                dup_check = supabase.table("invoices").select("id").eq("user_id", user_id).eq("invoice_number", invoice_number).execute()
                 if dup_check.data:
                     print(f"[INFO] Invoice {invoice_number} already exists — reusing existing record (idempotent retry)")
                     new_state["invoice"] = {"id": dup_check.data[0]["id"], "reused": True}
                 else:
                     inv_data = {
-                        "workbench_id": workbench_id,
+                        "user_id": user_id,
                         "party_id": party_id,
                         "invoice_number": invoice_number,
                         "amount": amount,
@@ -82,13 +82,13 @@ class ActivityExecutor:
                 bill_number = trade.get("invoice_number") or f"BILL-{trade_id[:8]}"
 
                 # Idempotency: if bill already exists, reuse it instead of failing
-                dup_check = supabase.table("bills").select("id").eq("workbench_id", workbench_id).eq("bill_number", bill_number).execute()
+                dup_check = supabase.table("bills").select("id").eq("user_id", user_id).eq("bill_number", bill_number).execute()
                 if dup_check.data:
                     print(f"[INFO] Bill {bill_number} already exists — reusing existing record (idempotent retry)")
                     new_state["bill"] = {"id": dup_check.data[0]["id"], "reused": True}
                 else:
                     bill_data = {
-                        "workbench_id": workbench_id,
+                        "user_id": user_id,
                         "party_id": party_id,
                         "bill_number": bill_number,
                         "amount": amount,
@@ -124,7 +124,7 @@ class ActivityExecutor:
                 
                 if not label_id:
                     # Last resort: find a default expense/revenue account in the workbench
-                    accs = supabase.table("workbench_accounts").select("id, full_account_name, master_accounts(account_name)").eq("workbench_id", workbench_id).eq("is_active", True).execute()
+                    accs = supabase.table("user_accounts").select("id, full_account_name, master_accounts(account_name)").eq("user_id", user_id).eq("is_active", True).execute()
                     for acc in (accs.data or []):
                         master_name = (acc.get("master_accounts") or {}).get("account_name", "").lower()
                         if activity_type in ("ADD_EXPENSE", "ADD_INPUT_GST") and "exp" in master_name:
@@ -138,7 +138,7 @@ class ActivityExecutor:
                     print(f"[WARNING] No label resolved for {activity_type}, skipping balance update")
                     new_state["skipped"] = {"type": activity_type, "reason": "no_label_id"}
                 else:
-                    l_res = supabase.table("workbench_accounts").select("current_amount").eq("id", label_id).single().execute()
+                    l_res = supabase.table("user_accounts").select("current_amount").eq("id", label_id).single().execute()
                     prev_val = float(l_res.data.get("current_amount") or 0.0)
                     previous_state["label_balance"] = {"label_id": label_id, "balance": prev_val}
                     
@@ -149,7 +149,7 @@ class ActivityExecutor:
                         change = -amount
                     new_val = prev_val + change
                     
-                    supabase.table("workbench_accounts").update({"current_amount": new_val}).eq("id", label_id).execute()
+                    supabase.table("user_accounts").update({"current_amount": new_val}).eq("id", label_id).execute()
                     new_state["label_balance"] = {"label_id": label_id, "balance": new_val}
                 
             elif activity_type == "CREATE_ASSET":
@@ -160,7 +160,7 @@ class ActivityExecutor:
                 salvage = float(activity.get("metadata", {}).get("salvage_value") or 0.0)
                 
                 asset_data = {
-                    "workbench_id": workbench_id,
+                    "user_id": user_id,
                     "label_id": label_id,
                     "trade_id": trade_id,
                     "name": asset_name,

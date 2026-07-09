@@ -13,8 +13,8 @@
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS ocr_raw_output (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    document_id         UUID NOT NULL REFERENCES workbench_documents(id) ON DELETE CASCADE,
-    workbench_id        UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
+    document_id         UUID NOT NULL REFERENCES user_documents(id) ON DELETE CASCADE,
+    user_id        UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
 
     -- Raw text extracted from document (concatenated across pages)
     raw_text            TEXT,
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS ocr_raw_output (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ocr_raw_output_document  ON ocr_raw_output(document_id);
-CREATE INDEX IF NOT EXISTS idx_ocr_raw_output_workbench ON ocr_raw_output(workbench_id);
+CREATE INDEX IF NOT EXISTS idx_ocr_raw_output_workbench ON ocr_raw_output(user_id);
 
 
 -- ─────────────────────────────────────────────
@@ -47,8 +47,8 @@ CREATE INDEX IF NOT EXISTS idx_ocr_raw_output_workbench ON ocr_raw_output(workbe
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS document_classifications (
     id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    document_id             UUID NOT NULL REFERENCES workbench_documents(id) ON DELETE CASCADE,
-    workbench_id            UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
+    document_id             UUID NOT NULL REFERENCES user_documents(id) ON DELETE CASCADE,
+    user_id            UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
 
     document_type           TEXT CHECK (document_type IN (
                                 'sales_invoice', 'vendor_invoice',
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS document_classifications (
 );
 
 CREATE INDEX IF NOT EXISTS idx_doc_classifications_document  ON document_classifications(document_id);
-CREATE INDEX IF NOT EXISTS idx_doc_classifications_workbench ON document_classifications(workbench_id);
+CREATE INDEX IF NOT EXISTS idx_doc_classifications_workbench ON document_classifications(user_id);
 
 
 -- ─────────────────────────────────────────────
@@ -88,8 +88,8 @@ CREATE INDEX IF NOT EXISTS idx_doc_classifications_workbench ON document_classif
 CREATE TABLE IF NOT EXISTS analysis_notes (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
-    document_id         UUID NOT NULL REFERENCES workbench_documents(id) ON DELETE CASCADE,
-    workbench_id        UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
+    document_id         UUID NOT NULL REFERENCES user_documents(id) ON DELETE CASCADE,
+    user_id        UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
 
     -- Canonical document type (mirrors document_classifications.document_type)
     document_type       TEXT NOT NULL,
@@ -185,7 +185,7 @@ CREATE TABLE IF NOT EXISTS analysis_notes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_analysis_notes_document      ON analysis_notes(document_id);
-CREATE INDEX IF NOT EXISTS idx_analysis_notes_workbench     ON analysis_notes(workbench_id);
+CREATE INDEX IF NOT EXISTS idx_analysis_notes_workbench     ON analysis_notes(user_id);
 CREATE INDEX IF NOT EXISTS idx_analysis_notes_review_status ON analysis_notes(review_status);
 CREATE INDEX IF NOT EXISTS idx_analysis_notes_settlement_key ON analysis_notes(settlement_key);
 CREATE INDEX IF NOT EXISTS idx_analysis_notes_doc_type      ON analysis_notes(document_type);
@@ -198,8 +198,8 @@ CREATE INDEX IF NOT EXISTS idx_analysis_notes_doc_type      ON analysis_notes(do
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS document_processing_log (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    document_id     UUID NOT NULL REFERENCES workbench_documents(id) ON DELETE CASCADE,
-    workbench_id    UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
+    document_id     UUID NOT NULL REFERENCES user_documents(id) ON DELETE CASCADE,
+    user_id    UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
 
     stage           TEXT NOT NULL CHECK (stage IN (
                         'VALIDATE', 'SPLIT', 'OCR', 'CLASSIFY',
@@ -218,7 +218,7 @@ CREATE TABLE IF NOT EXISTS document_processing_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_processing_log_document  ON document_processing_log(document_id);
-CREATE INDEX IF NOT EXISTS idx_processing_log_workbench ON document_processing_log(workbench_id);
+CREATE INDEX IF NOT EXISTS idx_processing_log_workbench ON document_processing_log(user_id);
 CREATE INDEX IF NOT EXISTS idx_processing_log_stage     ON document_processing_log(stage);
 
 
@@ -234,28 +234,28 @@ ALTER TABLE document_processing_log ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Workbench members can manage ocr_raw_output" ON ocr_raw_output;
 CREATE POLICY "Workbench members can manage ocr_raw_output" ON ocr_raw_output
     FOR ALL USING (
-        EXISTS (SELECT 1 FROM workbenches WHERE id = ocr_raw_output.workbench_id)
+        EXISTS (SELECT 1 FROM workbenches WHERE id = ocr_raw_output.user_id)
     );
 
 -- document_classifications: workbench members can read/write
 DROP POLICY IF EXISTS "Workbench members can manage document_classifications" ON document_classifications;
 CREATE POLICY "Workbench members can manage document_classifications" ON document_classifications
     FOR ALL USING (
-        EXISTS (SELECT 1 FROM workbenches WHERE id = document_classifications.workbench_id)
+        EXISTS (SELECT 1 FROM workbenches WHERE id = document_classifications.user_id)
     );
 
 -- analysis_notes: workbench members can read/write
 DROP POLICY IF EXISTS "Workbench members can manage analysis_notes" ON analysis_notes;
 CREATE POLICY "Workbench members can manage analysis_notes" ON analysis_notes
     FOR ALL USING (
-        EXISTS (SELECT 1 FROM workbenches WHERE id = analysis_notes.workbench_id)
+        EXISTS (SELECT 1 FROM workbenches WHERE id = analysis_notes.user_id)
     );
 
 -- document_processing_log: workbench members can read/write
 DROP POLICY IF EXISTS "Workbench members can manage document_processing_log" ON document_processing_log;
 CREATE POLICY "Workbench members can manage document_processing_log" ON document_processing_log
     FOR ALL USING (
-        EXISTS (SELECT 1 FROM workbenches WHERE id = document_processing_log.workbench_id)
+        EXISTS (SELECT 1 FROM workbenches WHERE id = document_processing_log.user_id)
     );
 
 
@@ -264,17 +264,17 @@ CREATE POLICY "Workbench members can manage document_processing_log" ON document
 --    Enables: "find all notes with this settlement key in this workbench"
 -- ─────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_analysis_notes_wb_settlement
-    ON analysis_notes(workbench_id, settlement_key)
+    ON analysis_notes(user_id, settlement_key)
     WHERE settlement_key IS NOT NULL;
 
 
 -- ─────────────────────────────────────────────
--- 7. Add analysis_note_id backlink to workbench_documents
+-- 7. Add analysis_note_id backlink to user_documents
 --    Allows direct lookup: document → its latest analysis note
 -- ─────────────────────────────────────────────
-ALTER TABLE workbench_documents
+ALTER TABLE user_documents
     ADD COLUMN IF NOT EXISTS analysis_note_id UUID REFERENCES analysis_notes(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_workbench_docs_analysis_note
-    ON workbench_documents(analysis_note_id)
+    ON user_documents(analysis_note_id)
     WHERE analysis_note_id IS NOT NULL;

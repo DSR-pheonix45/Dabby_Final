@@ -18,7 +18,7 @@ Principle:
 
 Triggered:
   - Automatically when a new Business Event is created (via BusinessEventRegistry)
-  - Manually via POST /api/settlements/recalculate/{workbench_id}
+  - Manually via POST /api/settlements/recalculate/{user_id}
 """
 
 from typing import Dict, List, Optional, Tuple
@@ -110,7 +110,7 @@ class SettlementEngine:
     # Public: Recalculate all OPEN events in a workbench
     # ──────────────────────────────────────────────────────────────────────
 
-    async def recalculate_workbench(self, workbench_id: str) -> Dict:
+    async def recalculate_user_ledger(self, user_id: str) -> Dict:
         """
         Re-run settlement matching for all OPEN events in a workbench.
         Safe to call multiple times — idempotent.
@@ -118,7 +118,7 @@ class SettlementEngine:
         open_events = (
             supabase.table("business_events")
                     .select("id")
-                    .eq("workbench_id", workbench_id)
+                    .eq("user_id", user_id)
                     .eq("event_status", "OPEN")
                     .eq("is_superseded", False)
                     .execute()
@@ -139,7 +139,7 @@ class SettlementEngine:
                 errors.append({"event_id": row["id"], "error": str(e)})
 
         return {
-            "workbench_id":   workbench_id,
+            "user_id":   user_id,
             "total_checked":  len(open_events.data or []),
             "matched":        matched_count,
             "unmatched":      unmatched_count,
@@ -178,7 +178,7 @@ class SettlementEngine:
         candidates = (
             supabase.table("business_events")
                     .select("*")
-                    .eq("workbench_id", event["workbench_id"])
+                    .eq("user_id", event["user_id"])
                     .eq("settlement_key", event["settlement_key"])
                     .in_("event_type", complementary_types)
                     .in_("event_status", ["OPEN", "PARTIALLY_SETTLED"])
@@ -225,7 +225,7 @@ class SettlementEngine:
         candidates = (
             supabase.table("business_events")
                     .select("*")
-                    .eq("workbench_id", event["workbench_id"])
+                    .eq("user_id", event["user_id"])
                     .in_("event_type", complementary_types)
                     .in_("event_status", ["OPEN", "PARTIALLY_SETTLED"])
                     .eq("is_superseded", False)
@@ -272,7 +272,7 @@ class SettlementEngine:
         candidates = (
             supabase.table("business_events")
                     .select("*")
-                    .eq("workbench_id", event["workbench_id"])
+                    .eq("user_id", event["user_id"])
                     .eq("counterparty", event["counterparty"])
                     .in_("event_type", complementary_types)
                     .in_("event_status", ["OPEN", "PARTIALLY_SETTLED"])
@@ -358,7 +358,7 @@ class SettlementEngine:
 
         # Insert settlement record
         settlement_row = {
-            "workbench_id":      opener["workbench_id"],
+            "user_id":      opener["user_id"],
             "event_id_a":        opener["id"],
             "event_id_b":        settler["id"],
             "settlement_key":    settlement_key,

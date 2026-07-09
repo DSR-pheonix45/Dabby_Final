@@ -5,20 +5,20 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from typing import Optional
 from supabase_client import supabase
-from auth import require_membership, require_permission, get_current_user, P
+from auth import verify_user_access, get_current_user
 from services import plan_service
 
 router = APIRouter()
 
 
-@router.get("/status/{workbench_id}", dependencies=[])
-async def plan_status(workbench_id: str, principal=Depends(require_membership())):
+@router.get("/status/{user_id}", dependencies=[])
+async def plan_status(user_id: str, principal=Depends(verify_user_access)):
     """Plan tier, limits, and current usage for the workbench (+ caller's AI count today)."""
-    return plan_service.usage_summary(workbench_id, principal.user_id)
+    return plan_service.usage_summary(user_id, principal.user_id)
 
 
 class AIConsume(BaseModel):
-    workbench_id: Optional[str] = None
+    user_id: Optional[str] = None
 
 
 @router.post("/ai-usage/consume")
@@ -27,18 +27,18 @@ async def ai_consume(payload: AIConsume, user: dict = Depends(get_current_user))
     Meter one AI consultant message for the authenticated user. The chat calls
     this BEFORE hitting the LLM; if `allowed` is false it shows an upgrade prompt.
     """
-    return plan_service.consume_ai_message(payload.workbench_id, user["id"])
+    return plan_service.consume_ai_message(payload.user_id, user["id"])
 
 
 class SetPlan(BaseModel):
     plan: str
 
 
-@router.post("/set/{workbench_id}")
-async def set_plan(workbench_id: str, payload: SetPlan, principal=Depends(require_permission(P.MANAGE_BILLING))):
+@router.post("/set/{user_id}")
+async def set_plan(user_id: str, payload: SetPlan, principal=Depends(verify_user_access)):
     """Change a workbench's plan tier. Owner-only (manage_billing)."""
     plan = plan_service.normalize_plan(payload.plan)
-    supabase.table("workbenches").update({"plan": plan}).eq("id", workbench_id).execute()
+    supabase.table("users").update({"plan": plan}).eq("id", user_id).execute()
     return {"status": "updated", "plan": plan, "limits": plan_service.limits_for(plan)}
 
 

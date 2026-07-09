@@ -1,7 +1,7 @@
 -- 1. Projects Table (For cross-functional clubbing)
 CREATE TABLE IF NOT EXISTS projects (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    workbench_id UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     status TEXT DEFAULT 'active',
     created_at TIMESTAMPTZ DEFAULT NOW()
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS projects (
 -- 2. Budgets Table (Acts as category allocations in this setup)
 CREATE TABLE IF NOT EXISTS budgets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    workbench_id UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
     project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
     name TEXT NOT NULL, -- This acts as the category/sub-account name (e.g. 'Marketing')
     total_amount NUMERIC NOT NULL DEFAULT 0,
@@ -27,7 +27,7 @@ ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES projects(id) ON DELETE SET N
 CREATE OR REPLACE VIEW view_budget_vs_actual AS
 SELECT 
     b.id,
-    b.workbench_id,
+    b.user_id,
     b.name AS category,
     b.total_amount AS budgeted_amount,
     COALESCE((
@@ -36,7 +36,7 @@ SELECT
         FROM transaction_entries te
         JOIN transactions t ON t.id = te.transaction_id
         JOIN labels l ON l.id = te.label_id
-        WHERE t.workbench_id = b.workbench_id
+        WHERE t.user_id = b.user_id
           AND l.sub_account = b.name
           AND t.transaction_date >= b.start_date 
           AND t.transaction_date <= b.end_date
@@ -49,7 +49,7 @@ SELECT
                 FROM transaction_entries te
                 JOIN transactions t ON t.id = te.transaction_id
                 JOIN labels l ON l.id = te.label_id
-                WHERE t.workbench_id = b.workbench_id
+                WHERE t.user_id = b.user_id
                   AND l.sub_account = b.name
                   AND t.transaction_date >= b.start_date 
                   AND t.transaction_date <= b.end_date
@@ -60,7 +60,7 @@ FROM budgets b;
 
 -- 5. Add RLS Policies
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can manage projects in their workbenches" ON projects FOR ALL USING (EXISTS (SELECT 1 FROM workbenches WHERE id = projects.workbench_id));
+CREATE POLICY "Users can manage projects in their workbenches" ON projects FOR ALL USING (EXISTS (SELECT 1 FROM workbenches WHERE id = projects.user_id));
 
 ALTER TABLE budgets ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can manage budgets in their workbenches" ON budgets FOR ALL USING (EXISTS (SELECT 1 FROM workbenches WHERE id = budgets.workbench_id));
+CREATE POLICY "Users can manage budgets in their workbenches" ON budgets FOR ALL USING (EXISTS (SELECT 1 FROM workbenches WHERE id = budgets.user_id));

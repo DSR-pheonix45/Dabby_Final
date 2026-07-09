@@ -13,11 +13,11 @@ export const backendService = {
   /**
    * Creates a manual record (transaction, compliance, budget, or party)
    */
-  async createRecord(workbenchId, recordType, summary, metadata) {
+  async createRecord(userId, recordType, summary, metadata) {
     try {
       const { data, error } = await supabase.functions.invoke('create-record', {
         body: {
-          workbench_id: workbenchId,
+          user_id: userId,
           record_type: recordType,
           summary,
           metadata
@@ -38,11 +38,11 @@ export const backendService = {
   /**
    * Pushes a financial adjustment
    */
-  async pushAdjustment(workbenchId, originalRecordId, adjustmentType, reason, metadata) {
+  async pushAdjustment(userId, originalRecordId, adjustmentType, reason, metadata) {
     try {
       const { data, error } = await supabase.functions.invoke('push-adjustment', {
         body: {
-          workbench_id: workbenchId,
+          user_id: userId,
           original_record_id: originalRecordId,
           adjustment_type: adjustmentType,
           reason,
@@ -64,11 +64,11 @@ export const backendService = {
   /**
    * Uploads and initiates document processing
    */
-  async uploadDocument(workbenchId, file, documentType, transactionId = null) {
+  async uploadDocument(userId, file, documentType, transactionId = null) {
     // 1. Upload to storage first
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-    const filePath = `${workbenchId}/${fileName}`;
+    const filePath = `${userId}/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from("Doc_vault_Raw")
@@ -77,10 +77,10 @@ export const backendService = {
     if (uploadError) throw uploadError;
 
     // 2. Register document in database
-    // We insert into workbench_documents if it exists, or fallback to metadata in transaction
+    // We insert into user_documents if it exists, or fallback to metadata in transaction
     try {
       const docPayload = {
-        workbench_id: workbenchId,
+        user_id: userId,
         transaction_id: transactionId,
         filename: file.name,
         file_path: filePath,
@@ -93,17 +93,17 @@ export const backendService = {
       console.log('[DEBUG] Attempting to register document:', docPayload);
 
       const { data, error } = await supabase
-        .from('workbench_documents')
+        .from('user_documents')
         .insert(docPayload)
         .select()
         .single();
 
       if (error) {
-        console.error('CRITICAL: Failed to register document in workbench_documents:', error);
+        console.error('CRITICAL: Failed to register document in user_documents:', error);
         throw new Error(`Database registration failed: ${error.message}`);
       }
 
-      console.log('Document successfully registered in workbench_documents:', data);
+      console.log('Document successfully registered in user_documents:', data);
 
       // Trigger background processing on backend asynchronously
       apiFetch(`/api/ops/documents/process/${data.id}`, { method: 'POST' }).catch(err => {
@@ -179,11 +179,11 @@ export const backendService = {
         console.error("[WARNING] Auto-seeding labels failed:", seedErr);
       }
 
-      // 2. Insert into workbench_members table
+      // 2. Insert into user_members table
       const { error: memError } = await supabase
-        .from('workbench_members')
+        .from('user_members')
         .insert({
-          workbench_id: workbench.id,
+          user_id: workbench.id,
           user_id: user.id,
           role: 'founder',
         });
@@ -203,7 +203,7 @@ export const backendService = {
   /**
    * Saves a chat message and updates the session
    */
-  async saveChatMessage(sessionId, role, content, metadata, workbenchId = null) {
+  async saveChatMessage(sessionId, role, content, metadata, userId = null) {
     return await this._saveChatMessageDirect(sessionId, role, content, metadata);
   },
 
@@ -244,30 +244,30 @@ export const backendService = {
    * Creates a new chat session
    * Falls back to direct insert if edge function is unavailable
    */
-  async createChatSession(title, workbenchId = null) {
+  async createChatSession(title, userId = null) {
     try {
       const { data, error } = await supabase.functions.invoke('create-chat-session', {
         body: {
           title,
-          workbench_id: workbenchId
+          user_id: userId
         }
       });
 
       if (error) {
         console.warn('Edge Function Error (create-chat-session), falling back to direct insert:', error.message || error);
-        return await this._createChatSessionDirect(title, workbenchId);
+        return await this._createChatSessionDirect(title, userId);
       }
 
       // Edge function may return error in body
       if (data && data.error) {
         console.warn('Edge Function returned error, falling back:', data.error);
-        return await this._createChatSessionDirect(title, workbenchId);
+        return await this._createChatSessionDirect(title, userId);
       }
 
       return data;
     } catch (err) {
       console.warn('Failed to call create-chat-session edge function, falling back to direct insert:', err.message);
-      return await this._createChatSessionDirect(title, workbenchId);
+      return await this._createChatSessionDirect(title, userId);
     }
   },
 
@@ -275,7 +275,7 @@ export const backendService = {
    * Direct insert fallback for chat session creation
    * Used when edge function is unavailable or returns errors
    */
-  async _createChatSessionDirect(title, workbenchId = null) {
+  async _createChatSessionDirect(title, userId = null) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
@@ -284,7 +284,7 @@ export const backendService = {
       .from('chat_sessions')
       .insert({
         user_id: user.id,
-        workbench_id: workbenchId || null,
+        user_id: userId || null,
         title: (title || 'Untitled Chat').substring(0, 200),
       })
       .select()
@@ -301,8 +301,8 @@ export const backendService = {
   /**
    * Lists all transactions for a workbench
    */
-  async listTransactions(workbenchId) {
-    const response = await apiFetch(`/api/ledger/transactions/${workbenchId}`);
+  async listTransactions(userId) {
+    const response = await apiFetch(`/api/ledger/transactions/${userId}`);
     if (!response.ok) throw new Error('Failed to fetch transactions');
     return await response.json();
   },
@@ -312,7 +312,7 @@ export const backendService = {
    */
   async linkDocumentToTransaction(docId, transactionId) {
     const { data, error } = await supabase
-      .from('workbench_documents')
+      .from('user_documents')
       .update({ transaction_id: transactionId })
       .eq('id', docId)
       .select()
@@ -345,10 +345,10 @@ export const backendService = {
   /**
    * Runs the reconciliation engine for a workbench
    */
-  async runReconciliation(workbenchId) {
+  async runReconciliation(userId) {
     try {
       const { data, error } = await supabase.functions.invoke('run-reconciliation', {
-        body: { workbench_id: workbenchId }
+        body: { user_id: userId }
       });
 
       if (error) {
@@ -365,10 +365,10 @@ export const backendService = {
   /**
    * Fetches the health status and intelligence metrics for a workbench
    */
-  async getWorkbenchIntelligence(workbenchId) {
+  async getWorkbenchIntelligence(userId) {
     try {
       const { data, error } = await supabase.functions.invoke('get-intelligence', {
-        body: { workbench_id: workbenchId }
+        body: { user_id: userId }
       });
 
       if (error) {
@@ -446,8 +446,8 @@ export const backendService = {
 
   // --- AR System ---
 
-  async listInvoices(workbenchId) {
-    const response = await apiFetch(`/api/ops/invoices/${workbenchId}`);
+  async listInvoices(userId) {
+    const response = await apiFetch(`/api/ops/invoices/${userId}`);
     if (!response.ok) throw new Error('Failed to fetch invoices');
     return await response.json();
   },
@@ -483,16 +483,16 @@ export const backendService = {
     return await response.json();
   },
 
-  async getARMetrics(workbenchId) {
-    const response = await apiFetch(`/api/ops/metrics/ar/${workbenchId}`);
+  async getARMetrics(userId) {
+    const response = await apiFetch(`/api/ops/metrics/ar/${userId}`);
     if (!response.ok) throw new Error('Failed to fetch AR metrics');
     return await response.json();
   },
 
   // --- AP System ---
 
-  async listBills(workbenchId) {
-    const response = await apiFetch(`/api/ops/bills/${workbenchId}`);
+  async listBills(userId) {
+    const response = await apiFetch(`/api/ops/bills/${userId}`);
     if (!response.ok) throw new Error('Failed to fetch bills');
     return await response.json();
   },
@@ -520,14 +520,14 @@ export const backendService = {
     return await response.json();
   },
 
-  async getAPMetrics(workbenchId) {
-    const response = await apiFetch(`/api/ops/metrics/ap/${workbenchId}`);
+  async getAPMetrics(userId) {
+    const response = await apiFetch(`/api/ops/metrics/ap/${userId}`);
     if (!response.ok) throw new Error('Failed to fetch AP metrics');
     return await response.json();
   },
 
-  async scanInvoiceDoc(workbenchId, file) {
-    const doc = await this.uploadDocument(workbenchId, file, 'AP_Bill');
+  async scanInvoiceDoc(userId, file) {
+    const doc = await this.uploadDocument(userId, file, 'AP_Bill');
     if (!doc.id) throw new Error("Document upload failed to return ID");
     const extracted = await this.scanInvoice(doc.id);
     return { ...extracted, doc_id: doc.id };
@@ -564,7 +564,7 @@ export const backendService = {
     if (storageError) console.warn("Storage deletion warning:", storageError);
 
     const { error: dbError } = await supabase
-      .from('workbench_documents')
+      .from('user_documents')
       .delete()
       .eq('id', docId);
     if (dbError) throw dbError;
@@ -573,8 +573,8 @@ export const backendService = {
 
   // --- Task Management ---
 
-  async listTasks(workbenchId) {
-    const response = await apiFetch(`/api/tasks/${workbenchId}`);
+  async listTasks(userId) {
+    const response = await apiFetch(`/api/tasks/${userId}`);
     if (!response.ok) throw new Error('Failed to fetch tasks');
     return await response.json();
   },
@@ -607,28 +607,28 @@ export const backendService = {
     return await response.json();
   },
 
-  async listWorkbenchMembers(workbenchId) {
-    const response = await apiFetch(`/api/tasks/${workbenchId}/members`);
+  async listWorkbenchMembers(userId) {
+    const response = await apiFetch(`/api/tasks/${userId}/members`);
     if (!response.ok) throw new Error('Failed to fetch members');
     return await response.json();
   },
 
-  async listWorkbenchEntities(workbenchId) {
-    const response = await apiFetch(`/api/ops/entities/workbench/${workbenchId}`);
+  async listWorkbenchEntities(userId) {
+    const response = await apiFetch(`/api/ops/entities/user/${userId}`);
     if (!response.ok) throw new Error('Failed to fetch entities');
     return await response.json();
   },
 
   // --- Budgets ---
 
-  async getBudgetPerformance(workbenchId) {
-    const response = await apiFetch(`/api/budgets/${workbenchId}/performance`);
+  async getBudgetPerformance(userId) {
+    const response = await apiFetch(`/api/budgets/${userId}/performance`);
     if (!response.ok) throw new Error('Failed to fetch budget performance');
     return await response.json();
   },
 
-  async getBudgetTransactions(workbenchId, category) {
-    const response = await apiFetch(`/api/budgets/${workbenchId}/transactions/${encodeURIComponent(category)}`);
+  async getBudgetTransactions(userId, category) {
+    const response = await apiFetch(`/api/budgets/${userId}/transactions/${encodeURIComponent(category)}`);
     if (!response.ok) throw new Error('Failed to fetch clubbed transactions');
     return await response.json();
   },
@@ -731,12 +731,12 @@ export const backendService = {
     return await response.json();
   },
 
-  async changeWorkbenchPlan(workbenchId, plan) {
+  async changeWorkbenchPlan(userId, plan) {
     const headers = await this.getAuthHeaders();
-    const response = await fetch('/api/superadmin/workbench/set-plan', {
+    const response = await fetch('/api/superadmin/user/set-plan', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ workbench_id: workbenchId, plan })
+      body: JSON.stringify({ user_id: userId, plan })
     });
     if (!response.ok) {
       const err = await response.json();
@@ -745,12 +745,12 @@ export const backendService = {
     return await response.json();
   },
 
-  async simulatePayment(workbenchId, email, amount, plan) {
+  async simulatePayment(userId, email, amount, plan) {
     const headers = await this.getAuthHeaders();
     const response = await fetch('/api/superadmin/payments/simulate', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ workbench_id: workbenchId, email, amount, plan })
+      body: JSON.stringify({ user_id: userId, email, amount, plan })
     });
     if (!response.ok) {
       const err = await response.json();

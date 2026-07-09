@@ -129,7 +129,7 @@ class AnalysisNoteService:
     async def generate_and_store(
         self,
         document_id: str,
-        workbench_id: str,
+        user_id: str,
         ocr_output: Dict,          # raw OCR extraction output
         classification: Dict,      # document_classifier output
         existing_processed: Optional[Dict] = None,  # optional pre-processed data (e.g. bank KPIs)
@@ -144,7 +144,7 @@ class AnalysisNoteService:
           4. Build three-dimensional confidence
           5. Determine review_status and routing
           6. Persist to analysis_notes table
-          7. Update workbench_documents.analysis_note_id
+          7. Update user_documents.analysis_note_id
 
         Returns the stored analysis_note record.
         """
@@ -189,7 +189,7 @@ class AnalysisNoteService:
         # ── 8. Persist ─────────────────────────────────────────
         note_row = {
             "document_id":       document_id,
-            "workbench_id":      workbench_id,
+            "user_id":      user_id,
             "document_type":     doc_type,
             "confidence":        confidence,
             "document_metadata": note_fields["document_metadata"],
@@ -215,8 +215,8 @@ class AnalysisNoteService:
         stored_note = result.data[0]
         note_id     = stored_note["id"]
 
-        # ── 9. Backlink on workbench_documents ─────────────────
-        supabase.table("workbench_documents").update({
+        # ── 9. Backlink on user_documents ─────────────────
+        supabase.table("user_documents").update({
             "analysis_note_id": note_id
         }).eq("id", document_id).execute()
 
@@ -240,7 +240,7 @@ class AnalysisNoteService:
 
     async def list_for_workbench(
         self,
-        workbench_id: str,
+        user_id: str,
         review_status: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
@@ -249,7 +249,7 @@ class AnalysisNoteService:
         q = (
             supabase.table("analysis_notes")
                     .select("*")
-                    .eq("workbench_id", workbench_id)
+                    .eq("user_id", user_id)
                     .eq("is_superseded", False)
                     .order("created_at", desc=True)
                     .limit(limit)
@@ -287,7 +287,7 @@ class AnalysisNoteService:
         return result.data[0] if result.data else {}
 
     async def find_linked_by_settlement_key(
-        self, workbench_id: str, settlement_key: str
+        self, user_id: str, settlement_key: str
     ) -> List[Dict]:
         """
         Find all Analysis Notes in a workbench that share a settlement key.
@@ -296,7 +296,7 @@ class AnalysisNoteService:
         result = (
             supabase.table("analysis_notes")
                     .select("id, document_id, document_type, settlement_key, event_candidate, amounts, dates")
-                    .eq("workbench_id", workbench_id)
+                    .eq("user_id", user_id)
                     .eq("settlement_key", settlement_key)
                     .eq("is_superseded", False)
                     .execute()

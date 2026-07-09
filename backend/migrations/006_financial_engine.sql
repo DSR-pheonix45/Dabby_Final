@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS trade_activity_execution (
 -- 4. Create assets table (Asset Register)
 CREATE TABLE IF NOT EXISTS assets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    workbench_id UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
     label_id UUID REFERENCES workbench_accounts(id) ON DELETE SET NULL,
     trade_id UUID REFERENCES trades(id) ON DELETE SET NULL,
     name TEXT NOT NULL,
@@ -85,7 +85,7 @@ ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 -- 8. Add RLS Policies
 DROP POLICY IF EXISTS "Users can manage trade activities in their workbenches" ON trade_activities;
 CREATE POLICY "Users can manage trade activities in their workbenches" ON trade_activities
-    FOR ALL USING (EXISTS (SELECT 1 FROM trades WHERE id = trade_activities.trade_id AND EXISTS (SELECT 1 FROM workbenches WHERE id = trades.workbench_id)));
+    FOR ALL USING (EXISTS (SELECT 1 FROM trades WHERE id = trade_activities.trade_id AND EXISTS (SELECT 1 FROM workbenches WHERE id = trades.user_id)));
 
 DROP POLICY IF EXISTS "Users can manage execution records in their workbenches" ON trade_activity_execution;
 CREATE POLICY "Users can manage execution records in their workbenches" ON trade_activity_execution
@@ -93,13 +93,13 @@ CREATE POLICY "Users can manage execution records in their workbenches" ON trade
         SELECT 1 FROM trade_activities 
         JOIN trades ON trades.id = trade_activities.trade_id
         WHERE trade_activities.id = trade_activity_execution.activity_id 
-          AND EXISTS (SELECT 1 FROM workbenches WHERE id = trades.workbench_id)
+          AND EXISTS (SELECT 1 FROM workbenches WHERE id = trades.user_id)
     ));
 
 DROP POLICY IF EXISTS "Users can manage assets in their workbenches" ON assets;
 CREATE POLICY "Users can manage assets in their workbenches" ON assets
-    FOR ALL USING (EXISTS (SELECT 1 FROM workbenches WHERE id = assets.workbench_id));
+    FOR ALL USING (EXISTS (SELECT 1 FROM workbenches WHERE id = assets.user_id));
 
 DROP POLICY IF EXISTS "Users can manage audit logs in their workbenches" ON audit_logs;
 CREATE POLICY "Users can manage audit logs in their workbenches" ON audit_logs
-    FOR ALL USING (EXISTS (SELECT 1 FROM trades WHERE id = audit_logs.trade_id AND EXISTS (SELECT 1 FROM workbenches WHERE id = trades.workbench_id)));
+    FOR ALL USING (EXISTS (SELECT 1 FROM trades WHERE id = audit_logs.trade_id AND EXISTS (SELECT 1 FROM workbenches WHERE id = trades.user_id)));

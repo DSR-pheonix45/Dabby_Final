@@ -460,7 +460,7 @@ export async function callLLMWithFallback(request) {
     // TODO: Enable this once edge functions are deployed with CORS configured
     /*
     console.log('Uploading files to Supabase for RAG processing...')
-    const uploadResults = await uploadFilesToSupabase(request.uploaded_files, request.workbench_id)
+    const uploadResults = await uploadFilesToSupabase(request.uploaded_files, request.user_id)
     const uploadedCount = uploadResults.filter(r => r.success).length
     console.log(`Uploaded ${uploadedCount}/${uploadResults.length} files successfully for RAG`)
     */

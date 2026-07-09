@@ -13,9 +13,9 @@ def check_storage():
         print(f"Files in bucket root: {res}")
         
         # Try to list files for the specific workbench if we have one
-        workbench_id = "0338e803-e024-4bae-bfcd-e0f88262770d"
-        res_wb = supabase.storage.from_(bucket_name).list(workbench_id, {"limit": 10})
-        print(f"Files in workbench {workbench_id}: {res_wb}")
+        user_id = "0338e803-e024-4bae-bfcd-e0f88262770d"
+        res_wb = supabase.storage.from_(bucket_name).list(user_id, {"limit": 10})
+        print(f"Files in workbench {user_id}: {res_wb}")
         
     except Exception as e:
         print(f"Error checking storage: {str(e)}")

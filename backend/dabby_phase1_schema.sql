@@ -3,7 +3,7 @@
 -- 1. Labels Table (Leaf nodes for transactions)
 CREATE TABLE IF NOT EXISTS labels (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    workbench_id UUID NOT NULL,
+    user_id UUID NOT NULL,
     name TEXT NOT NULL,
     type TEXT NOT NULL CHECK (type IN ('asset', 'liability', 'equity', 'revenue', 'expense')),
     sub_account TEXT NOT NULL, -- Layer 2: Sub-Accounts (grouping)
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS labels (
 -- 2. Transactions Table (The event header - represents a Trade)
 CREATE TABLE IF NOT EXISTS transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    workbench_id UUID NOT NULL,
+    user_id UUID NOT NULL,
     description TEXT,
     transaction_date DATE NOT NULL DEFAULT CURRENT_DATE,
     source_party_id UUID, -- NEW
@@ -37,15 +37,15 @@ CREATE TABLE IF NOT EXISTS transaction_entries (
 );
 
 -- Indices for performance
-CREATE INDEX IF NOT EXISTS idx_labels_workbench ON labels(workbench_id);
-CREATE INDEX IF NOT EXISTS idx_transactions_workbench ON transactions(workbench_id);
+CREATE INDEX IF NOT EXISTS idx_labels_workbench ON labels(user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_workbench ON transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transaction_entries_transaction ON transaction_entries(transaction_id);
 CREATE INDEX IF NOT EXISTS idx_transaction_entries_label ON transaction_entries(label_id);
 
 -- Parties (The Who: Individuals or Groups)
 CREATE TABLE IF NOT EXISTS parties (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    workbench_id UUID REFERENCES workbenches(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES workbenches(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     category TEXT NOT NULL CHECK (category IN ('individual', 'corporation', 'group')),
     email TEXT,
@@ -68,7 +68,7 @@ ALTER TABLE parties ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entities ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can manage parties in their workbenches" ON parties;
-CREATE POLICY "Users can manage parties in their workbenches" ON parties FOR ALL USING (EXISTS (SELECT 1 FROM workbenches WHERE id = parties.workbench_id));
+CREATE POLICY "Users can manage parties in their workbenches" ON parties FOR ALL USING (EXISTS (SELECT 1 FROM workbenches WHERE id = parties.user_id));
 
 DROP POLICY IF EXISTS "Users can manage entities in their parties" ON entities;
 CREATE POLICY "Users can manage entities in their parties" ON entities FOR ALL USING (EXISTS (SELECT 1 FROM parties WHERE id = entities.party_id));

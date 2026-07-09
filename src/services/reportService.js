@@ -18,9 +18,9 @@ export const reportService = {
         red: [239, 68, 68]      // #ef4444
     },
 
-    async generateReport(type, workbenchId, workbenchName, dateRange, config = {}) {
+    async generateReport(type, userId, userName, dateRange, config = {}) {
         try {
-            console.log(`[ReportService] Generating ${type} report for ${workbenchId}...`);
+            console.log(`[ReportService] Generating ${type} report for ${userId}...`);
 
             let data = [];
             let doc = new jsPDF();
@@ -30,28 +30,28 @@ export const reportService = {
             // 1. Fetch Data
             switch (type) {
                 case 'cashflow':
-                    data = await this.fetchCashflowData(workbenchId, dateRange);
-                    this.generateCashflowPDF(doc, data, workbenchName, timestamp, dateRange, config);
+                    data = await this.fetchCashflowData(userId, dateRange);
+                    this.generateCashflowPDF(doc, data, userName, timestamp, dateRange, config);
                     break;
                 case 'budget':
-                    data = await this.fetchBudgetData(workbenchId);
-                    this.generateBudgetPDF(doc, data, workbenchName, timestamp, config);
+                    data = await this.fetchBudgetData(userId);
+                    this.generateBudgetPDF(doc, data, userName, timestamp, config);
                     break;
                 case 'compliance':
-                    data = await this.fetchComplianceData(workbenchId);
-                    this.generateCompliancePDF(doc, data, workbenchName, timestamp, config);
+                    data = await this.fetchComplianceData(userId);
+                    this.generateCompliancePDF(doc, data, userName, timestamp, config);
                     break;
                 case 'aging':
-                    data = await this.fetchAgingData(workbenchId);
-                    this.generateAgingPDF(doc, data, workbenchName, timestamp, config);
+                    data = await this.fetchAgingData(userId);
+                    this.generateAgingPDF(doc, data, userName, timestamp, config);
                     break;
                 case 'dataroom':
-                    data = await this.fetchDataRoomData(workbenchId);
-                    this.generateDataRoomPDF(doc, data, workbenchName, timestamp, config);
+                    data = await this.fetchDataRoomData(userId);
+                    this.generateDataRoomPDF(doc, data, userName, timestamp, config);
                     break;
                 case 'vendor':
-                    data = await this.fetchVendorData(workbenchId);
-                    this.generateVendorPDF(doc, data, workbenchName, timestamp, config);
+                    data = await this.fetchVendorData(userId);
+                    this.generateVendorPDF(doc, data, userName, timestamp, config);
                     break;
                 default:
                     throw new Error("Invalid report type");
@@ -68,7 +68,7 @@ export const reportService = {
 
     // --- DATA FETCHING (Unchanged logic, just ensure robustness) ---
 
-    async fetchCashflowData(workbenchId, dateRange) {
+    async fetchCashflowData(userId, dateRange) {
         const now = new Date();
         let startDate = new Date(0);
 
@@ -80,41 +80,41 @@ export const reportService = {
         const { data, error } = await supabase
             .from('workbench_records')
             .select('*')
-            .eq('workbench_id', workbenchId)
+            .eq('user_id', userId)
             .eq('record_type', 'transaction')
             .gte('metadata->>transaction_date', startDate.toISOString().split('T')[0])
             .order('metadata->>transaction_date', { ascending: false });
 
         if (error) throw error;
-        const { data: pos } = await supabase.from('view_cash_position').select('*').eq('workbench_id', workbenchId).maybeSingle();
+        const { data: pos } = await supabase.from('view_cash_position').select('*').eq('user_id', userId).maybeSingle();
         return { transactions: data || [], summary: pos || { balance: 0, inflow: 0, outflow: 0 } };
     },
 
-    async fetchBudgetData(workbenchId) {
-        const { data, error } = await supabase.from('view_budget_vs_actual').select('*').eq('workbench_id', workbenchId);
+    async fetchBudgetData(userId) {
+        const { data, error } = await supabase.from('view_budget_vs_actual').select('*').eq('user_id', userId);
         if (error) throw error;
         return data || [];
     },
 
-    async fetchComplianceData(workbenchId) {
-        const { data, error } = await supabase.from('compliances').select('*').eq('workbench_id', workbenchId).order('deadline', { ascending: true });
+    async fetchComplianceData(userId) {
+        const { data, error } = await supabase.from('compliances').select('*').eq('user_id', userId).order('deadline', { ascending: true });
         if (error) throw error;
         return data || [];
     },
 
-    async fetchAgingData(workbenchId) {
-        const { data: receivables } = await supabase.from('view_receivables').select('*').eq('workbench_id', workbenchId);
-        const { data: payables } = await supabase.from('view_payables').select('*').eq('workbench_id', workbenchId);
+    async fetchAgingData(userId) {
+        const { data: receivables } = await supabase.from('view_receivables').select('*').eq('user_id', userId);
+        const { data: payables } = await supabase.from('view_payables').select('*').eq('user_id', userId);
         return { receivables: receivables || [], payables: payables || [] };
     },
 
-    async fetchVendorData(workbenchId) {
-        const { data: expenses } = await supabase.from('view_expense_categorization').select('*').eq('workbench_id', workbenchId);
+    async fetchVendorData(userId) {
+        const { data: expenses } = await supabase.from('view_expense_categorization').select('*').eq('user_id', userId);
         return { expenses: expenses || [] };
     },
 
-    async fetchDataRoomData(workbenchId) {
-        const response = await apiFetch(`/api/investor/statements/${workbenchId}`);
+    async fetchDataRoomData(userId) {
+        const response = await apiFetch(`/api/investor/statements/${userId}`);
         if (!response.ok) throw new Error("Failed to fetch data room content");
         return await response.json();
     },
@@ -122,7 +122,7 @@ export const reportService = {
 
     // --- PROFESSIONAL PDF GENERATOR HELPERS ---
 
-    setupPage(doc, title, workbenchName, timestamp, subtitle = "", config = {}) {
+    setupPage(doc, title, userName, timestamp, subtitle = "", config = {}) {
         const pageWidth = doc.internal.pageSize.width;
 
         // 1. Top Branding Bar
@@ -173,7 +173,7 @@ export const reportService = {
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
         // Use custom preparedFor text if available, else workbench name
-        doc.text(config.preparedFor || workbenchName || "Client Workbench", 17, 58);
+        doc.text(config.preparedFor || userName || "Client Workbench", 17, 58);
 
         // Right Box: Provider Info
         doc.rect(106, 45, pageWidth - 120, 20);
@@ -250,8 +250,8 @@ export const reportService = {
 
     // --- SPECIFIC REPORT GENERATORS ---
 
-    generateCashflowPDF(doc, data, workbenchName, timestamp, dateRange, config) {
-        let y = this.setupPage(doc, "Cash Flow Statement", workbenchName, timestamp, `Period: ${dateRange}`, config);
+    generateCashflowPDF(doc, data, userName, timestamp, dateRange, config) {
+        let y = this.setupPage(doc, "Cash Flow Statement", userName, timestamp, `Period: ${dateRange}`, config);
         y = this.drawNotes(doc, config.notes, y);
 
         // Summary Cards
@@ -296,8 +296,8 @@ export const reportService = {
         this.addFooter(doc);
     },
 
-    generateBudgetPDF(doc, data, workbenchName, timestamp, config) {
-        let y = this.setupPage(doc, "Budget Variance", workbenchName, timestamp, "", config);
+    generateBudgetPDF(doc, data, userName, timestamp, config) {
+        let y = this.setupPage(doc, "Budget Variance", userName, timestamp, "", config);
         y = this.drawNotes(doc, config.notes, y);
 
         const totalBudget = data.reduce((sum, item) => sum + item.budgeted_amount, 0);
@@ -367,8 +367,8 @@ export const reportService = {
         this.addFooter(doc);
     },
 
-    generateCompliancePDF(doc, data, workbenchName, timestamp, config) {
-        let y = this.setupPage(doc, "Compliance Scorecard", workbenchName, timestamp, "", config);
+    generateCompliancePDF(doc, data, userName, timestamp, config) {
+        let y = this.setupPage(doc, "Compliance Scorecard", userName, timestamp, "", config);
         y = this.drawNotes(doc, config.notes, y);
 
         const pending = data.filter(c => (c.status || c.metadata?.status) === 'pending').length;
@@ -427,8 +427,8 @@ export const reportService = {
         this.addFooter(doc);
     },
 
-    generateAgingPDF(doc, data, workbenchName, timestamp, config) {
-        let y = this.setupPage(doc, "Aging Analysis", workbenchName, timestamp, "", config);
+    generateAgingPDF(doc, data, userName, timestamp, config) {
+        let y = this.setupPage(doc, "Aging Analysis", userName, timestamp, "", config);
         y = this.drawNotes(doc, config.notes, y);
 
         // Receivables
@@ -487,8 +487,8 @@ export const reportService = {
         this.addFooter(doc);
     },
 
-    generateVendorPDF(doc, data, workbenchName, timestamp, config) {
-        let y = this.setupPage(doc, "Vendor Intelligence", workbenchName, timestamp, "", config);
+    generateVendorPDF(doc, data, userName, timestamp, config) {
+        let y = this.setupPage(doc, "Vendor Intelligence", userName, timestamp, "", config);
         y = this.drawNotes(doc, config.notes, y);
 
         const topN = config.params?.topN || 10;
@@ -526,11 +526,11 @@ export const reportService = {
         this.addFooter(doc);
     },
 
-    generateDataRoomPDF(doc, data, workbenchName, timestamp, config) {
+    generateDataRoomPDF(doc, data, userName, timestamp, config) {
         const { pl, bs, mis, interpretation } = data;
         
         // --- Page 1: Cover & Interpretation ---
-        let y = this.setupPage(doc, "Financial Data Room", workbenchName, timestamp, "Executive Interpretation", config);
+        let y = this.setupPage(doc, "Financial Data Room", userName, timestamp, "Executive Interpretation", config);
         
         doc.setFontSize(18);
         doc.setTextColor(...this.colors.dark);
@@ -556,7 +556,7 @@ export const reportService = {
 
         // --- Page 2: Profit & Loss ---
         doc.addPage();
-        y = this.setupPage(doc, "Profit & Loss", workbenchName, timestamp, "Operating Performance", config);
+        y = this.setupPage(doc, "Profit & Loss", userName, timestamp, "Operating Performance", config);
         
         // Summary Card for P&L
         autoTable(doc, {
@@ -603,7 +603,7 @@ export const reportService = {
 
         // --- Page 3: Balance Sheet ---
         doc.addPage();
-        y = this.setupPage(doc, "Balance Sheet", workbenchName, timestamp, "Position of Truth", config);
+        y = this.setupPage(doc, "Balance Sheet", userName, timestamp, "Position of Truth", config);
         
         // Asset Section
         autoTable(doc, {
@@ -636,7 +636,7 @@ export const reportService = {
 
         // --- Page 4: MIS & Concentration ---
         doc.addPage();
-        y = this.setupPage(doc, "MIS Report", workbenchName, timestamp, "Expense Concentration Analysis", config);
+        y = this.setupPage(doc, "MIS Report", userName, timestamp, "Expense Concentration Analysis", config);
         
         autoTable(doc, {
             startY: y,
