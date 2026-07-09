@@ -3,6 +3,7 @@ import { useWorkbench } from "../../context/WorkbenchContext";
 import { useAuth } from "../../hooks/useAuth";
 import { BsPersonPlus, BsSearch, BsThreeDots } from "react-icons/bs";
 import { collaborationService } from "../../services/collaborationService";
+import AddMemberModal from "./AddMemberModal";
 
 export default function Members() {
   const { activeWorkbench } = useWorkbench();
@@ -10,6 +11,7 @@ export default function Members() {
   const [searchQuery, setSearchQuery] = useState("");
   const [members, setMembers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
 
   useEffect(() => {
     if (activeWorkbench) {
@@ -47,7 +49,7 @@ export default function Members() {
             <h1 className="text-2xl font-bold text-white tracking-tight">Members</h1>
             <p className="text-gray-400 text-sm mt-1">Manage team access to {activeWorkbench.name}</p>
           </div>
-          <button className="flex items-center space-x-2 px-4 py-2 bg-teal-500 hover:bg-teal-400 text-black font-semibold text-sm rounded-md transition-colors w-full sm:w-auto justify-center">
+          <button onClick={() => setIsAddMemberOpen(true)} className="flex items-center space-x-2 px-4 py-2 bg-teal-500 hover:bg-teal-400 text-black font-semibold text-sm rounded-md transition-colors w-full sm:w-auto justify-center shadow-[0_0_10px_rgba(20,184,166,0.3)]">
             <BsPersonPlus size={16} />
             <span>Invite Member</span>
           </button>
@@ -130,6 +132,11 @@ export default function Members() {
         </div>
 
       </div>
+      <AddMemberModal
+        isOpen={isAddMemberOpen}
+        onClose={() => setIsAddMemberOpen(false)}
+        workbenchId={activeWorkbench.id}
+      />
     </div>
   );
 }

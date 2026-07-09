@@ -31,6 +31,33 @@ export const collaborationService = {
     return res.json();
   },
 
+  async generateInviteLink(workbenchId, role) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/invites/generate`, {
+      method: "POST",
+      body: JSON.stringify({ role }),
+    });
+    if (!res.ok) throw new Error("Failed to generate invite link");
+    return res.json();
+  },
+
+  async joinWorkbench(token) {
+    const res = await apiFetch(`/api/collaboration/join`, {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    });
+    if (!res.ok) throw new Error("Failed to join workbench");
+    return res.json();
+  },
+
+  async addTradeVessel(workbenchId, partyId, vesselData) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/parties/${partyId}/vessels`, {
+      method: "POST",
+      body: JSON.stringify(vesselData),
+    });
+    if (!res.ok) throw new Error("Failed to add trade vessel");
+    return res.json();
+  },
+
   async updateSettings(workbenchId, settingsData) {
     const res = await apiFetch(`/api/collaboration/${workbenchId}/settings`, {
       method: "PUT",

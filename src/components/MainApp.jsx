@@ -14,6 +14,7 @@ import WorkbenchLayout from "../pages/workbench/WorkbenchLayout";
 import Members from "../pages/workbench/Members";
 import Parties from "../pages/workbench/Parties";
 import WorkbenchSettings from "../pages/workbench/Settings";
+import JoinWorkbench from "../pages/workbench/JoinWorkbench";
 import OnboardingTour from "./Onboarding/OnboardingTour";
 import FeedbackModal from "./ChatArea/FeedbackModal";
 import { backendService } from "../services/backendService";
@@ -702,6 +703,7 @@ Based on the Profit & Loss statement provided, the business shows stable operati
               }
             />
             <Route path="settings" element={<Settings />} />
+            <Route path="join" element={<JoinWorkbench />} />
             <Route path="workbenches" element={<Workbenches />} />
             <Route path="workbench" element={<WorkbenchLayout />}>
               <Route path="members" element={<Members />} />

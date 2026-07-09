@@ -9,3 +9,4 @@ redis
 google-generativeai
 pypdf
 PyMuPDF
+PyJWT
