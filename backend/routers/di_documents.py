@@ -124,15 +124,38 @@ async def process_document(document_id: str):
         valid_labels = [l['name'] for l in labels_res.data] if labels_res.data else ["Purchase", "Sales"]
 
         system_prompt = f"""
-You are an expert AI accounting agent. Analyze the document and extract the JSON data.
+You are an expert AI accounting agent. Analyze the document and extract detailed financial insights.
 You MUST classify this document into exactly one of these labels: {valid_labels}.
-Return ONLY valid JSON matching this schema:
+
+Return ONLY valid JSON matching this exact schema:
 {{
-    "vendor": "String",
-    "total_amount": 1500.00,
-    "date": "YYYY-MM-DD",
     "predicted_label": "String (Must be one of the provided labels)",
-    "reasoning": "Brief explanation of the classification"
+    "reasoning": "Detailed explanation of the classification and accounting treatment",
+    "document_metadata": {{
+        "document_type": "Invoice / Receipt / Bank Statement / etc",
+        "date": "YYYY-MM-DD",
+        "reference_number": "String"
+    }},
+    "parties": {{
+        "vendor": "String",
+        "vendor_address": "String",
+        "buyer": "String",
+        "buyer_address": "String"
+    }},
+    "financials": {{
+        "total_amount": 1500.00,
+        "tax_amount": 100.00,
+        "subtotal": 1400.00,
+        "currency": "USD"
+    }},
+    "line_items": [
+        {{
+            "description": "String",
+            "quantity": 1,
+            "unit_price": 100.00,
+            "total": 100.00
+        }}
+    ]
 }}
 """
 
@@ -163,9 +186,12 @@ Return ONLY valid JSON matching this schema:
             if ap_res.data:
                 credit_account = f"{ap_res.data[0]['code']} {ap_res.data[0]['name']}"
 
+        financials = analysis_data.get("financials", {})
+        total_amount = financials.get("total_amount", 0.0)
+
         analysis_data["proposed_journal_entries"] = [
-            {"account": debit_account, "type": "debit", "amount": analysis_data.get("total_amount", 0.0)},
-            {"account": credit_account, "type": "credit", "amount": analysis_data.get("total_amount", 0.0)}
+            {"account": debit_account, "type": "debit", "amount": total_amount},
+            {"account": credit_account, "type": "credit", "amount": total_amount}
         ]
         
         supabase.table("di_analysis_notes").insert({

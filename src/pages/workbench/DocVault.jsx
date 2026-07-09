@@ -195,14 +195,97 @@ export default function DocVault() {
                   </div>
                 </div>
 
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">Extracted Data</h3>
-                  <div className="bg-[#0A0A0A] rounded-xl p-4 overflow-x-auto border border-white/5">
-                    <pre className="text-xs text-green-400 font-mono">
-                      {JSON.stringify(selectedDoc.di_analysis_notes[0].extracted_data, null, 2)}
-                    </pre>
+                {selectedDoc.di_analysis_notes[0].extracted_data?.document_metadata && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">Document Details</h3>
+                    <div className="p-4 bg-[#111111] border border-white/5 rounded-xl grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="block text-xs text-gray-500 uppercase tracking-wider">Type</span>
+                        <span className="text-gray-200">{selectedDoc.di_analysis_notes[0].extracted_data.document_metadata.document_type || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="block text-xs text-gray-500 uppercase tracking-wider">Date</span>
+                        <span className="text-gray-200">{selectedDoc.di_analysis_notes[0].extracted_data.document_metadata.date || '-'}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="block text-xs text-gray-500 uppercase tracking-wider">Reference</span>
+                        <span className="text-gray-200">{selectedDoc.di_analysis_notes[0].extracted_data.document_metadata.reference_number || '-'}</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {selectedDoc.di_analysis_notes[0].extracted_data?.parties && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">Parties</h3>
+                    <div className="p-4 bg-[#111111] border border-white/5 rounded-xl space-y-4 text-sm">
+                      <div>
+                        <span className="block text-xs text-gray-500 uppercase tracking-wider">Vendor</span>
+                        <span className="text-gray-200 font-medium">{selectedDoc.di_analysis_notes[0].extracted_data.parties.vendor || '-'}</span>
+                        {selectedDoc.di_analysis_notes[0].extracted_data.parties.vendor_address && (
+                          <span className="block text-gray-400 text-xs mt-1">{selectedDoc.di_analysis_notes[0].extracted_data.parties.vendor_address}</span>
+                        )}
+                      </div>
+                      <div className="pt-3 border-t border-white/5">
+                        <span className="block text-xs text-gray-500 uppercase tracking-wider">Buyer</span>
+                        <span className="text-gray-200 font-medium">{selectedDoc.di_analysis_notes[0].extracted_data.parties.buyer || '-'}</span>
+                        {selectedDoc.di_analysis_notes[0].extracted_data.parties.buyer_address && (
+                          <span className="block text-gray-400 text-xs mt-1">{selectedDoc.di_analysis_notes[0].extracted_data.parties.buyer_address}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedDoc.di_analysis_notes[0].extracted_data?.financials && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">Financials</h3>
+                    <div className="p-4 bg-[#111111] border border-white/5 rounded-xl space-y-3 text-sm">
+                      <div className="flex justify-between items-center text-gray-400">
+                        <span>Subtotal</span>
+                        <span>{selectedDoc.di_analysis_notes[0].extracted_data.financials.currency || '$'} {selectedDoc.di_analysis_notes[0].extracted_data.financials.subtotal || '0.00'}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-gray-400">
+                        <span>Tax</span>
+                        <span>{selectedDoc.di_analysis_notes[0].extracted_data.financials.currency || '$'} {selectedDoc.di_analysis_notes[0].extracted_data.financials.tax_amount || '0.00'}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-white font-medium pt-2 border-t border-white/5 text-base">
+                        <span>Total</span>
+                        <span>{selectedDoc.di_analysis_notes[0].extracted_data.financials.currency || '$'} {selectedDoc.di_analysis_notes[0].extracted_data.financials.total_amount || '0.00'}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedDoc.di_analysis_notes[0].extracted_data?.line_items && selectedDoc.di_analysis_notes[0].extracted_data.line_items.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wider">Line Items</h3>
+                    <div className="bg-[#111111] border border-white/5 rounded-xl overflow-hidden">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-[#181818] text-gray-500 uppercase tracking-wider border-b border-white/5">
+                          <tr>
+                            <th className="p-3 font-medium">Description</th>
+                            <th className="p-3 font-medium text-right">Qty</th>
+                            <th className="p-3 font-medium text-right">Price</th>
+                            <th className="p-3 font-medium text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                          {selectedDoc.di_analysis_notes[0].extracted_data.line_items.map((item, i) => (
+                            <tr key={i} className="text-gray-300">
+                              <td className="p-3">{item.description}</td>
+                              <td className="p-3 text-right">{item.quantity}</td>
+                              <td className="p-3 text-right">{item.unit_price}</td>
+                              <td className="p-3 text-right">{item.total}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Optional Raw Data Toggle could go here, but for now we omit it */}
                 
               </div>
             ) : (
