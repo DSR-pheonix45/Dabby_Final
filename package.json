@@ -32,6 +32,7 @@
     "pdfjs-dist": "^4.9.155",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-dropzone": "^15.0.0",
     "react-google-recaptcha": "^3.1.0",
     "react-hot-toast": "^2.6.0",
     "react-icons": "^4.11.0",
