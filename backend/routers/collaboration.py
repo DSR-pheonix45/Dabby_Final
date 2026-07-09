@@ -99,21 +99,27 @@ def join_workbench(payload: JoinToken, user = Depends(get_current_user)):
 
 @router.get("/{workbench_id}/parties")
 def get_parties(workbench_id: str, user = Depends(get_current_user)):
-    # Fetch parties and their nested trade vessels (financial_accounts)
-    res = supabase.table("parties").select("*, party_profiles(*), financial_accounts(*)").eq("workbench_id", workbench_id).execute()
-    return res.data
+    try:
+        # Fetch parties and their nested trade vessels (financial_accounts)
+        res = supabase.table("parties").select("*, party_profiles(*), financial_accounts(*)").eq("workbench_id", workbench_id).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Database error: {str(e)}")
 
 @router.post("/{workbench_id}/parties")
 def create_party(workbench_id: str, payload: PartyCreate, user = Depends(get_current_user)):
-    res = supabase.table("parties").insert({
-        "workbench_id": workbench_id,
-        "name": payload.name,
-        "party_type": payload.party_type,
-        "email": payload.email,
-        "phone": payload.phone,
-        "notes": payload.notes
-    }).execute()
-    return res.data[0] if res.data else None
+    try:
+        res = supabase.table("parties").insert({
+            "workbench_id": workbench_id,
+            "name": payload.name,
+            "party_type": payload.party_type,
+            "email": payload.email,
+            "phone": payload.phone,
+            "notes": payload.notes
+        }).execute()
+        return res.data[0] if res.data else None
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Database error: {str(e)}")
 
 @router.post("/{workbench_id}/parties/{party_id}/vessels")
 def add_trade_vessel(workbench_id: str, party_id: str, payload: VesselCreate, user = Depends(get_current_user)):
