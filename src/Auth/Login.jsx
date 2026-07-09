@@ -60,14 +60,11 @@ export default function Login() {
   // Redirect if already logged in
   useEffect(() => {
     if (user && !authLoading) {
-      if (profile?.status === 'partial') {
-        navigate('/onboarding');
-      } else {
-        const returnUrl = location.state?.from?.pathname || '/dashboard';
-        navigate(returnUrl);
-      }
+      const fromLoc = location.state?.from;
+      const returnUrl = fromLoc ? fromLoc.pathname + (fromLoc.search || '') : '/dashboard';
+      navigate(returnUrl);
     }
-  }, [user, profile, authLoading, navigate, location]);
+  }, [user, authLoading, navigate, location]);
 
   const handleEmailLogin = async (e) => {
     e.preventDefault();

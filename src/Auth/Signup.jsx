@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import BrandLogo from '../components/common/BrandLogo';
 import { AlertCircle, Loader, Eye, EyeOff } from 'lucide-react';
@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase';
 
 export default function Signup() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -59,9 +60,11 @@ export default function Signup() {
   // Redirect if already logged in
   useEffect(() => {
     if (user && !authLoading) {
-      navigate('/dashboard');
+      const fromLoc = location.state?.from;
+      const returnUrl = fromLoc ? fromLoc.pathname + (fromLoc.search || '') : '/dashboard';
+      navigate(returnUrl);
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, location]);
 
   const handleEmailSignup = async (e) => {
     e.preventDefault();

@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { saveRedirectIntent } from '../utils/redirectUtility';
 
 export default function ProtectedRoute({ children }) {
   const { user, profile, loading } = useAuth();
@@ -20,6 +21,7 @@ export default function ProtectedRoute({ children }) {
 
   // If profile is partial and we're not already on onboarding, redirect to onboarding
   if (profile && profile.status === 'partial' && location.pathname !== '/onboarding') {
+    saveRedirectIntent(location.pathname + location.search);
     return <Navigate to="/onboarding" replace />;
   }
 

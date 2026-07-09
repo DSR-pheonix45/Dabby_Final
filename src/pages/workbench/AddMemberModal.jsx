@@ -61,7 +61,6 @@ export default function AddMemberModal({ isOpen, onClose, workbenchId }) {
                   <option value="finance_manager">Finance Manager</option>
                   <option value="cfo">CFO</option>
                   <option value="auditor">Auditor</option>
-                  <option value="admin">Admin</option>
                 </select>
                 <p className="text-xs text-gray-500 mt-2">
                   Generate a secure invite link. Anyone with this link can join your workbench as a {role}.
