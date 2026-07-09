@@ -1,7 +1,7 @@
 import React from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useWorkbench } from "../../context/WorkbenchContext";
-import { BsPerson, BsBuilding, BsGear, BsFileEarmarkText, BsDiagram3 } from "react-icons/bs";
+import { BsPerson, BsBuilding, BsGear, BsFileEarmarkText, BsDiagram3, BsGraphUp } from "react-icons/bs";
 
 export default function WorkbenchLayout() {
   const { activeWorkbench } = useWorkbench();
@@ -21,6 +21,7 @@ export default function WorkbenchLayout() {
     { label: "Parties", path: "/dashboard/workbench/parties", icon: BsBuilding },
     { label: "COA", path: "/dashboard/workbench/coa", icon: BsDiagram3 },
     { label: "Doc Vault", path: "/dashboard/workbench/doc-vault", icon: BsFileEarmarkText },
+    { label: "OPS", path: "/dashboard/workbench/ops", icon: BsGraphUp },
     { label: "Settings", path: "/dashboard/workbench/settings", icon: BsGear },
   ];
 
