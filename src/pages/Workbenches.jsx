@@ -180,7 +180,7 @@ export default function Workbenches() {
               key={wb.id}
               onClick={() => {
                 changeActiveWorkbench(wb);
-                navigate("/dashboard");
+                navigate("/dashboard/workbench/members");
               }}
               className={`bg-[#181818] border ${
                 activeWorkbench?.id === wb.id

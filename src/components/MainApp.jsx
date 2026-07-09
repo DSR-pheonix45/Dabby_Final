@@ -10,6 +10,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
 import Settings from "./Settings/Settings";
 import Workbenches from "../pages/Workbenches";
+import WorkbenchLayout from "../pages/workbench/WorkbenchLayout";
 import Members from "../pages/workbench/Members";
 import Parties from "../pages/workbench/Parties";
 import WorkbenchSettings from "../pages/workbench/Settings";
@@ -702,9 +703,11 @@ Based on the Profit & Loss statement provided, the business shows stable operati
             />
             <Route path="settings" element={<Settings />} />
             <Route path="workbenches" element={<Workbenches />} />
-            <Route path="workbench/members" element={<Members />} />
-            <Route path="workbench/parties" element={<Parties />} />
-            <Route path="workbench/settings" element={<WorkbenchSettings />} />
+            <Route path="workbench" element={<WorkbenchLayout />}>
+              <Route path="members" element={<Members />} />
+              <Route path="parties" element={<Parties />} />
+              <Route path="settings" element={<WorkbenchSettings />} />
+            </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>

@@ -278,53 +278,6 @@ export default function Sidebar({
                 <span className="text-lg leading-none mb-0.5">+</span>
                 <span>VIEW ALL</span>
               </button>
-              
-              {activeWorkbench && (
-                <div className="pt-2 border-t border-white/5 space-y-1">
-                  <div className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-2 px-3">
-                    {activeWorkbench.name}
-                  </div>
-                  <button
-                    onClick={() => {
-                      navigate("/dashboard/workbench/members");
-                      onNavigate?.();
-                    }}
-                    className={`w-full text-left px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${
-                      location.pathname.includes("/dashboard/workbench/members")
-                        ? "text-white bg-white/10"
-                        : "text-gray-500 hover:text-white hover:bg-white/5"
-                    }`}
-                  >
-                    Members
-                  </button>
-                  <button
-                    onClick={() => {
-                      navigate("/dashboard/workbench/parties");
-                      onNavigate?.();
-                    }}
-                    className={`w-full text-left px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${
-                      location.pathname.includes("/dashboard/workbench/parties")
-                        ? "text-white bg-white/10"
-                        : "text-gray-500 hover:text-white hover:bg-white/5"
-                    }`}
-                  >
-                    Parties
-                  </button>
-                  <button
-                    onClick={() => {
-                      navigate("/dashboard/workbench/settings");
-                      onNavigate?.();
-                    }}
-                    className={`w-full text-left px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${
-                      location.pathname.includes("/dashboard/workbench/settings")
-                        ? "text-white bg-white/10"
-                        : "text-gray-500 hover:text-white hover:bg-white/5"
-                    }`}
-                  >
-                    Settings
-                  </button>
-                </div>
-              )}
             </div>
           </ExpandableSection>
 

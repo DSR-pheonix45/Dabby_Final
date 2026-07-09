@@ -39,7 +39,7 @@ export default function WorkbenchSettings() {
   };
 
   return (
-    <div className="h-full bg-[#111111] overflow-y-auto custom-scrollbar p-6 lg:p-10 font-dm-sans">
+    <div className="p-6 lg:p-10 font-dm-sans">
       <div className="max-w-4xl mx-auto space-y-8">
         
         {/* Header Section */}
