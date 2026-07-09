@@ -158,6 +158,7 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
                   <option value="Partnership">Partnership</option>
                   <option value="LLC">LLC</option>
                   <option value="Corporation">Corporation</option>
+                  <option value="Private Limited">Private Limited</option>
                   <option value="Non-Profit">Non-Profit</option>
                 </select>
               </div>

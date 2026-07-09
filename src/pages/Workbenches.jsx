@@ -21,7 +21,7 @@ export default function Workbenches() {
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold text-white tracking-tight">Projects</h1>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Workbenches</h1>
         </div>
 
         {/* Toolbar Section */}
@@ -31,7 +31,7 @@ export default function Workbenches() {
               <BsSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
               <input
                 type="text"
-                placeholder="Search for a project"
+                placeholder="Search for a workbench"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-[#1A1A1A] border border-white/10 rounded-md py-1.5 pl-9 pr-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20 transition-colors"
@@ -60,10 +60,10 @@ export default function Workbenches() {
 
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="flex items-center space-x-2 px-3 py-1.5 bg-[#24B47E] hover:bg-[#20A070] text-black font-semibold text-sm rounded-md transition-colors"
+              className="flex items-center space-x-2 px-3 py-1.5 bg-teal-500 hover:bg-teal-400 text-black font-semibold text-sm rounded-md transition-colors"
             >
               <span className="text-lg leading-none mb-0.5">+</span>
-              <span>New project</span>
+              <span>New workbench</span>
             </button>
           </div>
         </div>
@@ -79,7 +79,7 @@ export default function Workbenches() {
               }}
               className={`bg-[#181818] border ${
                 activeWorkbench?.id === wb.id
-                  ? "border-[#24B47E]"
+                  ? "border-teal-500"
                   : "border-white/10"
               } hover:border-white/20 rounded-lg p-5 cursor-pointer transition-all group flex flex-col`}
             >
@@ -110,7 +110,7 @@ export default function Workbenches() {
                   {wb.currency}
                 </span>
                 {activeWorkbench?.id === wb.id && (
-                  <span className="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide bg-[#24B47E]/10 text-[#24B47E] rounded ml-auto border border-[#24B47E]/20">
+                  <span className="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide bg-teal-500/10 text-teal-400 rounded ml-auto border border-teal-500/20">
                     Active
                   </span>
                 )}
@@ -119,7 +119,7 @@ export default function Workbenches() {
           ))}
           {filteredWorkbenches.length === 0 && (
             <div className="col-span-full py-12 text-center text-gray-500">
-              No projects found.
+              No workbenches found.
             </div>
           )}
         </div>
