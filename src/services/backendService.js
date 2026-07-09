@@ -168,6 +168,21 @@ export const backendService = {
         throw new Error(wbError.message || 'Failed to create workbench');
       }
 
+      // 1.2 Insert owner into workbench_members
+      try {
+        const { error: memberError } = await supabase
+          .from('workbench_members')
+          .insert({
+            workbench_id: workbench.id,
+            user_id: user.id,
+            role: 'owner',
+            status: 'active'
+          });
+        if (memberError) console.error("[WARNING] Failed to insert owner into workbench_members:", memberError);
+      } catch (memberErr) {
+        console.error("[WARNING] Exception inserting owner into workbench_members:", memberErr);
+      }
+
       // 1.5. Auto-seed Chart of Accounts labels/ontology
       try {
         await apiFetch(`/api/ledger/labels/seed/${workbench.id}`, {
