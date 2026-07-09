@@ -19,10 +19,12 @@ import { BsRocketTakeoff, BsChevronRight } from "react-icons/bs";
 import { apiFetch } from "../lib/apiClient";
 import { consumeAiMessage } from "../lib/plans";
 import { toast } from "react-hot-toast";
+import { useWorkbench } from "../context/WorkbenchContext";
 
 export default function MainApp() {
   useTheme(); // Theme context is used for side effects
   const location = useLocation();
+  const { activeWorkbench } = useWorkbench();
   const { user, profile, loading: authLoading } = useAuth();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -673,9 +675,11 @@ Based on the Profit & Loss statement provided, the business shows stable operati
                 ) : (
                   <>
                     <WelcomeSection />
-                    <ActionCards
-                      onQuestionCardClick={handleQuestionCardClick}
-                    />
+                    {activeWorkbench && (
+                      <ActionCards
+                        onQuestionCardClick={handleQuestionCardClick}
+                      />
+                    )}
                   </>
                 )
               }
@@ -685,9 +689,11 @@ Based on the Profit & Loss statement provided, the business shows stable operati
               element={
                 <>
                   <WelcomeSection />
-                  <ActionCards
-                    onQuestionCardClick={handleQuestionCardClick}
-                  />
+                  {activeWorkbench && (
+                    <ActionCards
+                      onQuestionCardClick={handleQuestionCardClick}
+                    />
+                  )}
                 </>
               }
             />
