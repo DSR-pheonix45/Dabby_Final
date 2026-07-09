@@ -29,9 +29,24 @@ async def upload_document(
     try:
         file_bytes = await file.read()
         storage_path = f"{workbench_id}/{uuid.uuid4()}_{file.filename}"
+        import httpx
+        from supabase_client import url, key
         
-        # Upload to Supabase Storage
-        supabase.storage.from_("Doc_vault_Raw").upload(storage_path, file_bytes)
+        # Upload to Supabase Storage using HTTP REST API to bypass storage3 sdk bug
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "apikey": key,
+            "Content-Type": file.content_type
+        }
+        
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{url}/storage/v1/object/Doc_vault_Raw/{storage_path}",
+                content=file_bytes,
+                headers=headers
+            )
+            if resp.status_code >= 400:
+                raise Exception(f"Failed to upload to storage: {resp.text}")
         
         # Insert into di_documents
         doc_data = {
@@ -74,8 +89,22 @@ async def process_document(document_id: str):
             "status": "started"
         }).execute()
         
-        # 2. Download from storage
-        file_bytes = supabase.storage.from_("Doc_vault_Raw").download(doc_data['storage_path'])
+        # 2. Download from storage via HTTP
+        import httpx
+        from supabase_client import url, key
+        
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "apikey": key
+        }
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{url}/storage/v1/object/Doc_vault_Raw/{doc_data['storage_path']}",
+                headers=headers
+            )
+            if resp.status_code >= 400:
+                raise Exception(f"Failed to download from storage: {resp.text}")
+            file_bytes = resp.content
         
         extracted_text = ""
         prompt_content = []
