@@ -33,23 +33,23 @@ const KpiCard = ({ title, netValue, grossValue, color }) => {
 };
 
 export default function COA() {
-  const { currentWorkbench } = useWorkbench();
+  const { activeWorkbench } = useWorkbench();
   const [accounts, setAccounts] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (currentWorkbench) {
+    if (activeWorkbench) {
       loadData();
     }
-  }, [currentWorkbench]);
+  }, [activeWorkbench]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [accs, docs] = await Promise.all([
-        diService.getAccounts(currentWorkbench.id),
-        diService.getDocuments(currentWorkbench.id)
+        diService.getAccounts(activeWorkbench.id),
+        diService.getDocuments(activeWorkbench.id)
       ]);
       setAccounts(accs || []);
       setDocuments(docs || []);
@@ -127,7 +127,7 @@ export default function COA() {
                     onClick={async () => {
                       setLoading(true);
                       try {
-                        await diService.seedAccounts(currentWorkbench.id, 'default-template-id');
+                        await diService.seedAccounts(activeWorkbench.id, 'default-template-id');
                         toast.success('Financial Language seeded successfully!');
                         loadData();
                       } catch (err) {

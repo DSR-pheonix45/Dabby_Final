@@ -16,7 +16,7 @@ import {
 } from "react-icons/bs";
 
 export default function DocVault() {
-  const { currentWorkbench } = useWorkbench();
+  const { activeWorkbench } = useWorkbench();
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -24,15 +24,15 @@ export default function DocVault() {
   const [activeTab, setActiveTab] = useState("UPLOADED DOCUMENTS");
 
   useEffect(() => {
-    if (currentWorkbench) {
+    if (activeWorkbench) {
       loadDocuments();
     }
-  }, [currentWorkbench]);
+  }, [activeWorkbench]);
 
   const loadDocuments = async () => {
     setLoading(true);
     try {
-      const docs = await diService.getDocuments(currentWorkbench.id);
+      const docs = await diService.getDocuments(activeWorkbench.id);
       setDocuments(docs || []);
     } catch (err) {
       toast.error("Failed to load documents");
@@ -49,10 +49,11 @@ export default function DocVault() {
     
     try {
       toast.loading("Uploading document...", { id: "upload" });
-      const res = await diService.uploadDocument(currentWorkbench.id, file);
+      const res = await diService.uploadDocument(activeWorkbench.id, file);
       
       toast.loading("Processing AI Extraction...", { id: "upload" });
-      await diService.processDocument(res.document_id);
+      
+      const analysis = await diService.processDocument(res.document_id);
       
       toast.success("Document processed successfully!", { id: "upload" });
       loadDocuments();
@@ -61,7 +62,7 @@ export default function DocVault() {
     } finally {
       setUploading(false);
     }
-  }, [currentWorkbench]);
+  }, [activeWorkbench]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
