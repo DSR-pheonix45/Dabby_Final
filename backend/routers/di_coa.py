@@ -72,7 +72,81 @@ async def seed_accounts_from_template(payload: COATemplateSeed):
             
             if labels_to_insert:
                 supabase.table("di_workbench_labels").insert(labels_to_insert).execute()
+                
+        # 5. Insert Custom Demo Accounts
+        demo_accounts = [
+            {
+                "workbench_id": payload.workbench_id,
+                "code": "1800",
+                "name": "Demo Tech Asset",
+                "category_code": "AST",
+                "normal_balance": "debit",
+                "is_postable": True,
+                "is_system": False,
+                "sort_order": 90
+            },
+            {
+                "workbench_id": payload.workbench_id,
+                "code": "5990",
+                "name": "Demo SaaS Subscription",
+                "category_code": "EXP",
+                "normal_balance": "debit",
+                "is_postable": True,
+                "is_system": False,
+                "sort_order": 115
+            }
+        ]
+        supabase.table("di_accounts").insert(demo_accounts).execute()
+
+        # 6. Insert Demo Document and Journal Transaction
+        import uuid
+        from datetime import datetime
         
-        return {"status": "success", "message": "Financial Language and COA successfully seeded."}
+        doc_id = str(uuid.uuid4())
+        supabase.table("di_documents").insert({
+            "id": doc_id,
+            "workbench_id": payload.workbench_id,
+            "storage_path": f"{payload.workbench_id}/demo_invoice_aws.pdf",
+            "original_filename": "demo_invoice_aws.pdf",
+            "mime_type": "application/pdf",
+            "size_bytes": 102400,
+            "file_hash": doc_id
+        }).execute()
+        
+        # Insert analysis note with proposed journals
+        mock_analysis_data = {
+            "predicted_label": "Software & SaaS",
+            "reasoning": "This is a demo invoice for AWS cloud hosting.",
+            "document_metadata": {
+                "document_type": "Invoice",
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "reference_number": "AWS-123456"
+            },
+            "parties": {
+                "vendor": "Amazon Web Services",
+                "buyer": "Dabby User"
+            },
+            "financials": {
+                "total_amount": 250.00,
+                "tax_amount": 20.00,
+                "subtotal": 230.00,
+                "currency": "USD"
+            },
+            "proposed_journal_entries": [
+                { "account": "5990 Demo SaaS Subscription", "type": "debit", "amount": 250.00 },
+                { "account": "2000 Accounts Payable", "type": "credit", "amount": 250.00 }
+            ]
+        }
+        
+        supabase.table("di_analysis_notes").insert({
+            "document_id": doc_id,
+            "classification_type": "software & saas",
+            "extracted_data": mock_analysis_data,
+            "reasoning": "Mock generated for pitch demo.",
+            "confidence": 0.99
+        }).execute()
+        
+        return {"status": "success", "message": "Financial Language, Demo Labels, and Demo Journals successfully seeded."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
