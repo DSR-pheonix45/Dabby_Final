@@ -183,15 +183,27 @@ export const backendService = {
         console.error("[WARNING] Exception inserting owner into workbench_members:", memberErr);
       }
 
-      // 1.5. Auto-seed Chart of Accounts labels/ontology
+      // 1.5. Auto-seed Chart of Accounts labels/ontology (Phase 1)
       try {
         await apiFetch(`/api/ledger/labels/seed/${workbench.id}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" }
         });
-        console.log(`[DEBUG] Automatically seeded Chart of Accounts for workbench: ${workbench.id}`);
+        console.log(`[DEBUG] Automatically seeded Phase 1 Chart of Accounts for workbench: ${workbench.id}`);
       } catch (seedErr) {
-        console.error("[WARNING] Auto-seeding labels failed:", seedErr);
+        console.error("[WARNING] Auto-seeding Phase 1 labels failed:", seedErr);
+      }
+
+      // 1.6 Auto-seed Phase 2 COA (di_accounts, di_workbench_labels, demo journals)
+      try {
+        await apiFetch(`/api/di/coa/seed`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workbench_id: workbench.id, template_id: "default" })
+        });
+        console.log(`[DEBUG] Automatically seeded Phase 2 Chart of Accounts for workbench: ${workbench.id}`);
+      } catch (seedErr) {
+        console.error("[WARNING] Auto-seeding Phase 2 labels failed:", seedErr);
       }
 
       // 2. Insert into user_members table
