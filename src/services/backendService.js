@@ -129,7 +129,7 @@ export const backendService = {
       // 1. Insert into workbenches table
       const baseRow = {
         name: name.trim(),
-        owner_user_id: user.id,
+        user_id: user.id,
         books_start_date: booksStartDate,
         description: description || `Workbench for ${name.trim()}`,
         location: extraData.location || 'India',
