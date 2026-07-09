@@ -12,7 +12,10 @@ export default function Workbenches() {
   const { workbenches, activeWorkbench, changeActiveWorkbench, fetchWorkbenches } = useWorkbench();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [openDropdownId, setOpenDropdownId] = useState(null);
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("Status");
+  const [sortBy, setSortBy] = useState("Sorted by name");
+  const [viewMode, setViewMode] = useState("grid");
   const [renamingWorkbench, setRenamingWorkbench] = useState(null);
   const [newWorkbenchName, setNewWorkbenchName] = useState("");
   const navigate = useNavigate();
@@ -21,7 +24,7 @@ export default function Workbenches() {
     e.stopPropagation();
     if (!window.confirm("Are you sure you want to delete this workbench?")) return;
     
-    setOpenDropdownId(null);
+    setOpenDropdown(null);
     const { error } = await supabase.from("workbenches").delete().eq("id", id);
     if (error) {
       toast.error("Failed to delete workbench");
@@ -53,9 +56,21 @@ export default function Workbenches() {
     }
   };
 
-  const filteredWorkbenches = workbenches.filter((wb) =>
+  let finalWorkbenches = workbenches.filter((wb) =>
     wb.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (statusFilter === "Active") {
+    finalWorkbenches = finalWorkbenches.filter(wb => activeWorkbench?.id === wb.id);
+  }
+
+  finalWorkbenches.sort((a, b) => {
+    if (sortBy === "Name (A-Z)") return a.name.localeCompare(b.name);
+    if (sortBy === "Name (Z-A)") return b.name.localeCompare(a.name);
+    if (sortBy === "Newest") return new Date(b.created_at) - new Date(a.created_at);
+    if (sortBy === "Oldest") return new Date(a.created_at) - new Date(b.created_at);
+    return 0;
+  });
 
   return (
     <div className="h-full bg-[#111111] overflow-y-auto custom-scrollbar p-6 lg:p-10 font-dm-sans">
@@ -79,22 +94,65 @@ export default function Workbenches() {
               />
             </div>
 
-            <button className="hidden sm:flex items-center space-x-2 px-3 py-1.5 bg-[#1A1A1A] hover:bg-white/5 border border-white/10 rounded-md text-sm text-gray-300 transition-colors">
-              <span>Status</span>
-              <HiChevronDown />
-            </button>
-            <button className="hidden sm:flex items-center space-x-2 px-3 py-1.5 bg-[#1A1A1A] hover:bg-white/5 border border-white/10 rounded-md text-sm text-gray-300 transition-colors">
-              <span>Sorted by name</span>
-              <HiChevronDown />
-            </button>
+            <div className="relative hidden sm:block z-30">
+              <button 
+                onClick={() => setOpenDropdown(openDropdown === "status" ? null : "status")}
+                className="flex items-center space-x-2 px-3 py-1.5 bg-[#1A1A1A] hover:bg-white/5 border border-white/10 rounded-md text-sm text-gray-300 transition-colors"
+              >
+                <span>{statusFilter}</span>
+                <HiChevronDown />
+              </button>
+              {openDropdown === "status" && (
+                <div className="absolute left-0 mt-1 w-32 bg-[#1A1A1A] border border-white/10 rounded-md shadow-lg overflow-hidden">
+                  {["Status", "Active"].map(opt => (
+                    <button
+                      key={opt}
+                      onClick={() => { setStatusFilter(opt); setOpenDropdown(null); }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
+                    >
+                      {opt === "Status" ? "All" : opt}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="relative hidden sm:block z-30">
+              <button 
+                onClick={() => setOpenDropdown(openDropdown === "sort" ? null : "sort")}
+                className="flex items-center space-x-2 px-3 py-1.5 bg-[#1A1A1A] hover:bg-white/5 border border-white/10 rounded-md text-sm text-gray-300 transition-colors"
+              >
+                <span>{sortBy}</span>
+                <HiChevronDown />
+              </button>
+              {openDropdown === "sort" && (
+                <div className="absolute left-0 mt-1 w-40 bg-[#1A1A1A] border border-white/10 rounded-md shadow-lg overflow-hidden">
+                  {["Sorted by name", "Name (A-Z)", "Name (Z-A)", "Newest", "Oldest"].map(opt => (
+                    <button
+                      key={opt}
+                      onClick={() => { setSortBy(opt); setOpenDropdown(null); }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
+                    >
+                      {opt === "Sorted by name" ? "Default" : opt}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>>
           </div>
 
           <div className="flex items-center space-x-3 w-full md:w-auto justify-between md:justify-end">
             <div className="flex items-center p-1 bg-[#1A1A1A] border border-white/10 rounded-md">
-              <button className="p-1 text-white bg-white/10 rounded">
+              <button 
+                onClick={() => setViewMode("grid")}
+                className={`p-1 rounded transition-colors ${viewMode === "grid" ? "text-white bg-white/10" : "text-gray-500 hover:text-white"}`}
+              >
                 <BsGrid />
               </button>
-              <button className="p-1 text-gray-500 hover:text-white rounded transition-colors">
+              <button 
+                onClick={() => setViewMode("list")}
+                className={`p-1 rounded transition-colors ${viewMode === "list" ? "text-white bg-white/10" : "text-gray-500 hover:text-white"}`}
+              >
                 <BsListUl />
               </button>
             </div>
@@ -109,15 +167,15 @@ export default function Workbenches() {
           </div>
         </div>
 
-        {openDropdownId && (
+        {openDropdown && (
           <div 
             className="fixed inset-0 z-10"
-            onClick={() => setOpenDropdownId(null)}
+            onClick={() => setOpenDropdown(null)}
           />
         )}
         {/* Workbenches Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative z-20">
-          {filteredWorkbenches.map((wb) => (
+        <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative z-20" : "flex flex-col gap-3 relative z-20"}>
+          {finalWorkbenches.map((wb) => (
             <div
               key={wb.id}
               onClick={() => {
@@ -128,9 +186,9 @@ export default function Workbenches() {
                 activeWorkbench?.id === wb.id
                   ? "border-teal-500"
                   : "border-white/10"
-              } hover:border-white/20 rounded-lg p-5 cursor-pointer transition-all group flex flex-col`}
+              } hover:border-white/20 rounded-lg p-5 cursor-pointer transition-all group flex ${viewMode === "grid" ? "flex-col" : "flex-row items-center justify-between"}`}
             >
-              <div className="flex justify-between items-start mb-4">
+              <div className={`flex justify-between items-start ${viewMode === "grid" ? "mb-4" : "flex-1 mr-4 items-center"}`}>
                 <div className="flex-1 min-w-0 pr-4">
                   <h3 className="text-white font-medium text-base truncate">
                     {wb.name}
@@ -141,15 +199,15 @@ export default function Workbenches() {
                 </div>
                 <div className="relative">
                   <button
-                    className={`text-gray-500 hover:text-white p-1 rounded hover:bg-white/10 transition-colors ${openDropdownId === wb.id ? "opacity-100 bg-white/10" : "opacity-0 group-hover:opacity-100"}`}
+                    className={`text-gray-500 hover:text-white p-1 rounded hover:bg-white/10 transition-colors ${openDropdown === wb.id ? "opacity-100 bg-white/10" : "opacity-0 group-hover:opacity-100"}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setOpenDropdownId(openDropdownId === wb.id ? null : wb.id);
+                      setOpenDropdown(openDropdown === wb.id ? null : wb.id);
                     }}
                   >
                     <BsThreeDots />
                   </button>
-                  {openDropdownId === wb.id && (
+                  {openDropdown === wb.id && (
                     <div 
                       className="absolute right-0 mt-1 w-36 bg-[#1A1A1A] border border-white/10 rounded-md shadow-lg overflow-hidden z-30"
                       onClick={(e) => e.stopPropagation()}
@@ -160,7 +218,7 @@ export default function Workbenches() {
                           e.stopPropagation();
                           setRenamingWorkbench(wb);
                           setNewWorkbenchName(wb.name);
-                          setOpenDropdownId(null);
+                          setOpenDropdown(null);
                         }}
                       >
                         <BsPencil size={12} />
@@ -178,7 +236,7 @@ export default function Workbenches() {
                 </div>
               </div>
 
-              <div className="mt-auto pt-4 flex items-center space-x-2">
+              <div className={`flex items-center space-x-2 ${viewMode === "grid" ? "mt-auto pt-4" : "border-l border-white/10 pl-4"}`}>
                 <span className="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide bg-white/5 text-gray-400 rounded">
                   {wb.business_type}
                 </span>
@@ -193,7 +251,7 @@ export default function Workbenches() {
               </div>
             </div>
           ))}
-          {filteredWorkbenches.length === 0 && (
+          {finalWorkbenches.length === 0 && (
             <div className="col-span-full py-12 text-center text-gray-500">
               No workbenches found.
             </div>
