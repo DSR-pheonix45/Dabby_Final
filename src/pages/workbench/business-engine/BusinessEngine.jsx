@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { useBusinessEngine, usePipeline, useProcessingTimeline } from './hooks/useBusinessEngine';
+import { useBusinessEngine, usePipeline, useProcessingTimeline } from '../../../hooks/useBusinessEngine';
 import BusinessEngineSummary from './components/BusinessEngineSummary';
 import BusinessEngineFilters from './components/BusinessEngineFilters';
 import PipelineBoard from './components/PipelineBoard';
