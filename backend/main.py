@@ -16,7 +16,8 @@ else:
     load_dotenv(env_path)
 
 
-from routers import auth, ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, assets, rulesets, plans, superadmin, ingestion, business_events, settlements, collaboration
+import auth
+from routers import ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, assets, rulesets, plans, superadmin, ingestion, business_events, settlements, collaboration
 
 app = FastAPI(title="Datalis API", description="FastAPI Backend for Datalis", version="1.0.0")
 
