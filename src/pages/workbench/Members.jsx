@@ -1,10 +1,33 @@
 import React, { useState, useEffect } from "react";
 import { useWorkbench } from "../../context/WorkbenchContext";
+import { useAuth } from "../../hooks/useAuth";
 import { BsPersonPlus, BsSearch, BsThreeDots } from "react-icons/bs";
+import { collaborationService } from "../../services/collaborationService";
 
 export default function Members() {
   const { activeWorkbench } = useWorkbench();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
+  const [members, setMembers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (activeWorkbench) {
+      loadMembers();
+    }
+  }, [activeWorkbench]);
+
+  const loadMembers = async () => {
+    setIsLoading(true);
+    try {
+      const data = await collaborationService.getMembers(activeWorkbench.id);
+      setMembers(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (!activeWorkbench) {
     return (
@@ -36,7 +59,7 @@ export default function Members() {
             <BsSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
             <input
               type="text"
-              placeholder="Search members by name or email"
+              placeholder="Search members by user ID"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[#1A1A1A] border border-white/10 rounded-md py-2 pl-9 pr-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20 transition-colors"
@@ -44,7 +67,7 @@ export default function Members() {
           </div>
         </div>
 
-        {/* Members List Shell */}
+        {/* Members List */}
         <div className="bg-[#181818] border border-white/10 rounded-lg overflow-hidden">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -56,37 +79,54 @@ export default function Members() {
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                <td className="px-6 py-4">
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 rounded-full bg-teal-500/20 text-teal-500 flex items-center justify-center font-bold mr-3">
-                      U
-                    </div>
-                    <div>
-                      <div className="text-white text-sm font-medium">You</div>
-                      <div className="text-gray-500 text-xs">Current User</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="text-sm text-gray-300 capitalize">Owner</span>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
-                    Active
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <button className="text-gray-500 hover:text-white transition-colors p-1 rounded hover:bg-white/10">
-                    <BsThreeDots />
-                  </button>
-                </td>
-              </tr>
+              {isLoading ? (
+                <tr>
+                  <td colSpan="4" className="px-6 py-8 text-center text-gray-500">Loading members...</td>
+                </tr>
+              ) : members.length === 0 ? (
+                <tr>
+                  <td colSpan="4" className="px-6 py-8 text-center text-gray-500">No members found.</td>
+                </tr>
+              ) : (
+                members.map((member) => (
+                  <tr key={member.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center">
+                        <div className="h-8 w-8 rounded-full bg-teal-500/20 text-teal-500 flex items-center justify-center font-bold mr-3">
+                          {member.user_id === user?.id ? "U" : "M"}
+                        </div>
+                        <div>
+                          <div className="text-white text-sm font-medium">
+                            {member.user_id === user?.id ? "You" : "User"}
+                          </div>
+                          <div className="text-gray-500 text-xs truncate max-w-[200px]">
+                            {member.user_id}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-gray-300 capitalize">{member.role}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
+                        member.status === 'active' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                        member.status === 'invited' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
+                        'bg-red-500/10 text-red-400 border-red-500/20'
+                      }`}>
+                        {member.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button className="text-gray-500 hover:text-white transition-colors p-1 rounded hover:bg-white/10">
+                        <BsThreeDots />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
-          <div className="py-8 text-center text-gray-500 text-sm">
-            This is a shell layout. Data fetching will be wired up later.
-          </div>
         </div>
 
       </div>

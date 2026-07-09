@@ -1,9 +1,16 @@
 import React, { useState } from "react";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { BsGear, BsBuilding } from "react-icons/bs";
+import { collaborationService } from "../../services/collaborationService";
+import { toast } from "react-hot-toast";
 
 export default function WorkbenchSettings() {
-  const { activeWorkbench } = useWorkbench();
+  const { activeWorkbench, setActiveWorkbench } = useWorkbench();
+  const [isSaving, setIsSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    name: activeWorkbench?.name || "",
+    legal_name: activeWorkbench?.legal_name || ""
+  });
 
   if (!activeWorkbench) {
     return (
@@ -12,6 +19,24 @@ export default function WorkbenchSettings() {
       </div>
     );
   }
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await collaborationService.updateSettings(activeWorkbench.id, {
+        name: formData.name,
+        legal_name: formData.legal_name
+      });
+      // Update local context
+      setActiveWorkbench({ ...activeWorkbench, ...formData });
+      toast.success("Settings saved successfully");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save settings");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="h-full bg-[#111111] overflow-y-auto custom-scrollbar p-6 lg:p-10 font-dm-sans">
@@ -48,7 +73,8 @@ export default function WorkbenchSettings() {
                   <label className="block text-sm font-medium text-gray-400 mb-2">Display Name</label>
                   <input
                     type="text"
-                    defaultValue={activeWorkbench.name}
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full bg-[#1A1A1A] border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-teal-500 transition-colors"
                   />
                 </div>
@@ -56,7 +82,8 @@ export default function WorkbenchSettings() {
                   <label className="block text-sm font-medium text-gray-400 mb-2">Legal Name</label>
                   <input
                     type="text"
-                    defaultValue={activeWorkbench.legal_name || ""}
+                    value={formData.legal_name}
+                    onChange={(e) => setFormData({ ...formData, legal_name: e.target.value })}
                     placeholder="E.g., Acme Corporation Pvt Ltd"
                     className="w-full bg-[#1A1A1A] border border-white/10 rounded-lg px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-teal-500 transition-colors"
                   />
@@ -83,8 +110,12 @@ export default function WorkbenchSettings() {
               </div>
 
               <div className="flex justify-end pt-4 border-t border-white/10">
-                <button className="px-6 py-2 bg-teal-500 hover:bg-teal-400 text-black font-medium rounded-md transition-colors">
-                  Save Changes
+                <button 
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="px-6 py-2 bg-teal-500 hover:bg-teal-400 text-black font-medium rounded-md transition-colors disabled:opacity-50"
+                >
+                  {isSaving ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </div>
