@@ -8,7 +8,8 @@ import {
   BsChevronDown,
   BsChevronRight,
   BsClockHistory,
-  BsPlusLg
+  BsPlusLg,
+  BsBuilding
 } from "react-icons/bs";
 import { useAuth } from "../../hooks/useAuth";
 import ChatSearch from "../ChatSearch";
@@ -143,6 +144,7 @@ export default function Sidebar({
   const location = useLocation();
 
   const [expandedSections, setExpandedSections] = useState({
+    workbenches: true,
     history: false,
   });
 
@@ -255,6 +257,27 @@ export default function Sidebar({
         {/* Navigation Sections */}
         <div className="flex-1 space-y-2">
 
+
+          <ExpandableSection
+            title="Workbenches"
+            icon={BsBuilding}
+            isExpanded={expandedSections.workbenches}
+            onToggle={() => toggleSection("workbenches")}
+            isCollapsed={isCollapsed}
+          >
+            <div className="py-1">
+              <button
+                onClick={() => {
+                  navigate("/dashboard/workbenches");
+                  onNavigate?.();
+                }}
+                className="flex items-center space-x-2 text-[10px] font-bold text-teal-500 hover:text-teal-400 transition-colors tracking-widest uppercase py-1"
+              >
+                <span className="text-lg leading-none mb-0.5">+</span>
+                <span>VIEW ALL</span>
+              </button>
+            </div>
+          </ExpandableSection>
 
           <ExpandableSection
             title="History"

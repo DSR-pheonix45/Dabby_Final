@@ -9,6 +9,7 @@ import ChatArea from "./ChatArea/ChatArea";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
 import Settings from "./Settings/Settings";
+import Workbenches from "../pages/Workbenches";
 import OnboardingTour from "./Onboarding/OnboardingTour";
 import FeedbackModal from "./ChatArea/FeedbackModal";
 import { backendService } from "../services/backendService";
@@ -691,6 +692,7 @@ Based on the Profit & Loss statement provided, the business shows stable operati
               }
             />
             <Route path="settings" element={<Settings />} />
+            <Route path="workbenches" element={<Workbenches />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>
