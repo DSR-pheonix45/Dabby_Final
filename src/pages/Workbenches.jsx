@@ -7,7 +7,7 @@ import CreateWorkbenchModal from "../components/Workbenches/CreateWorkbenchModal
 import { useNavigate } from "react-router-dom";
 
 export default function Workbenches() {
-  const { workbenches, activeWorkbench, changeActiveWorkbench } = useWorkbench();
+  const { workbenches, activeWorkbench, changeActiveWorkbench, fetchWorkbenches } = useWorkbench();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
@@ -128,7 +128,8 @@ export default function Workbenches() {
       <CreateWorkbenchModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        onSuccess={(newWb) => {
+        onSuccess={async (newWb) => {
+          await fetchWorkbenches();
           changeActiveWorkbench(newWb);
         }}
       />
