@@ -1,5 +1,5 @@
 import React from 'react';
-import { BsXLg, BsFileEarmarkText, BsLightningCharge, BsDiagram3 } from 'react-icons/bs';
+import { BsXLg, BsFileEarmarkText, BsLightningCharge, BsDiagram3, BsEye } from 'react-icons/bs';
 
 export default function InspectorDrawer({ isOpen, onClose, data }) {
   if (!isOpen || !data) return null;
