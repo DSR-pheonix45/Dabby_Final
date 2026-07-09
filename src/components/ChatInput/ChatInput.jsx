@@ -12,6 +12,7 @@ import {
   BsX,
   BsFileEarmark,
   BsBriefcase,
+  BsBuilding,
 } from "react-icons/bs";
 import FileSuggestions from "./FileSuggestions";
 import { toast } from "react-hot-toast";
