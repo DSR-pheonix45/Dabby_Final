@@ -17,7 +17,7 @@ else:
 
 
 import auth
-from routers import ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, assets, rulesets, plans, superadmin, ingestion, business_events, settlements, collaboration
+from routers import ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, assets, rulesets, plans, superadmin, ingestion, business_events, settlements, collaboration, di_coa, di_documents
 
 app = FastAPI(title="Datalis API", description="FastAPI Backend for Datalis", version="1.0.0")
 
@@ -45,7 +45,6 @@ app.add_middleware(
 
 
 # Include Routers
-app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(ai.router, prefix="/api/ai", tags=["AI"])
 app.include_router(budgets.router, prefix="/api/budgets", tags=["Budgets"])
 app.include_router(ledger.router, prefix="/api/ledger", tags=["Ledger"])
