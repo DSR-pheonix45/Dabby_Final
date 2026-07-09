@@ -16,6 +16,8 @@ import {
 import FileSuggestions from "./FileSuggestions";
 import { toast } from "react-hot-toast";
 import VoiceInput from "../VoiceInput";
+import { useWorkbench } from "../../context/WorkbenchContext";
+import { HiChevronDown } from "react-icons/hi";
 
 const PLACEHOLDERS = [
   "Ask about profit margins...",
@@ -44,6 +46,8 @@ const ChatInput = forwardRef(function ChatInput(
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const { workbenches, activeWorkbench, changeActiveWorkbench } = useWorkbench();
+  const [isWorkbenchDropdownOpen, setIsWorkbenchDropdownOpen] = useState(false);
 
   // Rotating Placeholder Logic
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -258,6 +262,48 @@ const ChatInput = forwardRef(function ChatInput(
               >
                 <BsPaperclip className="text-base sm:text-lg" />
               </button>
+            </div>
+
+            {/* Workbench Selector */}
+            <div className="flex items-center gap-1 px-1 relative">
+              <button
+                type="button"
+                onClick={() => setIsWorkbenchDropdownOpen(!isWorkbenchDropdownOpen)}
+                disabled={disabled || isLoading}
+                title={activeWorkbench ? `Workbench: ${activeWorkbench.name}` : "Select Workbench"}
+                className={`group/btn relative p-2 sm:p-2.5 rounded-lg sm:rounded-xl transition-all duration-200 ${
+                  activeWorkbench 
+                    ? "text-teal-400 bg-teal-500/10 shadow-[0_0_10px_rgba(20,184,166,0.1)]"
+                    : "text-gray-400 hover:text-teal-400 hover:bg-teal-500/10"
+                }`}
+              >
+                <BsBuilding className="text-base sm:text-lg" />
+              </button>
+
+              {isWorkbenchDropdownOpen && (
+                <div className="absolute bottom-full mb-2 left-0 w-56 bg-[#161B22]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10 z-50 p-1">
+                  {workbenches.map((wb) => (
+                    <button
+                      key={wb.id}
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        changeActiveWorkbench(wb);
+                        setIsWorkbenchDropdownOpen(false);
+                      }}
+                      className="w-full flex items-center px-3 py-2 hover:bg-white/10 rounded-lg transition-colors text-left"
+                    >
+                      <span className={`text-sm truncate ${activeWorkbench?.id === wb.id ? 'text-teal-400 font-medium' : 'text-white'}`}>
+                        {wb.name}
+                      </span>
+                    </button>
+                  ))}
+                  
+                  {workbenches.length === 0 && (
+                    <div className="px-3 py-2 text-sm text-gray-500">No workbenches</div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Web Search Toggle */}
