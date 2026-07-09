@@ -10,6 +10,9 @@ import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../hooks/useAuth";
 import Settings from "./Settings/Settings";
 import Workbenches from "../pages/Workbenches";
+import Members from "../pages/workbench/Members";
+import Parties from "../pages/workbench/Parties";
+import WorkbenchSettings from "../pages/workbench/Settings";
 import OnboardingTour from "./Onboarding/OnboardingTour";
 import FeedbackModal from "./ChatArea/FeedbackModal";
 import { backendService } from "../services/backendService";
@@ -699,13 +702,17 @@ Based on the Profit & Loss statement provided, the business shows stable operati
             />
             <Route path="settings" element={<Settings />} />
             <Route path="workbenches" element={<Workbenches />} />
+            <Route path="workbench/members" element={<Members />} />
+            <Route path="workbench/parties" element={<Parties />} />
+            <Route path="workbench/settings" element={<WorkbenchSettings />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>
 
         {!isInConversation &&
           !location.pathname.includes("/settings") &&
-          !location.pathname.includes("/workbenches") && (
+          !location.pathname.includes("/workbenches") &&
+          !location.pathname.includes("/workbench/") && (
             <ChatInput
               ref={chatInputRef}
               onSendMessage={handleSendMessage}
