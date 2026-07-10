@@ -32,8 +32,18 @@ class TaskUpdate(BaseModel):
 async def list_tasks(workbench_id: str, user = Depends(get_current_user)):
     try:
         # Fetch tasks for the workbench, ordering by created_at
-        tasks_res = supabase.table("workbench_tasks").select("*, assigned_user:users!workbench_tasks_assigned_to_fkey(id, name, email)").eq("workbench_id", workbench_id).order("created_at", desc=True).execute()
-        return tasks_res.data or []
+        tasks_res = supabase.table("workbench_tasks").select("*").eq("workbench_id", workbench_id).order("created_at", desc=True).execute()
+        tasks = tasks_res.data or []
+        
+        if tasks:
+            user_ids = list({t["assigned_to"] for t in tasks if t.get("assigned_to")})
+            if user_ids:
+                users_res = supabase.table("users").select("id, name, email").in_("id", user_ids).execute()
+                users_map = {u["id"]: u for u in (users_res.data or [])}
+                for t in tasks:
+                    t["assigned_user"] = users_map.get(t["assigned_to"], {})
+                    
+        return tasks
     except Exception as e:
         print(f"[ERROR] list_tasks: {e}")
         raise HTTPException(status_code=500, detail=str(e))
