@@ -112,8 +112,18 @@ class WorkbenchSettingsUpdate(BaseModel):
 
 @router.get("/{workbench_id}/members")
 def get_members(workbench_id: str, user = Depends(get_current_user)):
-    res = supabase.table("workbench_members").select("*, users:user_id(id, email, name)").eq("workbench_id", workbench_id).execute()
-    return res.data
+    res = supabase.table("workbench_members").select("*").eq("workbench_id", workbench_id).execute()
+    members = res.data or []
+    
+    if members:
+        user_ids = list({m["user_id"] for m in members if m.get("user_id")})
+        if user_ids:
+            users_res = supabase.table("users").select("id, email, name").in_("id", user_ids).execute()
+            users_map = {u["id"]: u for u in (users_res.data or [])}
+            for m in members:
+                m["users"] = users_map.get(m["user_id"], {})
+                
+    return members
 
 @router.get("/permissions")
 def get_permissions():
@@ -274,8 +284,18 @@ def update_settings(workbench_id: str, payload: WorkbenchSettingsUpdate, user = 
 def get_activity_logs(workbench_id: str, user = Depends(get_current_user)):
     try:
         # Fetch latest 50 activity logs for the workbench
-        res = supabase.table("activity_logs").select("*, users:user_id(id, name, email)").eq("workbench_id", workbench_id).order("created_at", desc=True).limit(50).execute()
-        return res.data or []
+        res = supabase.table("activity_logs").select("*").eq("workbench_id", workbench_id).order("created_at", desc=True).limit(50).execute()
+        logs = res.data or []
+        
+        if logs:
+            user_ids = list({log["user_id"] for log in logs if log.get("user_id")})
+            if user_ids:
+                users_res = supabase.table("users").select("id, email, name").in_("id", user_ids).execute()
+                users_map = {u["id"]: u for u in (users_res.data or [])}
+                for log in logs:
+                    log["users"] = users_map.get(log["user_id"], {})
+                    
+        return logs
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
