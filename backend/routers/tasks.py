@@ -31,8 +31,17 @@ class TaskUpdate(BaseModel):
 @router.get("/{workbench_id}")
 async def list_tasks(workbench_id: str, user = Depends(get_current_user)):
     try:
+        # Check user's role in the workbench
+        member_res = supabase.table("workbench_members").select("role").eq("workbench_id", workbench_id).eq("user_id", user["id"]).execute()
+        role = member_res.data[0]["role"] if member_res.data else "viewer"
+
         # Fetch tasks for the workbench, ordering by created_at
-        tasks_res = supabase.table("workbench_tasks").select("*").eq("workbench_id", workbench_id).order("created_at", desc=True).execute()
+        query = supabase.table("workbench_tasks").select("*").eq("workbench_id", workbench_id)
+        
+        if role not in ["owner", "admin"]:
+            query = query.or_(f"assigned_to.eq.{user['id']},created_by.eq.{user['id']}")
+            
+        tasks_res = query.order("created_at", desc=True).execute()
         tasks = tasks_res.data or []
         
         if tasks:
