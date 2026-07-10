@@ -13,6 +13,70 @@ router = APIRouter()
 JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "super_secret_key_for_dabby")
 ALGORITHM = "HS256"
 
+# Role Permissions Mapping
+ROLE_PERMISSIONS = {
+    "owner": {
+        "documents": {"upload": True, "delete": True, "review": True},
+        "reports": {"view": True, "export": True},
+        "chat": {"access": True},
+        "transactions": {"create": True, "approve": True},
+        "members": {"invite": True, "remove": True, "change_roles": True},
+        "settings": {"edit": True}
+    },
+    "admin": {
+        "documents": {"upload": True, "delete": True, "review": True},
+        "reports": {"view": True, "export": True},
+        "chat": {"access": True},
+        "transactions": {"create": True, "approve": True},
+        "members": {"invite": True, "remove": True, "change_roles": True},
+        "settings": {"edit": False}
+    },
+    "finance_manager": {
+        "documents": {"upload": True, "delete": False, "review": True},
+        "reports": {"view": True, "export": True},
+        "chat": {"access": True},
+        "transactions": {"create": True, "approve": True},
+        "members": {"invite": True, "remove": False, "change_roles": False},
+        "settings": {"edit": False}
+    },
+    "accountant": {
+        "documents": {"upload": True, "delete": False, "review": True},
+        "reports": {"view": True, "export": True},
+        "chat": {"access": True},
+        "transactions": {"create": True, "approve": False},
+        "members": {"invite": False, "remove": False, "change_roles": False},
+        "settings": {"edit": False}
+    },
+    "analyst": {
+        "documents": {"upload": False, "delete": False, "review": True},
+        "reports": {"view": True, "export": True},
+        "chat": {"access": True},
+        "transactions": {"create": False, "approve": False},
+        "members": {"invite": False, "remove": False, "change_roles": False},
+        "settings": {"edit": False}
+    },
+    "viewer": {
+        "documents": {"upload": False, "delete": False, "review": True},
+        "reports": {"view": True, "export": False},
+        "chat": {"access": False},
+        "transactions": {"create": False, "approve": False},
+        "members": {"invite": False, "remove": False, "change_roles": False},
+        "settings": {"edit": False}
+    },
+    "auditor": {
+        "documents": {"upload": False, "delete": False, "review": True},
+        "reports": {"view": True, "export": True},
+        "chat": {"access": False},
+        "transactions": {"create": False, "approve": False},
+        "members": {"invite": False, "remove": False, "change_roles": False},
+        "settings": {"edit": False}
+    }
+}
+
+# Default to a generic secret if SUPABASE_JWT_SECRET is not provided
+JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "super_secret_key_for_dabby")
+ALGORITHM = "HS256"
+
 class MemberInvite(BaseModel):
     user_id: str
     role: str
@@ -22,6 +86,9 @@ class RoleInvite(BaseModel):
 
 class JoinToken(BaseModel):
     token: str
+
+class RoleUpdate(BaseModel):
+    role: str
 
 class PartyCreate(BaseModel):
     name: str
@@ -45,8 +112,12 @@ class WorkbenchSettingsUpdate(BaseModel):
 
 @router.get("/{workbench_id}/members")
 def get_members(workbench_id: str, user = Depends(get_current_user)):
-    res = supabase.table("workbench_members").select("*").eq("workbench_id", workbench_id).execute()
+    res = supabase.table("workbench_members").select("*, users:user_id(id, email, name)").eq("workbench_id", workbench_id).execute()
     return res.data
+
+@router.get("/permissions")
+def get_permissions():
+    return ROLE_PERMISSIONS
 
 @router.post("/{workbench_id}/invites/generate")
 def generate_invite(workbench_id: str, payload: RoleInvite, user = Depends(get_current_user)):
@@ -79,6 +150,11 @@ def join_workbench(payload: JoinToken, user = Depends(get_current_user)):
         if existing.data:
             return existing.data[0]
             
+        # Validate workbench exists and is active
+        wb_res = supabase.table("workbenches").select("*").eq("id", workbench_id).execute()
+        if not wb_res.data:
+            raise HTTPException(status_code=400, detail="Workbench does not exist.")
+            
         # Insert new active member
         res = supabase.table("workbench_members").insert({
             "workbench_id": workbench_id,
@@ -89,11 +165,53 @@ def join_workbench(payload: JoinToken, user = Depends(get_current_user)):
             "joined_at": datetime.now(timezone.utc).isoformat()
         }).execute()
         
+        # Log activity
+        if res.data:
+            supabase.table("activity_logs").insert({
+                "workbench_id": workbench_id,
+                "user_id": user["id"],
+                "action_type": "member_joined",
+                "entity_type": "member",
+                "entity_id": user["id"],
+                "description": f"User joined workbench as {role}"
+            }).execute()
+            
         return res.data[0] if res.data else None
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=400, detail="Invite link has expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=400, detail="Invalid invite link")
+
+@router.put("/{workbench_id}/members/{target_user_id}/role")
+def update_member_role(workbench_id: str, target_user_id: str, payload: RoleUpdate, user = Depends(get_current_user)):
+    # Basic check for invoker permission (fallback in case RLS is weird)
+    invoker = supabase.table("workbench_members").select("role").eq("workbench_id", workbench_id).eq("user_id", user["id"]).execute()
+    if not invoker.data or invoker.data[0]["role"] not in ["owner", "admin"]:
+        raise HTTPException(status_code=403, detail="Only owners and admins can change roles.")
+
+    # Check valid role
+    if payload.role not in ROLE_PERMISSIONS:
+        raise HTTPException(status_code=400, detail="Invalid role specified.")
+
+    # Update role
+    res = supabase.table("workbench_members").update({"role": payload.role}).eq("workbench_id", workbench_id).eq("user_id", target_user_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Member not found")
+        
+    # Log activity
+    target_user = supabase.table("users").select("email").eq("id", target_user_id).execute()
+    target_email = target_user.data[0]["email"] if target_user.data else target_user_id
+    
+    supabase.table("activity_logs").insert({
+        "workbench_id": workbench_id,
+        "user_id": user["id"],
+        "action_type": "role_changed",
+        "entity_type": "member",
+        "entity_id": target_user_id,
+        "description": f"Changed role of {target_email} to {payload.role}"
+    }).execute()
+    
+    return res.data[0]
 
 # --- Parties & Trade Vessels ---
 
@@ -149,3 +267,30 @@ def update_settings(workbench_id: str, payload: WorkbenchSettingsUpdate, user = 
         
     res = supabase.table("workbenches").update(update_data).eq("id", workbench_id).execute()
     return res.data[0] if res.data else None
+
+# --- Activity & Notifications ---
+
+@router.get("/{workbench_id}/activity")
+def get_activity_logs(workbench_id: str, user = Depends(get_current_user)):
+    try:
+        # Fetch latest 50 activity logs for the workbench
+        res = supabase.table("activity_logs").select("*, users:user_id(id, name, email)").eq("workbench_id", workbench_id).order("created_at", desc=True).limit(50).execute()
+        return res.data or []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/user/notifications")
+def get_notifications(user = Depends(get_current_user)):
+    try:
+        res = supabase.table("notifications").select("*").eq("user_id", user["id"]).order("created_at", desc=True).limit(20).execute()
+        return res.data or []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.patch("/user/notifications/{notification_id}/read")
+def mark_notification_read(notification_id: str, user = Depends(get_current_user)):
+    try:
+        res = supabase.table("notifications").update({"is_read": True}).eq("id", notification_id).eq("user_id", user["id"]).execute()
+        return res.data[0] if res.data else None
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

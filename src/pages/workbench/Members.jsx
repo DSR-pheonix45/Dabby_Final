@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { useAuth } from "../../hooks/useAuth";
-import { BsPersonPlus, BsSearch, BsThreeDots } from "react-icons/bs";
+import { BsPersonPlus, BsSearch } from "react-icons/bs";
 import { collaborationService } from "../../services/collaborationService";
 import AddMemberModal from "./AddMemberModal";
+import MemberDetail from "./MemberDetail";
+import RoleChangeModal from "./RoleChangeModal";
 
 export default function Members() {
   const { activeWorkbench } = useWorkbench();
@@ -12,6 +14,8 @@ export default function Members() {
   const [members, setMembers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [isRoleChangeOpen, setIsRoleChangeOpen] = useState(false);
 
   useEffect(() => {
     if (activeWorkbench) {
@@ -24,11 +28,26 @@ export default function Members() {
     try {
       const data = await collaborationService.getMembers(activeWorkbench.id);
       setMembers(data || []);
+      
+      // Select the first member by default if none selected
+      if (data && data.length > 0 && !selectedMember) {
+        setSelectedMember(data[0]);
+      }
     } catch (err) {
       console.error(err);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const filteredMembers = members.filter(m => 
+    m.user_id.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (m.users && (m.users.name?.toLowerCase().includes(searchQuery.toLowerCase()) || m.users.email?.toLowerCase().includes(searchQuery.toLowerCase())))
+  );
+
+  const handleRoleChangeClick = (member) => {
+    setSelectedMember(member);
+    setIsRoleChangeOpen(true);
   };
 
   if (!activeWorkbench) {
@@ -40,103 +59,95 @@ export default function Members() {
   }
 
   return (
-    <div className="p-6 lg:p-10 font-dm-sans">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="h-full flex flex-col font-dm-sans">
+      <div className="flex-1 flex overflow-hidden">
         
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">Members</h1>
-            <p className="text-gray-400 text-sm mt-1">Manage team access to {activeWorkbench.name}</p>
+        {/* Left Panel - Master List */}
+        <div className={`w-full lg:w-[350px] flex-shrink-0 border-r border-white/10 flex flex-col bg-[#0A0A0A] ${selectedMember ? 'hidden lg:flex' : 'flex'}`}>
+          <div className="p-6 border-b border-white/10">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-xl font-bold text-white tracking-tight">Members</h1>
+                <p className="text-gray-400 text-xs mt-1">Manage team access</p>
+              </div>
+              <button onClick={() => setIsAddMemberOpen(true)} className="p-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors border border-white/10 shadow-[0_0_10px_rgba(255,255,255,0.05)]" title="Invite Member">
+                <BsPersonPlus size={18} />
+              </button>
+            </div>
+            
+            <div className="relative">
+              <BsSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Search members..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[#1A1A1A] border border-white/10 rounded-lg py-2 pl-9 pr-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20 transition-colors"
+              />
+            </div>
           </div>
-          <button onClick={() => setIsAddMemberOpen(true)} className="flex items-center space-x-2 px-4 py-2 bg-teal-500 hover:bg-teal-400 text-black font-semibold text-sm rounded-md transition-colors w-full sm:w-auto justify-center shadow-[0_0_10px_rgba(20,184,166,0.3)]">
-            <BsPersonPlus size={16} />
-            <span>Invite Member</span>
-          </button>
-        </div>
-
-        {/* Toolbar Section */}
-        <div className="flex items-center space-x-3 border-b border-white/10 pb-4">
-          <div className="relative w-full max-w-md">
-            <BsSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-            <input
-              type="text"
-              placeholder="Search members by user ID"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#1A1A1A] border border-white/10 rounded-md py-2 pl-9 pr-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20 transition-colors"
-            />
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            {isLoading ? (
+              <p className="text-center text-sm text-gray-500 py-4">Loading members...</p>
+            ) : filteredMembers.length === 0 ? (
+              <p className="text-center text-sm text-gray-500 py-4">No members found.</p>
+            ) : (
+              filteredMembers.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setSelectedMember(m)}
+                  className={`w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors ${
+                    selectedMember?.id === m.id 
+                      ? 'bg-teal-500/10 border-teal-500/30' 
+                      : 'hover:bg-white/5 border-transparent'
+                  } border`}
+                >
+                  <div className="h-10 w-10 shrink-0 rounded-full bg-teal-500/20 text-teal-500 flex items-center justify-center font-bold">
+                    {m.users?.name?.charAt(0)?.toUpperCase() || "M"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">
+                      {m.users?.name || m.user_id}
+                      {m.user_id === user?.id && <span className="ml-2 text-xs text-gray-500">(You)</span>}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate capitalize">{m.role}</p>
+                  </div>
+                  {m.status !== 'active' && (
+                    <span className="shrink-0 h-2 w-2 rounded-full bg-yellow-500" title={m.status}></span>
+                  )}
+                </button>
+              ))
+            )}
           </div>
         </div>
 
-        {/* Members List */}
-        <div className="bg-[#181818] border border-white/10 rounded-lg overflow-hidden">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-white/10 bg-white/5">
-                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-gray-400 uppercase">User</th>
-                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-gray-400 uppercase">Role</th>
-                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-gray-400 uppercase">Status</th>
-                <th className="px-6 py-3 text-xs font-semibold tracking-wider text-gray-400 uppercase text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center text-gray-500">Loading members...</td>
-                </tr>
-              ) : members.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center text-gray-500">No members found.</td>
-                </tr>
-              ) : (
-                members.map((member) => (
-                  <tr key={member.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center">
-                        <div className="h-8 w-8 rounded-full bg-teal-500/20 text-teal-500 flex items-center justify-center font-bold mr-3">
-                          {member.user_id === user?.id ? "U" : "M"}
-                        </div>
-                        <div>
-                          <div className="text-white text-sm font-medium">
-                            {member.user_id === user?.id ? "You" : "User"}
-                          </div>
-                          <div className="text-gray-500 text-xs truncate max-w-[200px]">
-                            {member.user_id}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-300 capitalize">{member.role}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
-                        member.status === 'active' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                        member.status === 'invited' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
-                        'bg-red-500/10 text-red-400 border-red-500/20'
-                      }`}>
-                        {member.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="text-gray-500 hover:text-white transition-colors p-1 rounded hover:bg-white/10">
-                        <BsThreeDots />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        {/* Right Panel - Detail View */}
+        <div className={`flex-1 p-6 lg:p-8 bg-[#0E1117] flex flex-col overflow-hidden ${!selectedMember ? 'hidden lg:flex' : 'flex'}`}>
+          <MemberDetail 
+            member={selectedMember} 
+            workbenchId={activeWorkbench.id} 
+            onClose={() => setSelectedMember(null)}
+            onRoleChangeClick={handleRoleChangeClick}
+          />
         </div>
-
+        
       </div>
+      
       <AddMemberModal
         isOpen={isAddMemberOpen}
         onClose={() => setIsAddMemberOpen(false)}
         workbenchId={activeWorkbench.id}
       />
+      
+      <RoleChangeModal
+        isOpen={isRoleChangeOpen}
+        onClose={() => setIsRoleChangeOpen(false)}
+        member={selectedMember}
+        workbenchId={activeWorkbench.id}
+        onRoleChanged={loadMembers}
+      />
+      
     </div>
   );
 }

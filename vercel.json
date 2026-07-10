@@ -18,6 +18,10 @@
         }
       ],
       "destination": "https://service.prerender.io/https://www.datalis.in/$1?prerenderToken=Bf0mUPSUhwGSbC2tOR1V"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }

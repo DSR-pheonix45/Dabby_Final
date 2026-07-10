@@ -7,6 +7,7 @@ import {
 import { HiChevronDown } from "react-icons/hi";
 import { useAuth } from "../../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import NotificationDropdown from "./NotificationDropdown";
 
 export default function Header({
   onMobileMenuClick,
@@ -82,6 +83,8 @@ export default function Header({
               </div>
             </div>
             
+            <NotificationDropdown />
+
             {/* Overflow Menu */}
             <div className="relative">
               <button
