@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useWorkbench } from "../../context/WorkbenchContext";
+import { useDataCache } from "../../hooks/useDataCache";
 import { BsSearch, BsShieldCheck, BsBuilding, BsPlus } from "react-icons/bs";
 import { collaborationService } from "../../services/collaborationService";
 import AddPartyModal from "./AddPartyModal";
@@ -9,30 +10,16 @@ export default function Parties() {
   const { activeWorkbench } = useWorkbench();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("ALL");
-  const [parties, setParties] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  
+  const { data, isLoading, refetch: loadParties } = useDataCache(
+    activeWorkbench ? `parties_${activeWorkbench.id}` : null,
+    () => collaborationService.getParties(activeWorkbench.id)
+  );
+
   const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
   const [isAddVesselOpen, setIsAddVesselOpen] = useState(false);
   const [selectedPartyId, setSelectedPartyId] = useState(null);
 
-  useEffect(() => {
-    if (activeWorkbench) {
-      loadParties();
-    }
-  }, [activeWorkbench]);
-
-  const loadParties = async () => {
-    setIsLoading(true);
-    try {
-      const data = await collaborationService.getParties(activeWorkbench.id);
-      setParties(data || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const parties = data || [];
 
   const handleAddVesselClick = (partyId) => {
     setSelectedPartyId(partyId);

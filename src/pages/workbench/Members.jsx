@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { useAuth } from "../../hooks/useAuth";
+import { useDataCache } from "../../hooks/useDataCache";
 import { BsPersonPlus, BsSearch } from "react-icons/bs";
 import { collaborationService } from "../../services/collaborationService";
 import AddMemberModal from "./AddMemberModal";
@@ -11,34 +12,23 @@ export default function Members() {
   const { activeWorkbench } = useWorkbench();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
-  const [members, setMembers] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data, isLoading, refetch: loadMembers } = useDataCache(
+    activeWorkbench ? `members_${activeWorkbench.id}` : null,
+    () => collaborationService.getMembers(activeWorkbench.id)
+  );
+
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [isRoleChangeOpen, setIsRoleChangeOpen] = useState(false);
 
-  useEffect(() => {
-    if (activeWorkbench) {
-      loadMembers();
-    }
-  }, [activeWorkbench]);
+  const members = data || [];
 
-  const loadMembers = async () => {
-    setIsLoading(true);
-    try {
-      const data = await collaborationService.getMembers(activeWorkbench.id);
-      setMembers(data || []);
-      
-      // Select the first member by default if none selected
-      if (data && data.length > 0 && !selectedMember) {
-        setSelectedMember(data[0]);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoading(false);
+  useEffect(() => {
+    // Select the first member by default if none selected
+    if (members.length > 0 && !selectedMember) {
+      setSelectedMember(members[0]);
     }
-  };
+  }, [members, selectedMember]);
 
   const filteredMembers = members.filter(m => 
     m.user_id.toLowerCase().includes(searchQuery.toLowerCase()) || 

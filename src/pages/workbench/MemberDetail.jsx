@@ -2,44 +2,43 @@ import React, { useState, useEffect } from "react";
 import { BsPerson, BsPlus, BsClockHistory, BsCheckCircle, BsCheck2All } from "react-icons/bs";
 import TaskCard from "./TaskCard";
 import AssignTaskModal from "./AssignTaskModal";
+import { useDataCache } from "../../hooks/useDataCache";
 import { apiFetch } from "../../lib/apiClient";
 import { toast } from "react-hot-toast";
 
 export default function MemberDetail({ member, workbenchId, onClose, onRoleChangeClick }) {
-  const [tasks, setTasks] = useState([]);
-  const [activity, setActivity] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isAssignTaskOpen, setIsAssignTaskOpen] = useState(false);
-  
-  useEffect(() => {
-    if (member) {
-      loadMemberData();
-    }
-  }, [member]);
 
-  const loadMemberData = async () => {
-    setIsLoading(true);
-    try {
-      // 1. Fetch all workbench tasks
-      const tRes = await apiFetch(`/api/tasks/${workbenchId}`);
-      if (tRes.ok) {
-        const allTasks = await tRes.json();
-        // Filter tasks assigned to this member
-        setTasks(allTasks.filter(t => t.assigned_to === member.user_id));
-      }
-      
-      // 2. Fetch activity logs
-      const aRes = await apiFetch(`/api/collaboration/${workbenchId}/activity`);
-      if (aRes.ok) {
-        const allActivity = await aRes.json();
-        // Filter activity for this member
-        setActivity(allActivity.filter(a => a.user_id === member.user_id));
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
+  const fetchTasks = async () => {
+    const tRes = await apiFetch(`/api/tasks/${workbenchId}`);
+    if (tRes.ok) return await tRes.json();
+    return [];
+  };
+
+  const fetchActivity = async () => {
+    const aRes = await apiFetch(`/api/collaboration/${workbenchId}/activity`);
+    if (aRes.ok) return await aRes.json();
+    return [];
+  };
+
+  const { data: allTasks, isLoading: isTasksLoading, refetch: refetchTasks } = useDataCache(
+    member ? `tasks_${workbenchId}` : null,
+    fetchTasks
+  );
+
+  const { data: allActivity, isLoading: isActivityLoading, refetch: refetchActivity } = useDataCache(
+    member ? `activity_${workbenchId}` : null,
+    fetchActivity
+  );
+
+  const isLoading = isTasksLoading || isActivityLoading;
+
+  const tasks = (allTasks || []).filter(t => t.assigned_to === member?.user_id);
+  const activity = (allActivity || []).filter(a => a.user_id === member?.user_id);
+
+  const loadMemberData = () => {
+    refetchTasks();
+    refetchActivity();
   };
 
   const handleStatusChange = async (taskId, newStatus) => {
