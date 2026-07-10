@@ -32,7 +32,7 @@ def get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "127.0.0.1"
 
 
-async def enforce_waitlist(email: str):
+async def enforce_waitlist(email: str, user_id: str):
     if not email:
         return
     email_lower = email.strip().lower()
@@ -40,6 +40,14 @@ async def enforce_waitlist(email: str):
     # Exempt superadmins from waitlist gating
     try:
         res = supabase.table("superadmins").select("id").eq("email", email_lower).execute()
+        if res.data:
+            return
+    except Exception:
+        pass
+
+    # Exempt users who are already invited and part of a workbench
+    try:
+        res = supabase.table("workbench_members").select("id").eq("user_id", user_id).limit(1).execute()
         if res.data:
             return
     except Exception:
@@ -133,9 +141,33 @@ async def get_current_user(request: Request, authorization: Optional[str] = Head
     email = getattr(user, "email", None)
     
     # 1. Enforce waitlist restrictions
-    await enforce_waitlist(email)
+    await enforce_waitlist(email, uid)
     
     # 2. Enforce IP restrictions (Account Sharing Prevention)
+    client_ip = get_client_ip(request)
+    await enforce_ip_restrictions(uid, client_ip, email)
+    
+    return {"id": uid, "email": email}
+
+async def get_current_user_no_waitlist(request: Request, authorization: Optional[str] = Header(None)) -> dict:
+    """
+    Same as get_current_user but skips the waitlist check. Useful for invite links.
+    """
+    token = _extract_bearer(authorization)
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required (missing bearer token)")
+    try:
+        res = supabase.auth.get_user(token)
+        user = getattr(res, "user", None)
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Invalid or expired session: {e}")
+    if not user or not getattr(user, "id", None):
+        raise HTTPException(status_code=401, detail="Invalid session token")
+    
+    uid = user.id
+    email = getattr(user, "email", None)
+    
+    # Skip waitlist, only enforce IP restrictions
     client_ip = get_client_ip(request)
     await enforce_ip_restrictions(uid, client_ip, email)
     

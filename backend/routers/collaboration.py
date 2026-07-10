@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional, Dict
 from pydantic import BaseModel
 from supabase_client import supabase
-from auth import get_current_user
+from auth import get_current_user, get_current_user_no_waitlist
 import jwt
 import os
 from datetime import datetime, timedelta, timezone
@@ -138,7 +138,7 @@ def generate_invite(workbench_id: str, payload: RoleInvite, user = Depends(get_c
     return {"token": token}
 
 @router.post("/join")
-def join_workbench(payload: JoinToken, user = Depends(get_current_user)):
+def join_workbench(payload: JoinToken, user = Depends(get_current_user_no_waitlist)):
     try:
         decoded = jwt.decode(payload.token, JWT_SECRET, algorithms=[ALGORITHM])
         workbench_id = decoded["workbench_id"]
