@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { BsPerson, BsPlus, BsClockHistory, BsCheckCircle, BsCheck2All } from "react-icons/bs";
 import TaskCard from "./TaskCard";
+import AssignTaskModal from "./AssignTaskModal";
 import { apiFetch } from "../../lib/apiClient";
 import { toast } from "react-hot-toast";
 
@@ -8,6 +9,7 @@ export default function MemberDetail({ member, workbenchId, onClose, onRoleChang
   const [tasks, setTasks] = useState([]);
   const [activity, setActivity] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAssignTaskOpen, setIsAssignTaskOpen] = useState(false);
   
   useEffect(() => {
     if (member) {
@@ -119,6 +121,13 @@ export default function MemberDetail({ member, workbenchId, onClose, onRoleChang
               <BsCheck2All />
               Assigned Tasks
             </h3>
+            <button 
+              onClick={() => setIsAssignTaskOpen(true)}
+              className="px-3 py-1.5 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 text-xs font-medium rounded-lg transition-colors border border-teal-500/20 flex items-center gap-1"
+            >
+              <BsPlus size={16} />
+              Assign Task
+            </button>
           </div>
           
           {isLoading ? (
@@ -179,6 +188,14 @@ export default function MemberDetail({ member, workbenchId, onClose, onRoleChang
         </section>
 
       </div>
+
+      <AssignTaskModal
+        isOpen={isAssignTaskOpen}
+        onClose={() => setIsAssignTaskOpen(false)}
+        member={member}
+        workbenchId={workbenchId}
+        onTaskCreated={loadMemberData}
+      />
     </div>
   );
 }
