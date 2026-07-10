@@ -107,8 +107,8 @@ async def enforce_ip_restrictions(user_id: str, ip_address: str, email: str):
             
         active_ips = {row["ip_address"] for row in res.data} if res.data else set()
         
-        MAX_DISTINCT_IPS = 2
-        # If user has more than 2 active IPs and current one isn't counted
+        MAX_DISTINCT_IPS = 100
+        # If user has more than 100 active IPs and current one isn't counted
         if len(active_ips) > MAX_DISTINCT_IPS and ip_address not in active_ips:
             raise HTTPException(
                 status_code=403,
