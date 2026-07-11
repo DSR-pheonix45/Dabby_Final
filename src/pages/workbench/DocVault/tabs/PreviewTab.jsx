@@ -12,17 +12,13 @@ export default function PreviewTab({ doc }) {
       if (!doc || !doc.storage_path) return;
       setLoading(true);
       try {
-        // Backend bypassed storage3 sdk by uploading via HTTP POST to Doc_vault_Raw
-        // Let's try getting public URL first, if fails then signed URL
-        const { data } = supabase.storage.from('Doc_vault_Raw').getPublicUrl(doc.storage_path);
+        // Doc_vault_Raw is private, so we MUST use createSignedUrl
+        const { data, error: signedError } = await supabase.storage.from('Doc_vault_Raw').createSignedUrl(doc.storage_path, 3600);
         
-        // If the bucket is private, we'd use createSignedUrl instead:
-        // const { data, error } = await supabase.storage.from('Doc_vault_Raw').createSignedUrl(doc.storage_path, 3600);
-        
-        if (data?.publicUrl) {
-          setUrl(data.publicUrl);
+        if (data?.signedUrl) {
+          setUrl(data.signedUrl);
         } else {
-          setError("Could not retrieve document URL");
+          setError(signedError?.message || "Could not retrieve document URL");
         }
       } catch (err) {
         setError(err.message);

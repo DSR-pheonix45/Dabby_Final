@@ -6,6 +6,8 @@ import { useDropzone } from "react-dropzone";
 import { BsCloudUpload, BsShieldLock } from "react-icons/bs";
 import DocumentList from "./DocumentList";
 import RightPanel from "./RightPanel";
+import PreviewTab from "./tabs/PreviewTab";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 
 // Utility to derive status dynamically since we skipped DDL changes for MVP
 export const deriveDocumentStatus = (doc) => {
@@ -129,32 +131,52 @@ export default function DocVaultIndex() {
 
       {/* Split Layout */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Panel */}
-        <div className="w-1/3 min-w-[320px] max-w-[450px] border-r border-white/5 flex flex-col bg-[#111111]">
-          <DocumentList 
-            documents={documents} 
-            loading={loading} 
-            selectedDoc={selectedDoc} 
-            onSelect={setSelectedDoc}
-            uploading={uploading}
-          />
-        </div>
-
-        {/* Right Panel */}
-        <div className="flex-1 flex flex-col bg-[#0D0D0D] overflow-hidden relative">
-          {selectedDoc ? (
-            <RightPanel 
-              doc={selectedDoc} 
-              onUpdate={loadDocuments} 
-              onClose={() => setSelectedDoc(null)} 
+        <PanelGroup direction="horizontal">
+          {/* Left Panel */}
+          <Panel defaultSize={20} minSize={15} className="border-r border-white/5 flex flex-col bg-[#111111]">
+            <DocumentList 
+              documents={documents} 
+              loading={loading} 
+              selectedDoc={selectedDoc} 
+              onSelect={setSelectedDoc}
+              uploading={uploading}
             />
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
-              <BsShieldLock className="text-6xl mb-4 opacity-20" />
-              <p className="font-medium text-gray-400">Select a document to review</p>
-            </div>
-          )}
-        </div>
+          </Panel>
+
+          <PanelResizeHandle className="w-1.5 bg-[#0D0D0D] hover:bg-teal-500/50 cursor-col-resize transition-colors z-10 flex flex-col justify-center items-center">
+            <div className="h-8 w-0.5 bg-white/20 rounded-full" />
+          </PanelResizeHandle>
+
+          {/* Right Panel */}
+          <Panel defaultSize={80} className="flex flex-col bg-[#0D0D0D] overflow-hidden relative">
+            {selectedDoc ? (
+              <PanelGroup direction="horizontal">
+                {/* Preview Tab (Always visible next to data) */}
+                <Panel defaultSize={40} minSize={20} className="border-r border-white/5">
+                  <PreviewTab doc={selectedDoc} />
+                </Panel>
+                
+                <PanelResizeHandle className="w-1.5 bg-[#0D0D0D] hover:bg-teal-500/50 cursor-col-resize transition-colors z-10 flex flex-col justify-center items-center">
+                  <div className="h-8 w-0.5 bg-white/20 rounded-full" />
+                </PanelResizeHandle>
+                
+                {/* Data Tabs */}
+                <Panel defaultSize={60} minSize={30} className="flex flex-col">
+                  <RightPanel 
+                    doc={selectedDoc} 
+                    onUpdate={loadDocuments} 
+                    onClose={() => setSelectedDoc(null)} 
+                  />
+                </Panel>
+              </PanelGroup>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
+                <BsShieldLock className="text-6xl mb-4 opacity-20" />
+                <p className="font-medium text-gray-400">Select a document to review</p>
+              </div>
+            )}
+          </Panel>
+        </PanelGroup>
       </div>
     </div>
   );
