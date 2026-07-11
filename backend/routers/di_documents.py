@@ -247,15 +247,21 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
 
         return {"status": "success", "message": "Document processed and proposed journal entries generated."}
     except Exception as e:
-        print(f"[DI ERROR] {str(e)}")
+        import traceback
+        err_msg = traceback.format_exc()
+        print(f"[DI ERROR] {err_msg}")
         # Log failure
-        supabase.table("di_document_processing_logs").insert({
-            "document_id": document_id,
-            "stage": "analysis",
-            "provider": "system",
-            "status": "failed"
-        }).execute()
-        raise HTTPException(status_code=500, detail=str(e))
+        try:
+            supabase.table("di_document_processing_logs").insert({
+                "document_id": document_id,
+                "stage": "analysis",
+                "provider": "system",
+                "status": "failed",
+                "error_message": str(e)[:500]
+            }).execute()
+        except:
+            pass
+        raise HTTPException(status_code=400, detail=f"Processing Error: {str(e)} | Traceback: {err_msg}")
 
 @router.post("/{document_id}/approve")
 async def approve_document(document_id: str):
