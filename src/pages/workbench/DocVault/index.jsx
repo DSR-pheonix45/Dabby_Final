@@ -7,7 +7,7 @@ import { BsCloudUpload, BsShieldLock } from "react-icons/bs";
 import DocumentList from "./DocumentList";
 import RightPanel from "./RightPanel";
 import PreviewTab from "./tabs/PreviewTab";
-import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 
 // Utility to derive status dynamically since we skipped DDL changes for MVP
 export const deriveDocumentStatus = (doc) => {
@@ -131,7 +131,7 @@ export default function DocVaultIndex() {
 
       {/* Split Layout */}
       <div className="flex flex-1 overflow-hidden">
-        <PanelGroup direction="horizontal">
+        <PanelGroup orientation="horizontal">
           {/* Left Panel */}
           <Panel defaultSize={20} minSize={15} className="border-r border-white/5 flex flex-col bg-[#111111]">
             <DocumentList 
@@ -150,7 +150,7 @@ export default function DocVaultIndex() {
           {/* Right Panel */}
           <Panel defaultSize={80} className="flex flex-col bg-[#0D0D0D] overflow-hidden relative">
             {selectedDoc ? (
-              <PanelGroup direction="horizontal">
+              <PanelGroup orientation="horizontal">
                 {/* Preview Tab (Always visible next to data) */}
                 <Panel defaultSize={40} minSize={20} className="border-r border-white/5">
                   <PreviewTab doc={selectedDoc} />
