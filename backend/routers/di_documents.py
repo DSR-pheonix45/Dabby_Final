@@ -195,7 +195,7 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
             
         genai.configure(api_key=gemini_key)
         model = genai.GenerativeModel(
-            "gemini-1.5-flash",
+            "gemini-2.5-flash",
             system_instruction=system_prompt,
             generation_config={"response_mime_type": "application/json", "temperature": 0.1}
         )
