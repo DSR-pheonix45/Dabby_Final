@@ -50,4 +50,22 @@ export const diService = {
     if (!res.ok) throw new Error('Failed to process document');
     return res.json();
   },
+
+  async approveDocument(documentId) {
+    const res = await apiFetch(`/api/di/documents/${documentId}/approve`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to approve document');
+    return res.json();
+  },
+
+  async updateUfo(documentId, extractedData) {
+    const res = await apiFetch(`/api/di/documents/${documentId}/ufo`, {
+      method: 'PUT',
+      body: JSON.stringify({ extracted_data: extractedData }),
+    });
+    if (!res.ok) throw new Error('Failed to update UFO');
+    return res.json();
+  }
 };
+

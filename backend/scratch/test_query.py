@@ -13,6 +13,7 @@ headers = {
     "Content-Type": "application/json"
 }
 
-# Fetch all ip logs for the newly joined user
-res = requests.get(f"{SUPABASE_URL}/rest/v1/user_ip_logs?user_id=eq.bfb8d539-f0d4-4dc7-be47-5e55a9a084b6", headers=headers)
-print("user_ip_logs:", res.json())
+# Fetch all members with the foreign key join
+res = requests.get(f"{SUPABASE_URL}/rest/v1/workbench_members?select=*,users:user_id(id,email,name)", headers=headers)
+print("status:", res.status_code)
+print("response:", res.text)

@@ -1,0 +1,92 @@
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../../../lib/supabase';
+import { BsFileEarmarkPdf, BsImage, BsFileEarmarkText, BsDownload } from 'react-icons/bs';
+
+export default function PreviewTab({ doc }) {
+  const [url, setUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function fetchUrl() {
+      if (!doc || !doc.storage_path) return;
+      setLoading(true);
+      try {
+        // Backend bypassed storage3 sdk by uploading via HTTP POST to Doc_vault_Raw
+        // Let's try getting public URL first, if fails then signed URL
+        const { data } = supabase.storage.from('Doc_vault_Raw').getPublicUrl(doc.storage_path);
+        
+        // If the bucket is private, we'd use createSignedUrl instead:
+        // const { data, error } = await supabase.storage.from('Doc_vault_Raw').createSignedUrl(doc.storage_path, 3600);
+        
+        if (data?.publicUrl) {
+          setUrl(data.publicUrl);
+        } else {
+          setError("Could not retrieve document URL");
+        }
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchUrl();
+  }, [doc]);
+
+  if (loading) {
+    return <div className="p-8 text-center text-gray-500 animate-pulse text-sm">Loading preview...</div>;
+  }
+
+  if (error || !url) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-500 p-8">
+        <BsFileEarmarkText className="text-4xl mb-4 opacity-50" />
+        <p className="text-sm">Preview not available.</p>
+        <p className="text-xs mt-2 opacity-50">{error}</p>
+      </div>
+    );
+  }
+
+  const isPdf = doc.mime_type === 'application/pdf';
+  const isImage = doc.mime_type?.startsWith('image/');
+
+  return (
+    <div className="flex flex-col h-full bg-[#111111]">
+      <div className="p-3 border-b border-white/5 flex justify-between items-center bg-[#0A0A0A]">
+        <div className="flex items-center gap-2 text-xs font-semibold text-gray-400">
+          {isPdf ? <BsFileEarmarkPdf /> : isImage ? <BsImage /> : <BsFileEarmarkText />}
+          {doc.original_filename}
+        </div>
+        <a 
+          href={url} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 text-xs font-semibold text-gray-300 transition-colors"
+        >
+          <BsDownload /> Download Original
+        </a>
+      </div>
+      
+      <div className="flex-1 overflow-auto flex items-center justify-center p-4">
+        {isPdf ? (
+          <iframe 
+            src={`${url}#toolbar=0&view=FitH`} 
+            className="w-full h-full rounded border border-white/10 bg-white"
+            title={doc.original_filename}
+          />
+        ) : isImage ? (
+          <img 
+            src={url} 
+            alt={doc.original_filename}
+            className="max-w-full max-h-full object-contain rounded border border-white/10"
+          />
+        ) : (
+          <div className="text-center text-gray-500">
+            <BsFileEarmarkText className="text-4xl mb-2 mx-auto opacity-50" />
+            <p>Cannot preview this file type.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

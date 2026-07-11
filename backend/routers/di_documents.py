@@ -156,35 +156,48 @@ async def process_document(document_id: str):
 You are an expert AI accounting agent. Analyze the document and extract detailed financial insights.
 You MUST classify this document into exactly one of these labels: {valid_labels}.
 
-Return ONLY valid JSON matching this exact schema:
+Return ONLY valid JSON matching this exact schema. For every value, provide a "value" and a "confidence" score (0.0 to 1.0).
+
 {{
     "predicted_label": "String (Must be one of the provided labels)",
-    "reasoning": "Detailed explanation of the classification and accounting treatment",
-    "document_metadata": {{
-        "document_type": "Invoice / Receipt / Bank Statement / etc",
-        "date": "YYYY-MM-DD",
-        "reference_number": "String"
-    }},
+    "document_type": "Invoice / Receipt / Bank Statement / etc",
     "parties": {{
-        "vendor": "String",
-        "vendor_address": "String",
-        "buyer": "String",
-        "buyer_address": "String"
+        "vendor": {{"value": "String", "confidence": 0.99}},
+        "customer": {{"value": "String", "confidence": 0.99}}
+    }},
+    "document": {{
+        "reference_number": {{"value": "String", "confidence": 0.99}},
+        "date": {{"value": "YYYY-MM-DD", "confidence": 0.99}}
     }},
     "financials": {{
-        "total_amount": 1500.00,
-        "tax_amount": 100.00,
-        "subtotal": 1400.00,
-        "currency": "USD"
+        "total_amount": {{"value": 1500.00, "confidence": 0.99}},
+        "tax_amount": {{"value": 100.00, "confidence": 0.99}},
+        "currency": {{"value": "USD", "confidence": 0.99}}
     }},
     "line_items": [
         {{
-            "description": "String",
-            "quantity": 1,
-            "unit_price": 100.00,
-            "total": 100.00
+            "description": {{"value": "String", "confidence": 0.99}},
+            "quantity": {{"value": 1, "confidence": 0.99}},
+            "unit_price": {{"value": 100.00, "confidence": 0.99}},
+            "total": {{"value": 100.00, "confidence": 0.99}}
         }}
-    ]
+    ],
+    "financial_impact": [
+        {{ "account": "Expense", "amount": 1400.00, "type": "increase" }},
+        {{ "account": "Tax Receivable", "amount": 100.00, "type": "increase" }},
+        {{ "account": "Accounts Payable", "amount": 1500.00, "type": "increase" }}
+    ],
+    "business_events": [
+        "Expense Incurred",
+        "Tax Liability Created",
+        "Accounts Payable Created"
+    ],
+    "expected_journal": [
+        {{ "account": "Expense", "type": "debit", "amount": 1400.00 }},
+        {{ "account": "Tax Receivable", "type": "debit", "amount": 100.00 }},
+        {{ "account": "Accounts Payable", "type": "credit", "amount": 1500.00 }}
+    ],
+    "analysis": "Human-readable interpretation of the financial impact (2-3 sentences)."
 }}
 """
 
@@ -203,32 +216,24 @@ Return ONLY valid JSON matching this exact schema:
         analysis_data = json.loads(llm_response.choices[0].message.content)
         predicted_label = analysis_data.get("predicted_label", "Purchase")
         
-        # 4. Resolve the label to the ledger account
-        label_res = supabase.table("di_workbench_labels").select("name, ledger_account_id, di_accounts!inner(code, name)").eq("workbench_id", doc_data['workbench_id']).eq("name", predicted_label).execute()
+        # Calculate overall confidence based on field confidences
+        confidences = []
+        try:
+            if "financials" in analysis_data:
+                confidences.append(analysis_data["financials"].get("total_amount", {}).get("confidence", 1.0))
+            if "document" in analysis_data:
+                confidences.append(analysis_data["document"].get("reference_number", {}).get("confidence", 1.0))
+        except:
+            pass
         
-        debit_account = predicted_label
-        credit_account = "Accounts Payable"
-        
-        if label_res.data:
-            debit_account = f"{label_res.data[0]['di_accounts']['code']} {label_res.data[0]['di_accounts']['name']}"
-            ap_res = supabase.table("di_accounts").select("code, name").eq("workbench_id", doc_data['workbench_id']).eq("code", "2000").execute()
-            if ap_res.data:
-                credit_account = f"{ap_res.data[0]['code']} {ap_res.data[0]['name']}"
-
-        financials = analysis_data.get("financials", {})
-        total_amount = financials.get("total_amount", 0.0)
-
-        analysis_data["proposed_journal_entries"] = [
-            {"account": debit_account, "type": "debit", "amount": total_amount},
-            {"account": credit_account, "type": "credit", "amount": total_amount}
-        ]
+        overall_confidence = sum(confidences) / len(confidences) if confidences else 0.95
         
         supabase.table("di_analysis_notes").insert({
             "document_id": document_id,
             "classification_type": predicted_label.lower(),
             "extracted_data": analysis_data,
-            "reasoning": analysis_data.get("reasoning", ""),
-            "confidence": 0.95
+            "reasoning": analysis_data.get("analysis", ""),
+            "confidence": overall_confidence
         }).execute()
         
         supabase.table("di_document_processing_logs").insert({
@@ -244,8 +249,39 @@ Return ONLY valid JSON matching this exact schema:
         # Log failure
         supabase.table("di_document_processing_logs").insert({
             "document_id": document_id,
-            "stage": "analysis_failed",
+            "stage": "analysis",
             "provider": "system",
             "status": "failed"
         }).execute()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{document_id}/approve")
+async def approve_document(document_id: str):
+    try:
+        supabase.table("di_document_processing_logs").insert({
+            "document_id": document_id,
+            "stage": "post",
+            "provider": "user",
+            "status": "success"
+        }).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/{document_id}/ufo")
+async def update_ufo(document_id: str, payload: dict):
+    try:
+        # In MVP we simply overwrite the extracted_data
+        supabase.table("di_analysis_notes").update({
+            "extracted_data": payload.get("extracted_data", {})
+        }).eq("document_id", document_id).execute()
+        
+        supabase.table("di_document_processing_logs").insert({
+            "document_id": document_id,
+            "stage": "user_edit",
+            "provider": "user",
+            "status": "success"
+        }).execute()
+        return {"status": "success"}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
