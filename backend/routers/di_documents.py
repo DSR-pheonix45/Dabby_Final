@@ -6,7 +6,6 @@ import uuid
 import json
 import base64
 import fitz
-from services.groq_pool import GroqPool
 
 router = APIRouter()
 
@@ -71,7 +70,10 @@ async def upload_document(
 
         return {"status": "success", "document_id": document_id}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        err_msg = traceback.format_exc()
+        print(f"[UPLOAD ERROR] {err_msg}")
+        raise HTTPException(status_code=400, detail=f"Upload Error: {str(e)} | Traceback: {err_msg}")
 
 @router.post("/{document_id}/process")
 async def process_document(document_id: str):
@@ -107,7 +109,6 @@ async def process_document(document_id: str):
             file_bytes = resp.content
         
         extracted_text = ""
-        prompt_content = []
         is_pdf = doc_data['mime_type'] == 'application/pdf'
         
         if is_pdf:
@@ -115,27 +116,11 @@ async def process_document(document_id: str):
             for page in pdf_doc:
                 extracted_text += page.get_text()
             pdf_doc.close()
-            prompt_content.append({
-                "type": "text", 
-                "text": f"Extract the financial details from this document text:\n\n{extracted_text}"
-            })
-        else:
-            base64_image = base64.b64encode(file_bytes).decode('utf-8')
-            prompt_content.append({
-                "type": "text", 
-                "text": "Extract the financial details from this image."
-            })
-            prompt_content.append({
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:{doc_data['mime_type']};base64,{base64_image}",
-                },
-            })
 
-        # Save OCR raw text
+        # Save OCR raw text (for images, we can leave it empty or extract text if needed, but for MVP we skip raw text for images)
         supabase.table("di_document_ocr").insert({
             "document_id": document_id,
-            "provider": "groq" if is_pdf else "groq-vision",
+            "provider": "gemini",
             "language": "en",
             "raw_text": extracted_text if extracted_text else "Image Document",
             "confidence": 0.95
@@ -144,11 +129,11 @@ async def process_document(document_id: str):
         supabase.table("di_document_processing_logs").insert({
             "document_id": document_id,
             "stage": "ocr",
-            "provider": "groq",
+            "provider": "gemini",
             "status": "success"
         }).execute()
 
-        # 3. Analyze with Groq (Fetch Workbench Labels to give to LLM)
+        # 3. Analyze with Gemini (Fetch Workbench Labels to give to LLM)
         labels_res = supabase.table("di_workbench_labels").select("name").eq("workbench_id", doc_data['workbench_id']).execute()
         valid_labels = [l['name'] for l in labels_res.data] if labels_res.data else ["Purchase", "Sales"]
 
@@ -201,19 +186,36 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
 }}
 """
 
-        def llm_call(client):
-            return client.chat.completions.create(
-                model="llama-3.2-11b-vision-preview" if not is_pdf else "llama3-8b-8192",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt_content}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.1
-            )
+        import google.generativeai as genai
+        import os
+        
+        gemini_key = os.environ.get("GEMINI_API_KEY")
+        if not gemini_key:
+            raise Exception("GEMINI_API_KEY is missing in environment variables.")
             
-        llm_response = GroqPool.execute(llm_call)
-        analysis_data = json.loads(llm_response.choices[0].message.content)
+        genai.configure(api_key=gemini_key)
+        model = genai.GenerativeModel(
+            "gemini-1.5-flash",
+            system_instruction=system_prompt,
+            generation_config={"response_mime_type": "application/json", "temperature": 0.1}
+        )
+        
+        if is_pdf:
+            response = model.generate_content([
+                extracted_text,
+                "Extract the financial details from this document text."
+            ])
+        else:
+            image_part = {
+                "mime_type": doc_data['mime_type'],
+                "data": file_bytes
+            }
+            response = model.generate_content([
+                image_part,
+                "Extract the financial details from this image."
+            ])
+            
+        analysis_data = json.loads(response.text)
         predicted_label = analysis_data.get("predicted_label", "Purchase")
         
         # Calculate overall confidence based on field confidences
