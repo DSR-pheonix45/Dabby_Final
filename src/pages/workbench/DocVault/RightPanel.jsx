@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BsX, BsFileText, BsBraces, BsGraphUp, BsClockHistory } from 'react-icons/bs';
+import { BsX, BsFileText, BsBraces, BsGraphUp, BsClockHistory, BsDiagram3 } from 'react-icons/bs';
 import PreviewTab from './tabs/PreviewTab';
 import ExtractedDataTab from './tabs/ExtractedDataTab';
 import FinancialImpactTab from './tabs/FinancialImpactTab';
