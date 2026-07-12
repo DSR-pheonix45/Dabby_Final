@@ -161,13 +161,19 @@ async def process_document(document_id: str):
             generation_config={"response_mime_type": "application/json", "temperature": 0.1}
         )
         
-        if is_pdf:
-            class_res = class_model.generate_content([extracted_text, "Classify this document."])
-        else:
-            class_res = class_model.generate_content([{"mime_type": doc_data['mime_type'], "data": file_bytes}, "Classify this document."])
+        document_part = {
+            "mime_type": doc_data['mime_type'],
+            "data": file_bytes
+        }
+        class_res = class_model.generate_content([document_part, "Classify this document."])
             
         try:
-            class_data = json.loads(class_res.text)
+            class_text = class_res.text.strip()
+            if class_text.startswith("```json"):
+                class_text = class_text[7:-3].strip()
+            elif class_text.startswith("```"):
+                class_text = class_text[3:-3].strip()
+            class_data = json.loads(class_text)
             doc_type = class_data.get("document_type", "unknown").lower()
         except:
             doc_type = "unknown"
@@ -255,22 +261,17 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
             generation_config={"response_mime_type": "application/json", "temperature": 0.1}
         )
         
-        if is_pdf:
-            response = model.generate_content([
-                extracted_text,
-                "Extract the financial details from this document text."
-            ])
-        else:
-            image_part = {
-                "mime_type": doc_data['mime_type'],
-                "data": file_bytes
-            }
-            response = model.generate_content([
-                image_part,
-                "Extract the financial details from this image."
-            ])
+        response = model.generate_content([
+            document_part,
+            "Extract the financial details from this document."
+        ])
             
-        analysis_data = json.loads(response.text)
+        analysis_text = response.text.strip()
+        if analysis_text.startswith("```json"):
+            analysis_text = analysis_text[7:-3].strip()
+        elif analysis_text.startswith("```"):
+            analysis_text = analysis_text[3:-3].strip()
+        analysis_data = json.loads(analysis_text)
         predicted_label = analysis_data.get("predicted_label", "Purchase")
         
         # Calculate overall confidence based on field confidences
