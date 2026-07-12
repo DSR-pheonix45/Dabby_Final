@@ -20,31 +20,53 @@ class UFOMapper:
         doc_type = UFOMapper._extract_value(doc_type_raw)
         
         # 1. Parties
+        # The extraction schema uses vendor/customer; tolerate legacy issuer/recipient keys too.
         raw_parties = analysis_data.get("parties", {})
+
+        def _party_name(*keys):
+            for k in keys:
+                v = UFOMapper._extract_value(raw_parties.get(k, ""))
+                if v:
+                    return v
+            return ""
+
         parties = {
             "issuer": {
-                "name": UFOMapper._extract_value(raw_parties.get("issuer_name", "")),
-                "address": UFOMapper._extract_value(raw_parties.get("issuer_address", "")),
-                "gstin": UFOMapper._extract_value(raw_parties.get("issuer_gstin", ""))
+                "name": _party_name("vendor", "issuer", "issuer_name", "vendor_name", "seller"),
+                "address": _party_name("vendor_address", "issuer_address"),
+                "gstin": _party_name("vendor_gstin", "issuer_gstin", "gstin")
             },
             "recipient": {
-                "name": UFOMapper._extract_value(raw_parties.get("recipient_name", "")),
-                "address": UFOMapper._extract_value(raw_parties.get("recipient_address", "")),
-                "gstin": UFOMapper._extract_value(raw_parties.get("recipient_gstin", ""))
+                "name": _party_name("customer", "recipient", "recipient_name", "customer_name", "buyer", "bill_to"),
+                "address": _party_name("customer_address", "recipient_address"),
+                "gstin": _party_name("customer_gstin", "recipient_gstin")
             }
         }
 
-        # 2. Money
+        # 2. Money  (schema: financials.total_amount / tax_amount / currency)
         raw_financials = analysis_data.get("financials", {})
+
+        def _num(v):
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return 0.0
+
+        total = _num(UFOMapper._extract_value(raw_financials.get("total_amount", 0)))
+        tax = _num(UFOMapper._extract_value(
+            raw_financials.get("tax_amount", raw_financials.get("total_tax", 0))))
+        subtotal = _num(UFOMapper._extract_value(raw_financials.get("subtotal", 0)))
+        if not subtotal and total:
+            subtotal = round(total - tax, 2)
         money = {
-            "total_amount": UFOMapper._extract_value(raw_financials.get("total_amount", 0)),
-            "subtotal": UFOMapper._extract_value(raw_financials.get("subtotal", 0)),
+            "total_amount": total,
+            "subtotal": subtotal,
             "currency": UFOMapper._extract_value(raw_financials.get("currency", "INR"))
         }
 
         # 3. Taxes
         taxes = {
-            "total_tax": UFOMapper._extract_value(raw_financials.get("total_tax", 0)),
+            "total_tax": tax,
             "tax_lines": []
         }
         raw_tax_lines = UFOMapper._extract_value(raw_financials.get("taxes", []))
