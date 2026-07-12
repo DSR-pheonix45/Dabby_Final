@@ -68,7 +68,7 @@ export default function DocumentList({ documents, loading, selectedDoc, onSelect
               const data = note?.extracted_data || {};
               
               const partyName = data.parties?.vendor?.value || data.parties?.customer?.value || "Unknown Party";
-              const docType = data.document_type || "Document";
+              const docType = (typeof data.document_type === 'object' ? data.document_type?.value : data.document_type) || "Document";
               const refNumber = data.document?.reference_number?.value || "No Ref";
               const amount = data.financials?.total_amount?.value;
               const currency = data.financials?.currency?.value || "USD";
