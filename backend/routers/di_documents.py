@@ -137,15 +137,84 @@ async def process_document(document_id: str):
         labels_res = supabase.table("di_workbench_labels").select("name").eq("workbench_id", doc_data['workbench_id']).execute()
         valid_labels = [l['name'] for l in labels_res.data] if labels_res.data else ["Purchase", "Sales"]
 
-        system_prompt = f"""
-You are an expert AI accounting agent. Analyze the document and extract detailed financial insights.
+        import google.generativeai as genai
+        import os
+        
+        gemini_key = os.environ.get("GEMINI_API_KEY")
+        if not gemini_key:
+            raise Exception("GEMINI_API_KEY is missing in environment variables.")
+            
+        genai.configure(api_key=gemini_key)
+        
+        # --- Step 1: Fast Classification ---
+        class_prompt = """
+        You are a document classification specialist. Identify the type of this financial document.
+        Return ONLY a JSON object with this exact schema:
+        {
+          "document_type": "bank_statement", // One of: sales_invoice, vendor_invoice, receipt, bank_statement, unknown
+          "confidence": 0.99
+        }
+        """
+        class_model = genai.GenerativeModel(
+            "gemini-2.5-flash",
+            system_instruction=class_prompt,
+            generation_config={"response_mime_type": "application/json", "temperature": 0.1}
+        )
+        
+        if is_pdf:
+            class_res = class_model.generate_content([extracted_text, "Classify this document."])
+        else:
+            class_res = class_model.generate_content([{"mime_type": doc_data['mime_type'], "data": file_bytes}, "Classify this document."])
+            
+        try:
+            class_data = json.loads(class_res.text)
+            doc_type = class_data.get("document_type", "unknown").lower()
+        except:
+            doc_type = "unknown"
+            
+        print(f"[DEBUG] di_documents classified as: {doc_type}")
+        
+        # --- Step 2: Specialized Extraction ---
+        if doc_type == "bank_statement":
+            system_prompt = f"""
+You are an expert AI accounting agent. Analyze the bank statement and extract detailed financial insights.
+You MUST classify this document into exactly one of these labels: {valid_labels}.
+
+Return ONLY valid JSON matching this exact schema. For every value, provide a "value" and a "confidence" score (0.0 to 1.0).
+
+{{
+    "predicted_label": "String (Must be one of the provided labels, e.g., 'Bank Statement' if available)",
+    "document_type": "Bank Statement",
+    "statement_summary": {{
+        "bank_name": {{"value": "String", "confidence": 0.99}},
+        "account_number": {{"value": "String", "confidence": 0.99}},
+        "statement_period": {{"value": "String", "confidence": 0.99}},
+        "opening_balance": {{"value": 0.0, "confidence": 0.99}},
+        "closing_balance": {{"value": 0.0, "confidence": 0.99}}
+    }},
+    "transactions": [
+        {{
+            "date": {{"value": "YYYY-MM-DD", "confidence": 0.99}},
+            "description": {{"value": "String", "confidence": 0.99}},
+            "debit_amount": {{"value": 0.0, "confidence": 0.99}},
+            "credit_amount": {{"value": 0.0, "confidence": 0.99}},
+            "balance": {{"value": 0.0, "confidence": 0.99}},
+            "payment_mode": {{"value": "String", "confidence": 0.99}}
+        }}
+    ],
+    "analysis": "Human-readable interpretation of the bank statement."
+}}
+"""
+        else:
+            system_prompt = f"""
+You are an expert AI accounting agent. Analyze the invoice/receipt and extract detailed financial insights.
 You MUST classify this document into exactly one of these labels: {valid_labels}.
 
 Return ONLY valid JSON matching this exact schema. For every value, provide a "value" and a "confidence" score (0.0 to 1.0).
 
 {{
     "predicted_label": "String (Must be one of the provided labels)",
-    "document_type": "Invoice / Receipt / Bank Statement / etc",
+    "document_type": "Invoice / Receipt / etc",
     "parties": {{
         "vendor": {{"value": "String", "confidence": 0.99}},
         "customer": {{"value": "String", "confidence": 0.99}}
@@ -168,32 +237,18 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
         }}
     ],
     "financial_impact": [
-        {{ "account": "Expense", "amount": 1400.00, "type": "increase" }},
-        {{ "account": "Tax Receivable", "amount": 100.00, "type": "increase" }},
-        {{ "account": "Accounts Payable", "amount": 1500.00, "type": "increase" }}
+        {{ "account": "Expense", "amount": 1400.00, "type": "increase" }}
     ],
     "business_events": [
-        "Expense Incurred",
-        "Tax Liability Created",
-        "Accounts Payable Created"
+        "Expense Incurred"
     ],
     "expected_journal": [
-        {{ "account": "Expense", "type": "debit", "amount": 1400.00 }},
-        {{ "account": "Tax Receivable", "type": "debit", "amount": 100.00 }},
-        {{ "account": "Accounts Payable", "type": "credit", "amount": 1500.00 }}
+        {{ "account": "Expense", "type": "debit", "amount": 1400.00 }}
     ],
     "analysis": "Human-readable interpretation of the financial impact (2-3 sentences)."
 }}
 """
 
-        import google.generativeai as genai
-        import os
-        
-        gemini_key = os.environ.get("GEMINI_API_KEY")
-        if not gemini_key:
-            raise Exception("GEMINI_API_KEY is missing in environment variables.")
-            
-        genai.configure(api_key=gemini_key)
         model = genai.GenerativeModel(
             "gemini-2.5-flash",
             system_instruction=system_prompt,

@@ -205,6 +205,53 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
                   ))}
                 </div>
               </section>
+            {/* Statement Summary (For Bank Statements) */}
+            {data.statement_summary && (
+              <section>
+                <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Statement Summary</h3>
+                <div className="bg-[#161616] border border-white/5 rounded-xl p-4">
+                  {Object.entries(data.statement_summary).map(([key, field]) => (
+                    <FieldRow 
+                      key={key} 
+                      label={key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} 
+                      fieldData={field} 
+                      onChange={(val) => handleFieldChange('statement_summary', key, val)} 
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Transactions (For Bank Statements) */}
+            {data.transactions && data.transactions.length > 0 && (
+              <section>
+                <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Transactions</h3>
+                <div className="space-y-3">
+                  {data.transactions.map((item, idx) => (
+                    <div key={idx} className="bg-[#161616] border border-white/5 rounded-xl p-4">
+                      {Object.entries(item).map(([key, field]) => (
+                        <FieldRow 
+                          key={key} 
+                          label={key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} 
+                          fieldData={field} 
+                          onChange={(val) => {
+                            setData(prev => {
+                              const updated = { ...prev };
+                              updated.transactions = [...prev.transactions];
+                              if (typeof updated.transactions[idx][key] === 'object' && updated.transactions[idx][key] !== null) {
+                                updated.transactions[idx][key] = { ...updated.transactions[idx][key], value: val };
+                              } else {
+                                updated.transactions[idx][key] = val;
+                              }
+                              return updated;
+                            });
+                          }} 
+                        />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </section>
             )}
             
           </div>
