@@ -10,12 +10,12 @@ export default function SnippetCard({ transaction, sourceDocument }) {
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkedDoc, setLinkedDoc] = useState(null);
   
-  // Safe extraction of nested transaction properties
-  const date = transaction?.date?.value || 'N/A';
-  const desc = transaction?.description?.value || 'Unknown Transaction';
-  const debit = transaction?.debit_amount?.value || 0;
-  const credit = transaction?.credit_amount?.value || 0;
-  const mode = transaction?.payment_mode?.value || 'Transfer';
+  // Safe extraction of nested transaction properties (supports both UFO and legacy)
+  const date = transaction?.date?.value ?? transaction?.date ?? 'N/A';
+  const desc = transaction?.description?.value ?? transaction?.description ?? 'Unknown Transaction';
+  const debit = transaction?.debit_amount?.value ?? transaction?.debit ?? transaction?.debit_amount ?? 0;
+  const credit = transaction?.credit_amount?.value ?? transaction?.credit ?? transaction?.credit_amount ?? 0;
+  const mode = transaction?.payment_mode?.value ?? transaction?.payment_mode ?? 'Transfer';
   
   const amount = debit > 0 ? debit : credit;
   const type = debit > 0 ? 'Debit' : 'Credit';
