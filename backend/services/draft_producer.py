@@ -8,8 +8,16 @@ converts the approved draft into an immutable Business Event.
 Deterministic classification: document_type -> event_type + which party is the
 counterparty. No LLM here — the UFO already carries the classification.
 """
+import re
 from typing import Dict, Optional, Tuple
 from supabase_client import supabase
+
+
+def _clean_date(raw) -> Optional[str]:
+    """Return a valid YYYY-MM-DD or None (AI often emits 'N/A', '', etc.)."""
+    if isinstance(raw, str) and re.match(r"^\d{4}-\d{2}-\d{2}", raw.strip()):
+        return raw.strip()[:10]
+    return None
 
 
 # document_type -> (event_type, counterparty_side)
@@ -105,8 +113,7 @@ class DraftProducer:
         currency = money.get("currency") or "INR"
 
         dates = note.get("dates") or {}
-        raw_date = dates.get("document_date")
-        event_date = raw_date[:10] if isinstance(raw_date, str) and raw_date else None
+        event_date = _clean_date(dates.get("document_date"))
 
         # 4. Idempotency — reuse an open pending draft for this document
         existing = (
