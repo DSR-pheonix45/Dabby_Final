@@ -79,7 +79,7 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-bold text-gray-200">Inspector</h2>
           <span className="text-[10px] uppercase font-bold text-gray-500 tracking-widest bg-white/5 px-2 py-0.5 rounded">
-            {data.document_type || "Unknown Document"}
+            {(typeof data.document_type === 'object' ? data.document_type?.value : data.document_type) || "Unknown Document"}
           </span>
         </div>
         <div className="flex items-center gap-4">
