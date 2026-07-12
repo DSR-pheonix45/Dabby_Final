@@ -1,141 +1,181 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { diService } from '../services/diService';
 import { deriveDocumentStatus } from '../pages/workbench/DocVault/index';
 
-const MOCK_PIPELINE_DATA = [
-  { id: 'doc_1', type: 'Invoice', party: 'AWS Cloud Services', amount: 450.00, confidence: 98, time: '2 mins ago', reviewer: 'Unassigned', stage: 'uploaded', linkedDocs: 0, 
-    analysis: { summary: "Standard monthly AWS hosting invoice.", tags: ["SaaS", "Cloud"] },
-    journal: [{ account: "5990 SaaS Subscription", type: "debit", amount: 450.00 }, { account: "2000 Accounts Payable", type: "credit", amount: 450.00 }],
-    mockSnippetAttached: true
-  },
-  { id: 'doc_2', type: 'Receipt', party: 'Uber', amount: 35.50, confidence: 85, time: '15 mins ago', reviewer: 'Unassigned', stage: 'ocr_processing', linkedDocs: 0,
-    analysis: { summary: "Travel expense. Uber ride.", tags: ["Travel"] },
-    journal: null
-  },
-  { id: 'doc_3', type: 'Invoice', party: 'WeWork', amount: 12000.00, confidence: 99, time: '1 hour ago', reviewer: 'Sarah J.', stage: 'analysis_complete', linkedDocs: 1,
-    analysis: { summary: "Monthly office lease invoice.", tags: ["Rent"] },
-    journal: [{ account: "5000 Rent Expense", type: "debit", amount: 12000.00 }, { account: "2000 Accounts Payable", type: "credit", amount: 12000.00 }],
-    mockSnippetAttached: true
-  },
-  { id: 'doc_4', type: 'Bank Statement', party: 'Chase Bank', amount: 0, confidence: 100, time: '3 hours ago', reviewer: 'System', stage: 'financial_event', linkedDocs: 15,
-    analysis: { summary: "Monthly checking account statement parsing.", tags: ["Banking"] },
-    journal: null
-  },
-  { id: 'doc_5', type: 'Invoice', party: 'Legal Counsel LLC', amount: 5500.00, confidence: 75, time: '1 day ago', reviewer: 'Mike T.', stage: 'pending_review', linkedDocs: 0,
-    analysis: { summary: "Retainer fee. Confidence low on line items.", tags: ["Legal", "Review Required"] },
-    journal: [{ account: "5800 Legal Fees", type: "debit", amount: 5500.00 }, { account: "2000 Accounts Payable", type: "credit", amount: 5500.00 }]
-  },
-  { id: 'doc_6', type: 'Receipt', party: 'Staples', amount: 145.20, confidence: 95, time: '1 day ago', reviewer: 'System', stage: 'journal_proposed', linkedDocs: 0,
-    analysis: { summary: "Office supplies.", tags: ["Supplies"] },
-    journal: [{ account: "5100 Office Supplies", type: "debit", amount: 145.20 }, { account: "2000 Accounts Payable", type: "credit", amount: 145.20 }]
-  },
-  { id: 'doc_7', type: 'Bill', party: 'Google Workspace', amount: 850.00, confidence: 99, time: '2 days ago', reviewer: 'Sarah J.', stage: 'ready_to_post', linkedDocs: 0,
-    analysis: { summary: "Monthly email hosting.", tags: ["SaaS"] },
-    journal: [{ account: "5990 SaaS Subscription", type: "debit", amount: 850.00 }, { account: "2000 Accounts Payable", type: "credit", amount: 850.00 }]
-  },
-];
+/**
+ * Business Engine data layer — wired to the real Document Intelligence pipeline.
+ *
+ * Source: GET /api/di/documents/{workbenchId} → di_documents rows joined with
+ * di_analysis_notes(*) (the UFO: document_type/parties/money/taxes/dates/line_items)
+ * and di_document_processing_logs(*).
+ *
+ * We read the flattened UFO columns first (Phase 1 contract) and fall back to the
+ * legacy nested extracted_data.{field}.value shape for older documents, so cards
+ * populate whether a doc was processed before or after the UFO mapper landed.
+ */
 
-const MOCK_TIMELINE_DATA = MOCK_PIPELINE_DATA.map(doc => ({
-  id: doc.id,
-  timestamp: doc.time,
-  document: `${doc.type} - ${doc.party}`,
-  stage: doc.stage,
-  status: doc.confidence > 90 ? 'Success' : 'Warning',
-  duration: Math.floor(Math.random() * 10) + 's',
-  user: doc.reviewer,
-  confidence: doc.confidence
-}));
+// ── UFO field extraction (handles flattened + legacy nested shapes) ──────────
+function pickVal(obj, keys) {
+  if (!obj) return null;
+  for (const k of keys) {
+    const v = obj[k];
+    if (v == null) continue;
+    if (typeof v === 'object' && !Array.isArray(v) && 'value' in v) {
+      if (v.value != null && v.value !== '') return v.value;
+    } else if (v !== '' && typeof v !== 'object') {
+      return v;
+    }
+  }
+  return null;
+}
 
+function cardType(note) {
+  if (!note) return 'Document';
+  const ex = note.extracted_data || {};
+  return note.document_type || pickVal(ex, ['document_type']) || note.classification_type || 'Document';
+}
+
+function cardParty(note, fallback) {
+  if (!note) return fallback || 'Unclassified';
+  const parties = note.parties || {};
+  const ex = note.extracted_data?.parties || {};
+  return (
+    pickVal(parties, ['counterparty', 'vendor_name', 'customer_name', 'vendor', 'customer', 'issuer_name', 'payee', 'payer', 'name']) ||
+    pickVal(ex, ['vendor_name', 'customer_name', 'issuer_name', 'counterparty', 'name']) ||
+    fallback ||
+    'Unclassified'
+  );
+}
+
+function cardAmount(note) {
+  if (!note) return 0;
+  const money = note.money || {};
+  const ex = note.extracted_data?.financials || note.extracted_data?.money || {};
+  const v =
+    pickVal(money, ['total', 'grand_total', 'total_amount', 'amount', 'net', 'gross', 'invoice_total']) ??
+    pickVal(ex, ['total_amount', 'grand_total', 'total', 'amount']);
+  return Number(v) || 0;
+}
+
+function cardConfidence(note) {
+  const c = note?.confidence;
+  return c == null ? null : Math.round(Number(c) * 100);
+}
+
+const STATUS_TO_STAGE = {
+  Uploaded: 'uploaded',
+  Processing: 'ocr_processing',
+  'Needs Review': 'pending_review',
+  'Ready to Post': 'ready_to_post',
+  Posted: 'posted',
+  Failed: 'uploaded', // no dedicated failed column; surface at intake
+};
+
+function mapDocToCard(doc) {
+  const note = doc.di_analysis_notes?.[0] || null;
+  const status = deriveDocumentStatus(doc);
+  const type = cardType(note);
+  const isBankStatement = String(type).toLowerCase().includes('bank');
+  return {
+    id: doc.id,
+    type,
+    party: cardParty(note, doc.original_filename),
+    amount: cardAmount(note),
+    confidence: cardConfidence(note),
+    time: doc.created_at ? new Date(doc.created_at).toLocaleString() : '—',
+    reviewer: 'Unassigned',
+    stage: STATUS_TO_STAGE[status] || 'uploaded',
+    status,
+    linkedDocs: (note?.line_items?.length) || 0,
+    filename: doc.original_filename,
+    analysis: {
+      summary: note?.reasoning || (note ? `Classified as ${type}` : 'Awaiting analysis'),
+      tags: [type].filter(Boolean),
+    },
+    journal: null, // Phase 4: proposed entries come from the Accounting Rule Engine (business_events not yet live)
+    mockSnippetAttached: isBankStatement && (note?.line_items?.length || 0) > 0,
+    ufo: note,
+    rawDocument: doc,
+  };
+}
+
+// Shared fetch helper
+async function loadDocs(workbenchId) {
+  const docs = await diService.getDocuments(workbenchId);
+  return Array.isArray(docs) ? docs : [];
+}
+
+// ── KPIs (real counts by derived status) ─────────────────────────────────────
 export function useBusinessEngine(workbenchId) {
+  const [kpis, setKpis] = useState({ uploaded: 0, processing: 0, awaitingReview: 0, readyToPost: 0, posted: 0, failed: 0 });
   const [loading, setLoading] = useState(true);
 
-  const kpis = {
-    uploaded: 145,
-    processing: 12,
-    awaitingReview: 5,
-    readyToPost: 34,
-    failed: 2
-  };
-
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(timer);
+    let alive = true;
+    if (!workbenchId) { setLoading(false); return; }
+    (async () => {
+      setLoading(true);
+      try {
+        const docs = await loadDocs(workbenchId);
+        if (!alive) return;
+        const c = { uploaded: 0, processing: 0, awaitingReview: 0, readyToPost: 0, posted: 0, failed: 0 };
+        for (const d of docs) {
+          const s = deriveDocumentStatus(d);
+          if (s === 'Uploaded') c.uploaded++;
+          else if (s === 'Processing') c.processing++;
+          else if (s === 'Needs Review') c.awaitingReview++;
+          else if (s === 'Ready to Post') c.readyToPost++;
+          else if (s === 'Posted') c.posted++;
+          else if (s === 'Failed') c.failed++;
+        }
+        setKpis(c);
+      } catch (err) {
+        console.error('[BusinessEngine] KPI load failed', err);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
   }, [workbenchId]);
 
   return { kpis, loading };
 }
 
+// ── Pipeline (real cards + client-side filter/search) ────────────────────────
 export function usePipeline(workbenchId) {
-  const [cards, setCards] = useState([]);
+  const [allCards, setAllCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({});
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    let isMounted = true;
-    const fetchDocuments = async () => {
-      setLoading(true);
-      try {
-        const docs = await diService.getDocuments(workbenchId);
-        if (!isMounted) return;
+  const refresh = useCallback(async () => {
+    if (!workbenchId) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      const docs = await loadDocs(workbenchId);
+      setAllCards(docs.map(mapDocToCard));
+    } catch (err) {
+      console.error('[BusinessEngine] pipeline load failed', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [workbenchId]);
 
-        let mappedCards = docs.map(doc => {
-          const status = deriveDocumentStatus(doc);
-          let stage = 'uploaded';
-          if (status === 'Processing') stage = 'ocr_processing';
-          else if (status === 'Needs Review') stage = 'pending_review';
-          else if (status === 'Ready to Post') stage = 'ready_to_post';
-          else if (status === 'Posted') stage = 'posted';
+  useEffect(() => { refresh(); }, [refresh]);
 
-          const extracted = doc.di_analysis_notes?.[0]?.extracted_data || {};
-          const isBankStatement = extracted.document_type?.value?.toLowerCase().includes('bank statement') || false;
+  // Derive filtered view (no refetch on filter/search change)
+  let cards = allCards;
+  if (search) {
+    const q = search.toLowerCase();
+    cards = cards.filter(c => String(c.party).toLowerCase().includes(q) || String(c.type).toLowerCase().includes(q));
+  }
+  if (filters.type) cards = cards.filter(c => String(c.type).toLowerCase() === String(filters.type).toLowerCase());
+  if (filters.stage) cards = cards.filter(c => c.stage === filters.stage);
 
-          return {
-            id: doc.id,
-            type: extracted.document_type?.value || 'Document',
-            party: extracted.parties?.vendor_name?.value || extracted.parties?.customer_name?.value || extracted.parties?.issuer_name?.value || 'Unknown Party',
-            amount: extracted.financials?.total_amount?.value || 0,
-            confidence: Math.round((doc.di_analysis_notes?.[0]?.confidence || 0) * 100),
-            time: new Date(doc.created_at).toLocaleDateString(),
-            reviewer: 'System',
-            stage: stage,
-            linkedDocs: 0,
-            analysis: { summary: "Live document from Vault", tags: [] },
-            journal: null,
-            mockSnippetAttached: isBankStatement, // Mock attach snippet if it's a bank statement
-            rawDocument: doc // Keep raw document just in case
-          };
-        });
-
-        if (search) {
-          mappedCards = mappedCards.filter(item => 
-            item.party.toLowerCase().includes(search.toLowerCase()) || 
-            item.type.toLowerCase().includes(search.toLowerCase())
-          );
-        }
-        
-        if (filters.type) {
-          mappedCards = mappedCards.filter(item => item.type.toLowerCase() === filters.type.toLowerCase());
-        }
-
-        if (filters.stage) {
-          mappedCards = mappedCards.filter(item => item.stage === filters.stage);
-        }
-        
-        setCards(mappedCards);
-      } catch (err) {
-        console.error("Failed to fetch pipeline documents", err);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    if (workbenchId) fetchDocuments();
-    return () => { isMounted = false; };
-  }, [workbenchId, filters, search]);
-
+  // Optimistic local move (stage is derived from processing logs, so this is a
+  // visual-only change until the event→ledger pipeline can persist a transition).
   const moveCard = (cardId, newStage) => {
-    setCards(prev => prev.map(c => c.id === cardId ? { ...c, stage: newStage } : c));
+    setAllCards(prev => prev.map(c => (c.id === cardId ? { ...c, stage: newStage } : c)));
   };
 
   return {
@@ -145,22 +185,67 @@ export function usePipeline(workbenchId) {
     activeFilters: filters,
     searchQuery: search,
     setSearchQuery: setSearch,
-    moveCard
+    moveCard,
+    refresh,
   };
 }
 
+// ── Processing timeline (real, from di_document_processing_logs) ─────────────
 export function useProcessingTimeline(workbenchId) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
-    const timer = setTimeout(() => {
-      setData(MOCK_TIMELINE_DATA);
-      setLoading(false);
-    }, 600);
-    
-    return () => clearTimeout(timer);
+    let alive = true;
+    if (!workbenchId) { setLoading(false); return; }
+    (async () => {
+      setLoading(true);
+      try {
+        const docs = await loadDocs(workbenchId);
+        if (!alive) return;
+        const rows = [];
+        for (const d of docs) {
+          const note = d.di_analysis_notes?.[0] || null;
+          const label = `${cardType(note)} — ${cardParty(note, d.original_filename)}`;
+          const conf = cardConfidence(note);
+          const logs = d.di_document_processing_logs || [];
+          if (logs.length) {
+            for (const log of logs) {
+              rows.push({
+                id: `${d.id}-${log.stage}-${log.created_at || ''}`,
+                timestamp: log.created_at ? new Date(log.created_at).toLocaleString() : '—',
+                _ts: log.created_at || d.created_at,
+                document: label,
+                stage: log.stage,
+                status: log.status === 'success' ? 'Success' : log.status === 'failed' ? 'Failed' : 'Warning',
+                duration: '—',
+                user: log.provider || 'System',
+                confidence: conf,
+              });
+            }
+          } else {
+            rows.push({
+              id: d.id,
+              timestamp: d.created_at ? new Date(d.created_at).toLocaleString() : '—',
+              _ts: d.created_at,
+              document: label,
+              stage: 'upload',
+              status: 'Success',
+              duration: '—',
+              user: 'System',
+              confidence: conf,
+            });
+          }
+        }
+        rows.sort((a, b) => new Date(b._ts || 0) - new Date(a._ts || 0));
+        setData(rows);
+      } catch (err) {
+        console.error('[BusinessEngine] timeline load failed', err);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
   }, [workbenchId]);
 
   return { data, loading };
