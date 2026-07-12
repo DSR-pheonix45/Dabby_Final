@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { diService } from '../services/diService';
+import { deriveDocumentStatus } from '../pages/workbench/DocVault/index';
 
 const MOCK_PIPELINE_DATA = [
   { id: 'doc_1', type: 'Invoice', party: 'AWS Cloud Services', amount: 450.00, confidence: 98, time: '2 mins ago', reviewer: 'Unassigned', stage: 'uploaded', linkedDocs: 0, 
@@ -70,30 +72,66 @@ export function usePipeline(workbenchId) {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    setLoading(true);
-    const timer = setTimeout(() => {
-      let filtered = [...MOCK_PIPELINE_DATA];
-      
-      if (search) {
-        filtered = filtered.filter(item => 
-          item.party.toLowerCase().includes(search.toLowerCase()) || 
-          item.type.toLowerCase().includes(search.toLowerCase())
-        );
-      }
-      
-      if (filters.type) {
-        filtered = filtered.filter(item => item.type.toLowerCase() === filters.type.toLowerCase());
-      }
+    let isMounted = true;
+    const fetchDocuments = async () => {
+      setLoading(true);
+      try {
+        const docs = await diService.getDocuments(workbenchId);
+        if (!isMounted) return;
 
-      if (filters.stage) {
-        filtered = filtered.filter(item => item.stage === filters.stage);
+        let mappedCards = docs.map(doc => {
+          const status = deriveDocumentStatus(doc);
+          let stage = 'uploaded';
+          if (status === 'Processing') stage = 'ocr_processing';
+          else if (status === 'Needs Review') stage = 'pending_review';
+          else if (status === 'Ready to Post') stage = 'ready_to_post';
+          else if (status === 'Posted') stage = 'posted';
+
+          const extracted = doc.di_analysis_notes?.[0]?.extracted_data || {};
+          const isBankStatement = extracted.document_type?.value?.toLowerCase().includes('bank statement') || false;
+
+          return {
+            id: doc.id,
+            type: extracted.document_type?.value || 'Document',
+            party: extracted.parties?.vendor_name?.value || extracted.parties?.customer_name?.value || extracted.parties?.issuer_name?.value || 'Unknown Party',
+            amount: extracted.financials?.total_amount?.value || 0,
+            confidence: Math.round((doc.di_analysis_notes?.[0]?.confidence || 0) * 100),
+            time: new Date(doc.created_at).toLocaleDateString(),
+            reviewer: 'System',
+            stage: stage,
+            linkedDocs: 0,
+            analysis: { summary: "Live document from Vault", tags: [] },
+            journal: null,
+            mockSnippetAttached: isBankStatement, // Mock attach snippet if it's a bank statement
+            rawDocument: doc // Keep raw document just in case
+          };
+        });
+
+        if (search) {
+          mappedCards = mappedCards.filter(item => 
+            item.party.toLowerCase().includes(search.toLowerCase()) || 
+            item.type.toLowerCase().includes(search.toLowerCase())
+          );
+        }
+        
+        if (filters.type) {
+          mappedCards = mappedCards.filter(item => item.type.toLowerCase() === filters.type.toLowerCase());
+        }
+
+        if (filters.stage) {
+          mappedCards = mappedCards.filter(item => item.stage === filters.stage);
+        }
+        
+        setCards(mappedCards);
+      } catch (err) {
+        console.error("Failed to fetch pipeline documents", err);
+      } finally {
+        if (isMounted) setLoading(false);
       }
-      
-      setCards(filtered);
-      setLoading(false);
-    }, 600);
-    
-    return () => clearTimeout(timer);
+    };
+
+    if (workbenchId) fetchDocuments();
+    return () => { isMounted = false; };
   }, [workbenchId, filters, search]);
 
   const moveCard = (cardId, newStage) => {

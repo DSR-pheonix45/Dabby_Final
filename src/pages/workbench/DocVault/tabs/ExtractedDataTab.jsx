@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { BsCodeSlash, BsCheckCircleFill, BsExclamationTriangleFill, BsDashCircleFill } from 'react-icons/bs';
+import { BsCodeSlash, BsCheckCircleFill, BsExclamationTriangleFill, BsDashCircleFill, BsFileText, BsRobot } from 'react-icons/bs';
+import SnippetCard from '../../business-engine/components/SnippetCard';
 import { diService } from '../../../../services/diService';
 import { toast } from 'react-hot-toast';
 
@@ -229,30 +230,14 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
             {/* Transactions (For Bank Statements) */}
             {data.transactions && data.transactions.length > 0 && (
               <section>
-                <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Transactions</h3>
-                <div className="space-y-3">
+                <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Extracted Snippets</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {data.transactions.map((item, idx) => (
-                    <div key={idx} className="bg-[#161616] border border-white/5 rounded-xl p-4">
-                      {Object.entries(item).map(([key, field]) => (
-                        <FieldRow 
-                          key={key} 
-                          label={key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} 
-                          fieldData={field} 
-                          onChange={(val) => {
-                            setData(prev => {
-                              const updated = { ...prev };
-                              updated.transactions = [...prev.transactions];
-                              if (typeof updated.transactions[idx][key] === 'object' && updated.transactions[idx][key] !== null) {
-                                updated.transactions[idx][key] = { ...updated.transactions[idx][key], value: val };
-                              } else {
-                                updated.transactions[idx][key] = val;
-                              }
-                              return updated;
-                            });
-                          }} 
-                        />
-                      ))}
-                    </div>
+                    <SnippetCard 
+                      key={idx} 
+                      transaction={item} 
+                      sourceDocument={{ filename: doc.file_name || 'Bank Statement' }} 
+                    />
                   ))}
                 </div>
               </section>
