@@ -4,12 +4,14 @@ import PreviewTab from './tabs/PreviewTab';
 import ExtractedDataTab from './tabs/ExtractedDataTab';
 import FinancialImpactTab from './tabs/FinancialImpactTab';
 import TimelineTab from './tabs/TimelineTab';
+import SnippetsTab from './tabs/SnippetsTab';
 
 export default function RightPanel({ doc, onUpdate, onClose }) {
   const [activeTab, setActiveTab] = useState('EXTRACTED DATA');
 
   const tabs = [
     { id: 'EXTRACTED DATA', label: 'Extracted Data', icon: BsBraces },
+    { id: 'SNIPPETS', label: 'Snippets', icon: BsDiagram3 },
     { id: 'FINANCIAL IMPACT', label: 'Financial Impact', icon: BsGraphUp },
     { id: 'TIMELINE', label: 'Timeline', icon: BsClockHistory },
   ];
@@ -45,6 +47,7 @@ export default function RightPanel({ doc, onUpdate, onClose }) {
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto relative">
         {activeTab === 'EXTRACTED DATA' && <ExtractedDataTab doc={doc} onUpdate={onUpdate} />}
+        {activeTab === 'SNIPPETS' && <SnippetsTab doc={doc} />}
         {activeTab === 'FINANCIAL IMPACT' && <FinancialImpactTab doc={doc} onUpdate={onUpdate} />}
         {activeTab === 'TIMELINE' && <TimelineTab doc={doc} />}
       </div>

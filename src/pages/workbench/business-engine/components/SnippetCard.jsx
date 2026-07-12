@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { BsCheckCircleFill, BsFileEarmarkText, BsBank, BsArrowRightShort, BsArrowsAngleExpand } from 'react-icons/bs';
+import { BsCheckCircleFill, BsFileEarmarkText, BsBank, BsArrowRightShort, BsArrowsAngleExpand, BsLink45Deg, BsXLg, BsSearch } from 'react-icons/bs';
 import PartyAnalyticsModal from '../../PartyAnalyticsModal';
 
 export default function SnippetCard({ transaction, sourceDocument }) {
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [linkedDoc, setLinkedDoc] = useState(null);
   
   // Safe extraction of nested transaction properties
   const date = transaction?.date?.value || 'N/A';
@@ -78,12 +80,27 @@ export default function SnippetCard({ transaction, sourceDocument }) {
 
         {/* Footer Actions */}
         <div className="px-4 py-3 bg-[#0F0F11] border-t border-[#2A2A2E] flex justify-between items-center">
-          <button 
-            onClick={(e) => { e.stopPropagation(); setIsAnalyticsOpen(true); }}
-            className="text-xs font-semibold text-teal-500 hover:text-teal-400 flex items-center gap-1 transition-colors"
-          >
-            <BsArrowsAngleExpand size={10} /> View Analytics
-          </button>
+          <div className="flex gap-4">
+            <button 
+              onClick={(e) => { e.stopPropagation(); setIsAnalyticsOpen(true); }}
+              className="text-xs font-semibold text-teal-500 hover:text-teal-400 flex items-center gap-1 transition-colors"
+            >
+              <BsArrowsAngleExpand size={10} /> View Analytics
+            </button>
+
+            {!linkedDoc ? (
+              <button 
+                onClick={(e) => { e.stopPropagation(); setIsLinkModalOpen(true); }}
+                className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
+              >
+                <BsLink45Deg size={14} /> Link Document
+              </button>
+            ) : (
+              <div className="text-xs font-bold text-gray-400 flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
+                <BsLink45Deg className="text-indigo-400" /> Linked to {linkedDoc}
+              </div>
+            )}
+          </div>
           
           <button className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
             <BsArrowRightShort size={16} />
@@ -97,6 +114,44 @@ export default function SnippetCard({ transaction, sourceDocument }) {
         onClose={() => setIsAnalyticsOpen(false)}
         party={mockParty}
       />
+
+      {/* Mock Linking Modal */}
+      {isLinkModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-[#18181A] border border-white/10 rounded-2xl shadow-2xl p-6 relative">
+            <button 
+              onClick={() => setIsLinkModalOpen(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white"
+            >
+              <BsXLg />
+            </button>
+            <h3 className="text-lg font-bold text-white mb-4">Link Document</h3>
+            <p className="text-xs text-gray-400 mb-6">Search for an invoice or bill to link this transaction snippet to.</p>
+            
+            <div className="relative mb-4">
+              <BsSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+              <input 
+                type="text" 
+                placeholder="Search by Invoice ID or Party..." 
+                className="w-full bg-[#111] border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:border-teal-500 focus:outline-none"
+              />
+            </div>
+            
+            <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+              {['INV-2024-089', 'BILL-AWS-07', 'INV-WW-892'].map(id => (
+                <div 
+                  key={id}
+                  onClick={() => { setLinkedDoc(id); setIsLinkModalOpen(false); }}
+                  className="bg-white/5 hover:bg-white/10 p-3 rounded-xl border border-transparent hover:border-white/10 cursor-pointer transition-colors flex justify-between items-center"
+                >
+                  <span className="text-sm font-bold text-gray-300">{id}</span>
+                  <span className="text-[10px] bg-teal-500/10 text-teal-400 px-2 py-0.5 rounded-full font-bold">Pending Settlement</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
