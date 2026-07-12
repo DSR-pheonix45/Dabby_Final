@@ -32,28 +32,25 @@ function pickVal(obj, keys) {
 function cardType(note) {
   if (!note) return 'Document';
   const ex = note.extracted_data || {};
-  return note.document_type || pickVal(ex, ['document_type']) || note.classification_type || 'Document';
+  return note.document_type || note.classification_type || pickVal(ex, ['document_type']) || 'Document';
 }
 
 function cardParty(note, fallback) {
   if (!note) return fallback || 'Unclassified';
-  const parties = note.parties || {};
-  const ex = note.extracted_data?.parties || {};
-  return (
-    pickVal(parties, ['counterparty', 'vendor_name', 'customer_name', 'vendor', 'customer', 'issuer_name', 'payee', 'payer', 'name']) ||
-    pickVal(ex, ['vendor_name', 'customer_name', 'issuer_name', 'counterparty', 'name']) ||
-    fallback ||
-    'Unclassified'
-  );
+  // Canonical UFO shape (UFOMapper): parties.issuer.name / parties.recipient.name
+  const p = note.parties || {};
+  const issuer = p.issuer?.name;
+  const recipient = p.recipient?.name;
+  // Legacy nested extracted_data fallback for pre-UFO docs
+  const legacy = pickVal(note.extracted_data?.parties || {}, ['vendor_name', 'customer_name', 'issuer_name', 'recipient_name', 'name']);
+  return issuer || recipient || legacy || fallback || 'Unclassified';
 }
 
 function cardAmount(note) {
   if (!note) return 0;
-  const money = note.money || {};
-  const ex = note.extracted_data?.financials || note.extracted_data?.money || {};
-  const v =
-    pickVal(money, ['total', 'grand_total', 'total_amount', 'amount', 'net', 'gross', 'invoice_total']) ??
-    pickVal(ex, ['total_amount', 'grand_total', 'total', 'amount']);
+  const m = note.money || {};
+  // Canonical UFO: money.total_amount / subtotal
+  const v = m.total_amount ?? m.subtotal ?? pickVal(note.extracted_data?.financials || {}, ['total_amount', 'grand_total', 'total', 'amount']);
   return Number(v) || 0;
 }
 

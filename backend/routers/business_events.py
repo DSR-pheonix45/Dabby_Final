@@ -6,8 +6,39 @@ from auth import verify_user_access
 from services.business_event_registry import business_event_registry
 from services.settlement_engine import settlement_engine
 from services.accounting_compiler import accounting_compiler
+from services.draft_producer import draft_producer
 
 router = APIRouter()
+
+
+@router.post("/from-document/{document_id}", dependencies=[Depends(verify_user_access)])
+async def create_draft_from_document(document_id: str, user=Depends(verify_user_access)):
+    """Phase 3: classify a document's UFO note into a PENDING_REVIEW trade draft."""
+    try:
+        uid = user.get("id") if isinstance(user, dict) else None
+        draft = await draft_producer.generate_from_document(document_id, uid)
+        return {"message": "Trade draft generated", "draft": draft}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/drafts/{draft_id}/approve", dependencies=[Depends(verify_user_access)])
+async def approve_draft(draft_id: str, user=Depends(verify_user_access)):
+    """Approve a PENDING_REVIEW trade draft -> immutable Business Event (+ settlement match)."""
+    try:
+        uid = user.get("id") if isinstance(user, dict) else None
+        event = await business_event_registry.create_from_trade_draft(draft_id, reviewed_by=uid)
+        return {"message": "Business Event created", "event": event}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/user/{user_id}", dependencies=[Depends(verify_user_access)])
 async def list_business_events(
