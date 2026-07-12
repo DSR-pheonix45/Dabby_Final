@@ -66,6 +66,49 @@ export const diService = {
     });
     if (!res.ok) throw new Error('Failed to update UFO');
     return res.json();
-  }
+  },
+
+  // --- Business Event Pipeline (Phase 3-5) ---
+  async _err(res, fallback) {
+    const d = await res.json().catch(() => ({}));
+    return d.detail || d.message || fallback;
+  },
+
+  async generateDraft(documentId) {
+    const res = await apiFetch(`/api/events/from-document/${documentId}`, { method: 'POST' });
+    if (!res.ok) throw new Error(await this._err(res, 'Failed to generate draft'));
+    return res.json();
+  },
+
+  async approveDraft(draftId) {
+    const res = await apiFetch(`/api/events/drafts/${draftId}/approve`, { method: 'POST' });
+    if (!res.ok) throw new Error(await this._err(res, 'Failed to approve draft'));
+    return res.json();
+  },
+
+  async compileEvent(eventId) {
+    const res = await apiFetch(`/api/events/${eventId}/compile`, { method: 'POST' });
+    if (!res.ok) throw new Error(await this._err(res, 'Failed to compile event'));
+    return res.json();
+  },
+
+  async listEvents(userId) {
+    const res = await apiFetch(`/api/events/user/${userId}`);
+    if (!res.ok) throw new Error('Failed to fetch business events');
+    return res.json();
+  },
+
+  /**
+   * Full pipeline in one call: document -> trade draft -> business event ->
+   * balanced ledger postings. Returns { draft, event, ledger }.
+   */
+  async postDocumentToLedger(documentId) {
+    const draftRes = await this.generateDraft(documentId);
+    const draft = draftRes.draft || draftRes;
+    const eventRes = await this.approveDraft(draft.id);
+    const event = eventRes.event || eventRes;
+    const compileRes = await this.compileEvent(event.id);
+    return { draft, event, ledger: compileRes.result || compileRes };
+  },
 };
 

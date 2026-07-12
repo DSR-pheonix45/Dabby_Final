@@ -1,14 +1,51 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BsXLg, BsFileEarmarkText, BsLightningCharge, BsDiagram3, BsEye } from 'react-icons/bs';
+import { toast } from 'react-hot-toast';
 import { useWorkbench } from '../../../../context/WorkbenchContext';
 import { formatCurrency } from '../../../../utils/currency';
+import { diService } from '../../../../services/diService';
 
 const lineDesc = (li, i) => li.description || li.desc || li.narration || li.particulars || li.name || `Line ${i + 1}`;
 const lineAmt = (li) => Number(li.amount ?? li.total ?? li.line_total ?? li.credit ?? li.debit ?? li.value ?? 0);
 
 export default function InspectorDrawer({ isOpen, onClose, data }) {
   const { activeWorkbench } = useWorkbench();
+  const [posting, setPosting] = useState(false);
+  const [posted, setPosted] = useState(null); // { status, debits, credits, entries }
+
+  useEffect(() => { setPosted(null); }, [data?.id]);
+
+  const handlePost = async () => {
+    if (!data?.id) return;
+    setPosting(true);
+    try {
+      const r = await diService.postDocumentToLedger(data.id);
+      const ledger = r.ledger || {};
+      if (ledger.status === 'compiled') {
+        setPosted(ledger);
+        toast.success(`Posted to ledger — balanced ${formatCurrency(ledger.debits, activeWorkbench?.country)}`);
+      } else if (ledger.status === 'no_entry') {
+        toast('This document type does not post to the ledger.', { icon: 'ℹ️' });
+      } else if (ledger.status === 'skipped') {
+        toast.error(`Skipped: ${ledger.reason || 'no amount on document'}`);
+      } else if (ledger.status === 'already_compiled') {
+        toast('Already posted to the ledger.', { icon: '✅' });
+      } else {
+        toast.success('Business event created.');
+      }
+    } catch (e) {
+      toast.error(e.message || 'Failed to post to ledger');
+    } finally {
+      setPosting(false);
+    }
+  };
+
   if (!isOpen || !data) return null;
+
+  // Prefer freshly-posted entries; fall back to any card-provided journal
+  const journalEntries = posted?.entries
+    ? posted.entries.map((e) => ({ account: e.role, type: e.direction, amount: e.amount }))
+    : data.journal;
 
   return (
     <>
@@ -114,9 +151,9 @@ export default function InspectorDrawer({ isOpen, onClose, data }) {
           {/* Proposed Journal */}
           <div>
             <h4 className="text-sm font-bold text-white border-b border-white/10 pb-2 mb-3 flex items-center">
-              <BsDiagram3 className="mr-2 text-teal-400" /> Proposed Journal
+              <BsDiagram3 className="mr-2 text-teal-400" /> {posted ? 'Posted Journal' : 'Proposed Journal'}
             </h4>
-            {data.journal ? (
+            {journalEntries ? (
               <div className="bg-[#181818] border border-white/10 rounded-lg overflow-hidden">
                 <table className="w-full text-xs text-left">
                   <thead className="bg-[#111111]/50 border-b border-white/10 text-gray-500">
@@ -127,7 +164,7 @@ export default function InspectorDrawer({ isOpen, onClose, data }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {data.journal.map((entry, idx) => (
+                    {journalEntries.map((entry, idx) => (
                       <tr key={idx} className="hover:bg-white/5">
                         <td className="px-3 py-2 text-gray-300">{entry.account}</td>
                         <td className="px-3 py-2 text-right font-medium text-gray-300">
@@ -154,11 +191,11 @@ export default function InspectorDrawer({ isOpen, onClose, data }) {
               View Evidence
             </button>
             <button
-              disabled={!data.journal}
-              title={data.journal ? '' : 'Available once a journal is proposed'}
+              onClick={handlePost}
+              disabled={posting || !!posted}
               className="px-4 py-2 bg-teal-500 hover:bg-teal-400 text-black font-bold rounded-lg text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Approve Post
+              {posting ? 'Posting…' : posted ? 'Posted ✓' : 'Approve & Post'}
             </button>
           </div>
         </div>
