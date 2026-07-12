@@ -1,7 +1,7 @@
 import React from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useWorkbench } from "../../context/WorkbenchContext";
-import { BsPerson, BsBuilding, BsGear, BsFileEarmarkText, BsDiagram3, BsGraphUp, BsCpu } from "react-icons/bs";
+import { BsPerson, BsBuilding, BsGear, BsFileEarmarkText, BsDiagram3, BsGraphUp, BsCpu, BsJournalText } from "react-icons/bs";
 
 export default function WorkbenchLayout() {
   const { activeWorkbench } = useWorkbench();
@@ -18,6 +18,7 @@ export default function WorkbenchLayout() {
 
   const navItems = [
     { label: "Business Engine", path: "/dashboard/workbench/business-engine", icon: BsCpu },
+    { label: "Ledger", path: "/dashboard/workbench/ledger", icon: BsJournalText },
     { label: "Members", path: "/dashboard/workbench/members", icon: BsPerson },
     { label: "Parties", path: "/dashboard/workbench/parties", icon: BsBuilding },
     { label: "COA", path: "/dashboard/workbench/coa", icon: BsDiagram3 },
@@ -69,7 +70,7 @@ export default function WorkbenchLayout() {
 
       {/* Page Content */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
-        <Outlet />
+        <Outlet context={{ workbench: activeWorkbench }} />
       </div>
     </div>
   );

@@ -98,6 +98,19 @@ export const diService = {
     return res.json();
   },
 
+  // --- Universal Ledger (Phase 5 read) ---
+  async getTrialBalance(workbenchId) {
+    const res = await apiFetch(`/api/di/ledger/trial-balance/${workbenchId}`);
+    if (!res.ok) throw new Error('Failed to fetch trial balance');
+    return res.json();
+  },
+
+  async getLedgerTransactions(workbenchId) {
+    const res = await apiFetch(`/api/di/ledger/transactions/${workbenchId}`);
+    if (!res.ok) throw new Error('Failed to fetch ledger transactions');
+    return res.json();
+  },
+
   /**
    * Full pipeline in one call: document -> trade draft -> business event ->
    * balanced ledger postings. Returns { draft, event, ledger }.
