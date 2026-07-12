@@ -18,7 +18,7 @@ export default function WorkbenchLayout() {
 
   const navItems = [
     { label: "Business Engine", path: "/dashboard/workbench/business-engine", icon: BsCpu },
-    { label: "Ledger", path: "/dashboard/workbench/ledger", icon: BsJournalText },
+    { label: "Financials", path: "/dashboard/workbench/ledger", icon: BsJournalText },
     { label: "Members", path: "/dashboard/workbench/members", icon: BsPerson },
     { label: "Parties", path: "/dashboard/workbench/parties", icon: BsBuilding },
     { label: "COA", path: "/dashboard/workbench/coa", icon: BsDiagram3 },

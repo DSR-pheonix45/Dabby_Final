@@ -111,6 +111,18 @@ export const diService = {
     return res.json();
   },
 
+  async getPnl(workbenchId) {
+    const res = await apiFetch(`/api/di/ledger/pnl/${workbenchId}`);
+    if (!res.ok) throw new Error('Failed to fetch P&L');
+    return res.json();
+  },
+
+  async getBalanceSheet(workbenchId) {
+    const res = await apiFetch(`/api/di/ledger/balance-sheet/${workbenchId}`);
+    if (!res.ok) throw new Error('Failed to fetch balance sheet');
+    return res.json();
+  },
+
   /**
    * Full pipeline in one call: document -> trade draft -> business event ->
    * balanced ledger postings. Returns { draft, event, ledger }.
