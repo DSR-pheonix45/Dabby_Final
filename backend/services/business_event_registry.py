@@ -190,7 +190,7 @@ class BusinessEventRegistry:
         """Fetch a Business Event with its Trade Draft and Analysis Note summary."""
         result = (
             supabase.table("business_events")
-                    .select("*, trade_drafts(status, reviewer_notes), analysis_notes(document_type, confidence, event_candidate)")
+                    .select("*, trade_drafts(status, reviewer_notes), di_analysis_notes(document_type, classification_type, confidence)")
                     .eq("id", event_id)
                     .single()
                     .execute()
@@ -274,9 +274,11 @@ class BusinessEventRegistry:
         Embed relevant Analysis Note data into event_metadata.
         One event per document — all detail embedded here.
         """
+        # The UFO analysis lives in di_analysis_notes with these columns:
+        # document_type, classification_type, parties, money, taxes, dates, line_items.
         note_res = (
-            supabase.table("analysis_notes")
-                    .select("document_type, amounts, dates, document_references, line_items, settlement, evidence, business_context")
+            supabase.table("di_analysis_notes")
+                    .select("document_type, classification_type, parties, money, taxes, dates, line_items")
                     .eq("id", draft["analysis_note_id"])
                     .single()
                     .execute()
@@ -285,36 +287,30 @@ class BusinessEventRegistry:
             return {}
 
         note = note_res.data
-        doc_type = note.get("document_type", "")
+        doc_type = (note.get("document_type") or note.get("classification_type") or "").lower()
 
         metadata = {
-            "document_type":    doc_type,
-            "amounts":          note.get("amounts", {}),
-            "dates":            note.get("dates", {}),
-            "business_context": note.get("business_context", {}),
+            "document_type": doc_type,
+            "parties":       note.get("parties", {}),
+            "money":         note.get("money", {}),
+            "taxes":         note.get("taxes", {}),
+            "dates":         note.get("dates", {}),
         }
 
-        # Embed line items (invoices, receipts, orders)
+        # Embed line items (invoices, receipts, orders, bank rows)
         line_items = note.get("line_items") or []
         if line_items:
             metadata["line_items"] = line_items
 
-        # Embed settlement/reconciliation data (bank statements)
-        settlement = note.get("settlement") or {}
-        if settlement:
-            metadata["settlement"] = settlement
-
-        # For payroll: Q2 answer — one event per payroll run
-        # Line items contain per-employee data
-        if doc_type == "payroll_register":
+        # One event per payroll run — line items carry per-employee data
+        if "payroll" in doc_type:
             metadata["payroll_employees"] = line_items
-            metadata["payroll_summary"]   = note.get("amounts", {})
+            metadata["payroll_summary"]   = note.get("money", {})
 
-        # For bank statement: Q3 answer — one event per statement
-        # Transactions embedded in metadata
-        if doc_type == "bank_statement":
-            metadata["transactions"]       = line_items[:200]  # cap at 200 rows
-            metadata["transaction_count"]  = len(line_items)
+        # One event per bank statement — transactions embedded (capped)
+        if "bank" in doc_type:
+            metadata["transactions"]      = line_items[:200]
+            metadata["transaction_count"] = len(line_items)
 
         return metadata
 
