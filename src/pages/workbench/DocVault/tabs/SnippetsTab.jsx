@@ -5,7 +5,8 @@ import SnippetCard from '../../business-engine/components/SnippetCard';
 export default function SnippetsTab({ doc }) {
   const data = doc.di_analysis_notes?.[0]?.extracted_data || {};
   const transactions = data.transactions || [];
-  const isBankStatement = data.document_type?.value?.toLowerCase().includes('bank statement');
+  const docTypeValue = typeof data.document_type === 'object' ? data.document_type?.value : data.document_type;
+  const isBankStatement = (docTypeValue || '').toLowerCase().includes('bank statement');
 
   if (!isBankStatement) {
     return (
