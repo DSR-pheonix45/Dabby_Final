@@ -119,7 +119,9 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
             <section>
               <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">General Information</h3>
               <div className="bg-[#161616] border border-white/5 rounded-xl p-4">
-                <FieldRow label="Label" fieldData={data.predicted_label} onChange={(val) => handleFieldChange('predicted_label', 'value', val)} />
+                {data.predicted_label !== undefined && (
+                  <FieldRow label="Label" fieldData={data.predicted_label} onChange={(val) => handleFieldChange('predicted_label', 'value', val)} />
+                )}
                 <FieldRow label="Doc Type" fieldData={data.document_type} onChange={(val) => handleFieldChange('document_type', 'value', val)} />
               </div>
             </section>

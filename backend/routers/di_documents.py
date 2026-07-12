@@ -184,12 +184,10 @@ async def process_document(document_id: str):
         if doc_type == "bank_statement":
             system_prompt = f"""
 You are an expert AI accounting agent. Analyze the bank statement and extract detailed financial insights.
-You MUST classify this document into exactly one of these labels: {valid_labels}.
 
 Return ONLY valid JSON matching this exact schema. For every value, provide a "value" and a "confidence" score (0.0 to 1.0).
 
 {{
-    "predicted_label": "String (Must be one of the provided labels, e.g., 'Bank Statement' if available)",
     "document_type": "Bank Statement",
     "statement_summary": {{
         "bank_name": {{"value": "String", "confidence": 0.99}},
