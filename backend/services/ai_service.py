@@ -20,6 +20,14 @@ class AIService:
         """
         Uses LLM to extract structured data from invoice text/content.
         """
+        from services.document_classifier import DocumentClassifier
+        classifier = DocumentClassifier(GroqPool.execute, self.gemini_model)
+        class_data = classifier.classify(file_content, filename)
+        doc_type = class_data.get("document_type", "unknown")
+        
+        print(f"[DEBUG] Document classified as: {doc_type}")
+        if doc_type == "bank_statement":
+            return await self.extract_bank_statement_text(file_content, filename)
 
         system_prompt = """
         You are an expert financial AI. Analyze the document text content and extract the fields according to the Dabby OCR Contract (v1).
@@ -108,9 +116,8 @@ class AIService:
                 )
             )
             extracted = json.loads(completion.choices[0].message.content)
-            if extracted.get("document_type") == "bank_statement":
-                print("[DEBUG] Bank statement detected in scan_invoice. Running dedicated workflow.")
-                return await self.extract_bank_statement_text(file_content, filename)
+            if doc_type != "unknown" and extracted.get("document_type") in ("unknown", None, "vendor_invoice", "sales_invoice"):
+                extracted["document_type"] = doc_type
             return extracted
         except Exception as e:
             print(f"[WARNING] Groq scan failed, attempting fallback to Gemini: {str(e)}")
@@ -133,6 +140,46 @@ class AIService:
 
         if not self.gemini_model:
             raise ValueError("GEMINI_API_KEY not configured")
+
+        # 1. Classify the document type first
+        class_prompt = """
+        You are a document classification specialist. Identify the type of this financial document.
+        Return ONLY a JSON object with this exact schema:
+        {
+          "document_type": "bank_statement", // One of: sales_invoice, vendor_invoice, customer_payment_receipt, vendor_payment_receipt, bank_statement, expense_receipt, payroll_register, credit_note, debit_note, purchase_order, sales_order, loan_agreement, investment_agreement, tax_document, unknown
+          "confidence": 0.95
+        }
+        """
+        class_schema = {
+            "type": "OBJECT",
+            "properties": {
+                "document_type": {"type": "STRING"},
+                "confidence": {"type": "NUMBER"}
+            },
+            "required": ["document_type", "confidence"]
+        }
+        try:
+            class_res = self.gemini_model.generate_content(
+                [class_prompt, {"mime_type": mime_type, "data": file_bytes}],
+                generation_config={
+                    "response_mime_type": "application/json",
+                    "response_schema": class_schema
+                }
+            )
+            class_text = class_res.text.strip()
+            if class_text.startswith("```json"):
+                class_text = class_text[7:-3].strip()
+            elif class_text.startswith("```"):
+                class_text = class_text[3:-3].strip()
+            class_data = json.loads(class_text)
+            doc_type = class_data.get("document_type", "unknown")
+            print(f"[DEBUG] Gemini Vision classified document as: {doc_type}")
+        except Exception as e:
+            print(f"[WARNING] Gemini Vision classification failed, defaulting to unknown: {e}")
+            doc_type = "unknown"
+
+        if doc_type == "bank_statement":
+            return await self.extract_bank_statement_vision(file_bytes, mime_type, filename)
 
         prompt = """
         You are an expert financial AI. Analyze this document and extract the fields according to the Dabby OCR Contract (v1).
@@ -291,9 +338,8 @@ class AIService:
                 
             try:
                 extracted = json.loads(text)
-                if extracted.get("document_type") == "bank_statement":
-                    print("[DEBUG] Bank statement detected in scan_document_vision. Running dedicated workflow.")
-                    return await self.extract_bank_statement_vision(file_bytes, mime_type, filename)
+                if doc_type != "unknown" and extracted.get("document_type") in ("unknown", None, "vendor_invoice", "sales_invoice"):
+                    extracted["document_type"] = doc_type
                 return extracted
             except json.JSONDecodeError as je:
                 print(f"[ERROR] Failed to parse Gemini JSON: {je}")
