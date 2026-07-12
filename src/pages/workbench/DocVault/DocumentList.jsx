@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { BsSearch, BsFileEarmarkText, BsExclamationCircle } from 'react-icons/bs';
-import { useWorkbench } from '../../context/WorkbenchContext';
-import { formatCurrency } from '../../utils/currency';
+import { useWorkbench } from '../../../context/WorkbenchContext';
+import { formatCurrency } from '../../../utils/currency';
 
 const StatusBadge = ({ status }) => {
   const styles = {

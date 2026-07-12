@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { BsCheckCircle, BsLightningCharge, BsArrowRightCircle, BsCheck2All } from 'react-icons/bs';
 import { diService } from '../../../../services/diService';
 import { toast } from 'react-hot-toast';
-import { useWorkbench } from '../../context/WorkbenchContext';
-import { formatCurrency } from '../../utils/currency';
+import { useWorkbench } from '../../../../context/WorkbenchContext';
+import { formatCurrency } from '../../../../utils/currency';
 
 export default function FinancialImpactTab({ doc, onUpdate }) {
   const [approving, setApproving] = useState(false);
