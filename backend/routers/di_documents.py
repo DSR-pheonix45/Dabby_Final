@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from supabase_client import supabase
+from services.ufo_mapper import UFOMapper
 import uuid
 import json
 import base64
@@ -284,12 +285,21 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
         
         overall_confidence = sum(confidences) / len(confidences) if confidences else 0.95
         
+        # Phase 1: Map unstructured JSON to strict UFO structure
+        ufo = UFOMapper.normalize(analysis_data)
+        
         supabase.table("di_analysis_notes").insert({
             "document_id": document_id,
             "classification_type": predicted_label.lower(),
             "extracted_data": analysis_data,
             "reasoning": analysis_data.get("analysis", ""),
-            "confidence": overall_confidence
+            "confidence": overall_confidence,
+            "document_type": ufo.get("document_type"),
+            "parties": ufo.get("parties"),
+            "money": ufo.get("money"),
+            "taxes": ufo.get("taxes"),
+            "dates": ufo.get("dates"),
+            "line_items": ufo.get("line_items")
         }).execute()
         
         supabase.table("di_document_processing_logs").insert({
@@ -333,10 +343,17 @@ async def approve_document(document_id: str):
 @router.put("/{document_id}/ufo")
 async def update_ufo(document_id: str, payload: dict):
     try:
-        # In MVP we simply overwrite the extracted_data
-        supabase.table("di_analysis_notes").update({
-            "extracted_data": payload.get("extracted_data", {})
-        }).eq("document_id", document_id).execute()
+        update_payload = {}
+        if "extracted_data" in payload:
+            update_payload["extracted_data"] = payload["extracted_data"]
+        
+        # Also allow updating UFO columns
+        for col in ["document_type", "parties", "money", "taxes", "dates", "line_items"]:
+            if col in payload:
+                update_payload[col] = payload[col]
+
+        if update_payload:
+            supabase.table("di_analysis_notes").update(update_payload).eq("document_id", document_id).execute()
         
         supabase.table("di_document_processing_logs").insert({
             "document_id": document_id,

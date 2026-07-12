@@ -67,18 +67,25 @@ export default function DocumentList({ documents, loading, selectedDoc, onSelect
           <div className="divide-y divide-white/5">
             {filteredDocs.map((doc) => {
               const isSelected = selectedDoc?.id === doc.id;
-              const note = doc.di_analysis_notes?.[0];
-              const data = note?.extracted_data || {};
+              const note = doc.di_analysis_notes?.[0] || {};
+              const data = note.extracted_data || {};
               
-              const partyName = data.parties?.vendor?.value || data.parties?.customer?.value || "Unknown Party";
-              const docType = (typeof data.document_type === 'object' ? data.document_type?.value : data.document_type) || "Document";
+              // Read from UFO columns if available, fallback to raw extracted_data
+              const rawDocType = note.document_type || data.document_type;
+              const docType = (typeof rawDocType === 'object' ? rawDocType?.value : rawDocType) || "Document";
+              
               const refNumber = data.document?.reference_number?.value || "No Ref";
-              const amount = data.financials?.total_amount?.value;
+              
+              const amount = note.money?.total_amount !== undefined ? note.money?.total_amount : data.financials?.total_amount?.value;
               
               const displayAmount = amount !== undefined ? formatCurrency(amount, activeWorkbench?.country) : "-";
               
               // Only show Needs Review icon if specifically Needs Review
               const showWarning = doc.derivedStatus === 'Needs Review';
+              
+              const ufoIssuer = note.parties?.issuer?.name;
+              const ufoRecipient = note.parties?.recipient?.name;
+              const partyName = ufoIssuer || ufoRecipient || data.parties?.vendor?.value || data.parties?.customer?.value || "Unknown Party";
 
               return (
                 <div 

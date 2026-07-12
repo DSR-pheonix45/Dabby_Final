@@ -3,9 +3,11 @@ import { BsDiagram3 } from 'react-icons/bs';
 import SnippetCard from '../../business-engine/components/SnippetCard';
 
 export default function SnippetsTab({ doc }) {
-  const data = doc.di_analysis_notes?.[0]?.extracted_data || {};
-  const transactions = data.transactions || [];
-  const docTypeValue = typeof data.document_type === 'object' ? data.document_type?.value : data.document_type;
+  const note = doc.di_analysis_notes?.[0] || {};
+  const data = note.extracted_data || {};
+  const transactions = note.line_items || data.transactions || [];
+  const rawDocType = note.document_type || data.document_type;
+  const docTypeValue = typeof rawDocType === 'object' ? rawDocType?.value : rawDocType;
   const isBankStatement = (docTypeValue || '').toLowerCase().includes('bank statement');
 
   if (!isBankStatement) {

@@ -35,9 +35,19 @@ const FieldRow = ({ label, fieldData, onChange }) => {
 export default function ExtractedDataTab({ doc, onUpdate }) {
   const [devMode, setDevMode] = useState(false);
   const note = doc.di_analysis_notes?.[0];
-  const originalData = note?.extracted_data || {};
   
-  const [data, setData] = useState(originalData);
+  // Construct UFO data, falling back to legacy extracted_data if UFO cols are missing
+  const ufoData = note ? {
+    document_type: note.document_type || note.extracted_data?.document_type,
+    parties: note.parties && Object.keys(note.parties).length > 0 ? note.parties : note.extracted_data?.parties,
+    money: note.money && Object.keys(note.money).length > 0 ? note.money : note.extracted_data?.financials,
+    taxes: note.taxes && Object.keys(note.taxes).length > 0 ? note.taxes : undefined,
+    dates: note.dates && Object.keys(note.dates).length > 0 ? note.dates : note.extracted_data?.document,
+    line_items: note.line_items && note.line_items.length > 0 ? note.line_items : note.extracted_data?.line_items,
+    raw_extracted: note.extracted_data
+  } : {};
+  
+  const [data, setData] = useState(ufoData);
   const [saving, setSaving] = useState(false);
 
   if (!note) {
@@ -71,7 +81,7 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
     }
   };
 
-  const hasChanges = JSON.stringify(data) !== JSON.stringify(originalData);
+  const hasChanges = JSON.stringify(data) !== JSON.stringify(ufoData);
 
   return (
     <div className="flex flex-col h-full bg-[#111111]">
@@ -126,17 +136,17 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
               </div>
             </section>
 
-            {/* Document Details */}
-            {data.document && (
+            {/* Dates (formerly Document Details) */}
+            {data.dates && (
               <section>
-                <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Document Details</h3>
+                <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Dates & Reference</h3>
                 <div className="bg-[#161616] border border-white/5 rounded-xl p-4">
-                  {Object.entries(data.document).map(([key, field]) => (
+                  {Object.entries(data.dates).map(([key, field]) => (
                     <FieldRow 
                       key={key} 
                       label={key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} 
                       fieldData={field} 
-                      onChange={(val) => handleFieldChange('document', key, val)} 
+                      onChange={(val) => handleFieldChange('dates', key, val)} 
                     />
                   ))}
                 </div>
@@ -147,32 +157,68 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
             {data.parties && (
               <section>
                 <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Parties</h3>
+                <div className="bg-[#161616] border border-white/5 rounded-xl p-4 space-y-4">
+                  {Object.entries(data.parties).map(([partyRole, details]) => (
+                    <div key={partyRole}>
+                      <h4 className="text-xs font-bold text-gray-400 capitalize mb-2">{partyRole}</h4>
+                      <div className="pl-4 border-l-2 border-white/5 space-y-1">
+                        {details && typeof details === 'object' && !details.value ? (
+                          Object.entries(details).map(([key, val]) => (
+                            <FieldRow 
+                              key={`${partyRole}_${key}`}
+                              label={key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                              fieldData={val}
+                              onChange={(newVal) => {
+                                setData(prev => {
+                                  const updated = { ...prev };
+                                  updated.parties = { ...prev.parties };
+                                  updated.parties[partyRole] = { ...prev.parties[partyRole], [key]: newVal };
+                                  return updated;
+                                });
+                              }}
+                            />
+                          ))
+                        ) : (
+                          <FieldRow 
+                            label={partyRole.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} 
+                            fieldData={details} 
+                            onChange={(val) => handleFieldChange('parties', partyRole, val)} 
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Money (formerly Financials) */}
+            {data.money && (
+              <section>
+                <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Money & Totals</h3>
                 <div className="bg-[#161616] border border-white/5 rounded-xl p-4">
-                  {Object.entries(data.parties).map(([key, field]) => (
+                  {Object.entries(data.money).map(([key, field]) => (
                     <FieldRow 
                       key={key} 
                       label={key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} 
                       fieldData={field} 
-                      onChange={(val) => handleFieldChange('parties', key, val)} 
+                      onChange={(val) => handleFieldChange('money', key, val)} 
                     />
                   ))}
                 </div>
               </section>
             )}
 
-            {/* Financials */}
-            {data.financials && (
+            {/* Taxes */}
+            {data.taxes && (
               <section>
-                <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Financials</h3>
+                <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Taxes</h3>
                 <div className="bg-[#161616] border border-white/5 rounded-xl p-4">
-                  {Object.entries(data.financials).map(([key, field]) => (
-                    <FieldRow 
-                      key={key} 
-                      label={key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} 
-                      fieldData={field} 
-                      onChange={(val) => handleFieldChange('financials', key, val)} 
-                    />
-                  ))}
+                  <FieldRow 
+                    label="Total Tax" 
+                    fieldData={data.taxes.total_tax} 
+                    onChange={(val) => handleFieldChange('taxes', 'total_tax', val)} 
+                  />
                 </div>
               </section>
             )}
