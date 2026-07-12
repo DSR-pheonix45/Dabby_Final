@@ -5,7 +5,7 @@ from supabase_client import supabase
 from auth import verify_user_access
 from services.business_event_registry import business_event_registry
 from services.settlement_engine import settlement_engine
-from services.accounting_compiler import accounting_compiler
+from services.ledger_compiler import ledger_compiler
 from services.draft_producer import draft_producer
 
 router = APIRouter()
@@ -77,7 +77,7 @@ async def compile_business_event(event_id: str, user=Depends(verify_user_access)
     """Trigger Accounting Compiler for this Business Event."""
     try:
         user_id = user.get("id") if isinstance(user, dict) else None
-        result = accounting_compiler.compile_from_business_event(event_id, executed_by=user_id)
+        result = ledger_compiler.compile_event(event_id, executed_by=user_id)
         return {"message": "Business Event compiled to Ledger", "result": result}
     except NotImplementedError as nie:
         raise HTTPException(status_code=400, detail=str(nie))
