@@ -5,6 +5,7 @@ import { BsSearch, BsShieldCheck, BsBuilding, BsPlus } from "react-icons/bs";
 import { collaborationService } from "../../services/collaborationService";
 import AddPartyModal from "./AddPartyModal";
 import AddVesselModal from "./AddVesselModal";
+import PartyAnalyticsModal from "./PartyAnalyticsModal";
 
 export default function Parties() {
   const { activeWorkbench } = useWorkbench();
@@ -18,6 +19,7 @@ export default function Parties() {
   const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
   const [isAddVesselOpen, setIsAddVesselOpen] = useState(false);
   const [selectedPartyId, setSelectedPartyId] = useState(null);
+  const [analyticsParty, setAnalyticsParty] = useState(null);
 
   const parties = data || [];
 
@@ -102,7 +104,11 @@ export default function Parties() {
               const vessels = party.financial_accounts || [];
 
               return (
-                <div key={party.id} className={`bg-[#0F0F11] border ${cardBorder} rounded-2xl p-6 relative flex flex-col`}>
+                <div 
+                  key={party.id} 
+                  className={`bg-[#0F0F11] border ${cardBorder} rounded-2xl p-6 relative flex flex-col cursor-pointer hover:bg-white/[0.02] transition-colors`}
+                  onClick={() => setAnalyticsParty(party)}
+                >
                   
                   {isOwner && (
                     <div className="absolute top-0 right-6 bg-yellow-500 text-black text-[9px] font-bold px-3 py-1 rounded-b-md uppercase tracking-wider">
@@ -137,7 +143,7 @@ export default function Parties() {
                     <div className="flex justify-between items-center mb-4">
                       <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Trade Vessels</span>
                       <button 
-                        onClick={() => handleAddVesselClick(party.id)}
+                        onClick={(e) => { e.stopPropagation(); handleAddVesselClick(party.id); }}
                         className="text-[10px] text-teal-400 font-bold uppercase tracking-widest hover:text-teal-300 transition-colors"
                       >
                         + Add Vessel
@@ -151,7 +157,11 @@ export default function Parties() {
                         </div>
                       ) : (
                         vessels.map(vessel => (
-                          <div key={vessel.id} className="bg-white/5 hover:bg-white/10 transition-colors rounded-xl p-3 flex items-center justify-between group cursor-pointer">
+                          <div 
+                            key={vessel.id} 
+                            onClick={(e) => e.stopPropagation()} 
+                            className="bg-white/5 hover:bg-white/10 transition-colors rounded-xl p-3 flex items-center justify-between group cursor-pointer"
+                          >
                             <div className="flex items-center space-x-3">
                               <div className="text-gray-400">
                                 <BsBuilding size={14} />
@@ -190,6 +200,12 @@ export default function Parties() {
         workbenchId={activeWorkbench.id}
         partyId={selectedPartyId}
         onSuccess={loadParties}
+      />
+
+      <PartyAnalyticsModal
+        isOpen={!!analyticsParty}
+        onClose={() => setAnalyticsParty(null)}
+        party={analyticsParty}
       />
     </div>
   );

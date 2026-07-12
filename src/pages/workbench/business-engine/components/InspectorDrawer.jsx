@@ -1,5 +1,6 @@
 import React from 'react';
-import { BsXLg, BsFileEarmarkText, BsLightningCharge, BsDiagram3, BsEye } from 'react-icons/bs';
+import { BsXLg, BsFileEarmarkText, BsLightningCharge, BsDiagram3, BsEye, BsPlus } from 'react-icons/bs';
+import SnippetCard from './SnippetCard';
 
 export default function InspectorDrawer({ isOpen, onClose, data }) {
   if (!isOpen || !data) return null;
@@ -72,6 +73,38 @@ export default function InspectorDrawer({ isOpen, onClose, data }) {
               </div>
             </div>
           )}
+
+          {/* Verification Evidence / Snippet */}
+          <div>
+            <h4 className="text-sm font-bold text-white border-b border-white/10 pb-2 mb-3 flex items-center justify-between">
+              <span className="flex items-center">
+                <BsFileEarmarkText className="mr-2 text-teal-400" /> Evidence
+              </span>
+              {!data.mockSnippetAttached && (
+                <button className="text-[10px] text-teal-500 font-bold uppercase tracking-widest hover:text-teal-400 transition-colors flex items-center">
+                  <BsPlus className="mr-0.5" /> Attach Snippet
+                </button>
+              )}
+            </h4>
+            
+            {data.mockSnippetAttached ? (
+              <SnippetCard 
+                transaction={{
+                  date: { value: '2026-07-10' },
+                  description: { value: `${data.party} / INV-SETTLEMENT / REF-${Math.floor(Math.random() * 10000)}` },
+                  credit_amount: { value: data.amount },
+                  payment_mode: { value: 'RTGS' }
+                }}
+                sourceDocument={{ filename: 'July Bank Statement.pdf' }}
+              />
+            ) : (
+              <div className="border border-dashed border-white/10 rounded-xl p-6 text-center bg-white/5 flex flex-col items-center justify-center">
+                <BsFileEarmarkText className="text-gray-500 mb-2" size={24} />
+                <p className="text-sm text-gray-400 font-medium">No payment receipt found.</p>
+                <p className="text-xs text-gray-600 mt-1">Attach a bank statement snippet to verify settlement.</p>
+              </div>
+            )}
+          </div>
 
           {/* Proposed Journal */}
           <div>

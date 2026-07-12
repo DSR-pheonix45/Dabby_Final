@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react';
 const MOCK_PIPELINE_DATA = [
   { id: 'doc_1', type: 'Invoice', party: 'AWS Cloud Services', amount: 450.00, confidence: 98, time: '2 mins ago', reviewer: 'Unassigned', stage: 'uploaded', linkedDocs: 0, 
     analysis: { summary: "Standard monthly AWS hosting invoice.", tags: ["SaaS", "Cloud"] },
-    journal: [{ account: "5990 SaaS Subscription", type: "debit", amount: 450.00 }, { account: "2000 Accounts Payable", type: "credit", amount: 450.00 }]
+    journal: [{ account: "5990 SaaS Subscription", type: "debit", amount: 450.00 }, { account: "2000 Accounts Payable", type: "credit", amount: 450.00 }],
+    mockSnippetAttached: true
   },
   { id: 'doc_2', type: 'Receipt', party: 'Uber', amount: 35.50, confidence: 85, time: '15 mins ago', reviewer: 'Unassigned', stage: 'ocr_processing', linkedDocs: 0,
     analysis: { summary: "Travel expense. Uber ride.", tags: ["Travel"] },
@@ -11,7 +12,8 @@ const MOCK_PIPELINE_DATA = [
   },
   { id: 'doc_3', type: 'Invoice', party: 'WeWork', amount: 12000.00, confidence: 99, time: '1 hour ago', reviewer: 'Sarah J.', stage: 'analysis_complete', linkedDocs: 1,
     analysis: { summary: "Monthly office lease invoice.", tags: ["Rent"] },
-    journal: [{ account: "5000 Rent Expense", type: "debit", amount: 12000.00 }, { account: "2000 Accounts Payable", type: "credit", amount: 12000.00 }]
+    journal: [{ account: "5000 Rent Expense", type: "debit", amount: 12000.00 }, { account: "2000 Accounts Payable", type: "credit", amount: 12000.00 }],
+    mockSnippetAttached: true
   },
   { id: 'doc_4', type: 'Bank Statement', party: 'Chase Bank', amount: 0, confidence: 100, time: '3 hours ago', reviewer: 'System', stage: 'financial_event', linkedDocs: 15,
     analysis: { summary: "Monthly checking account statement parsing.", tags: ["Banking"] },
