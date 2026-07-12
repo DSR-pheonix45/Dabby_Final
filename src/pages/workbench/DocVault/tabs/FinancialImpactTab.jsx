@@ -2,9 +2,12 @@ import React, { useState } from 'react';
 import { BsCheckCircle, BsLightningCharge, BsArrowRightCircle, BsCheck2All } from 'react-icons/bs';
 import { diService } from '../../../../services/diService';
 import { toast } from 'react-hot-toast';
+import { useWorkbench } from '../../context/WorkbenchContext';
+import { formatCurrency } from '../../utils/currency';
 
 export default function FinancialImpactTab({ doc, onUpdate }) {
   const [approving, setApproving] = useState(false);
+  const { activeWorkbench } = useWorkbench();
   const note = doc.di_analysis_notes?.[0];
   const data = note?.extracted_data;
 
@@ -55,7 +58,7 @@ export default function FinancialImpactTab({ doc, onUpdate }) {
                 <div key={idx} className="bg-[#161616] border border-white/5 rounded-xl p-4 flex items-center justify-between">
                   <span className="text-sm font-semibold text-gray-300">{impact.account}</span>
                   <div className={`text-sm font-bold flex items-center gap-1 ${impact.type === 'increase' ? 'text-teal-400' : 'text-rose-400'}`}>
-                    {impact.type === 'increase' ? '+' : '-'} {new Intl.NumberFormat('en-US', { style: 'currency', currency: data.financials?.currency?.value || 'USD' }).format(impact.amount)}
+                    {impact.type === 'increase' ? '+' : '-'} {formatCurrency(impact.amount, activeWorkbench?.country)}
                   </div>
                 </div>
               ))}
@@ -98,10 +101,10 @@ export default function FinancialImpactTab({ doc, onUpdate }) {
                         {entry.account}
                       </td>
                       <td className="p-3 text-right font-mono">
-                        {entry.type === 'debit' ? Number(entry.amount).toLocaleString() : ''}
+                        {entry.type === 'debit' ? formatCurrency(entry.amount, activeWorkbench?.country) : ''}
                       </td>
                       <td className="p-3 text-right font-mono">
-                        {entry.type === 'credit' ? Number(entry.amount).toLocaleString() : ''}
+                        {entry.type === 'credit' ? formatCurrency(entry.amount, activeWorkbench?.country) : ''}
                       </td>
                     </tr>
                   ))}

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { BsSearch, BsFileEarmarkText, BsExclamationCircle } from 'react-icons/bs';
+import { useWorkbench } from '../../context/WorkbenchContext';
+import { formatCurrency } from '../../utils/currency';
 
 const StatusBadge = ({ status }) => {
   const styles = {
@@ -22,6 +24,7 @@ const StatusBadge = ({ status }) => {
 
 export default function DocumentList({ documents, loading, selectedDoc, onSelect, uploading }) {
   const [search, setSearch] = useState("");
+  const { activeWorkbench } = useWorkbench();
 
   const filteredDocs = documents.filter(doc => {
     const term = search.toLowerCase();
@@ -71,9 +74,8 @@ export default function DocumentList({ documents, loading, selectedDoc, onSelect
               const docType = (typeof data.document_type === 'object' ? data.document_type?.value : data.document_type) || "Document";
               const refNumber = data.document?.reference_number?.value || "No Ref";
               const amount = data.financials?.total_amount?.value;
-              const currency = data.financials?.currency?.value || "USD";
               
-              const displayAmount = amount !== undefined ? new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount) : "-";
+              const displayAmount = amount !== undefined ? formatCurrency(amount, activeWorkbench?.country) : "-";
               
               // Only show Needs Review icon if specifically Needs Review
               const showWarning = doc.derivedStatus === 'Needs Review';

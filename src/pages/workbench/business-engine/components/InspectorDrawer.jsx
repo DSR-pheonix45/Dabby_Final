@@ -1,8 +1,11 @@
 import React from 'react';
 import { BsXLg, BsFileEarmarkText, BsLightningCharge, BsDiagram3, BsEye, BsPlus } from 'react-icons/bs';
 import SnippetCard from './SnippetCard';
+import { useWorkbench } from '../../../../context/WorkbenchContext';
+import { formatCurrency } from '../../../../utils/currency';
 
 export default function InspectorDrawer({ isOpen, onClose, data }) {
+  const { activeWorkbench } = useWorkbench();
   if (!isOpen || !data) return null;
 
   return (
@@ -49,7 +52,7 @@ export default function InspectorDrawer({ isOpen, onClose, data }) {
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white/5 p-3 rounded-lg">
               <p className="text-xs text-gray-500 mb-1">Amount</p>
-              <p className="text-lg font-bold text-white">${data.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              <p className="text-lg font-bold text-white">{formatCurrency(data.amount, activeWorkbench?.country)}</p>
             </div>
             <div className="bg-white/5 p-3 rounded-lg">
               <p className="text-xs text-gray-500 mb-1">Processing Time</p>
@@ -126,10 +129,10 @@ export default function InspectorDrawer({ isOpen, onClose, data }) {
                       <tr key={idx} className="hover:bg-white/5">
                         <td className="px-3 py-2 text-gray-300">{entry.account}</td>
                         <td className="px-3 py-2 text-right font-medium text-gray-300">
-                          {entry.type === 'debit' ? `$${entry.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
+                          {entry.type === 'debit' ? formatCurrency(entry.amount, activeWorkbench?.country) : '-'}
                         </td>
                         <td className="px-3 py-2 text-right font-medium text-gray-300">
-                          {entry.type === 'credit' ? `$${entry.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
+                          {entry.type === 'credit' ? formatCurrency(entry.amount, activeWorkbench?.country) : '-'}
                         </td>
                       </tr>
                     ))}

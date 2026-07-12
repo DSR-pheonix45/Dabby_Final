@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { BsCheckCircleFill, BsFileEarmarkText, BsBank, BsArrowRightShort, BsArrowsAngleExpand, BsLink45Deg, BsXLg, BsSearch } from 'react-icons/bs';
 import PartyAnalyticsModal from '../../PartyAnalyticsModal';
+import { useWorkbench } from '../../../../context/WorkbenchContext';
+import { formatCurrency } from '../../../../utils/currency';
 
 export default function SnippetCard({ transaction, sourceDocument }) {
+  const { activeWorkbench } = useWorkbench();
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkedDoc, setLinkedDoc] = useState(null);
@@ -55,7 +58,7 @@ export default function SnippetCard({ transaction, sourceDocument }) {
             </div>
             <div className="text-right shrink-0">
               <div className={`text-lg font-bold ${type === 'Credit' ? 'text-teal-400' : 'text-rose-400'}`}>
-                {type === 'Credit' ? '+' : '-'}${amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                {type === 'Credit' ? '+' : '-'}{formatCurrency(amount, activeWorkbench?.country)}
               </div>
               <div className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-1">
                 {type}

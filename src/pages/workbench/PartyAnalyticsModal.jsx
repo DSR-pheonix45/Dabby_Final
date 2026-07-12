@@ -4,8 +4,11 @@ import {
   BsCashCoin, BsFileEarmarkText, BsReceipt, BsBuilding, BsShieldCheck,
   BsPeopleFill, BsClockHistory, BsLightningCharge, BsDiagram3
 } from 'react-icons/bs';
+import { useWorkbench } from '../../context/WorkbenchContext';
+import { formatCurrency } from '../../utils/currency';
 
 export default function PartyAnalyticsModal({ isOpen, onClose, party }) {
+  const { activeWorkbench } = useWorkbench();
   if (!isOpen || !party) return null;
 
   const isOwner = party.party_type === 'internal';
@@ -121,7 +124,7 @@ export default function PartyAnalyticsModal({ isOpen, onClose, party }) {
                 <div className="text-[10px] text-teal-300/70 font-bold uppercase tracking-widest mb-1 flex items-center gap-1">
                   Receivables Liability
                 </div>
-                <div className="text-3xl font-bold text-white mb-2">${receivables.toLocaleString()}</div>
+                <div className="text-3xl font-bold text-white mb-2">{formatCurrency(receivables, activeWorkbench?.country)}</div>
                 <div className="text-xs font-medium text-teal-400/80">
                   Total outstanding amounts
                 </div>
@@ -187,7 +190,7 @@ export default function PartyAnalyticsModal({ isOpen, onClose, party }) {
                   <div className="mb-8">
                     <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">Total Lifetime Revenue</div>
                     <div className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-500 to-amber-300">
-                      ${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      {formatCurrency(totalRevenue, activeWorkbench?.country)}
                     </div>
                   </div>
 
