@@ -205,6 +205,8 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
                   ))}
                 </div>
               </section>
+            )}
+
             {/* Statement Summary (For Bank Statements) */}
             {data.statement_summary && (
               <section>
