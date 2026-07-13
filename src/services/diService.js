@@ -43,8 +43,11 @@ export const diService = {
     return res.json();
   },
 
-  async processDocument(documentId) {
-    const res = await apiFetch(`/api/di/documents/${documentId}/process`, {
+  async processDocument(documentId, hint = null) {
+    const url = hint 
+      ? `/api/di/documents/${documentId}/process?hint=${encodeURIComponent(hint)}`
+      : `/api/di/documents/${documentId}/process`;
+    const res = await apiFetch(url, {
       method: 'POST',
     });
     if (!res.ok) throw new Error('Failed to process document');

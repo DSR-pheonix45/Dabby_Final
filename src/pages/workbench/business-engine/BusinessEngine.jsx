@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { useBusinessEngine, usePipeline, useProcessingTimeline } from '../../../hooks/useBusinessEngine';
+import { useBusinessEngine, usePipeline, useProcessingTimeline, useSnippets } from '../../../hooks/useBusinessEngine';
 import BusinessEngineSummary from './components/BusinessEngineSummary';
 import BusinessEngineFilters from './components/BusinessEngineFilters';
 import PipelineBoard from './components/PipelineBoard';
 import TimelineTable from './components/TimelineTable';
 import InspectorDrawer from './components/InspectorDrawer';
-import { BsKanban, BsListUl, BsArrowRepeat } from 'react-icons/bs';
+import SnippetsBoard from './components/SnippetsBoard';
+import { BsKanban, BsListUl, BsArrowRepeat, BsDiagram3 } from 'react-icons/bs';
 
 export default function BusinessEngine() {
   const { workbench } = useOutletContext() || {};
   const workbenchId = workbench?.id || 'demo';
+  const workbenchId = workbench?.id || 'demo';
   
-  const [viewMode, setViewMode] = useState('pipeline'); // 'pipeline' | 'timeline'
+  const [viewMode, setViewMode] = useState('pipeline'); // 'pipeline' | 'timeline' | 'snippets'
   const [selectedDoc, setSelectedDoc] = useState(null);
 
   const { kpis, loading: kpiLoading } = useBusinessEngine(workbenchId);
@@ -26,8 +28,10 @@ export default function BusinessEngine() {
     moveCard,
     refresh
   } = usePipeline(workbenchId);
+  } = usePipeline(workbenchId);
   
   const { data: timelineData, loading: timelineLoading } = useProcessingTimeline(workbenchId);
+  const { snippets, loading: snippetsLoading } = useSnippets(workbenchId);
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#111111] overflow-hidden relative">
@@ -56,6 +60,13 @@ export default function BusinessEngine() {
             >
               <BsListUl />
             </button>
+            <button 
+              onClick={() => setViewMode('snippets')}
+              className={`p-2 rounded-md transition-colors ${viewMode === 'snippets' ? 'bg-white/10 text-teal-400' : 'text-gray-500 hover:text-white'}`}
+              title="Snippets View"
+            >
+              <BsDiagram3 />
+            </button>
           </div>
           
           <button className="flex items-center space-x-2 px-4 py-2 bg-[#181818] hover:bg-[#222222] border border-white/10 rounded-lg text-sm font-medium text-white transition-colors">
@@ -78,18 +89,25 @@ export default function BusinessEngine() {
             onSearch={setSearchQuery}
           />
 
-          {viewMode === 'pipeline' ? (
+          {viewMode === 'pipeline' && (
             <PipelineBoard 
               cards={cards} 
               loading={pipelineLoading} 
               onMoveCard={moveCard}
               onCardClick={setSelectedDoc}
             />
-          ) : (
+          )}
+          {viewMode === 'timeline' && (
             <TimelineTable 
               data={timelineData} 
               loading={timelineLoading} 
               onRowClick={setSelectedDoc}
+            />
+          )}
+          {viewMode === 'snippets' && (
+            <SnippetsBoard
+              snippets={snippets}
+              loading={snippetsLoading}
             />
           )}
 

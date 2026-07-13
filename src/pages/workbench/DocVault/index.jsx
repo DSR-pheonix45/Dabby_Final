@@ -35,6 +35,8 @@ export default function DocVaultIndex() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
+  const [pendingFile, setPendingFile] = useState(null);
+  const [showClassModal, setShowClassModal] = useState(false);
 
   const loadDocuments = async () => {
     if (!activeWorkbench) return;
@@ -69,19 +71,26 @@ export default function DocVaultIndex() {
     loadDocuments();
   }, [activeWorkbench]);
 
-  const onDrop = useCallback(async (acceptedFiles) => {
+  const onDrop = useCallback((acceptedFiles) => {
     if (acceptedFiles.length === 0 || !activeWorkbench) return;
+    setPendingFile(acceptedFiles[0]);
+    setShowClassModal(true);
+  }, [activeWorkbench]);
+
+  const handleUploadWithHint = async (hint) => {
+    if (!pendingFile || !activeWorkbench) return;
+    const file = pendingFile;
+    setPendingFile(null);
+    setShowClassModal(false);
     
     setUploading(true);
-    const file = acceptedFiles[0];
-    
     try {
       toast.loading("Uploading document...", { id: "upload" });
       const res = await diService.uploadDocument(activeWorkbench.id, file);
       
       toast.loading("AI parsing in progress...", { id: "upload" });
       
-      await diService.processDocument(res.document_id);
+      await diService.processDocument(res.document_id, hint);
       
       toast.success("Document parsed successfully!", { id: "upload" });
       loadDocuments();
@@ -90,7 +99,7 @@ export default function DocVaultIndex() {
     } finally {
       setUploading(false);
     }
-  }, [activeWorkbench]);
+  };
 
   const { getRootProps, getInputProps } = useDropzone({
     onDrop,
@@ -178,6 +187,48 @@ export default function DocVaultIndex() {
           </Panel>
         </PanelGroup>
       </div>
+
+      {showClassModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-[#18181A] border border-white/10 rounded-2xl p-6 shadow-2xl relative">
+            <h3 className="text-lg font-bold text-white mb-2">Classify Document</h3>
+            <p className="text-xs text-gray-400 mb-6">If you are uploading a payment receipt, tell us the direction of money.</p>
+            
+            <div className="space-y-3">
+              <button 
+                onClick={() => handleUploadWithHint(null)}
+                className="w-full text-left px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors"
+              >
+                <div className="text-sm font-bold text-white">Auto-Detect</div>
+                <div className="text-[10px] text-gray-400 mt-0.5">Let AI figure out the document type</div>
+              </button>
+              
+              <button 
+                onClick={() => handleUploadWithHint('customer_payment_receipt')}
+                className="w-full text-left px-4 py-3 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/20 rounded-xl transition-colors"
+              >
+                <div className="text-sm font-bold text-teal-400">Money In (Credit)</div>
+                <div className="text-[10px] text-teal-500/70 mt-0.5">Customer Payment Receipt</div>
+              </button>
+              
+              <button 
+                onClick={() => handleUploadWithHint('expense_receipt')}
+                className="w-full text-left px-4 py-3 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-xl transition-colors"
+              >
+                <div className="text-sm font-bold text-rose-400">Money Out (Debit)</div>
+                <div className="text-[10px] text-rose-500/70 mt-0.5">Vendor Payment / Expense Receipt</div>
+              </button>
+            </div>
+            
+            <button 
+              onClick={() => { setPendingFile(null); setShowClassModal(false); }}
+              className="mt-6 w-full py-2 text-xs font-semibold text-gray-500 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

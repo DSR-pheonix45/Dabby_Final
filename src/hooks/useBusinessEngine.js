@@ -279,3 +279,70 @@ export function useProcessingTimeline(workbenchId) {
 
   return { data, loading };
 }
+
+// ── Snippets Hook (Aggregate from Bank Statements and Receipts) ──────────────
+export function useSnippets(workbenchId) {
+  const [snippets, setSnippets] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    if (!workbenchId) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      const { docs } = await loadDocs(workbenchId);
+      
+      let allSnippets = [];
+      for (const doc of docs) {
+        const note = doc.di_analysis_notes?.[0] || {};
+        const data = note.extracted_data || {};
+        const type = cardType(note).toLowerCase();
+        
+        if (type.includes('bank statement')) {
+          const transactions = note.line_items || data.transactions || [];
+          transactions.forEach(t => {
+            allSnippets.push({ ...t, sourceDocument: doc });
+          });
+        } else if (type.includes('customer_payment_receipt') || type.includes('vendor_payment_receipt') || type.includes('expense_receipt')) {
+          // Treat the receipt as a snippet
+          const date = pickVal(note.document || data.document, ['date']) || pickVal(data, ['document_date']) || new Date(doc.created_at).toISOString().split('T')[0];
+          const party = cardParty(note, doc.original_filename);
+          const amount = cardAmount(note);
+          
+          const isCredit = type.includes('customer_payment');
+          allSnippets.push({
+            date: { value: date },
+            raw_particulars: { value: `Payment Receipt: ${party}` },
+            beneficiary_name: { value: party },
+            debit_amount: { value: isCredit ? 0 : amount },
+            credit_amount: { value: isCredit ? amount : 0 },
+            payment_mode: { value: 'Receipt' },
+            sourceDocument: doc
+          });
+        }
+      }
+      
+      setSnippets(allSnippets);
+    } catch (err) {
+      console.error('[BusinessEngine] snippets load failed', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [workbenchId]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  useEffect(() => {
+    const onPosted = () => refresh();
+    const onVisible = () => { if (!document.hidden) refresh(); };
+    window.addEventListener('ledger:updated', onPosted);
+    window.addEventListener('focus', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('ledger:updated', onPosted);
+      window.removeEventListener('focus', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [refresh]);
+
+  return { snippets, loading, refresh };
+}

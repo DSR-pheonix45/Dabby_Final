@@ -78,7 +78,7 @@ async def upload_document(
         raise HTTPException(status_code=400, detail=f"Upload Error: {str(e)} | Traceback: {err_msg}")
 
 @router.post("/{document_id}/process")
-async def process_document(document_id: str):
+async def process_document(document_id: str, hint: Optional[str] = None):
     try:
         # 1. Fetch document metadata
         doc_res = supabase.table("di_documents").select("*").eq("id", document_id).execute()
@@ -149,38 +149,42 @@ async def process_document(document_id: str):
         genai.configure(api_key=gemini_key)
         
         # --- Step 1: Fast Classification ---
-        class_prompt = """
-        You are a document classification specialist. Identify the type of this financial document.
-        Return ONLY a JSON object with this exact schema:
-        {
-          "document_type": "bank_statement", // One of: sales_invoice, vendor_invoice, receipt, bank_statement, unknown
-          "confidence": 0.99
-        }
-        """
-        class_model = genai.GenerativeModel(
-            GEMINI_MODEL,
-            system_instruction=class_prompt,
-            generation_config={"response_mime_type": "application/json", "temperature": 0.1}
-        )
-        
-        document_part = {
-            "mime_type": doc_data['mime_type'],
-            "data": file_bytes
-        }
-        class_res = class_model.generate_content([document_part, "Classify this document."])
+        if hint and hint in ["customer_payment_receipt", "vendor_payment_receipt", "expense_receipt"]:
+            doc_type = hint
+            print(f"[DEBUG] Using manual classification hint: {doc_type}")
+        else:
+            class_prompt = """
+            You are a document classification specialist. Identify the type of this financial document.
+            Return ONLY a JSON object with this exact schema:
+            {
+              "document_type": "bank_statement", // One of: sales_invoice, vendor_invoice, receipt, bank_statement, unknown
+              "confidence": 0.99
+            }
+            """
+            class_model = genai.GenerativeModel(
+                GEMINI_MODEL,
+                system_instruction=class_prompt,
+                generation_config={"response_mime_type": "application/json", "temperature": 0.1}
+            )
             
-        try:
-            class_text = class_res.text.strip()
-            if class_text.startswith("```json"):
-                class_text = class_text[7:-3].strip()
-            elif class_text.startswith("```"):
-                class_text = class_text[3:-3].strip()
-            class_data = json.loads(class_text)
-            doc_type = class_data.get("document_type", "unknown").lower()
-        except:
-            doc_type = "unknown"
-            
-        print(f"[DEBUG] di_documents classified as: {doc_type}")
+            document_part = {
+                "mime_type": doc_data['mime_type'],
+                "data": file_bytes
+            }
+            class_res = class_model.generate_content([document_part, "Classify this document."])
+                
+            try:
+                class_text = class_res.text.strip()
+                if class_text.startswith("```json"):
+                    class_text = class_text[7:-3].strip()
+                elif class_text.startswith("```"):
+                    class_text = class_text[3:-3].strip()
+                class_data = json.loads(class_text)
+                doc_type = class_data.get("document_type", "unknown").lower()
+            except:
+                doc_type = "unknown"
+                
+            print(f"[DEBUG] di_documents classified as: {doc_type}")
         
         # --- Step 2: Specialized Extraction ---
         if doc_type == "bank_statement":
