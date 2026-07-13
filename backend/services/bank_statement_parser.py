@@ -90,6 +90,7 @@ GENERAL RULES:
 5. All monetary values must be numeric.
 6. Dates should be returned in YYYY-MM-DD format.
 7. Maintain transaction order.
+8. CRITICAL: You MUST extract EVERY SINGLE transaction row from the document. Do not omit, truncate, skip, or summarize ANY rows. Failure to extract all rows will result in severe data loss.
 
 NARRATION PARSING RULES:
 - SAK is NOT a payment mode. When narration starts with SAK/ or SAK, treat SAK as internal_prefix.
@@ -124,6 +125,7 @@ GENERAL RULES:
 4. All monetary values must be numeric.
 5. Dates in YYYY-MM-DD format.
 6. Maintain transaction order.
+7. CRITICAL: You MUST extract EVERY SINGLE transaction row from the document. Do not omit, truncate, skip, or summarize ANY rows. Failure to extract all rows will result in severe data loss.
 
 NARRATION PARSING RULES:
 - SAK is NOT a payment mode. Treat as internal_prefix.
@@ -195,6 +197,7 @@ class BankStatementParser:
                 generation_config={
                     "response_mime_type": "application/json",
                     "response_schema": BANK_STATEMENT_GEMINI_SCHEMA,
+                    "max_output_tokens": 8192,
                 }
             )
             raw_data = json.loads(response.text.strip())
@@ -208,7 +211,7 @@ class BankStatementParser:
         Extract bank statement data from plain text using Groq/Llama.
         Returns normalized KPI dict.
         """
-        user_msg = f"Document Filename: {filename}\nContent:\n{text_content[:20000]}"
+        user_msg = f"Document Filename: {filename}\nContent:\n{text_content[:80000]}"
         try:
             completion = self._groq_execute(
                 lambda client: client.chat.completions.create(
@@ -218,6 +221,7 @@ class BankStatementParser:
                         {"role": "user",   "content": user_msg},
                     ],
                     response_format={"type": "json_object"},
+                    max_tokens=8192,
                 )
             )
             raw_data = json.loads(completion.choices[0].message.content)
@@ -239,7 +243,7 @@ class BankStatementParser:
         Returns raw extraction dict (NOT post-processed — that happens at aggregation).
         """
         if is_text:
-            user_msg = f"Document Page Content:\n{page_text or ''}"
+            user_msg = f"Document Page Content:\n{page_text[:80000] if page_text else ''}"
             completion = self._groq_execute(
                 lambda client: client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
@@ -248,6 +252,7 @@ class BankStatementParser:
                         {"role": "user",   "content": user_msg},
                     ],
                     response_format={"type": "json_object"},
+                    max_tokens=8192,
                 )
             )
             return json.loads(completion.choices[0].message.content)
@@ -260,6 +265,7 @@ class BankStatementParser:
                 generation_config={
                     "response_mime_type": "application/json",
                     "response_schema": BANK_STATEMENT_GEMINI_SCHEMA,
+                    "max_output_tokens": 8192,
                 }
             )
             if not response.candidates or not response.candidates[0].content.parts:
