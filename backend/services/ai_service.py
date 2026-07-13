@@ -5,6 +5,10 @@ from groq import Groq
 import google.generativeai as genai
 from services.groq_pool import GroqPool
 
+# Single source of truth for the Gemini model name. Overridable via env so a key
+# swap that drops access to a model name doesn't require a code change.
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
+
 class AIService:
     def __init__(self):
         gemini_key = os.environ.get("VITE_GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
@@ -12,7 +16,7 @@ class AIService:
         if gemini_key:
             sanitized_gemini = gemini_key.strip().strip('"').strip("'")
             genai.configure(api_key=sanitized_gemini)
-            self.gemini_model = genai.GenerativeModel('gemini-2.5-flash')
+            self.gemini_model = genai.GenerativeModel(GEMINI_MODEL)
         else:
             self.gemini_model = None
 

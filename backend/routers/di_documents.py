@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from supabase_client import supabase
 from services.ufo_mapper import UFOMapper
+from services.ai_service import GEMINI_MODEL
 import uuid
 import json
 import base64
@@ -157,7 +158,7 @@ async def process_document(document_id: str):
         }
         """
         class_model = genai.GenerativeModel(
-            "gemini-2.5-flash",
+            GEMINI_MODEL,
             system_instruction=class_prompt,
             generation_config={"response_mime_type": "application/json", "temperature": 0.1}
         )
@@ -255,7 +256,7 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
 """
 
         model = genai.GenerativeModel(
-            "gemini-2.5-flash",
+            GEMINI_MODEL,
             system_instruction=system_prompt,
             generation_config={"response_mime_type": "application/json", "temperature": 0.1}
         )
