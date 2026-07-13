@@ -1,22 +1,7 @@
 import { useState, useEffect } from 'react';
+import { diService } from '../services/diService';
 
-// --- MOCK DATA ---
-
-const MOCK_AR_DATA = [
-  { id: 'inv_001', customer: 'Acme Corp', invoiceNumber: 'INV-2026-001', date: '2026-06-15', dueDate: '2026-07-15', amount: 15400.00, daysOutstanding: 25, status: 'Outstanding', rep: 'Sarah J.', lastActivity: 'Email sent 2 days ago' },
-  { id: 'inv_002', customer: 'Global Tech', invoiceNumber: 'INV-2026-002', date: '2026-05-10', dueDate: '2026-06-10', amount: 8250.50, daysOutstanding: 61, status: 'Overdue', rep: 'Mike T.', lastActivity: 'Call scheduled' },
-  { id: 'inv_003', customer: 'Stark Industries', invoiceNumber: 'INV-2026-003', date: '2026-07-01', dueDate: '2026-07-31', amount: 45000.00, daysOutstanding: 9, status: 'Outstanding', rep: 'Sarah J.', lastActivity: 'Invoice viewed' },
-  { id: 'inv_004', customer: 'Wayne Enterprises', invoiceNumber: 'INV-2026-004', date: '2026-04-15', dueDate: '2026-05-15', amount: 12000.00, daysOutstanding: 86, status: 'Overdue', rep: 'Mike T.', lastActivity: 'Payment promised' },
-  { id: 'inv_005', customer: 'Oscorp', invoiceNumber: 'INV-2026-005', date: '2026-07-05', dueDate: '2026-08-05', amount: 3400.00, daysOutstanding: 5, status: 'Outstanding', rep: 'Sarah J.', lastActivity: 'Invoice sent' },
-];
-
-const MOCK_AP_DATA = [
-  { id: 'bill_001', vendor: 'AWS Cloud Services', billNumber: 'AWS-2026-07', date: '2026-07-01', dueDate: '2026-07-15', amount: 4500.00, daysRemaining: 5, status: 'Due Soon', terms: 'Net 15' },
-  { id: 'bill_002', vendor: 'WeWork', billNumber: 'WW-08992', date: '2026-07-01', dueDate: '2026-07-05', amount: 12000.00, daysRemaining: -5, status: 'Overdue', terms: 'Due on Receipt' },
-  { id: 'bill_003', vendor: 'Google Workspace', billNumber: 'G-77483', date: '2026-07-02', dueDate: '2026-07-16', amount: 850.00, daysRemaining: 6, status: 'Outstanding', terms: 'Net 14' },
-  { id: 'bill_004', vendor: 'Legal Counsel LLC', billNumber: 'INV-992', date: '2026-06-15', dueDate: '2026-07-15', amount: 5500.00, daysRemaining: 5, status: 'Due Soon', terms: 'Net 30' },
-  { id: 'bill_005', vendor: 'Marketing Agency', billNumber: 'MA-044', date: '2026-06-20', dueDate: '2026-07-20', amount: 8900.00, daysRemaining: 10, status: 'Outstanding', terms: 'Net 30' },
-];
+// --- MOCK DATA (Budgeting only — no backing table yet) ---
 
 const MOCK_BUDGET_DATA = [
   { id: 'b_001', name: 'Q3 Marketing', department: 'Marketing', category: 'Advertising', allocated: 50000.00, utilized: 15400.00, remaining: 34600.00, variance: '+5%' },
@@ -27,99 +12,71 @@ const MOCK_BUDGET_DATA = [
 
 // --- HOOKS ---
 
+const EMPTY_AR_KPIS = { total: 0, overdue: 0, dso: 0, customersWithOverdue: 0 };
+const EMPTY_AP_KPIS = { total: 0, dueThisWeek: 0, overdue: 0, dpo: 0 };
+
 export function useAccountsReceivable(workbenchId) {
-  const [data, setData] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [kpis, setKpis] = useState(EMPTY_AR_KPIS);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filters, setFilters] = useState({});
   const [search, setSearch] = useState('');
 
-  const kpis = {
-    total: 84050.50,
-    overdue: 20250.50,
-    dso: 42,
-    customersWithOverdue: 2
-  };
-
   useEffect(() => {
-    // Simulate network delay
+    if (!workbenchId || workbenchId === 'demo') { setRows([]); setKpis(EMPTY_AR_KPIS); setLoading(false); return; }
+    let cancelled = false;
     setLoading(true);
-    const timer = setTimeout(() => {
-      let filtered = [...MOCK_AR_DATA];
-      
-      if (search) {
-        filtered = filtered.filter(item => 
-          item.customer.toLowerCase().includes(search.toLowerCase()) || 
-          item.invoiceNumber.toLowerCase().includes(search.toLowerCase())
-        );
-      }
-      
-      if (filters.status) {
-        filtered = filtered.filter(item => item.status.toLowerCase() === filters.status.toLowerCase());
-      }
-      
-      setData(filtered);
-      setLoading(false);
-    }, 800);
-    
-    return () => clearTimeout(timer);
-  }, [workbenchId, filters, search]);
+    setError(null);
+    diService.getReceivables(workbenchId)
+      .then((res) => { if (!cancelled) { setRows(res.data || []); setKpis(res.kpis || EMPTY_AR_KPIS); } })
+      .catch((e) => { if (!cancelled) { setError(e.message); setRows([]); setKpis(EMPTY_AR_KPIS); } })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [workbenchId]);
 
-  return {
-    data,
-    kpis,
-    loading,
-    setFilters,
-    activeFilters: filters,
-    searchQuery: search,
-    setSearchQuery: setSearch
-  };
+  const data = rows.filter((item) => {
+    if (search) {
+      const q = search.toLowerCase();
+      if (!(item.customer || '').toLowerCase().includes(q) && !(item.invoiceNumber || '').toLowerCase().includes(q)) return false;
+    }
+    if (filters.status && (item.status || '').toLowerCase() !== filters.status.toLowerCase()) return false;
+    return true;
+  });
+
+  return { data, kpis, loading, error, setFilters, activeFilters: filters, searchQuery: search, setSearchQuery: setSearch };
 }
 
 export function useAccountsPayable(workbenchId) {
-  const [data, setData] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [kpis, setKpis] = useState(EMPTY_AP_KPIS);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filters, setFilters] = useState({});
   const [search, setSearch] = useState('');
 
-  const kpis = {
-    total: 31750.00,
-    dueThisWeek: 10850.00,
-    overdue: 12000.00,
-    dpo: 28
-  };
-
   useEffect(() => {
+    if (!workbenchId || workbenchId === 'demo') { setRows([]); setKpis(EMPTY_AP_KPIS); setLoading(false); return; }
+    let cancelled = false;
     setLoading(true);
-    const timer = setTimeout(() => {
-      let filtered = [...MOCK_AP_DATA];
-      
-      if (search) {
-        filtered = filtered.filter(item => 
-          item.vendor.toLowerCase().includes(search.toLowerCase()) || 
-          item.billNumber.toLowerCase().includes(search.toLowerCase())
-        );
-      }
-      
-      if (filters.status) {
-        filtered = filtered.filter(item => item.status.toLowerCase() === filters.status.toLowerCase());
-      }
-      
-      setData(filtered);
-      setLoading(false);
-    }, 800);
-    
-    return () => clearTimeout(timer);
-  }, [workbenchId, filters, search]);
+    setError(null);
+    diService.getPayables(workbenchId)
+      .then((res) => { if (!cancelled) { setRows(res.data || []); setKpis(res.kpis || EMPTY_AP_KPIS); } })
+      .catch((e) => { if (!cancelled) { setError(e.message); setRows([]); setKpis(EMPTY_AP_KPIS); } })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [workbenchId]);
 
-  return {
-    data,
-    kpis,
-    loading,
-    setFilters,
-    activeFilters: filters,
-    searchQuery: search,
-    setSearchQuery: setSearch
-  };
+  const data = rows.filter((item) => {
+    if (search) {
+      const q = search.toLowerCase();
+      if (!(item.vendor || '').toLowerCase().includes(q) && !(item.billNumber || '').toLowerCase().includes(q)) return false;
+    }
+    if (filters.status && (item.status || '').toLowerCase() !== filters.status.toLowerCase()) return false;
+    return true;
+  });
+
+  return { data, kpis, loading, error, setFilters, activeFilters: filters, searchQuery: search, setSearchQuery: setSearch };
 }
 
 export function useBudgets(workbenchId) {

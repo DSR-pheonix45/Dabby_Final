@@ -36,7 +36,7 @@ export default function AccountsPayable({ workbenchId }) {
     { 
       header: 'Amount', 
       align: 'right',
-      render: (row) => <span className="font-semibold">${row.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+      render: (row) => <span className="font-semibold">₹{row.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
     },
     { 
       header: 'Days Left', 
@@ -62,7 +62,7 @@ export default function AccountsPayable({ workbenchId }) {
     {
       header: 'Actions',
       align: 'right',
-      render: (row) => (
+      render: () => (
         <div className="flex justify-end space-x-2">
           <button className="text-xs text-teal-400 hover:text-teal-300">View</button>
           <button className="text-xs text-indigo-400 hover:text-indigo-300">Pay</button>
@@ -71,7 +71,7 @@ export default function AccountsPayable({ workbenchId }) {
     }
   ];
 
-  const formatCurrency = (val) => `$${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatCurrency = (val) => `₹${(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div className="space-y-6 fade-in">

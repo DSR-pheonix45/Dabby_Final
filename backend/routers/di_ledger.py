@@ -1,7 +1,10 @@
 """
 Universal Ledger read API — Trial Balance + transaction list.
 Reads di_ledger_transactions / di_ledger_entries against di_accounts.
+Also serves invoice-level Accounts Receivable / Payable off the
+Business Event pipeline (business_events + event_settlements).
 """
+from datetime import date, datetime
 from fastapi import APIRouter, HTTPException
 from supabase_client import supabase
 
@@ -184,6 +187,138 @@ async def balance_sheet(workbench_id: str):
             "liabilities_plus_equity": _r2(total_liabilities + total_equity),
             "current_year_earnings": current_year_earnings,
             "balanced": abs(total_assets - (total_liabilities + total_equity)) < 0.01,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Accounts Receivable / Payable (Business Event pipeline) ─────────────────
+
+def _workbench_document_ids(workbench_id: str):
+    docs = supabase.table("di_documents").select("id").eq("workbench_id", workbench_id).execute().data or []
+    return [d["id"] for d in docs]
+
+
+def _settled_by_event(event_ids):
+    """Sum amount_matched per event across event_settlements (either leg)."""
+    settled = {eid: 0.0 for eid in event_ids}
+    if not event_ids:
+        return settled
+    for col in ("event_id_a", "event_id_b"):
+        for i in range(0, len(event_ids), 100):
+            chunk = event_ids[i:i + 100]
+            rows = supabase.table("event_settlements").select(f"{col}, amount_matched, settlement_status") \
+                .in_(col, chunk).execute().data or []
+            for r in rows:
+                eid = r[col]
+                if eid in settled:
+                    settled[eid] += float(r.get("amount_matched") or 0)
+    return settled
+
+
+def _parse_date(s):
+    if not s:
+        return None
+    try:
+        return datetime.strptime(str(s)[:10], "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
+
+
+def _ar_ap_rows(workbench_id: str, event_type: str):
+    """Invoice-level open receivables/payables from business_events."""
+    doc_ids = _workbench_document_ids(workbench_id)
+    if not doc_ids:
+        return []
+    events = []
+    for i in range(0, len(doc_ids), 100):
+        chunk = doc_ids[i:i + 100]
+        events += supabase.table("business_events") \
+            .select("id, counterparty, amount, event_date, settlement_key, event_status, event_metadata, document_id") \
+            .in_("document_id", chunk).eq("event_type", event_type).eq("is_superseded", False).execute().data or []
+
+    settled = _settled_by_event([e["id"] for e in events])
+    today = date.today()
+    rows = []
+    for e in events:
+        if e.get("event_status") == "CANCELLED":
+            continue
+        amount = float(e.get("amount") or 0)
+        paid = _r2(settled.get(e["id"], 0.0))
+        outstanding = _r2(amount - paid)
+        meta = e.get("event_metadata") or {}
+        dates = meta.get("dates") or {}
+        issue = _parse_date(e.get("event_date")) or _parse_date(dates.get("document_date"))
+        due = _parse_date(dates.get("due_date")) or (issue if issue else None)
+        days_out = (today - issue).days if issue else 0
+        days_left = (due - today).days if due else None
+        if outstanding <= 0.01:
+            status = "Paid"
+        elif due and today > due:
+            status = "Overdue"
+        elif days_left is not None and 0 <= days_left <= 7:
+            status = "Due Soon"
+        else:
+            status = "Outstanding"
+        rows.append({
+            "id": e["id"],
+            "counterparty": e.get("counterparty") or "Unknown",
+            "reference": e.get("settlement_key") or f"BE-{str(e['id'])[:8]}",
+            "date": str(issue) if issue else None,
+            "dueDate": str(due) if due else None,
+            "amount": amount,
+            "outstanding": outstanding,
+            "paid": paid,
+            "daysOutstanding": max(days_out, 0),
+            "daysRemaining": days_left,
+            "status": status,
+        })
+    rows.sort(key=lambda r: r["date"] or "", reverse=True)
+    return rows
+
+
+@router.get("/receivables/{workbench_id}")
+async def receivables(workbench_id: str):
+    """Open customer invoices (CUSTOMER_BILLED events) with aging + KPIs."""
+    try:
+        rows = _ar_ap_rows(workbench_id, "CUSTOMER_BILLED")
+        open_rows = [r for r in rows if r["status"] != "Paid"]
+        total = _r2(sum(r["outstanding"] for r in open_rows))
+        overdue_rows = [r for r in open_rows if r["status"] == "Overdue"]
+        overdue = _r2(sum(r["outstanding"] for r in overdue_rows))
+        dso = round(sum(r["daysOutstanding"] for r in open_rows) / len(open_rows)) if open_rows else 0
+        customers_overdue = len({r["counterparty"] for r in overdue_rows})
+        return {
+            "data": [{
+                "id": r["id"], "customer": r["counterparty"], "invoiceNumber": r["reference"],
+                "date": r["date"], "dueDate": r["dueDate"], "amount": r["outstanding"],
+                "daysOutstanding": r["daysOutstanding"], "status": r["status"], "rep": "—",
+            } for r in open_rows],
+            "kpis": {"total": total, "overdue": overdue, "dso": dso, "customersWithOverdue": customers_overdue},
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/payables/{workbench_id}")
+async def payables(workbench_id: str):
+    """Open vendor bills (VENDOR_BILLED events) with aging + KPIs."""
+    try:
+        rows = _ar_ap_rows(workbench_id, "VENDOR_BILLED")
+        open_rows = [r for r in rows if r["status"] != "Paid"]
+        total = _r2(sum(r["outstanding"] for r in open_rows))
+        overdue = _r2(sum(r["outstanding"] for r in open_rows if r["status"] == "Overdue"))
+        due_this_week = _r2(sum(r["outstanding"] for r in open_rows
+                                if r["daysRemaining"] is not None and 0 <= r["daysRemaining"] <= 7))
+        dpo = round(sum(r["daysOutstanding"] for r in open_rows) / len(open_rows)) if open_rows else 0
+        return {
+            "data": [{
+                "id": r["id"], "vendor": r["counterparty"], "billNumber": r["reference"],
+                "date": r["date"], "dueDate": r["dueDate"], "amount": r["outstanding"],
+                "daysRemaining": r["daysRemaining"] if r["daysRemaining"] is not None else 0,
+                "status": r["status"], "terms": "—",
+            } for r in open_rows],
+            "kpis": {"total": total, "dueThisWeek": due_this_week, "overdue": overdue, "dpo": dpo},
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

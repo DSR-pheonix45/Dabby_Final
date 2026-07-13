@@ -123,6 +123,18 @@ export const diService = {
     return res.json();
   },
 
+  async getReceivables(workbenchId) {
+    const res = await apiFetch(`/api/di/ledger/receivables/${workbenchId}`);
+    if (!res.ok) throw new Error('Failed to fetch receivables');
+    return res.json();
+  },
+
+  async getPayables(workbenchId) {
+    const res = await apiFetch(`/api/di/ledger/payables/${workbenchId}`);
+    if (!res.ok) throw new Error('Failed to fetch payables');
+    return res.json();
+  },
+
   /**
    * Full pipeline in one call: document -> trade draft -> business event ->
    * balanced ledger postings. Returns { draft, event, ledger }.
