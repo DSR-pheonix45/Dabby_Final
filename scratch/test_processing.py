@@ -6,8 +6,8 @@ import asyncio
 backend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend'))
 sys.path.insert(0, backend_path)
 
-from services.queue_service import process_queued_document
-from supabase_client import supabase
+from services.queue_service import process_queued_document # type: ignore
+from supabase_client import supabase # type: ignore
 
 async def main():
     doc_id = "135e130c-98dc-4e6b-b34b-09ab4908eb6f"

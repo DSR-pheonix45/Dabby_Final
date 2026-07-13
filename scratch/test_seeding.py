@@ -5,7 +5,7 @@ import sys
 sys.path.append(r"c:\Users\Medhansh Pc\Desktop\Dabby_Final\backend")
 
 from supabase import create_client
-from services.coa_seeder import seed_coa
+from services.coa_seeder import seed_coa # type: ignore
 
 supabase_url = "https://rdwrxipstlogfthhveim.supabase.co"
 service_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkd3J4aXBzdGxvZ2Z0aGh2ZWltIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzU2MzM2MiwiZXhwIjoyMDg5MTM5MzYyfQ.i3ZhTBfC6DxGrsoNvL4kV2BmSJME3YABHbCH-2vIl_I"

@@ -136,8 +136,9 @@ async def process_queued_document(doc_id: str):
             
             print(f"[WORKER] Document {doc_id} matched cache: copied results from {cached_doc['id']}")
             
-            from services.trade_service import trade_service
-            await trade_service.create_trade_from_document(doc_id)
+            # TODO: Integrate trade_service when implemented
+            # from services.trade_service import trade_service
+            # await trade_service.create_trade_from_document(doc_id)
             return
 
         # Check if the document is a ZIP file (keep existing ZIP logic)

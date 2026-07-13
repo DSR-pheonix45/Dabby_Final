@@ -534,7 +534,7 @@ async def create_bill(bill: BillCreate):
         new_bill = res.data[0]
         
         # 2. Record Financial Transaction (Dr Expense, Cr AP)
-        await ledger_service.record_transaction(
+        tx_res = await ledger_service.record_transaction(
             user_id=bill.user_id,
             from_label_id=bill.ap_label_id,     # Source of obligation (Liability)
             to_label_id=bill.expense_label_id, # Destination of value (Expense)
@@ -542,7 +542,7 @@ async def create_bill(bill: BillCreate):
             description=f"Bill Recorded: {bill.bill_number}",
             transaction_date=bill.issue_date,
             source_party_id=bill.party_id,
-            bill_id=new_bill["id"]
+            invoice_id=new_bill["id"]
         )
         
         # 3. Link Document if provided
@@ -612,7 +612,7 @@ async def record_bill_payment(bill_id: str, req: BillPaymentRequest):
             description=req.description or f"Payment made for Bill {bill['bill_number']}",
             transaction_date=req.payment_date,
             destination_party_id=bill["party_id"],
-            bill_id=bill_id
+            invoice_id=bill_id
         )
         
         # 4. Link Document if provided

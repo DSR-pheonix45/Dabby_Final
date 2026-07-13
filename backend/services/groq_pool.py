@@ -15,7 +15,7 @@ class GroqPool:
             res = supabase.table("groq_api_keys") \
                 .select("*") \
                 .eq("status", "active") \
-                .order("last_used_at", nulls_first=True) \
+                .order("last_used_at", nullsfirst=True) \
                 .execute()
             return res.data or []
         except Exception as e:
@@ -120,4 +120,6 @@ class GroqPool:
                 continue
                 
         # If all keys failed, raise the final exception
-        raise last_error
+        if last_error:
+            raise last_error
+        raise Exception("Failed to execute function against Groq pool.")
