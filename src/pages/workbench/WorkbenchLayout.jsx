@@ -1,12 +1,17 @@
-import React from "react";
+import React, { useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { BsPerson, BsBuilding, BsGear, BsFileEarmarkText, BsDiagram3, BsGraphUp, BsCpu, BsJournalText, BsLightningCharge, BsFileEarmarkBarGraph } from "react-icons/bs";
+import GeneratorModal from "./GeneratorModal";
+import ReportsModal from "./ReportsModal";
 
 export default function WorkbenchLayout() {
   const { activeWorkbench } = useWorkbench();
   const location = useLocation();
   const navigate = useNavigate();
+  
+  const [isGeneratorModalOpen, setIsGeneratorModalOpen] = useState(false);
+  const [isReportsModalOpen, setIsReportsModalOpen] = useState(false);
 
   if (!activeWorkbench) {
     return (
@@ -48,7 +53,11 @@ export default function WorkbenchLayout() {
             </div>
           </div>
           <div className="flex items-center justify-between">
-            <div className="flex space-x-8 overflow-x-auto custom-scrollbar">
+            <div 
+              className="flex space-x-8 overflow-x-auto" 
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              <style dangerouslySetInnerHTML={{__html: `\n                .flex.space-x-8.overflow-x-auto::-webkit-scrollbar {\n                  display: none;\n                }\n              `}} />
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname.includes(item.path);
@@ -67,10 +76,10 @@ export default function WorkbenchLayout() {
               })}
             </div>
             
-            <div className="flex items-center space-x-3 pb-4">
-              <div className="h-6 w-[1px] bg-white/10 mr-2"></div>
+            <div className="flex items-center space-x-3 pb-4 shrink-0">
+              <div className="h-6 w-[1px] bg-white/10 mr-2 hidden md:block"></div>
               <button 
-                onClick={() => navigate("/dashboard/templates")}
+                onClick={() => setIsGeneratorModalOpen(true)}
                 className="flex items-center space-x-2 px-3 py-1.5 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 rounded-lg text-sm font-semibold transition-colors"
                 title="Generators"
               >
@@ -78,7 +87,7 @@ export default function WorkbenchLayout() {
                 <span>Generators</span>
               </button>
               <button 
-                onClick={() => navigate("/dashboard/reports")}
+                onClick={() => setIsReportsModalOpen(true)}
                 className="flex items-center space-x-2 px-3 py-1.5 bg-[#222] hover:bg-[#333] text-gray-300 hover:text-white border border-white/10 rounded-lg text-sm font-semibold transition-colors"
                 title="Reports"
               >
@@ -94,6 +103,9 @@ export default function WorkbenchLayout() {
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <Outlet context={{ workbench: activeWorkbench }} />
       </div>
+
+      <GeneratorModal isOpen={isGeneratorModalOpen} onClose={() => setIsGeneratorModalOpen(false)} />
+      <ReportsModal isOpen={isReportsModalOpen} onClose={() => setIsReportsModalOpen(false)} />
     </div>
   );
 }
