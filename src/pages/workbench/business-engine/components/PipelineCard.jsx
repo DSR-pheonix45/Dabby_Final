@@ -1,10 +1,12 @@
 import React from 'react';
-import { BsFileEarmarkText, BsLightningCharge, BsClock, BsLink45Deg, BsDiagram3 } from 'react-icons/bs';
+import { BsFileEarmarkText, BsLightningCharge, BsArrowRightShort } from 'react-icons/bs';
 import { useWorkbench } from '../../../../context/WorkbenchContext';
 import { formatCurrency } from '../../../../utils/currency';
+import { financialRouting, ROUTING_TONE } from '../../../../utils/financialRouting';
 
 export default function PipelineCard({ card, onDragStart, onClick }) {
   const { activeWorkbench } = useWorkbench();
+  const routing = financialRouting(card.type, card.eventType);
 
   const getConfidenceColor = (conf) => {
     if (conf >= 90) return 'text-teal-400 bg-teal-500/10';
@@ -32,8 +34,14 @@ export default function PipelineCard({ card, onDragStart, onClick }) {
       </div>
       
       <h4 className="text-xs font-semibold text-gray-400 mb-1 line-clamp-1" title={card.party}>{card.party}</h4>
-      <p className="text-lg font-bold text-gray-200 mb-3">{formatCurrency(card.amount, activeWorkbench?.country)}</p>
-      
+      <p className="text-lg font-bold text-gray-200 mb-2">{formatCurrency(card.amount, activeWorkbench?.country)}</p>
+
+      {/* Where this document lands in OPS / the ledger */}
+      <div className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md border text-[10px] font-bold mb-2 ${ROUTING_TONE[routing.tone]}`} title={routing.hint}>
+        <BsArrowRightShort className="text-sm -ml-1" />
+        {routing.label}
+      </div>
+
       <div className="flex items-center justify-between text-[10px] text-gray-500 font-semibold mt-auto pt-3 border-t border-white/5">
         <span className="flex items-center">
           <BsLightningCharge className="mr-1" />

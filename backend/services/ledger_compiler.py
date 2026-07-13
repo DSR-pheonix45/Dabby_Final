@@ -201,6 +201,20 @@ class LedgerCompiler:
             "compiled_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", business_event_id).execute()
 
+        # Record a 'post' processing log so the document derives to "Posted"
+        # in Doc Vault / Business Engine (deriveDocumentStatus looks for this).
+        doc_id = ev.get("document_id")
+        if doc_id:
+            try:
+                supabase.table("di_document_processing_logs").insert({
+                    "document_id": doc_id,
+                    "stage": "post",
+                    "provider": "ledger_compiler",
+                    "status": "success",
+                }).execute()
+            except Exception as log_err:
+                print(f"[LedgerCompiler WARNING] could not write post log for doc {doc_id}: {log_err}")
+
         print(f"[LedgerCompiler] {event_type} -> tx {tx_id} | Dr {debits} = Cr {credits} | {len(resolved)} legs")
         return {
             "status": "compiled",

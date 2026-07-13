@@ -1,16 +1,17 @@
 import React from 'react';
 import PipelineColumn from './PipelineColumn';
-import { BsCloudUpload, BsCpu, BsFileBarGraph, BsFileEarmarkMedical, BsEye, BsPencilSquare, BsCheckCircle, BsArchive } from 'react-icons/bs';
+import { BsCloudUpload, BsCpu, BsEye, BsCheckCircle, BsArchive } from 'react-icons/bs';
 
+// The real, reachable pipeline. A document flows:
+//   Uploaded -> Processing -> Draft (Needs Review / Ready to Post) -> Posted to Ledger.
+// "Approve & Post" turns a ready draft into an immutable Business Event, compiles the
+// balanced journal, and lands it in OPS (Receivable/Payable) + Financials in one step.
 const STAGES = [
   { id: 'uploaded', label: 'Uploaded', icon: BsCloudUpload },
-  { id: 'ocr_processing', label: 'OCR Processing', icon: BsCpu },
-  { id: 'analysis_complete', label: 'Analysis Complete', icon: BsFileBarGraph },
-  { id: 'financial_event', label: 'Event Created', icon: BsFileEarmarkMedical },
-  { id: 'pending_review', label: 'Pending Review', icon: BsEye },
-  { id: 'journal_proposed', label: 'Journal Proposed', icon: BsPencilSquare },
-  { id: 'ready_to_post', label: 'Ready to Post', icon: BsCheckCircle },
-  { id: 'posted', label: 'Posted', icon: BsArchive }
+  { id: 'ocr_processing', label: 'Processing', icon: BsCpu },
+  { id: 'pending_review', label: 'Draft · Needs Review', icon: BsEye },
+  { id: 'ready_to_post', label: 'Draft · Ready to Post', icon: BsCheckCircle },
+  { id: 'posted', label: 'Posted to Ledger', icon: BsArchive }
 ];
 
 export default function PipelineBoard({ cards, loading, onMoveCard, onCardClick }) {

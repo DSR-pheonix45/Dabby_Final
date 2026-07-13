@@ -4,11 +4,12 @@ import { toast } from 'react-hot-toast';
 import { useWorkbench } from '../../../../context/WorkbenchContext';
 import { formatCurrency } from '../../../../utils/currency';
 import { diService } from '../../../../services/diService';
+import { financialRouting, ROUTING_TONE } from '../../../../utils/financialRouting';
 
 const lineDesc = (li, i) => li.description || li.desc || li.narration || li.particulars || li.name || `Line ${i + 1}`;
 const lineAmt = (li) => Number(li.amount ?? li.total ?? li.line_total ?? li.credit ?? li.debit ?? li.value ?? 0);
 
-export default function InspectorDrawer({ isOpen, onClose, data }) {
+export default function InspectorDrawer({ isOpen, onClose, data, onPosted }) {
   const { activeWorkbench } = useWorkbench();
   const [posting, setPosting] = useState(false);
   const [posted, setPosted] = useState(null); // { status, debits, credits, entries }
@@ -24,14 +25,17 @@ export default function InspectorDrawer({ isOpen, onClose, data }) {
       if (ledger.status === 'compiled') {
         setPosted(ledger);
         toast.success(`Posted to ledger — balanced ${formatCurrency(ledger.debits, activeWorkbench?.country)}`);
+        onPosted?.();
+      } else if (ledger.status === 'already_compiled') {
+        toast('Already posted to the ledger.', { icon: '✅' });
+        onPosted?.();
       } else if (ledger.status === 'no_entry') {
         toast('This document type does not post to the ledger.', { icon: 'ℹ️' });
       } else if (ledger.status === 'skipped') {
         toast.error(`Skipped: ${ledger.reason || 'no amount on document'}`);
-      } else if (ledger.status === 'already_compiled') {
-        toast('Already posted to the ledger.', { icon: '✅' });
       } else {
         toast.success('Business event created.');
+        onPosted?.();
       }
     } catch (e) {
       toast.error(e.message || 'Failed to post to ledger');
@@ -41,6 +45,8 @@ export default function InspectorDrawer({ isOpen, onClose, data }) {
   };
 
   if (!isOpen || !data) return null;
+
+  const routing = financialRouting(data.type, data.eventType);
 
   // Prefer freshly-posted entries; fall back to any card-provided journal
   const journalEntries = posted?.entries
@@ -98,6 +104,18 @@ export default function InspectorDrawer({ isOpen, onClose, data }) {
               <p className="text-sm font-semibold text-gray-300 flex items-center">
                 <BsLightningCharge className="mr-1 text-teal-400" /> {data.time || 'N/A'}
               </p>
+            </div>
+          </div>
+
+          {/* Where this document lands (OPS / ledger routing) */}
+          <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${ROUTING_TONE[routing.tone]}`}>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider opacity-70 font-bold">Posts to</p>
+              <p className="text-sm font-bold">{routing.where}</p>
+            </div>
+            <div className="text-right">
+              <span className="px-2 py-0.5 rounded text-xs font-bold border border-current/30">{routing.label}</span>
+              <p className="text-[10px] opacity-70 mt-1">{routing.hint}</p>
             </div>
           </div>
 

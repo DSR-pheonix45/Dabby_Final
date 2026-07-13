@@ -21,9 +21,10 @@ export default function BusinessEngine() {
     loading: pipelineLoading, 
     activeFilters, 
     setFilters, 
-    searchQuery, 
+    searchQuery,
     setSearchQuery,
-    moveCard 
+    moveCard,
+    refresh
   } = usePipeline(workbenchId);
   
   const { data: timelineData, loading: timelineLoading } = useProcessingTimeline(workbenchId);
@@ -96,10 +97,11 @@ export default function BusinessEngine() {
       </div>
 
       {/* Inspector Slide-out */}
-      <InspectorDrawer 
-        isOpen={!!selectedDoc} 
-        onClose={() => setSelectedDoc(null)} 
-        data={selectedDoc} 
+      <InspectorDrawer
+        isOpen={!!selectedDoc}
+        onClose={() => setSelectedDoc(null)}
+        data={selectedDoc}
+        onPosted={refresh}
       />
       
     </div>
