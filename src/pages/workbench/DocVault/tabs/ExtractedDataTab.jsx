@@ -53,7 +53,8 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
   const [saving, setSaving] = useState(false);
 
   const rawDocType = data.document_type;
-  const isBankStatement = (typeof rawDocType === 'object' ? rawDocType?.value : rawDocType) === 'bank_statement';
+  const docTypeValue = typeof rawDocType === 'object' ? rawDocType?.value : rawDocType;
+  const isBankStatement = (docTypeValue || '').toLowerCase().includes('bank');
 
   if (!note) {
     return <div className="p-8 text-center text-gray-500 text-sm">No extracted data available yet. Document may still be processing.</div>;
