@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
-import { BsCheckCircleFill, BsFileEarmarkText, BsBank, BsArrowRightShort, BsArrowsAngleExpand, BsLink45Deg, BsXLg, BsSearch } from 'react-icons/bs';
-import PartyAnalyticsModal from '../../PartyAnalyticsModal';
+import { BsCheckCircleFill, BsFileEarmarkText, BsBank, BsArrowRightShort, BsLink45Deg, BsXLg, BsSearch } from 'react-icons/bs';
 import { useWorkbench } from '../../../../context/WorkbenchContext';
 import { formatCurrency } from '../../../../utils/currency';
 
 export default function SnippetCard({ transaction, sourceDocument }) {
   const { activeWorkbench } = useWorkbench();
-  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkedDoc, setLinkedDoc] = useState(null);
   
@@ -20,12 +18,7 @@ export default function SnippetCard({ transaction, sourceDocument }) {
   const amount = debit > 0 ? debit : credit;
   const type = debit > 0 ? 'Debit' : 'Credit';
   
-  // Create a mock party object to pass to the modal for demonstration
-  const mockParty = {
-    id: 'mock-snippet-party',
-    name: desc.split('/')[0] || 'Unknown Counterparty',
-    party_type: 'customer' // default mock
-  };
+
 
   return (
     <>
@@ -84,13 +77,6 @@ export default function SnippetCard({ transaction, sourceDocument }) {
         {/* Footer Actions */}
         <div className="px-4 py-3 bg-[#0F0F11] border-t border-[#2A2A2E] flex justify-between items-center">
           <div className="flex gap-4">
-            <button 
-              onClick={(e) => { e.stopPropagation(); setIsAnalyticsOpen(true); }}
-              className="text-xs font-semibold text-teal-500 hover:text-teal-400 flex items-center gap-1 transition-colors"
-            >
-              <BsArrowsAngleExpand size={10} /> View Analytics
-            </button>
-
             {!linkedDoc ? (
               <button 
                 onClick={(e) => { e.stopPropagation(); setIsLinkModalOpen(true); }}
@@ -112,11 +98,7 @@ export default function SnippetCard({ transaction, sourceDocument }) {
 
       </div>
 
-      <PartyAnalyticsModal 
-        isOpen={isAnalyticsOpen}
-        onClose={() => setIsAnalyticsOpen(false)}
-        party={mockParty}
-      />
+
 
       {/* Mock Linking Modal */}
       {isLinkModalOpen && (

@@ -156,7 +156,7 @@ You must classify into EXACTLY ONE of these types:
 - customer_payment_receipt : Proof of payment received from a customer
 - vendor_payment_receipt   : Proof of payment made to a vendor
 - expense_receipt       : Receipt for a small expense (meals, fuel, travel, etc.)
-- bank_statement        : Bank account statement from a bank
+- bank_statement        : Bank account statement from a bank (Do NOT classify this as tax_document)
 - payroll_register      : Payroll/salary register or payslip
 - credit_note           : Credit note issued to reverse a previous invoice
 - debit_note            : Debit note issued as a vendor adjustment
@@ -164,7 +164,7 @@ You must classify into EXACTLY ONE of these types:
 - sales_order           : Sales order from or to a customer
 - loan_agreement        : Agreement for a loan (bank or private)
 - investment_agreement  : Agreement for equity investment, SAFE, convertible note
-- tax_document          : Tax filing, TDS certificate, GST return, income tax return
+- tax_document          : Tax filing, TDS certificate, GST return, income tax return (Excludes bank statements)
 - unknown               : Cannot classify with confidence
 
 RULES:

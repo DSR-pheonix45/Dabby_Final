@@ -48,7 +48,7 @@ class AIService:
         - 'debit_note' (Vendor Adjustment event)
         - 'loan_agreement' (Create Loan event)
         - 'investment_agreement' (Raise Capital event)
-        - 'tax_document' (Tax Liability event)
+        - 'tax_document' (Tax Liability event, do NOT use for bank statements)
         - 'purchase_order' (Procurement Commitment event)
         - 'sales_order' (Revenue Pipeline event)
         - 'manual_journal' (Manual Journal event)
@@ -150,7 +150,7 @@ class AIService:
         You are a document classification specialist. Identify the type of this financial document.
         Return ONLY a JSON object with this exact schema:
         {
-          "document_type": "bank_statement", // One of: sales_invoice, vendor_invoice, customer_payment_receipt, vendor_payment_receipt, bank_statement, expense_receipt, payroll_register, credit_note, debit_note, purchase_order, sales_order, loan_agreement, investment_agreement, tax_document, unknown
+          "document_type": "bank_statement", // One of: sales_invoice, vendor_invoice, customer_payment_receipt, vendor_payment_receipt, bank_statement, expense_receipt, payroll_register, credit_note, debit_note, purchase_order, sales_order, loan_agreement, investment_agreement, tax_document (do not use for bank statements), unknown
           "confidence": 0.95
         }
         """
@@ -200,7 +200,7 @@ class AIService:
         - 'debit_note'
         - 'loan_agreement'
         - 'investment_agreement'
-        - 'tax_document'
+        - 'tax_document' (do NOT use for bank statements)
         - 'purchase_order'
         - 'sales_order'
         - 'manual_journal'
@@ -405,6 +405,7 @@ class AIService:
         5. All monetary values must be numeric.
         6. Dates should be returned in YYYY-MM-DD format.
         7. Maintain transaction order.
+        8. Withdrawals, payments, and deductions MUST be placed in 'debit_amount'. Deposits, receipts, and additions MUST be placed in 'credit_amount'.
 
         NARRATION PARSING RULES:
         - SAK is NOT a payment mode. When narration starts with SAK/ or SAK, treat SAK as internal_prefix. Do NOT classify it as beneficiary, payment mode, or bank. Use the next token to determine transaction type. E.g., SAK/CASH WDL means Payment Mode: Cash Withdrawal, Internal Prefix: SAK.
@@ -522,6 +523,7 @@ class AIService:
         5. All monetary values must be numeric.
         6. Dates should be returned in YYYY-MM-DD format.
         7. Maintain transaction order.
+        8. Withdrawals, payments, and deductions MUST be placed in 'debit_amount'. Deposits, receipts, and additions MUST be placed in 'credit_amount'.
 
         NARRATION PARSING RULES:
         - SAK is NOT a payment mode. When narration starts with SAK/ or SAK, treat SAK as internal_prefix. Do NOT classify it as beneficiary, payment mode, or bank. Use the next token to determine transaction type. E.g., SAK/CASH WDL means Payment Mode: Cash Withdrawal, Internal Prefix: SAK.

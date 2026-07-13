@@ -1,131 +1,70 @@
-# Dabby Platform: Complete Module Architecture
+# Dabby Platform Context & Roadmap
 
-Below is the full modular breakdown of the Dabby platform, tracking data flow from **Authentication** to **Chart of Accounts (COA)**, **Investor Analytics**, **Role-Based Access Control (RBAC)**, and **Subscription Plans**.
+This document serves as the master blueprint of where the Dabby architecture currently stands, what is functionally wired to the backend, and what remains to be built to achieve the v1 vision.
 
 ---
 
+## The Vision (v1 Roadmap)
+We are building a deterministic, modular pipeline that transforms unstructured documents into immutable ledger entries.
+
 ```mermaid
-graph TD
-    A[1. Authentication & OAuth] --> B[2. Workbenches & Members]
-    B --> C[3. Doc Vault & OCR Ingestion]
-    C --> D[4. Ruleset Engine]
-    D --> E{Auto-Approve?}
-    E -- No --> F[5. Trade Engine queue - Needs Review]
-    E -- Yes --> G[6. Activity Executor - Stage 10]
-    F -->|Approve & Execute| G
-    G --> H[7. Accounting Compiler - Stage 11]
-    H --> I[8. Supabase Ledger - Transaction Entries]
-    I --> J[9. COA & Live Balance Refresh]
-    I --> K[10. Investor View & Runway Reports]
-    B -.-> L[11. RBAC Validation Module]
-    C -.-> M[12. Plan Limits Validation]
+flowchart TD
+    A[DOCUMENTS] --> B[AI Extraction]
+    B --> C[Universal Financial Object]
+    C --> D[Entity Resolver]
+    D --> E[Business Event Engine]
+    E --> F[Business State Engine]
+    E --> G[Accounting Rule Engine]
+    E --> H[Evidence Graph]
+    F --> I[Universal Ledger]
+    G --> I
 ```
 
 ---
 
-## 1. Authentication & Session Module (`/Auth`)
-*   **Sign Up & Sign In**: Handled via Supabase Authentication (email/password, OAuth callbacks).
-*   **Session State**: Managed via React `AuthContext` to persist tokens, current user session, and company-level context.
-*   **Protected Routing**: Checks permissions before rendering dashboard modules, ensuring isolated client-side access.
+## 🟢 What We Have Completed (100% Functional)
+
+### Phase 0: AI Extraction & Sync
+- **Supabase Realtime Sync:** The Doc Vault accurately reads from the `di_documents` table in Supabase.
+- **AI Engine (Groq):** Documents (Bank Statements, Invoices, Receipts) are sent to Groq and extracted into a structured, schema-agnostic JSON format.
+
+### Phase 1: Universal Financial Object (UFO) ✅ *(Just Completed)*
+- **The Problem:** The frontend UI and backend pipeline were previously reading raw AI JSON directly. This made the app fragile because AI occasionally hallucinates schema keys (e.g., nesting values under `{ value: '...', confidence: 0.99 }`).
+- **The Solution:** We introduced the `UFOMapper` utility in the backend. 
+- **Current State:** The AI output is now strictly flattened into deterministic database columns in the `di_analysis_notes` table: `document_type`, `parties`, `money`, `taxes`, `dates`, and `line_items`. The UI (Extracted Data Tab & Snippets Tab) reads perfectly from this reliable UFO contract.
+
+### Foundational UI
+- **Dynamic Extracted Data Tab:** Dynamically renders the UFO structure and allows the user to save edits back to Supabase.
+- **Snippets Tab:** Parses the `line_items` array (from Bank Statements) and renders verified transaction cards.
+- **Internationalization:** Complete dynamic currency formatting (`Intl` API) across the entire platform based on the Workbench's selected country.
 
 ---
 
-## 2. Workbench Module (`/components/Workbenches`)
-*   **Workspace Isolation**: High-level separation for different legal entities. All documents, chart of accounts, parties, and ledger tables are partitioned by `workbench_id`.
-*   **Member Management**: Supabase row-level security and `workbench_members` define access privileges (owners, consultants, auditors).
+## 🟡 Structurally Built but Incomplete (UI Mocked)
+
+These features have premium UI components built, but their underlying logic is disconnected or mocked:
+
+1. **"Link Document" Flow (Snippet Cards):** The UI modal to link a snippet to an invoice exists, but it doesn't query actual invoices or push the relational link to Supabase.
+2. **Party Analytics Modal:** The charts and metrics (DSO, DPO, LTV) are currently simulated using math formulas rather than aggregating actual ledger data.
+3. **Business Engine Pipeline (Kanban):** The beautiful pipeline columns (Identified, Extraction, Verification) use `MOCK_PIPELINE_DATA`. We need to wire this to the `di_documents` table.
+4. **Inspector Drawer (Double Entry Ledger):** Clicking a card slides out a proposed Journal Entry, but it uses mock debits/credits rather than the output of our Accounting Rule Engine.
 
 ---
 
-## 3. Doc Vault Ingestion Module (`/pages/DataIngestion`)
-*   **File Uploads**: Drag-and-drop file ingestion interface for PDFs, JPGs, PNGs, and Excel files.
-*   **OCR Parsing Queue**: Queues files to Google Cloud Vision API for raw character extraction.
-*   **LLM Schema Alignment**: Processes text through a Google Gemini 1.5 Flash structured contract to output:
-    *   `document_type` (Vendor Invoice, Sales Invoice, Expense Receipt, Bank Statement, etc.)
-    *   Amounts (Gross, Net, Tax/GST)
-    *   Parties (detected counterparty, legal address, tax identifiers)
-    *   Detailed line-item lists
+## 🚀 What We Need To Do Next
 
----
+To bridge the gap between our UFO data and the Universal Ledger, we must execute the following phases:
 
-## 4. Rulesets & Automatic Processing Module (`/pages/Rulesets`)
-*   **Routing Rules**: Rules defined on variables like `amount`, `party_name`, and `document_type`.
-*   **Pipeline Evaluation**: Compares OCR-extracted document data with configured rulesets:
-    *   **Pass**: Auto-approve and send directly to execution.
-    *   **Fail**: Send to Trade Engine's **Needs Review** queue.
+### Phase 2: Entity Resolver (The "Who")
+The UFO currently extracts string names (e.g., "AWS" or "Amazon Web Services"). We need an Entity Resolver to map these strings deterministically to an exact `party_id` in the `di_accounts` or `parties` table to prevent duplicate ledgers.
 
----
+### Phase 3: Business Event Engine (The "What")
+This is the heart of the system. We need to connect the `analysis_note_service.py` to the Business Event pipeline. 
+- A UFO document must be deterministically classified (e.g., an Invoice becomes a `CUSTOMER_BILLED` event).
+- Events are immutable and act as the single source of truth for downstream systems.
 
-## 5. Trade Engine Queue Module (`/pages/TradeEngine`)
-*   **Trade Stages**: Trades are organized into four queues: `Needs Review`, `Draft`, `Approved`, and `Rejected`.
-*   **Review Panel**: An interactive UI for reviewing and adjusting party relationships, payment vessels (banks/cash accounts), gross vs. net tax splits, and accounting tags.
-*   **Error Resolution**: Connects with `TradeResolveModal` on execution failure to guide users on fixing missing or unbalanced accounts.
+### Phase 4: Accounting Rule Engine (The "How")
+Once a `CUSTOMER_BILLED` event is fired, the Accounting Rule Engine will determine the debits and credits based on the Chart of Accounts (COA) template. This replaces the mocked Inspector Drawer logic.
 
----
-
-## 6. Activity Executor Module (`/services/activity_executor.py`)
-*   **Stage 10 Execution**: Performs operational database updates, such as creating a payable bill, creating a receivable invoice, or recording entity cash/bank balances.
-*   **Idempotency Checks**: Prevents duplicate operational document creation on approval retries.
-
----
-
-## 7. Accounting Compiler Module (`/services/accounting_compiler.py`)
-*   **Stage 11 Generation**: Translates executed operations into double-entry ledger entries.
-*   **Label Mapping**: Resolves accounts by priority: `activity parameters` → `ruleset map tags` → `Chart of Accounts typed fallbacks`.
-*   **Double-Entry Validation**: Enforces that `Debits === Credits`. Discrepancies are safely routed to a Suspense/Clearing account.
-
----
-
-## 8. Supabase Ledger Module (`/services/ledger_service.py`)
-*   **Immutable Transaction Journal**: Writes entries to `transactions` and `transaction_entries` tables.
-*   **Journal Integrity**: Once compiled, journal entries cannot be edited, preserving the auditing trail.
-
----
-
-## 9. Chart of Accounts (COA) Module (`/components/Workbenches/detail/COAView.jsx`)
-*   **Account Hierarchy**: Standardizes accounts under Assets, Liabilities, Equity, Revenue, and Expenses.
-*   **Dynamic Balances**: The UI calculates balances in real-time from `transaction_entries` by listening for the `refresh-ledger-data` event.
-
----
-
-## 10. Investor View & Reporting Module (`/pages/InvestorView`)
-*   **Financial MRI**: Computes runway, net profit, burn rates, and cash runway projections based on live ledger metrics.
-*   **Snapshot Audits**: Exports auditor-ready CSV/PDF reports directly from ledger states.
-
----
-
-## 11. Role-Based Access Control (RBAC) Module
-> [!NOTE]
-> **Specification Draft Only — Do Not Implement**
-*   **Design Proposal**: Introduces granular role assignments inside `workbench_members` (assigned per workbench).
-*   **Defined Roles & Permissions Matrix**:
-    *   `Owner`: Full permissions across the workbench, including billing, user inviting, deleting transactions, ruleset writing, and document uploads.
-    *   `Accountant`: Can edit drafts, configure the Chart of Accounts, approve trades, and trigger executions. Cannot invite other users or delete workbenches.
-    *   `Auditor / Investor`: Read-only access across the entire workbench, including Chart of Accounts, documents, and ledger reports. Cannot execute trades or edit drafts.
-    *   `Member / Uploader`: Read-only access to queues and reports. Upload-only access to Doc Vault (cannot view other members' uploaded documents unless approved).
-
----
-
-## 12. Plan Usage Limits & AI Rate Limiting Module
-> [!NOTE]
-> **Specification Draft Only — Do Not Implement**
-*   **Design Proposal**: Sets up usage limits and query quotas tied to subscription levels.
-*   **Defined Tiers & Feature Restrictions**:
-    *   **Free Plan**:
-        *   Access: Only gets the AI consultant chat interface.
-        *   Uploads: 0 document uploads or queue processing.
-        *   AI Chat Limit: Max 10 messages / day.
-    *   **Go Plan (Seed Tier)**:
-        *   Uploads: Max 50 OCR document uploads / month.
-        *   Seats: Max 2 workbench members.
-        *   AI Chat Limit: Max 100 messages / day.
-        *   Features: Suspense fallback auto-routing active, custom rulesets disabled.
-    *   **Pro Plan (Growth Tier)**:
-        *   Uploads: Max 500 OCR document uploads / month.
-        *   Seats: Max 5 workbench members.
-        *   AI Chat Limit: Max 500 messages / day.
-        *   Features: Custom rulesets, auto-approvals, and multibank ledger support active.
-    *   **Enterprise Plan (Scale Tier)**:
-        *   Uploads: Unlimited OCR document uploads.
-        *   Seats: Unlimited members.
-        *   AI Chat Limit: Unlimited messages (high-priority API queue).
-        *   Features: Multi-currency consolidation, custom investor audit snapshots.
+### Phase 5: The Universal Ledger
+The rules engine posts the debits and credits to the actual `transactions` and `transaction_entries` tables, officially impacting the company's financial state.

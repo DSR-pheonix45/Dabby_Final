@@ -42,13 +42,18 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
     parties: note.parties && Object.keys(note.parties).length > 0 ? note.parties : note.extracted_data?.parties,
     money: note.money && Object.keys(note.money).length > 0 ? note.money : note.extracted_data?.financials,
     taxes: note.taxes && Object.keys(note.taxes).length > 0 ? note.taxes : undefined,
-    dates: note.dates && Object.keys(note.dates).length > 0 ? note.dates : note.extracted_data?.document,
+    dates: note.dates && Object.keys(note.dates).length > 0 ? note.dates : note.extracted_data?.document_metadata || note.extracted_data?.document,
     line_items: note.line_items && note.line_items.length > 0 ? note.line_items : note.extracted_data?.line_items,
+    statement_summary: note.extracted_data?.bank_statement?.statement_summary || note.extracted_data?.statement_summary,
+    transactions: note.extracted_data?.bank_statement?.transactions || note.extracted_data?.transactions,
     raw_extracted: note.extracted_data
   } : {};
   
   const [data, setData] = useState(ufoData);
   const [saving, setSaving] = useState(false);
+
+  const rawDocType = data.document_type;
+  const isBankStatement = (typeof rawDocType === 'object' ? rawDocType?.value : rawDocType) === 'bank_statement';
 
   if (!note) {
     return <div className="p-8 text-center text-gray-500 text-sm">No extracted data available yet. Document may still be processing.</div>;
@@ -137,7 +142,7 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
             </section>
 
             {/* Dates (formerly Document Details) */}
-            {data.dates && (
+            {data.dates && !isBankStatement && (
               <section>
                 <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Dates & Reference</h3>
                 <div className="bg-[#161616] border border-white/5 rounded-xl p-4">
@@ -154,7 +159,7 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
             )}
 
             {/* Parties */}
-            {data.parties && (
+            {data.parties && !isBankStatement && (
               <section>
                 <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Parties</h3>
                 <div className="bg-[#161616] border border-white/5 rounded-xl p-4 space-y-4">
@@ -193,7 +198,7 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
             )}
 
             {/* Money (formerly Financials) */}
-            {data.money && (
+            {data.money && !isBankStatement && (
               <section>
                 <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Money & Totals</h3>
                 <div className="bg-[#161616] border border-white/5 rounded-xl p-4">
@@ -210,7 +215,7 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
             )}
 
             {/* Taxes */}
-            {data.taxes && (
+            {data.taxes && !isBankStatement && (
               <section>
                 <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Taxes</h3>
                 <div className="bg-[#161616] border border-white/5 rounded-xl p-4">
@@ -224,7 +229,7 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
             )}
 
             {/* Line Items */}
-            {data.line_items && data.line_items.length > 0 && (
+            {data.line_items && data.line_items.length > 0 && !isBankStatement && (
               <section>
                 <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Line Items</h3>
                 <div className="space-y-3">
@@ -256,48 +261,126 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
             )}
 
             {/* Statement Summary (For Bank Statements) */}
-            {data.statement_summary && (
+            {data.statement_summary && isBankStatement && (
               <section>
                 <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Statement Summary</h3>
                 <div className="bg-[#161616] border border-white/5 rounded-xl p-4">
-                  {Object.entries(data.statement_summary).map(([key, field]) => (
                     <FieldRow 
-                      key={key} 
-                      label={key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} 
-                      fieldData={field} 
-                      onChange={(val) => handleFieldChange('statement_summary', key, val)} 
+                      label="Opening Balance"
+                      fieldData={data.statement_summary.opening_balance}
+                      onChange={(val) => handleFieldChange('statement_summary', 'opening_balance', val)}
                     />
-                  ))}
+                    <FieldRow 
+                      label="Closing Balance"
+                      fieldData={data.statement_summary.closing_balance}
+                      onChange={(val) => handleFieldChange('statement_summary', 'closing_balance', val)}
+                    />
+                    <FieldRow 
+                      label="Date of Opening"
+                      fieldData={data.statement_summary.statement_start_date}
+                      onChange={(val) => handleFieldChange('statement_summary', 'statement_start_date', val)}
+                    />
+                    <FieldRow 
+                      label="Date of Closing"
+                      fieldData={data.statement_summary.statement_end_date}
+                      onChange={(val) => handleFieldChange('statement_summary', 'statement_end_date', val)}
+                    />
+                    <FieldRow 
+                      label="Total Transactions"
+                      fieldData={data.transactions ? data.transactions.length : 0}
+                      onChange={() => {}}
+                    />
                 </div>
               </section>
             )}
 
             {/* Transactions (For Bank Statements) */}
-            {data.transactions && data.transactions.length > 0 && (
+            {data.transactions && data.transactions.length > 0 && isBankStatement && (
               <section>
                 <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Transactions</h3>
                 <div className="space-y-3">
                   {data.transactions.map((item, idx) => (
                     <div key={idx} className="bg-[#161616] border border-white/5 rounded-xl p-4">
-                      {Object.entries(item).map(([key, field]) => (
                         <FieldRow 
-                          key={key} 
-                          label={key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} 
-                          fieldData={field} 
+                          label="Date"
+                          fieldData={item.date} 
                           onChange={(val) => {
                             setData(prev => {
                               const updated = { ...prev };
                               updated.transactions = [...prev.transactions];
-                              if (typeof updated.transactions[idx][key] === 'object' && updated.transactions[idx][key] !== null) {
-                                updated.transactions[idx][key] = { ...updated.transactions[idx][key], value: val };
+                              if (typeof updated.transactions[idx].date === 'object' && updated.transactions[idx].date !== null) {
+                                updated.transactions[idx].date = { ...updated.transactions[idx].date, value: val };
                               } else {
-                                updated.transactions[idx][key] = val;
+                                updated.transactions[idx].date = val;
                               }
                               return updated;
                             });
                           }} 
                         />
-                      ))}
+                        <FieldRow 
+                          label="Particular"
+                          fieldData={item.raw_particulars} 
+                          onChange={(val) => {
+                            setData(prev => {
+                              const updated = { ...prev };
+                              updated.transactions = [...prev.transactions];
+                              if (typeof updated.transactions[idx].raw_particulars === 'object' && updated.transactions[idx].raw_particulars !== null) {
+                                updated.transactions[idx].raw_particulars = { ...updated.transactions[idx].raw_particulars, value: val };
+                              } else {
+                                updated.transactions[idx].raw_particulars = val;
+                              }
+                              return updated;
+                            });
+                          }} 
+                        />
+                        <FieldRow 
+                          label="Party"
+                          fieldData={item.beneficiary_name} 
+                          onChange={(val) => {
+                            setData(prev => {
+                              const updated = { ...prev };
+                              updated.transactions = [...prev.transactions];
+                              if (typeof updated.transactions[idx].beneficiary_name === 'object' && updated.transactions[idx].beneficiary_name !== null) {
+                                updated.transactions[idx].beneficiary_name = { ...updated.transactions[idx].beneficiary_name, value: val };
+                              } else {
+                                updated.transactions[idx].beneficiary_name = val;
+                              }
+                              return updated;
+                            });
+                          }} 
+                        />
+                        <FieldRow 
+                          label="Amount"
+                          fieldData={item.amount || item.debit_amount || item.credit_amount} 
+                          onChange={(val) => {
+                            setData(prev => {
+                              const updated = { ...prev };
+                              updated.transactions = [...prev.transactions];
+                              if (typeof updated.transactions[idx].amount === 'object' && updated.transactions[idx].amount !== null) {
+                                updated.transactions[idx].amount = { ...updated.transactions[idx].amount, value: val };
+                              } else {
+                                updated.transactions[idx].amount = val;
+                              }
+                              return updated;
+                            });
+                          }} 
+                        />
+                        <FieldRow 
+                          label="Direction"
+                          fieldData={item.type || (item.debit_amount > 0 ? 'Debit' : 'Credit')} 
+                          onChange={(val) => {
+                            setData(prev => {
+                              const updated = { ...prev };
+                              updated.transactions = [...prev.transactions];
+                              if (typeof updated.transactions[idx].type === 'object' && updated.transactions[idx].type !== null) {
+                                updated.transactions[idx].type = { ...updated.transactions[idx].type, value: val };
+                              } else {
+                                updated.transactions[idx].type = val;
+                              }
+                              return updated;
+                            });
+                          }} 
+                        />
                     </div>
                   ))}
                 </div>
