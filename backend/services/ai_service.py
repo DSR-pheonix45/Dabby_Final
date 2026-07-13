@@ -405,7 +405,8 @@ class AIService:
         5. All monetary values must be numeric.
         6. Dates should be returned in YYYY-MM-DD format.
         7. Maintain transaction order.
-        8. Withdrawals, payments, and deductions MUST be placed in 'debit_amount'. Deposits, receipts, and additions MUST be placed in 'credit_amount'.
+        8. CRITICAL: You MUST extract EVERY SINGLE transaction row from the document. Do not omit, truncate, skip, or summarize ANY rows. Failure to extract all rows will result in severe data loss.
+        9. Withdrawals, payments, and deductions MUST be placed in 'debit_amount'. Deposits, receipts, and additions MUST be placed in 'credit_amount'.
         9. EXPLICITLY IGNORE any "Charge Statement" or fee summary tables at the end of the document. Only extract actual account ledger transactions.
         10. DECODE the party/beneficiary name directly from the particular/narration and place it in the 'beneficiary_name' field. Strip out transaction prefixes (like NEFT, RTGS, IMPS), reference numbers, and bank codes to isolate the clean party name.
 
@@ -499,7 +500,8 @@ class AIService:
                 [prompt, {"mime_type": mime_type, "data": file_bytes}],
                 generation_config={
                     "response_mime_type": "application/json",
-                    "response_schema": schema
+                    "response_schema": schema,
+                    "max_output_tokens": 8192,
                 }
             )
             raw_data = json.loads(response.text.strip())
@@ -525,7 +527,8 @@ class AIService:
         5. All monetary values must be numeric.
         6. Dates should be returned in YYYY-MM-DD format.
         7. Maintain transaction order.
-        8. Withdrawals, payments, and deductions MUST be placed in 'debit_amount'. Deposits, receipts, and additions MUST be placed in 'credit_amount'.
+        8. CRITICAL: You MUST extract EVERY SINGLE transaction row from the document. Do not omit, truncate, skip, or summarize ANY rows. Failure to extract all rows will result in severe data loss.
+        9. Withdrawals, payments, and deductions MUST be placed in 'debit_amount'. Deposits, receipts, and additions MUST be placed in 'credit_amount'.
         9. EXPLICITLY IGNORE any "Charge Statement" or fee summary tables at the end of the document. Only extract actual account ledger transactions.
         10. DECODE the party/beneficiary name directly from the particular/narration and place it in the 'beneficiary_name' field. Strip out transaction prefixes (like NEFT, RTGS, IMPS), reference numbers, and bank codes to isolate the clean party name.
 
@@ -576,7 +579,7 @@ class AIService:
         }
         """
 
-        user_msg = f"Document Filename: {filename}\nContent:\n{file_content[:20000]}"
+        user_msg = f"Document Filename: {filename}\nContent:\n{file_content[:80000]}"
 
         try:
             completion = GroqPool.execute(
@@ -586,7 +589,8 @@ class AIService:
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_msg}
                     ],
-                    response_format={"type": "json_object"}
+                    response_format={"type": "json_object"},
+                    max_tokens=8192,
                 )
             )
             raw_data = json.loads(completion.choices[0].message.content)
