@@ -663,9 +663,11 @@ class AIService:
 
             # Apply strict party fallback rules based on narration
             raw_part = (tx.get("raw_particulars") or "").strip().lower()
-            if "sak/" in raw_part or "cash wdl" in raw_part or "cash dep" in raw_part or "/self" in raw_part:
+            if "gst" in raw_part:
+                tx["beneficiary_name"] = "Unknown Entity (GST)"
+            elif "sak/" in raw_part or "cash wdl" in raw_part or "cash dep" in raw_part or "/self" in raw_part:
                 tx["beneficiary_name"] = "Self"
-            elif any(k in raw_part for k in ["monthly charge", "monthly avg bal", "service chrg", "service ch", "bank charge", "gst @18%"]):
+            elif any(k in raw_part for k in ["monthly charge", "monthly avg bal", "service chrg", "service ch", "bank charge"]):
                 tx["beneficiary_name"] = bank_name_val
 
         # 2. Bunch redundant or duplicate of those line item entries
