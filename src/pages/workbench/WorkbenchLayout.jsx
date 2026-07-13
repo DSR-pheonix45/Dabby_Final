@@ -1,7 +1,7 @@
 import React from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useWorkbench } from "../../context/WorkbenchContext";
-import { BsPerson, BsBuilding, BsGear, BsFileEarmarkText, BsDiagram3, BsGraphUp, BsCpu, BsJournalText } from "react-icons/bs";
+import { BsPerson, BsBuilding, BsGear, BsFileEarmarkText, BsDiagram3, BsGraphUp, BsCpu, BsJournalText, BsLightningCharge, BsFileEarmarkBarGraph } from "react-icons/bs";
 
 export default function WorkbenchLayout() {
   const { activeWorkbench } = useWorkbench();
@@ -47,23 +47,45 @@ export default function WorkbenchLayout() {
               </div>
             </div>
           </div>
-          <div className="flex space-x-8">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname.includes(item.path);
-              return (
-                <button
-                  key={item.path}
-                  onClick={() => navigate(item.path)}
-                  className={`pb-4 flex items-center space-x-2 border-b-2 transition-colors -mb-[1px] ${
-                    isActive ? "border-teal-500 text-teal-400" : "border-transparent text-gray-400 hover:text-white"
-                  }`}
-                >
-                  <Icon />
-                  <span className="font-semibold text-sm">{item.label}</span>
-                </button>
-              );
-            })}
+          <div className="flex items-center justify-between">
+            <div className="flex space-x-8 overflow-x-auto custom-scrollbar">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = location.pathname.includes(item.path);
+                return (
+                  <button
+                    key={item.path}
+                    onClick={() => navigate(item.path)}
+                    className={`pb-4 flex items-center space-x-2 border-b-2 transition-colors -mb-[1px] whitespace-nowrap ${
+                      isActive ? "border-teal-500 text-teal-400" : "border-transparent text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    <Icon />
+                    <span className="font-semibold text-sm">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            
+            <div className="flex items-center space-x-3 pb-4">
+              <div className="h-6 w-[1px] bg-white/10 mr-2"></div>
+              <button 
+                onClick={() => navigate("/dashboard/templates")}
+                className="flex items-center space-x-2 px-3 py-1.5 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 rounded-lg text-sm font-semibold transition-colors"
+                title="Generators"
+              >
+                <BsLightningCharge />
+                <span>Generators</span>
+              </button>
+              <button 
+                onClick={() => navigate("/dashboard/reports")}
+                className="flex items-center space-x-2 px-3 py-1.5 bg-[#222] hover:bg-[#333] text-gray-300 hover:text-white border border-white/10 rounded-lg text-sm font-semibold transition-colors"
+                title="Reports"
+              >
+                <BsFileEarmarkBarGraph />
+                <span>Reports</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
