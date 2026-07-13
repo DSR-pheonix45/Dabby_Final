@@ -11,3 +11,4 @@ pypdf
 PyMuPDF
 PyJWT
 python-multipart
+sarvamai
