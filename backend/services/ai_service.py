@@ -51,7 +51,7 @@ class AIService:
         - 'tax_document' (Tax Liability event, do NOT use for bank statements)
         - 'purchase_order' (Procurement Commitment event)
         - 'sales_order' (Revenue Pipeline event)
-        - 'manual_journal' (Manual Journal event)
+
 
         RULES:
         1. OCR is ONLY responsible for extracting facts and metadata. Do NOT output ledger accounts (e.g. do not suggest debit_account or credit_account keys).
@@ -203,7 +203,7 @@ class AIService:
         - 'tax_document' (do NOT use for bank statements)
         - 'purchase_order'
         - 'sales_order'
-        - 'manual_journal'
+
 
         RULES:
         1. OCR is ONLY responsible for extracting facts and metadata. Do NOT output ledger accounts (e.g. do not suggest debit_account or credit_account keys).
@@ -406,6 +406,8 @@ class AIService:
         6. Dates should be returned in YYYY-MM-DD format.
         7. Maintain transaction order.
         8. Withdrawals, payments, and deductions MUST be placed in 'debit_amount'. Deposits, receipts, and additions MUST be placed in 'credit_amount'.
+        9. EXPLICITLY IGNORE any "Charge Statement" or fee summary tables at the end of the document. Only extract actual account ledger transactions.
+        10. DECODE the party/beneficiary name directly from the particular/narration and place it in the 'beneficiary_name' field. Strip out transaction prefixes (like NEFT, RTGS, IMPS), reference numbers, and bank codes to isolate the clean party name.
 
         NARRATION PARSING RULES:
         - SAK is NOT a payment mode. When narration starts with SAK/ or SAK, treat SAK as internal_prefix. Do NOT classify it as beneficiary, payment mode, or bank. Use the next token to determine transaction type. E.g., SAK/CASH WDL means Payment Mode: Cash Withdrawal, Internal Prefix: SAK.
@@ -524,6 +526,8 @@ class AIService:
         6. Dates should be returned in YYYY-MM-DD format.
         7. Maintain transaction order.
         8. Withdrawals, payments, and deductions MUST be placed in 'debit_amount'. Deposits, receipts, and additions MUST be placed in 'credit_amount'.
+        9. EXPLICITLY IGNORE any "Charge Statement" or fee summary tables at the end of the document. Only extract actual account ledger transactions.
+        10. DECODE the party/beneficiary name directly from the particular/narration and place it in the 'beneficiary_name' field. Strip out transaction prefixes (like NEFT, RTGS, IMPS), reference numbers, and bank codes to isolate the clean party name.
 
         NARRATION PARSING RULES:
         - SAK is NOT a payment mode. When narration starts with SAK/ or SAK, treat SAK as internal_prefix. Do NOT classify it as beneficiary, payment mode, or bank. Use the next token to determine transaction type. E.g., SAK/CASH WDL means Payment Mode: Cash Withdrawal, Internal Prefix: SAK.
@@ -1019,7 +1023,7 @@ class AIService:
             system_prompt = """
             You are an expert financial AI. Analyze the document text content and extract the fields according to the Dabby OCR Contract (v1).
             Classify the document into one of the following exact 'document_type' string values:
-            - 'sales_invoice', 'customer_payment_receipt', 'vendor_invoice', 'vendor_payment_receipt', 'expense_receipt', 'payroll_register', 'credit_note', 'debit_note', 'loan_agreement', 'investment_agreement', 'tax_document', 'purchase_order', 'sales_order', 'manual_journal'.
+            - 'sales_invoice', 'customer_payment_receipt', 'vendor_invoice', 'vendor_payment_receipt', 'expense_receipt', 'payroll_register', 'credit_note', 'debit_note', 'loan_agreement', 'investment_agreement', 'tax_document', 'purchase_order', 'sales_order'.
             Return ONLY a JSON object adhering exactly to this schema:
             {
               "document_type": "vendor_invoice",

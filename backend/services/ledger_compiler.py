@@ -44,7 +44,12 @@ ROLE_CODES: Dict[str, List[str]] = {
 }
 
 # Events that never post to the ledger (operational only)
-NON_POSTING = {"PURCHASE_ORDER_CREATED", "SALES_ORDER_CREATED", "BANK_ACTIVITY_RECORDED", "UNCLASSIFIED"}
+NON_POSTING = {
+    "PURCHASE_ORDER_CREATED", "SALES_ORDER_CREATED", 
+    "BANK_ACTIVITY_RECORDED", "UNCLASSIFIED",
+    "LOAN_RECEIVED", "LOAN_REPAID", "INVESTMENT_RECEIVED", 
+    "PAYROLL_INCURRED", "PAYROLL_PAID"
+}
 
 
 def build_postings(event_type: str, total: float, tax: float, net: float) -> List[Tuple[str, str, float]]:
