@@ -135,6 +135,12 @@ export const diService = {
     return res.json();
   },
 
+  async getDocumentStatus(workbenchId) {
+    const res = await apiFetch(`/api/di/ledger/document-status/${workbenchId}`);
+    if (!res.ok) throw new Error('Failed to fetch document status');
+    return res.json();
+  },
+
   /**
    * Full pipeline in one call: document -> trade draft -> business event ->
    * balanced ledger postings. Returns { draft, event, ledger }.

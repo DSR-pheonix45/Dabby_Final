@@ -4,14 +4,10 @@ import { BsSearch, BsFilter } from 'react-icons/bs';
 export default function BusinessEngineFilters({ activeFilters, onFilterChange, searchQuery, onSearch }) {
   const documentTypes = ['Invoice', 'Receipt', 'Bank Statement', 'Bill'];
   const stages = [
-    { id: 'uploaded', label: 'Uploaded' },
-    { id: 'ocr_processing', label: 'OCR Processing' },
-    { id: 'analysis_complete', label: 'Analysis Complete' },
-    { id: 'financial_event', label: 'Event Created' },
-    { id: 'pending_review', label: 'Pending Review' },
-    { id: 'journal_proposed', label: 'Journal Proposed' },
-    { id: 'ready_to_post', label: 'Ready to Post' },
-    { id: 'posted', label: 'Posted' }
+    { id: 'ready_to_post', label: 'Draft · Ready to Post' },
+    { id: 'needs_review', label: 'Needs Review' },
+    { id: 'partially_completed', label: 'Partially Completed' },
+    { id: 'completed', label: 'Completed' }
   ];
 
   return (

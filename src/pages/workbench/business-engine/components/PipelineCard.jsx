@@ -1,5 +1,5 @@
 import React from 'react';
-import { BsFileEarmarkText, BsLightningCharge, BsArrowRightShort } from 'react-icons/bs';
+import { BsFileEarmarkText, BsLightningCharge, BsArrowRightShort, BsCheck2All } from 'react-icons/bs';
 import { useWorkbench } from '../../../../context/WorkbenchContext';
 import { formatCurrency } from '../../../../utils/currency';
 import { financialRouting, ROUTING_TONE } from '../../../../utils/financialRouting';
@@ -41,6 +41,28 @@ export default function PipelineCard({ card, onDragStart, onClick }) {
         <BsArrowRightShort className="text-sm -ml-1" />
         {routing.label}
       </div>
+
+      {/* Settlement view (posted): invoice vs matched payment snippets */}
+      {card.settlement && (
+        card.settlement.status === 'completed' ? (
+          <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 mb-1">
+            <BsCheck2All /> Fully settled
+          </div>
+        ) : (
+          <div className="mb-1">
+            <div className="flex justify-between text-[10px] font-semibold text-gray-400 mb-1">
+              <span>Paid {formatCurrency(card.settlement.paid, activeWorkbench?.country)}</span>
+              <span className="text-amber-400">Due {formatCurrency(card.settlement.difference, activeWorkbench?.country)}</span>
+            </div>
+            <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-amber-400 rounded-full"
+                style={{ width: `${Math.min(100, Math.max(0, card.settlement.invoiceValue ? (card.settlement.paid / card.settlement.invoiceValue) * 100 : 0))}%` }}
+              />
+            </div>
+          </div>
+        )
+      )}
 
       <div className="flex items-center justify-between text-[10px] text-gray-500 font-semibold mt-auto pt-3 border-t border-white/5">
         <span className="flex items-center">

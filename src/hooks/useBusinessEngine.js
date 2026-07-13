@@ -59,20 +59,30 @@ function cardConfidence(note) {
   return c == null ? null : Math.round(Number(c) * 100);
 }
 
-const STATUS_TO_STAGE = {
-  Uploaded: 'uploaded',
-  Processing: 'ocr_processing',
-  'Needs Review': 'pending_review',
-  'Ready to Post': 'ready_to_post',
-  Posted: 'posted',
-  Failed: 'uploaded', // no dedicated failed column; surface at intake
-};
+// Board stages, in order. A document flows:
+//   Needs Review / Ready to Post (draft)  ->  posted  ->  settlement decides:
+//   Partially Completed (paid < invoice, difference shown) / Completed (paid == invoice)
+export const STAGE_IDS = ['ready_to_post', 'needs_review', 'partially_completed', 'completed'];
 
-function mapDocToCard(doc) {
-  const note = doc.di_analysis_notes?.[0] || null;
+/**
+ * Resolve a document's board stage.
+ * Once posted (a Business Event exists), settlement drives it: partially_completed
+ * until the matched payment snippets equal the invoice value, then completed.
+ * Before posting it's a draft: ready_to_post (high confidence) or needs_review.
+ */
+function computeStage(doc, statusMap) {
+  const st = statusMap[doc.id];
+  if (st && st.posted) return st.status; // 'partially_completed' | 'completed'
   const status = deriveDocumentStatus(doc);
+  return status === 'Ready to Post' ? 'ready_to_post' : 'needs_review';
+}
+
+function mapDocToCard(doc, statusMap = {}) {
+  const note = doc.di_analysis_notes?.[0] || null;
   const type = cardType(note);
   const isBankStatement = String(type).toLowerCase().includes('bank');
+  const st = statusMap[doc.id] || null;
+  const stage = computeStage(doc, statusMap);
   return {
     id: doc.id,
     type,
@@ -81,30 +91,40 @@ function mapDocToCard(doc) {
     confidence: cardConfidence(note),
     time: doc.created_at ? new Date(doc.created_at).toLocaleString() : '—',
     reviewer: 'Unassigned',
-    stage: STATUS_TO_STAGE[status] || 'uploaded',
-    status,
+    stage,
+    posted: !!st?.posted,
+    // Settlement view for posted invoices: invoice value vs matched snippet payments
+    settlement: st ? {
+      invoiceValue: st.invoice_value,
+      paid: st.paid,
+      difference: st.difference,
+      status: st.status,
+    } : null,
     linkedDocs: (note?.line_items?.length) || 0,
     filename: doc.original_filename,
     analysis: {
       summary: note?.reasoning || (note ? `Classified as ${type}` : 'Awaiting analysis'),
       tags: [type].filter(Boolean),
     },
-    journal: null, // Phase 4: proposed entries come from the Accounting Rule Engine (business_events not yet live)
+    journal: null,
     mockSnippetAttached: isBankStatement && (note?.line_items?.length || 0) > 0,
     ufo: note,
     rawDocument: doc,
   };
 }
 
-// Shared fetch helper
+// Shared fetch helper — documents + their posted/settlement status
 async function loadDocs(workbenchId) {
-  const docs = await diService.getDocuments(workbenchId);
-  return Array.isArray(docs) ? docs : [];
+  const [docs, statusMap] = await Promise.all([
+    diService.getDocuments(workbenchId),
+    diService.getDocumentStatus(workbenchId).catch(() => ({})),
+  ]);
+  return { docs: Array.isArray(docs) ? docs : [], statusMap: statusMap || {} };
 }
 
-// ── KPIs (real counts by derived status) ─────────────────────────────────────
+// ── KPIs (real counts by board stage) ────────────────────────────────────────
 export function useBusinessEngine(workbenchId) {
-  const [kpis, setKpis] = useState({ uploaded: 0, processing: 0, awaitingReview: 0, readyToPost: 0, posted: 0, failed: 0 });
+  const [kpis, setKpis] = useState({ readyToPost: 0, needsReview: 0, partiallyCompleted: 0, completed: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -113,17 +133,15 @@ export function useBusinessEngine(workbenchId) {
     (async () => {
       setLoading(true);
       try {
-        const docs = await loadDocs(workbenchId);
+        const { docs, statusMap } = await loadDocs(workbenchId);
         if (!alive) return;
-        const c = { uploaded: 0, processing: 0, awaitingReview: 0, readyToPost: 0, posted: 0, failed: 0 };
+        const c = { readyToPost: 0, needsReview: 0, partiallyCompleted: 0, completed: 0 };
         for (const d of docs) {
-          const s = deriveDocumentStatus(d);
-          if (s === 'Uploaded') c.uploaded++;
-          else if (s === 'Processing') c.processing++;
-          else if (s === 'Needs Review') c.awaitingReview++;
-          else if (s === 'Ready to Post') c.readyToPost++;
-          else if (s === 'Posted') c.posted++;
-          else if (s === 'Failed') c.failed++;
+          const s = computeStage(d, statusMap);
+          if (s === 'ready_to_post') c.readyToPost++;
+          else if (s === 'needs_review') c.needsReview++;
+          else if (s === 'partially_completed') c.partiallyCompleted++;
+          else if (s === 'completed') c.completed++;
         }
         setKpis(c);
       } catch (err) {
@@ -149,8 +167,8 @@ export function usePipeline(workbenchId) {
     if (!workbenchId) { setLoading(false); return; }
     setLoading(true);
     try {
-      const docs = await loadDocs(workbenchId);
-      setAllCards(docs.map(mapDocToCard));
+      const { docs, statusMap } = await loadDocs(workbenchId);
+      setAllCards(docs.map((d) => mapDocToCard(d, statusMap)));
     } catch (err) {
       console.error('[BusinessEngine] pipeline load failed', err);
     } finally {
@@ -198,7 +216,7 @@ export function useProcessingTimeline(workbenchId) {
     (async () => {
       setLoading(true);
       try {
-        const docs = await loadDocs(workbenchId);
+        const { docs } = await loadDocs(workbenchId);
         if (!alive) return;
         const rows = [];
         for (const d of docs) {

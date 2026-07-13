@@ -119,6 +119,36 @@ export default function InspectorDrawer({ isOpen, onClose, data, onPosted }) {
             </div>
           </div>
 
+          {/* Settlement status (posted invoices): invoice value vs matched snippets */}
+          {data.settlement && (
+            <div className="bg-[#181818] border border-white/10 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-gray-300">Settlement</span>
+                {data.settlement.status === 'completed' ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400">Completed</span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400">Partially Completed</span>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-[10px] text-gray-500">Invoice</p>
+                  <p className="text-sm font-bold text-gray-200">{formatCurrency(data.settlement.invoiceValue, activeWorkbench?.country)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500">Paid</p>
+                  <p className="text-sm font-bold text-emerald-400">{formatCurrency(data.settlement.paid, activeWorkbench?.country)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500">Difference</p>
+                  <p className={`text-sm font-bold ${data.settlement.difference > 0.01 ? 'text-amber-400' : 'text-gray-400'}`}>
+                    {formatCurrency(data.settlement.difference, activeWorkbench?.country)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Analysis Summary */}
           {data.analysis && (
             <div>

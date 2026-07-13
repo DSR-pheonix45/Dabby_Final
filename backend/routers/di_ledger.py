@@ -322,3 +322,68 @@ async def payables(workbench_id: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Per-document completion status (invoice value vs matched payment snippets) ──
+# Openers are obligations that get settled by payments. For these we compare the
+# invoice value against the sum of matched settlement snippets:
+#   paid == invoice  -> Completed
+#   paid <  invoice  -> Partially Completed (difference is shown)
+OPENER_EVENT_TYPES = {
+    "CUSTOMER_BILLED", "VENDOR_BILLED", "LOAN_RECEIVED",
+    "TAX_LIABILITY_CREATED", "PAYROLL_INCURRED",
+}
+
+
+@router.get("/document-status/{workbench_id}")
+async def document_status(workbench_id: str):
+    """Map document_id -> completion status once posted as a Business Event.
+
+    posted invoices/bills report {invoice_value, paid, difference, status}
+    where status is 'completed' when fully settled, else 'partially_completed'.
+    Non-opener posted events (payments, expenses, bank) report 'completed'.
+    """
+    try:
+        doc_ids = _workbench_document_ids(workbench_id)
+        if not doc_ids:
+            return {}
+        events = []
+        for i in range(0, len(doc_ids), 100):
+            chunk = doc_ids[i:i + 100]
+            events += supabase.table("business_events") \
+                .select("id, document_id, event_type, amount, event_status, created_at") \
+                .in_("document_id", chunk).eq("is_superseded", False).execute().data or []
+
+        # Latest non-superseded event per document
+        events.sort(key=lambda e: e.get("created_at") or "")
+        latest = {}
+        for e in events:
+            if e.get("event_status") == "CANCELLED":
+                continue
+            latest[e["document_id"]] = e
+
+        settled = _settled_by_event([e["id"] for e in latest.values()])
+        out = {}
+        for doc_id, e in latest.items():
+            invoice_value = _r2(e.get("amount") or 0)
+            etype = e.get("event_type")
+            if etype in OPENER_EVENT_TYPES and invoice_value > 0:
+                paid = _r2(settled.get(e["id"], 0.0))
+                difference = _r2(invoice_value - paid)
+                status = "completed" if difference <= 0.01 else "partially_completed"
+            else:
+                paid = invoice_value
+                difference = 0.0
+                status = "completed"
+            out[doc_id] = {
+                "posted": True,
+                "event_id": e["id"],
+                "event_type": etype,
+                "invoice_value": invoice_value,
+                "paid": paid,
+                "difference": difference,
+                "status": status,
+            }
+        return out
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
