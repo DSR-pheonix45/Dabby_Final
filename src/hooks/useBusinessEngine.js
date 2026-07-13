@@ -178,6 +178,20 @@ export function usePipeline(workbenchId) {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // Auto-refresh when a document is posted anywhere, or on return to this tab.
+  useEffect(() => {
+    const onPosted = () => refresh();
+    const onVisible = () => { if (!document.hidden) refresh(); };
+    window.addEventListener('ledger:updated', onPosted);
+    window.addEventListener('focus', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('ledger:updated', onPosted);
+      window.removeEventListener('focus', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [refresh]);
+
   // Derive filtered view (no refetch on filter/search change)
   let cards = allCards;
   if (search) {

@@ -12,6 +12,25 @@ const MOCK_BUDGET_DATA = [
 
 // --- HOOKS ---
 
+// Bumps a counter whenever a document is posted anywhere, or the user returns to
+// this tab/window — consumers add it to their fetch deps to auto-refresh live.
+function useLedgerRefreshKey() {
+  const [key, setKey] = useState(0);
+  useEffect(() => {
+    const bump = () => setKey((k) => k + 1);
+    const onVisible = () => { if (!document.hidden) bump(); };
+    window.addEventListener('ledger:updated', bump);
+    window.addEventListener('focus', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('ledger:updated', bump);
+      window.removeEventListener('focus', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+  return key;
+}
+
 const EMPTY_AR_KPIS = { total: 0, overdue: 0, dso: 0, customersWithOverdue: 0 };
 const EMPTY_AP_KPIS = { total: 0, dueThisWeek: 0, overdue: 0, dpo: 0 };
 
@@ -22,6 +41,7 @@ export function useAccountsReceivable(workbenchId) {
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({});
   const [search, setSearch] = useState('');
+  const refreshKey = useLedgerRefreshKey();
 
   useEffect(() => {
     if (!workbenchId || workbenchId === 'demo') { setRows([]); setKpis(EMPTY_AR_KPIS); setLoading(false); return; }
@@ -33,7 +53,7 @@ export function useAccountsReceivable(workbenchId) {
       .catch((e) => { if (!cancelled) { setError(e.message); setRows([]); setKpis(EMPTY_AR_KPIS); } })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [workbenchId]);
+  }, [workbenchId, refreshKey]);
 
   const data = rows.filter((item) => {
     if (search) {
@@ -54,6 +74,7 @@ export function useAccountsPayable(workbenchId) {
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({});
   const [search, setSearch] = useState('');
+  const refreshKey = useLedgerRefreshKey();
 
   useEffect(() => {
     if (!workbenchId || workbenchId === 'demo') { setRows([]); setKpis(EMPTY_AP_KPIS); setLoading(false); return; }
@@ -65,7 +86,7 @@ export function useAccountsPayable(workbenchId) {
       .catch((e) => { if (!cancelled) { setError(e.message); setRows([]); setKpis(EMPTY_AP_KPIS); } })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [workbenchId]);
+  }, [workbenchId, refreshKey]);
 
   const data = rows.filter((item) => {
     if (search) {

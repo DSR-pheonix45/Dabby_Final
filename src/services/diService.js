@@ -151,7 +151,12 @@ export const diService = {
     const eventRes = await this.approveDraft(draft.id);
     const event = eventRes.event || eventRes;
     const compileRes = await this.compileEvent(event.id);
-    return { draft, event, ledger: compileRes.result || compileRes };
+    const result = { draft, event, ledger: compileRes.result || compileRes };
+    // Notify open views (Financials, OPS) so they refresh live without a manual reload.
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ledger:updated', { detail: { documentId } }));
+    }
+    return result;
   },
 };
 

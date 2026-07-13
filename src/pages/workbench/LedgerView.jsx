@@ -72,6 +72,21 @@ export default function LedgerView() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Auto-refresh: when a document is posted anywhere, and when the user returns
+  // to this tab/window — so statements always reflect the latest postings live.
+  useEffect(() => {
+    const onPosted = () => load();
+    const onVisible = () => { if (!document.hidden) load(); };
+    window.addEventListener('ledger:updated', onPosted);
+    window.addEventListener('focus', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('ledger:updated', onPosted);
+      window.removeEventListener('focus', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [load]);
+
   const { tb, pnl, bs, txs } = data;
   const empty = tb && tb.account_count === 0;
 
