@@ -12,7 +12,6 @@ import { BsKanban, BsListUl, BsArrowRepeat, BsDiagram3 } from 'react-icons/bs';
 export default function BusinessEngine() {
   const { workbench } = useOutletContext() || {};
   const workbenchId = workbench?.id || 'demo';
-  const workbenchId = workbench?.id || 'demo';
   
   const [viewMode, setViewMode] = useState('pipeline'); // 'pipeline' | 'timeline' | 'snippets'
   const [selectedDoc, setSelectedDoc] = useState(null);
@@ -27,7 +26,6 @@ export default function BusinessEngine() {
     setSearchQuery,
     moveCard,
     refresh
-  } = usePipeline(workbenchId);
   } = usePipeline(workbenchId);
   
   const { data: timelineData, loading: timelineLoading } = useProcessingTimeline(workbenchId);
