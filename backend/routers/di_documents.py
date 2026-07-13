@@ -112,17 +112,82 @@ async def process_document(document_id: str, hint: Optional[str] = None):
         
         extracted_text = ""
         is_pdf = doc_data['mime_type'] == 'application/pdf'
+        ocr_provider = "sarvam"
         
-        if is_pdf:
-            pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
-            for page in pdf_doc:
-                extracted_text += page.get_text()
-            pdf_doc.close()
+        try:
+            from sarvamai.client import SarvamAI
+            import os
+            import time
+            import requests
+            import io
+            import zipfile
+            import asyncio
+            
+            api_key = os.getenv("SARVAM_API_KEY")
+            if api_key:
+                print(f"[DEBUG] Attempting Sarvam AI Document OCR for {doc_data['original_filename']}")
+                sarvam_client = SarvamAI(api_subscription_key=api_key)
+                file_name = doc_data['original_filename']
+                
+                job = sarvam_client.document_intelligence.create_job(language='en-IN', output_format='md')
+                job_id = job.id if hasattr(job, "id") else getattr(job, "job_id", getattr(job, "jobId", None))
+                
+                upload_resp = sarvam_client.document_intelligence.get_upload_links(job_id=job_id, files=[file_name])
+                
+                if hasattr(upload_resp, "upload_urls"):
+                    urls_dict = upload_resp.upload_urls
+                    upload_url = urls_dict[file_name].file_url if hasattr(urls_dict[file_name], "file_url") else urls_dict[file_name]["file_url"]
+                else:
+                    urls_dict = upload_resp["upload_urls"]
+                    upload_url = urls_dict[file_name]["file_url"]
+                    
+                headers = {"x-ms-blob-type": "BlockBlob"}
+                res = requests.put(upload_url, data=file_bytes, headers=headers)
+                
+                if res.status_code in [200, 201]:
+                    sarvam_client.document_intelligence.start(job_id=job_id)
+                    
+                    attempts = 0
+                    state = ""
+                    while attempts < 30: # 1 min timeout
+                        status = sarvam_client.document_intelligence.get_status(job_id=job_id)
+                        state = getattr(status, "job_state", getattr(status, "status", None))
+                        if state in ["Completed", "Failed", "Completed_with_errors"]:
+                            break
+                        await asyncio.sleep(2)
+                        attempts += 1
+                        
+                    if state in ["Completed", "Completed_with_errors"]:
+                        download = sarvam_client.document_intelligence.get_download_links(job_id=job_id)
+                        
+                        if hasattr(download, "download_urls"):
+                            zip_url = download.download_urls['document.zip'].file_url if hasattr(download.download_urls['document.zip'], "file_url") else download.download_urls['document.zip']["file_url"]
+                        else:
+                            zip_url = download["download_urls"]['document.zip']["file_url"]
+                            
+                        zip_res = requests.get(zip_url)
+                        with zipfile.ZipFile(io.BytesIO(zip_res.content)) as z:
+                            md_files = [n for n in z.namelist() if n.endswith('.md') or n.endswith('.txt')]
+                            if md_files:
+                                extracted_text = "\n".join(z.read(n).decode('utf-8') for n in md_files)
+                                print("[DEBUG] Sarvam AI OCR successful.")
+        except Exception as e:
+            print(f"[WARNING] Sarvam API extraction failed: {e}")
+            extracted_text = ""
+            
+        if not extracted_text:
+            ocr_provider = "gemini"
+            print("[DEBUG] Falling back to PyMuPDF/Gemini OCR logic.")
+            if is_pdf:
+                pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
+                for page in pdf_doc:
+                    extracted_text += page.get_text()
+                pdf_doc.close()
 
-        # Save OCR raw text (for images, we can leave it empty or extract text if needed, but for MVP we skip raw text for images)
+        # Save OCR raw text
         supabase.table("di_document_ocr").insert({
             "document_id": document_id,
-            "provider": "gemini",
+            "provider": ocr_provider,
             "language": "en",
             "raw_text": extracted_text if extracted_text else "Image Document",
             "confidence": 0.95
@@ -131,7 +196,7 @@ async def process_document(document_id: str, hint: Optional[str] = None):
         supabase.table("di_document_processing_logs").insert({
             "document_id": document_id,
             "stage": "ocr",
-            "provider": "gemini",
+            "provider": ocr_provider,
             "status": "success"
         }).execute()
 
@@ -171,7 +236,10 @@ async def process_document(document_id: str, hint: Optional[str] = None):
                 "mime_type": doc_data['mime_type'],
                 "data": file_bytes
             }
-            class_res = class_model.generate_content([document_part, "Classify this document."])
+            classification_prompt = "Classify this document."
+            if extracted_text:
+                classification_prompt = f"Here is the high-quality OCR text from Sarvam AI:\n\n{extracted_text[:4000]}\n\n" + classification_prompt
+            class_res = class_model.generate_content([document_part, classification_prompt])
                 
             try:
                 class_text = class_res.text.strip()
@@ -265,9 +333,13 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
             generation_config={"response_mime_type": "application/json", "temperature": 0.1}
         )
         
+        extraction_prompt = "Extract the financial details from this document."
+        if extracted_text:
+            extraction_prompt = f"Here is the high-quality OCR text from Sarvam AI:\n\n{extracted_text[:80000]}\n\n" + extraction_prompt
+            
         response = model.generate_content([
             document_part,
-            "Extract the financial details from this document."
+            extraction_prompt
         ])
             
         analysis_text = response.text.strip()
