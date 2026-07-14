@@ -181,21 +181,25 @@ class BankStatementParser:
         Extract bank statement data from an image or PDF using Gemini Vision.
         Returns normalized KPI dict.
         """
-        try:
-            response = self._gemini.generate_content(
-                [BANK_STATEMENT_VISION_PROMPT,
-                 {"mime_type": mime_type, "data": file_bytes}],
-                generation_config={
-                    "response_mime_type": "application/json",
-                    "response_schema": BANK_STATEMENT_GEMINI_SCHEMA,
-                    "max_output_tokens": 8192,
-                }
-            )
-            raw_data = json.loads(response.text.strip())
-            return self.compute_kpis(raw_data)
-        except Exception as e:
-            print(f"[BankStatementParser] Vision extraction failed: {e}")
-            raise
+        last_err = None
+        for attempt in range(3):
+            try:
+                response = self._gemini.generate_content(
+                    [BANK_STATEMENT_VISION_PROMPT,
+                     {"mime_type": mime_type, "data": file_bytes}],
+                    generation_config={
+                        "response_mime_type": "application/json",
+                        "response_schema": BANK_STATEMENT_GEMINI_SCHEMA,
+                        "max_output_tokens": 8192,
+                    }
+                )
+                raw_data = json.loads(response.text.strip())
+                return self.compute_kpis(raw_data)
+            except Exception as e:
+                print(f"[BankStatementParser] Vision extraction attempt {attempt+1} failed: {e}")
+                last_err = e
+        print(f"[BankStatementParser] Vision extraction ultimately failed: {last_err}")
+        raise last_err
 
     async def parse_text(self, text_content: str, filename: str) -> Dict:
         """
@@ -203,23 +207,27 @@ class BankStatementParser:
         Returns normalized KPI dict.
         """
         user_msg = f"Document Filename: {filename}\nContent:\n{text_content[:80000]}"
-        try:
-            completion = self._groq_execute(
-                lambda client: client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[
-                        {"role": "system", "content": BANK_STATEMENT_TEXT_PROMPT},
-                        {"role": "user",   "content": user_msg},
-                    ],
-                    response_format={"type": "json_object"},
-                    max_tokens=8192,
+        last_err = None
+        for attempt in range(3):
+            try:
+                completion = self._groq_execute(
+                    lambda client: client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[
+                            {"role": "system", "content": BANK_STATEMENT_TEXT_PROMPT},
+                            {"role": "user",   "content": user_msg},
+                        ],
+                        response_format={"type": "json_object"},
+                        max_tokens=8192,
+                    )
                 )
-            )
-            raw_data = json.loads(completion.choices[0].message.content)
-            return self.compute_kpis(raw_data)
-        except Exception as e:
-            print(f"[BankStatementParser] Text extraction failed: {e}")
-            raise
+                raw_data = json.loads(completion.choices[0].message.content)
+                return self.compute_kpis(raw_data)
+            except Exception as e:
+                print(f"[BankStatementParser] Text extraction attempt {attempt+1} failed: {e}")
+                last_err = e
+        print(f"[BankStatementParser] Text extraction ultimately failed: {last_err}")
+        raise last_err
 
     async def parse_page_raw(
         self,

@@ -264,7 +264,7 @@ async def process_document(document_id: str, hint: Optional[str] = None):
             gemini_model = genai.GenerativeModel(GEMINI_MODEL)
             parser = BankStatementParser(gemini_model, GroqPool.execute)
             
-            if extracted_text:
+            if extracted_text and ocr_provider == "sarvam":
                 print("[DEBUG] Using Sarvam text with Llama-3.3-70b parser")
                 analysis_data = await parser.parse_text(extracted_text, doc_data['original_filename'])
             else:
