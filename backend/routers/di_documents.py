@@ -256,33 +256,27 @@ async def process_document(document_id: str, hint: Optional[str] = None):
         
         # --- Step 2: Specialized Extraction ---
         if doc_type == "bank_statement":
-            system_prompt = f"""
-You are an expert AI accounting agent. Analyze the bank statement and extract detailed financial insights.
-
-Return ONLY valid JSON matching this exact schema. For every value, provide a "value" and a "confidence" score (0.0 to 1.0).
-
-{{
-    "document_type": "Bank Statement",
-    "statement_summary": {{
-        "bank_name": {{"value": "String", "confidence": 0.99}},
-        "account_number": {{"value": "String", "confidence": 0.99}},
-        "statement_period": {{"value": "String", "confidence": 0.99}},
-        "opening_balance": {{"value": 0.0, "confidence": 0.99}},
-        "closing_balance": {{"value": 0.0, "confidence": 0.99}}
-    }},
-    "transactions": [
-        {{
-            "date": {{"value": "YYYY-MM-DD", "confidence": 0.99}},
-            "description": {{"value": "String", "confidence": 0.99}},
-            "debit_amount": {{"value": 0.0, "confidence": 0.99}},
-            "credit_amount": {{"value": 0.0, "confidence": 0.99}},
-            "balance": {{"value": 0.0, "confidence": 0.99}},
-            "payment_mode": {{"value": "String", "confidence": 0.99}}
-        }}
-    ],
-    "analysis": "Human-readable interpretation of the bank statement."
-}}
-"""
+            print(f"[DEBUG] Using dedicated BankStatementParser for {doc_data['original_filename']}")
+            from services.bank_statement_parser import BankStatementParser
+            from services.groq_pool import GroqPool
+            import google.generativeai as genai
+            
+            gemini_model = genai.GenerativeModel(GEMINI_MODEL)
+            parser = BankStatementParser(gemini_model, GroqPool.execute)
+            
+            if extracted_text:
+                print("[DEBUG] Using Sarvam text with Llama-3.3-70b parser")
+                analysis_data = await parser.parse_text(extracted_text, doc_data['original_filename'])
+            else:
+                print("[DEBUG] Falling back to Gemini Vision parser")
+                analysis_data = await parser.parse_vision(file_bytes, doc_data['mime_type'], doc_data['original_filename'])
+                
+            predicted_label = "bank_statement"
+            overall_confidence = 0.99
+            analysis_data["analysis"] = "Bank Statement parsed successfully using dedicated extraction module."
+            
+            # Formatting as required by di_analysis_notes / ExtractedDataTab
+            analysis_data["document_type"] = "bank_statement"
         else:
             system_prompt = f"""
 You are an expert AI accounting agent. Analyze the invoice/receipt and extract detailed financial insights.
@@ -327,28 +321,28 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
 }}
 """
 
-        model = genai.GenerativeModel(
-            GEMINI_MODEL,
-            system_instruction=system_prompt,
-            generation_config={"response_mime_type": "application/json", "temperature": 0.1}
-        )
-        
-        extraction_prompt = "Extract the financial details from this document."
-        if extracted_text:
-            extraction_prompt = f"Here is the high-quality OCR text from Sarvam AI:\n\n{extracted_text[:80000]}\n\n" + extraction_prompt
+            model = genai.GenerativeModel(
+                GEMINI_MODEL,
+                system_instruction=system_prompt,
+                generation_config={"response_mime_type": "application/json", "temperature": 0.1}
+            )
             
-        response = model.generate_content([
-            document_part,
-            extraction_prompt
-        ])
-            
-        analysis_text = response.text.strip()
-        if analysis_text.startswith("```json"):
-            analysis_text = analysis_text[7:-3].strip()
-        elif analysis_text.startswith("```"):
-            analysis_text = analysis_text[3:-3].strip()
-        analysis_data = json.loads(analysis_text)
-        predicted_label = analysis_data.get("predicted_label", "Purchase")
+            extraction_prompt = "Extract the financial details from this document."
+            if extracted_text:
+                extraction_prompt = f"Here is the high-quality OCR text from Sarvam AI:\n\n{extracted_text[:80000]}\n\n" + extraction_prompt
+                
+            response = model.generate_content([
+                document_part,
+                extraction_prompt
+            ])
+                
+            analysis_text = response.text.strip()
+            if analysis_text.startswith("```json"):
+                analysis_text = analysis_text[7:-3].strip()
+            elif analysis_text.startswith("```"):
+                analysis_text = analysis_text[3:-3].strip()
+            analysis_data = json.loads(analysis_text)
+            predicted_label = analysis_data.get("predicted_label", "Purchase")
         
         # Calculate overall confidence based on field confidences
         confidences = []
