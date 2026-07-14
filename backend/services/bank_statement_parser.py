@@ -85,31 +85,20 @@ Your objective is to accurately extract statement-level details and all transact
 GENERAL RULES:
 1. Extract information exactly as printed. Do not hallucinate values.
 2. Preserve original narration in a Raw Particulars field.
-3. Interpret transaction narrations to identify payment mode, beneficiary, bank, references.
-4. If a field cannot be identified confidently, return null. Do not guess beneficiary names.
+3. Interpret transaction narrations to identify the required fields.
+4. If a field cannot be identified confidently, return null. 
 5. All monetary values must be numeric.
 6. Dates should be returned in YYYY-MM-DD format.
 7. Maintain transaction order.
 8. CRITICAL: You MUST extract EVERY SINGLE transaction row from the document. Do not omit, truncate, skip, or summarize ANY rows. Failure to extract all rows will result in severe data loss.
 
-NARRATION PARSING RULES:
-- SAK is NOT a payment mode. When narration starts with SAK/ or SAK, treat SAK as internal_prefix.
-  Do NOT classify it as beneficiary, payment mode, or bank.
-  Use the next token to determine transaction type.
-  E.g., SAK/CASH WDL means Payment Mode: Cash Withdrawal, Internal Prefix: SAK.
-- Examples:
-  - SAK/CASH WDL/SAK431881998/125/DOMBIVLI/(SELF) → Payment Mode: Cash Withdrawal, Internal Prefix: SAK, Reference: SAK431881998, Branch: 125, Location: DOMBIVLI, Beneficiary: SELF
-  - NEFT/HDFCH00099710200/ADVAIT BUILDERS DEVELOPERS/HDFC BANK/0001 → Payment Mode: NEFT, Reference: HDFCH00099710200, Beneficiary: ADVAIT BUILDERS DEVELOPERS, Beneficiary Bank: HDFC BANK, Branch: 0001
-  - RTGS/UBINR22025032001939320/SHREE SWAMI SAMARTH AS/UNION BANK OF INDIA → Payment Mode: RTGS, Reference: UBINR22025032001939320, Beneficiary: SHREE SWAMI SAMARTH AS, Beneficiary Bank: UNION BANK OF INDIA
-  - CLG/000332/030425/ICICI BANK → Payment Mode: Cheque Clearing, Cheque Number: 000332, Value Date: 2025-04-03, Beneficiary Bank: ICICI BANK
-  - SAK NEFT/RTGS Charges → Category: Bank Charges, Payment Mode: Charges, Charge Type: NEFT/RTGS
-
-Recognize these payment modes:
-  NEFT, RTGS, IMPS, UPI, Cash Withdrawal, Cash Deposit, ATM, POS,
-  ECS, NACH, Cheque, Cheque Clearing, Interest, Bank Charges, GST,
-  Internal Transfer, Unknown
-
-Recognize internal prefixes: SAK, SK, INT, TRF, MB, etc.
+FIELDS TO EXTRACT FOR EACH TRANSACTION:
+- Date: as it is printed.
+- Chq no.: Optional, is used only for cheque based transactions and cash withdrawals.
+- Party (Beneficiary): name is clearly given in particulars like BOMBAY TECH HOUSE, ADVAIT BUILDERS, SHREE SWAMI SAMARTH etc. (If the narration contains SAK - then the party is 'Self').
+- Mode of transaction: Cash withdrawal, NEFT, RTGS, IMPS, UPI, etc.
+- Debit/Credit Amount: Extract the amount and assign it to debit_amount or credit_amount.
+- Balance: The running balance after the transaction.
 
 Return ONLY a JSON object matching the requested schema. Do NOT perform any totals or averages.
 """
@@ -127,11 +116,13 @@ GENERAL RULES:
 6. Maintain transaction order.
 7. CRITICAL: You MUST extract EVERY SINGLE transaction row from the document. Do not omit, truncate, skip, or summarize ANY rows. Failure to extract all rows will result in severe data loss.
 
-NARRATION PARSING RULES:
-- SAK is NOT a payment mode. Treat as internal_prefix.
-- Recognize: NEFT, RTGS, IMPS, UPI, Cash Withdrawal, Cash Deposit, ATM, POS,
-  ECS, NACH, Cheque, Cheque Clearing, Interest, Bank Charges, GST,
-  Internal Transfer, Unknown.
+FIELDS TO EXTRACT FOR EACH TRANSACTION:
+- Date: as it is printed.
+- Chq no.: Optional, is used only for cheque based transactions and cash withdrawals.
+- Party (Beneficiary): name is clearly given in particulars like BOMBAY TECH HOUSE, ADVAIT BUILDERS, SHREE SWAMI SAMARTH etc. (If the narration contains SAK - then the party is 'Self').
+- Mode of transaction: Cash withdrawal, NEFT, RTGS, IMPS, UPI, etc.
+- Debit/Credit Amount: Extract the amount and assign it to debit_amount or credit_amount.
+- Balance: The running balance after the transaction.
 
 Return ONLY a JSON object with this schema:
 {

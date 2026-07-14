@@ -3,13 +3,16 @@ import { useWorkbench } from "../../context/WorkbenchContext";
 import { BsGear, BsBuilding } from "react-icons/bs";
 import { collaborationService } from "../../services/collaborationService";
 import { toast } from "react-hot-toast";
+import CompanyMaster from "./CompanyMaster";
 
 export default function WorkbenchSettings() {
   const { activeWorkbench, setActiveWorkbench } = useWorkbench();
+  const [activeTab, setActiveTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: activeWorkbench?.name || "",
-    legal_name: activeWorkbench?.legal_name || ""
+    legal_name: activeWorkbench?.legal_name || "",
+    logo: activeWorkbench?.logo || ""
   });
 
   if (!activeWorkbench) {
@@ -25,7 +28,8 @@ export default function WorkbenchSettings() {
     try {
       await collaborationService.updateSettings(activeWorkbench.id, {
         name: formData.name,
-        legal_name: formData.legal_name
+        legal_name: formData.legal_name,
+        logo: formData.logo
       });
       // Update local context
       setActiveWorkbench({ ...activeWorkbench, ...formData });
@@ -56,9 +60,29 @@ export default function WorkbenchSettings() {
 
         {/* Settings Content */}
         <div className="space-y-6 border-t border-white/10 pt-6">
-          
-          <div className="bg-[#181818] border border-white/10 rounded-xl overflow-hidden">
-            <div className="p-6 border-b border-white/10 flex items-center space-x-3">
+          <div className="flex space-x-6 border-b border-white/10 mb-8">
+            <button 
+              onClick={() => setActiveTab('general')}
+              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'general' ? 'border-teal-500 text-teal-500' : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              General Information
+            </button>
+            <button 
+              onClick={() => setActiveTab('master')}
+              className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'master' ? 'border-teal-500 text-teal-500' : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              Company Master
+            </button>
+          </div>
+
+          {activeTab === 'general' && (
+            <>
+              <div className="bg-[#181818] border border-white/10 rounded-xl overflow-hidden">
+                <div className="p-6 border-b border-white/10 flex items-center space-x-3">
               <div className="p-2 bg-white/5 rounded-lg text-gray-400">
                 <BsBuilding size={20} />
               </div>
@@ -68,6 +92,32 @@ export default function WorkbenchSettings() {
               </div>
             </div>
             <div className="p-6 space-y-6">
+              <div className="flex items-center space-x-6 mb-6">
+                <div className="w-20 h-20 bg-[#1A1A1A] border border-white/10 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
+                  {formData.logo ? (
+                    <img src={formData.logo} alt="Company Logo" className="w-full h-full object-contain" />
+                  ) : (
+                    <span className="text-gray-500 text-xs text-center">No Logo</span>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">Company Logo</label>
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        const file = e.target.files[0];
+                        const reader = new FileReader();
+                        reader.onload = (e) => setFormData({ ...formData, logo: e.target.result });
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-500/10 file:text-teal-500 hover:file:bg-teal-500/20"
+                  />
+                  <p className="text-xs text-gray-600 mt-2">Recommended size: 256x256px</p>
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-2">Display Name</label>
@@ -141,6 +191,12 @@ export default function WorkbenchSettings() {
               </button>
             </div>
           </div>
+            </>
+          )}
+
+          {activeTab === 'master' && (
+            <CompanyMaster />
+          )}
 
         </div>
 

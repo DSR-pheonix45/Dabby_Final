@@ -319,16 +319,16 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
                           }} 
                         />
                         <FieldRow 
-                          label="Particular"
-                          fieldData={item.raw_particulars} 
+                          label="Chq no."
+                          fieldData={item.cheque_number} 
                           onChange={(val) => {
                             setData(prev => {
                               const updated = { ...prev };
                               updated.transactions = [...prev.transactions];
-                              if (typeof updated.transactions[idx].raw_particulars === 'object' && updated.transactions[idx].raw_particulars !== null) {
-                                updated.transactions[idx].raw_particulars = { ...updated.transactions[idx].raw_particulars, value: val };
+                              if (typeof updated.transactions[idx].cheque_number === 'object' && updated.transactions[idx].cheque_number !== null) {
+                                updated.transactions[idx].cheque_number = { ...updated.transactions[idx].cheque_number, value: val };
                               } else {
-                                updated.transactions[idx].raw_particulars = val;
+                                updated.transactions[idx].cheque_number = val;
                               }
                               return updated;
                             });
@@ -351,25 +351,30 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
                           }} 
                         />
                         <FieldRow 
-                          label="Amount"
-                          fieldData={item.amount || item.debit_amount || item.credit_amount} 
+                          label="Mode of transaction"
+                          fieldData={item.payment_mode} 
                           onChange={(val) => {
                             setData(prev => {
                               const updated = { ...prev };
                               updated.transactions = [...prev.transactions];
-                              if (typeof updated.transactions[idx].amount === 'object' && updated.transactions[idx].amount !== null) {
-                                updated.transactions[idx].amount = { ...updated.transactions[idx].amount, value: val };
+                              if (typeof updated.transactions[idx].payment_mode === 'object' && updated.transactions[idx].payment_mode !== null) {
+                                updated.transactions[idx].payment_mode = { ...updated.transactions[idx].payment_mode, value: val };
                               } else {
-                                updated.transactions[idx].amount = val;
+                                updated.transactions[idx].payment_mode = val;
                               }
                               return updated;
                             });
                           }} 
                         />
                         <FieldRow 
-                          label="Direction"
-                          fieldData={item.type || (item.debit_amount > 0 ? 'Debit' : 'Credit')} 
+                          label="Credit/debit"
+                          fieldData={
+                            item.amount && item.type 
+                              ? `${item.amount} ${item.type === 'Credit' ? 'Credit' : 'Debit'}` 
+                              : (item.debit_amount > 0 ? `${item.debit_amount} Debit` : (item.credit_amount > 0 ? `${item.credit_amount} Credit` : ''))
+                          }
                           onChange={(val) => {
+                            // Read-only logic mostly for this combined field, but we can store it back in 'type' temporarily or ignore
                             setData(prev => {
                               const updated = { ...prev };
                               updated.transactions = [...prev.transactions];
@@ -377,6 +382,22 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
                                 updated.transactions[idx].type = { ...updated.transactions[idx].type, value: val };
                               } else {
                                 updated.transactions[idx].type = val;
+                              }
+                              return updated;
+                            });
+                          }} 
+                        />
+                        <FieldRow 
+                          label="Balance"
+                          fieldData={item.balance} 
+                          onChange={(val) => {
+                            setData(prev => {
+                              const updated = { ...prev };
+                              updated.transactions = [...prev.transactions];
+                              if (typeof updated.transactions[idx].balance === 'object' && updated.transactions[idx].balance !== null) {
+                                updated.transactions[idx].balance = { ...updated.transactions[idx].balance, value: val };
+                              } else {
+                                updated.transactions[idx].balance = val;
                               }
                               return updated;
                             });
