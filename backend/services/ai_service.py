@@ -1489,6 +1489,72 @@ class AIService:
             "bank_accounts": list(set(bank_accounts))[:5],
         }
 
+    async def scan_company_master_import(self, file_bytes: bytes, mime_type: str) -> list:
+        """
+        Uses Gemini Vision to extract Chart of Accounts / Ledgers from an imported document (Trial Balance, P&L, etc.)
+        and map them to Dabby's internal account structure.
+        """
+        if not self.gemini_model:
+            raise ValueError("GEMINI_API_KEY not configured")
+            
+        prompt = """
+        You are an expert accountant and AI assistant. Your task is to analyze the provided financial document (which could be a Trial Balance, P&L, Balance Sheet, or Chart of Accounts export from systems like Tally, Zoho, etc.) and extract all the ledger accounts mentioned in it.
+        
+        For each ledger account you find, map it to Dabby's internal account structure which consists of:
+        1. 'account_class': Must be exactly one of ["Assets", "Liabilities", "Equity", "Revenue", "Expenses"]
+        2. 'group_code': A 3-letter prefix based on the following mapping:
+           - Assets: ACO (Cash & Cash Equivalents), AAR (Accounts Receivable), AIN (Inventory), ATX (Tax & Operational Advances), AFA (Fixed & Intangible Assets)
+           - Liabilities: LAP (Accounts Payable), LDE (Debt & Credit Lines), LST (Statutory & Tax Liabilities), LPR (Payroll Liabilities)
+           - Equity: ESC (Share Capital), ERE (Retained Earnings & Option Pools)
+           - Revenue: ROP (Operating Revenue), RCR (Contra-Revenue & Other Income)
+           - Expenses: XDC (Direct Costs/COGS), XPE (Personnel Costs/OPEX), XMK (Marketing & Growth/OPEX), XTE (Technology & Internal Tools/OPEX), XAD (Administrative & Statutory Expenses)
+        3. 'ledger': The exact name of the ledger as found in the document.
+        4. 'label': A short, user-friendly label (can be same as ledger or slightly simplified).
+        
+        Return ONLY a JSON object containing an array called "accounts" with the extracted and mapped data.
+        """
+        
+        schema = {
+            "type": "OBJECT",
+            "properties": {
+                "accounts": {
+                    "type": "ARRAY",
+                    "items": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "account_class": {"type": "STRING"},
+                            "group_code": {"type": "STRING"},
+                            "ledger": {"type": "STRING"},
+                            "label": {"type": "STRING"}
+                        },
+                        "required": ["account_class", "group_code", "ledger", "label"]
+                    }
+                }
+            },
+            "required": ["accounts"]
+        }
+        
+        try:
+            response = self.gemini_model.generate_content(
+                [prompt, {"mime_type": mime_type, "data": file_bytes}],
+                generation_config={
+                    "response_mime_type": "application/json",
+                    "response_schema": schema
+                }
+            )
+            
+            text = response.text.strip()
+            if text.startswith("```json"):
+                text = text[7:-3].strip()
+            elif text.startswith("```"):
+                text = text[3:-3].strip()
+                
+            data = json.loads(text)
+            return data.get("accounts", [])
+        except Exception as e:
+            print(f"[ERROR] Company Master Import scan failed: {str(e)}")
+            raise ValueError(f"Failed to process document: {str(e)}")
+
 
 ai_service = AIService()
 

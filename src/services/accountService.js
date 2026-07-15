@@ -32,4 +32,17 @@ export const accountService = {
     if (!res.ok) throw new Error("Failed to delete account");
     return res.json();
   },
+
+  async importAccounts(workbenchId, file) {
+    const formData = new FormData();
+    formData.append("workbench_id", workbenchId);
+    formData.append("file", file);
+
+    const res = await apiFetch(`/api/workbench-accounts/ai-import`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) throw new Error("Failed to process document");
+    return res.json();
+  },
 };

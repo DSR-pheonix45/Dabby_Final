@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from typing import List, Optional
 from pydantic import BaseModel
 from supabase_client import supabase
 from auth import get_current_user
+from services.ai_service import ai_service
 
 router = APIRouter()
 
@@ -30,6 +31,19 @@ async def create_account(account: AccountCreate, user = Depends(get_current_user
         if not res.data:
             raise HTTPException(status_code=400, detail="Failed to create account")
         return res.data[0]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/ai-import")
+async def ai_import(
+    workbench_id: str = Form(...),
+    file: UploadFile = File(...),
+    user = Depends(get_current_user)
+):
+    try:
+        content = await file.read()
+        accounts = await ai_service.scan_company_master_import(content, file.content_type)
+        return {"accounts": accounts}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
