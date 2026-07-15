@@ -4,11 +4,13 @@ import { BsGear, BsBuilding } from "react-icons/bs";
 import { collaborationService } from "../../services/collaborationService";
 import { toast } from "react-hot-toast";
 import CompanyMaster from "./CompanyMaster";
+import { supabase } from "../../lib/supabase";
 
 export default function WorkbenchSettings() {
-  const { activeWorkbench, setActiveWorkbench } = useWorkbench();
+  const { activeWorkbench, changeActiveWorkbench, fetchWorkbenches } = useWorkbench();
   const [activeTab, setActiveTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
+  const [logoFile, setLogoFile] = useState(null);
   const [formData, setFormData] = useState({
     name: activeWorkbench?.name || "",
     legal_name: activeWorkbench?.legal_name || "",
@@ -26,13 +28,36 @@ export default function WorkbenchSettings() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      let logoUrl = formData.logo;
+
+      if (logoFile) {
+        const fileExt = logoFile.name.split('.').pop();
+        const fileName = `${activeWorkbench.id}-${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('logos')
+          .upload(fileName, logoFile, { upsert: true });
+
+        if (uploadError) {
+          throw new Error('Error uploading logo');
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('logos')
+          .getPublicUrl(fileName);
+
+        logoUrl = publicUrl;
+      }
+
       await collaborationService.updateSettings(activeWorkbench.id, {
         name: formData.name,
         legal_name: formData.legal_name,
-        logo: formData.logo
+        logo: logoUrl
       });
       // Update local context
-      setActiveWorkbench({ ...activeWorkbench, ...formData });
+      changeActiveWorkbench({ ...activeWorkbench, ...formData, logo: logoUrl });
+      await fetchWorkbenches();
+      setLogoFile(null);
       toast.success("Settings saved successfully");
     } catch (err) {
       console.error(err);
@@ -108,9 +133,9 @@ export default function WorkbenchSettings() {
                     onChange={(e) => {
                       if (e.target.files && e.target.files[0]) {
                         const file = e.target.files[0];
-                        const reader = new FileReader();
-                        reader.onload = (e) => setFormData({ ...formData, logo: e.target.result });
-                        reader.readAsDataURL(file);
+                        setLogoFile(file);
+                        const objectUrl = URL.createObjectURL(file);
+                        setFormData({ ...formData, logo: objectUrl });
                       }
                     }}
                     className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-500/10 file:text-teal-500 hover:file:bg-teal-500/20"

@@ -107,6 +107,7 @@ class VesselCreate(BaseModel):
 class WorkbenchSettingsUpdate(BaseModel):
     name: Optional[str] = None
     legal_name: Optional[str] = None
+    logo: Optional[str] = None
 
 # --- Members & Invites ---
 
@@ -271,6 +272,8 @@ def update_settings(workbench_id: str, payload: WorkbenchSettingsUpdate, user = 
         update_data["name"] = payload.name
     if payload.legal_name is not None:
         update_data["legal_name"] = payload.legal_name
+    if payload.logo is not None:
+        update_data["logo"] = payload.logo
     
     if not update_data:
         return {"status": "no changes"}
