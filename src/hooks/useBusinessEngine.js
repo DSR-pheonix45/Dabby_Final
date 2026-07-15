@@ -62,7 +62,7 @@ function cardConfidence(note) {
 // Board stages, in order. A document flows:
 //   Needs Review / Ready to Post (draft)  ->  posted  ->  settlement decides:
 //   Partially Completed (paid < invoice, difference shown) / Completed (paid == invoice)
-export const STAGE_IDS = ['ready_to_post', 'needs_review', 'partially_completed', 'completed'];
+export const STAGE_IDS = ['ready_to_post', 'needs_review', 'linked_snippet', 'partially_completed', 'completed'];
 
 /**
  * Resolve a document's board stage.
@@ -124,7 +124,7 @@ async function loadDocs(workbenchId) {
 
 // ── KPIs (real counts by board stage) ────────────────────────────────────────
 export function useBusinessEngine(workbenchId) {
-  const [kpis, setKpis] = useState({ readyToPost: 0, needsReview: 0, partiallyCompleted: 0, completed: 0 });
+  const [kpis, setKpis] = useState({ readyToPost: 0, needsReview: 0, linkedSnippet: 0, partiallyCompleted: 0, completed: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -135,11 +135,12 @@ export function useBusinessEngine(workbenchId) {
       try {
         const { docs, statusMap } = await loadDocs(workbenchId);
         if (!alive) return;
-        const c = { readyToPost: 0, needsReview: 0, partiallyCompleted: 0, completed: 0 };
+        const c = { readyToPost: 0, needsReview: 0, linkedSnippet: 0, partiallyCompleted: 0, completed: 0 };
         for (const d of docs) {
           const s = computeStage(d, statusMap);
           if (s === 'ready_to_post') c.readyToPost++;
           else if (s === 'needs_review') c.needsReview++;
+          else if (s === 'linked_snippet') c.linkedSnippet++;
           else if (s === 'partially_completed') c.partiallyCompleted++;
           else if (s === 'completed') c.completed++;
         }

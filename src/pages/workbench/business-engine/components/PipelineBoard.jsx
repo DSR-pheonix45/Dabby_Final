@@ -1,6 +1,6 @@
 import React from 'react';
 import PipelineColumn from './PipelineColumn';
-import { BsEye, BsCheckCircle, BsHourglassSplit, BsCheck2All } from 'react-icons/bs';
+import { BsEye, BsCheckCircle, BsHourglassSplit, BsCheck2All, BsDiagram3 } from 'react-icons/bs';
 
 // A document flows: draft (Needs Review / Ready to Post) -> Approve & Post ->
 // settlement decides completion. Once posted, we compare the invoice value against
@@ -9,6 +9,7 @@ import { BsEye, BsCheckCircle, BsHourglassSplit, BsCheck2All } from 'react-icons
 const STAGES = [
   { id: 'ready_to_post', label: 'Draft · Ready to Post', icon: BsCheckCircle },
   { id: 'needs_review', label: 'Needs Review', icon: BsEye },
+  { id: 'linked_snippet', label: 'Linked Snippet', icon: BsDiagram3 },
   { id: 'partially_completed', label: 'Partially Completed', icon: BsHourglassSplit },
   { id: 'completed', label: 'Completed', icon: BsCheck2All }
 ];
