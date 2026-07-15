@@ -108,6 +108,7 @@ class WorkbenchSettingsUpdate(BaseModel):
     name: Optional[str] = None
     legal_name: Optional[str] = None
     logo: Optional[str] = None
+    company_master: Optional[list] = None
 
 # --- Members & Invites ---
 
@@ -274,6 +275,8 @@ def update_settings(workbench_id: str, payload: WorkbenchSettingsUpdate, user = 
         update_data["legal_name"] = payload.legal_name
     if payload.logo is not None:
         update_data["logo"] = payload.logo
+    if payload.company_master is not None:
+        update_data["company_master"] = payload.company_master
     
     if not update_data:
         return {"status": "no changes"}

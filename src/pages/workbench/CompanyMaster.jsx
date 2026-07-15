@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useWorkbench } from '../../context/WorkbenchContext';
 import { BsTrash } from 'react-icons/bs';
 import { toast } from 'react-hot-toast';
+import { collaborationService } from '../../services/collaborationService';
 
 const ACCOUNT_CLASSES = {
   A: 'Assets',
@@ -107,10 +108,23 @@ export default function CompanyMaster() {
     });
   };
 
-  const handleSave = () => {
-    // Save to context
-    changeActiveWorkbench({ ...activeWorkbench, companyMaster: tableRows });
-    toast.success("Company Master saved successfully! (Frontend state)");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await collaborationService.updateSettings(activeWorkbench.id, {
+        company_master: tableRows
+      });
+      // Save to context
+      changeActiveWorkbench({ ...activeWorkbench, companyMaster: tableRows });
+      toast.success("Company Master saved successfully!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save Company Master to database.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -123,9 +137,10 @@ export default function CompanyMaster() {
           </div>
           <button 
             onClick={handleSave}
-            className="px-4 py-2 bg-teal-500 hover:bg-teal-400 text-black font-medium rounded-md transition-colors text-sm"
+            disabled={isSaving}
+            className="px-4 py-2 bg-teal-500 hover:bg-teal-400 text-black font-medium rounded-md transition-colors text-sm disabled:opacity-50"
           >
-            Save Master Data
+            {isSaving ? "Saving..." : "Save Master Data"}
           </button>
         </div>
 

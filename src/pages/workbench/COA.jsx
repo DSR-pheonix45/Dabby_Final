@@ -47,18 +47,18 @@ export default function COA() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [accs, docs] = await Promise.all([
-        diService.getAccounts(activeWorkbench.id),
-        diService.getDocuments(activeWorkbench.id)
-      ]);
-      setAccounts(accs || []);
+      const docs = await diService.getDocuments(activeWorkbench.id);
       setDocuments(docs || []);
     } catch (err) {
-      toast.error("Failed to load COA data");
+      toast.error("Failed to load COA documents");
     } finally {
       setLoading(false);
     }
   };
+
+  const masterRows = (activeWorkbench?.companyMaster && Array.isArray(activeWorkbench.companyMaster))
+    ? activeWorkbench.companyMaster.filter(row => row.fullCode && row.ledger)
+    : [];
 
   // Mock KPI data for the 5 account types
   const kpis = [
@@ -120,38 +120,23 @@ export default function COA() {
                     <div className="h-4 bg-white/10 rounded w-1/2"></div>
                   </div>
                 </div>
-              ) : accounts.length === 0 ? (
+              ) : masterRows.length === 0 ? (
                 <div className="text-center text-gray-500 py-12">
-                  <p>No accounts configured yet.</p>
-                  <button 
-                    onClick={async () => {
-                      setLoading(true);
-                      try {
-                        await diService.seedAccounts(activeWorkbench.id, 'default-template-id');
-                        toast.success('Financial Language seeded successfully!');
-                        loadData();
-                      } catch (err) {
-                        toast.error(err.message || 'Failed to seed accounts');
-                        setLoading(false);
-                      }
-                    }}
-                    className="mt-4 px-4 py-2 bg-teal-500/20 text-teal-400 border border-teal-500/30 text-sm rounded-lg hover:bg-teal-500/30 transition-colors"
-                  >
-                    Seed Financial Language
-                  </button>
+                  <p>No master accounts configured yet.</p>
+                  <p className="text-xs mt-2">Go to Settings &gt; Company Master to set up your Chart of Accounts.</p>
                 </div>
               ) : (
                 <ul className="space-y-2">
-                  {accounts.map(acc => (
-                    <li key={acc.id} className="p-3 bg-[#181818] border border-white/5 rounded-md shadow-sm transition-colors hover:border-white/10">
+                  {masterRows.map(row => (
+                    <li key={row.id} className="p-3 bg-[#181818] border border-white/5 rounded-md shadow-sm transition-colors hover:border-white/10">
                       <div className="flex justify-between items-center">
                         <span className="font-medium text-white">
-                          <span className="text-teal-400/70 mr-2 font-mono">{acc.code}</span>
-                          {acc.name}
+                          <span className="text-teal-400/70 mr-2 font-mono">{row.fullCode}</span>
+                          {row.ledger}
                         </span>
-                        <span className="text-[10px] px-2 py-1 bg-[#111111] border border-white/10 text-gray-400 rounded uppercase font-bold tracking-wider">{acc.category_code}</span>
+                        <span className="text-[10px] px-2 py-1 bg-[#111111] border border-white/10 text-gray-400 rounded uppercase font-bold tracking-wider">{row.accountClass}</span>
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">Balance: <span className="capitalize">{acc.normal_balance}</span></div>
+                      <div className="text-xs text-gray-500 mt-1">Label: <span className="capitalize">{row.label || "—"}</span> | Group: {row.groupCode}</div>
                     </li>
                   ))}
                 </ul>
