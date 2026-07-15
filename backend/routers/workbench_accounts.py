@@ -42,7 +42,7 @@ async def ai_import(
 ):
     try:
         content = await file.read()
-        accounts = await ai_service.scan_company_master_import(content, file.content_type)
+        accounts = await ai_service.scan_company_master_import(content, file.content_type, file.filename)
         return {"accounts": accounts}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -1489,14 +1489,11 @@ class AIService:
             "bank_accounts": list(set(bank_accounts))[:5],
         }
 
-    async def scan_company_master_import(self, file_bytes: bytes, mime_type: str) -> list:
+    async def scan_company_master_import(self, file_bytes: bytes, mime_type: str, filename: str = "") -> list:
         """
-        Uses Gemini Vision to extract Chart of Accounts / Ledgers from an imported document (Trial Balance, P&L, etc.)
-        and map them to Dabby's internal account structure.
+        Uses Groq (for text/XML/CSV) or Gemini Vision (for PDF/images) to extract Chart of Accounts / Ledgers 
+        from an imported document and map them to Dabby's internal account structure.
         """
-        if not self.gemini_model:
-            raise ValueError("GEMINI_API_KEY not configured")
-            
         prompt = """
         You are an expert accountant and AI assistant. Your task is to analyze the provided financial document (which could be a Trial Balance, P&L, Balance Sheet, or Chart of Accounts export from systems like Tally, Zoho, etc.) and extract all the ledger accounts mentioned in it.
         
@@ -1513,7 +1510,7 @@ class AIService:
         
         Return ONLY a JSON object containing an array called "accounts" with the extracted and mapped data.
         """
-        
+
         schema = {
             "type": "OBJECT",
             "properties": {
@@ -1533,6 +1530,50 @@ class AIService:
             },
             "required": ["accounts"]
         }
+
+        # Try to decode as text or extract PDF text to use Groq (avoids Gemini rate limits)
+        text_content = ""
+        mime = (mime_type or "").lower()
+        filename_lower = (filename or "").lower()
+        is_pdf = mime == "application/pdf" or filename_lower.endswith(".pdf")
+        
+        if is_pdf:
+            try:
+                import fitz
+                pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
+                for page in pdf_doc:
+                    text_content += page.get_text()
+                pdf_doc.close()
+            except Exception as e:
+                print(f"[WARNING] PDF text extraction failed: {e}")
+        else:
+            try:
+                text_content = file_bytes.decode("utf-8")
+            except Exception:
+                pass
+        
+        if text_content and len(text_content.strip()) > 50:
+            from services.groq_pool import GroqPool
+            try:
+                user_msg = f"Document Filename: {filename}\nContent:\n{text_content[:80000]}"
+                completion = GroqPool.execute(
+                    lambda client: client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[
+                            {"role": "system", "content": prompt},
+                            {"role": "user", "content": user_msg}
+                        ],
+                        response_format={"type": "json_object"}
+                    )
+                )
+                data = json.loads(completion.choices[0].message.content)
+                return data.get("accounts", [])
+            except Exception as e:
+                print(f"[WARNING] Groq COA import failed, falling back to Gemini: {e}")
+
+        # Fallback to Gemini
+        if not self.gemini_model:
+            raise ValueError("GEMINI_API_KEY not configured")
         
         try:
             response = self.gemini_model.generate_content(
