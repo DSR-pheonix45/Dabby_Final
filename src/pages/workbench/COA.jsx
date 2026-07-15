@@ -150,7 +150,7 @@ export default function COA() {
                           {row.ledger}
                         </span>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono text-emerald-400 font-medium">
+                          <span className={`text-xs font-mono font-medium ${(row.accountClass === 'Expenses' || row.accountClass === 'Liabilities' || row.groupCode?.startsWith('X') || row.groupCode?.startsWith('L')) ? 'text-rose-400' : 'text-emerald-400'}`}>
                             ₹{(row.currentBalance || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                           </span>
                         </div>
