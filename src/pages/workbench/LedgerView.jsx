@@ -120,12 +120,6 @@ export default function LedgerView() {
         <div className="max-w-[1100px] mx-auto">
           {loading ? (
             <div className="flex items-center justify-center py-24 text-gray-500"><BsArrowRepeat className="animate-spin mr-2" /> Loading…</div>
-          ) : empty ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center">
-              <BsJournalText size={40} className="text-gray-600 mb-4" />
-              <h3 className="text-white font-semibold">No postings yet</h3>
-              <p className="text-gray-500 text-sm mt-1 max-w-sm">In the Business Engine, open a document and click <span className="text-teal-400 font-medium">Approve &amp; Post</span> — your financial statements will build here.</p>
-            </div>
           ) : tab === 'trial' ? (
             <TrialBalance tb={tb} country={country} />
           ) : tab === 'pnl' ? (

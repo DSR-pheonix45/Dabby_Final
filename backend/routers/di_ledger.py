@@ -40,8 +40,6 @@ def _balances(workbench_id: str):
     rows = []
     for a in accts:
         d, c = _r2(agg[a["id"]]["debit"]), _r2(agg[a["id"]]["credit"])
-        if d == 0 and c == 0:
-            continue
         nb = a["normal_balance"]
         net = _r2(d - c) if nb == "debit" else _r2(c - d)
         rows.append({"account_id": a["id"], "code": a["code"], "name": a["name"],
@@ -69,8 +67,6 @@ async def trial_balance(workbench_id: str):
         rows = []
         for a in accts:
             d, c = _r2(agg[a["id"]]["debit"]), _r2(agg[a["id"]]["credit"])
-            if d == 0 and c == 0:
-                continue  # only accounts with activity
             nb = a["normal_balance"]
             net = _r2(d - c) if nb == "debit" else _r2(c - d)
             # place the net balance on its normal side (contra balances flip)
