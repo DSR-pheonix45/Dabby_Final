@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useWorkbench } from '../../context/WorkbenchContext';
 import { BsTrash } from 'react-icons/bs';
 import { toast } from 'react-hot-toast';
-import { collaborationService } from '../../services/collaborationService';
+import { accountService } from '../../services/accountService';
 
 const ACCOUNT_CLASSES = {
   A: 'Assets',
@@ -46,14 +46,42 @@ const SUB_ACCOUNT_GROUPS = {
 export default function CompanyMaster() {
   const { activeWorkbench, changeActiveWorkbench } = useWorkbench();
   
-  // Try to load flat table structure from context, otherwise use an empty initial row
-  const [tableRows, setTableRows] = useState(
-    Array.isArray(activeWorkbench?.companyMaster) && activeWorkbench?.companyMaster.length > 0
-      ? activeWorkbench.companyMaster
-      : [
-          { id: `row-${Date.now()}`, accountClass: '', groupCode: '', ledger: '', label: '', fullCode: '' }
-        ]
-  );
+  const [initialAccounts, setInitialAccounts] = useState([]);
+  const [tableRows, setTableRows] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  React.useEffect(() => {
+    if (activeWorkbench) {
+      loadAccounts();
+    }
+  }, [activeWorkbench]);
+
+  const loadAccounts = async () => {
+    setIsLoading(true);
+    try {
+      const data = await accountService.getAccounts(activeWorkbench.id);
+      setInitialAccounts(data);
+      if (data && data.length > 0) {
+        // Map backend snake_case to frontend camelCase
+        setTableRows(data.map(acc => ({
+          id: acc.id,
+          accountClass: acc.account_class,
+          groupCode: acc.group_code,
+          ledger: acc.ledger,
+          label: acc.label || '',
+          fullCode: acc.full_code,
+          isNew: false
+        })));
+      } else {
+        setTableRows([{ id: `row-${Date.now()}`, accountClass: '', groupCode: '', ledger: '', label: '', fullCode: '', isNew: true }]);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load accounts");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Helper to completely re-index all rows to guarantee consecutive numbering (01, 02, 03...)
   const reindexRows = (rows) => {
@@ -97,7 +125,7 @@ export default function CompanyMaster() {
   const addNewBlankRow = () => {
     setTableRows(prev => [
       ...prev, 
-      { id: `row-${Date.now()}`, accountClass: '', groupCode: '', ledger: '', label: '', fullCode: '' }
+      { id: `row-${Date.now()}`, accountClass: '', groupCode: '', ledger: '', label: '', fullCode: '', isNew: true }
     ]);
   };
 
@@ -113,19 +141,52 @@ export default function CompanyMaster() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await collaborationService.updateSettings(activeWorkbench.id, {
-        company_master: tableRows
-      });
-      // Save to context
-      changeActiveWorkbench({ ...activeWorkbench, companyMaster: tableRows });
-      toast.success("Company Master saved successfully!");
+      // 1. Find deleted rows
+      const currentIds = new Set(tableRows.map(r => r.id));
+      const deletedAccounts = initialAccounts.filter(acc => !currentIds.has(acc.id));
+      
+      const promises = [];
+      
+      // Delete
+      for (const acc of deletedAccounts) {
+        promises.push(accountService.deleteAccount(acc.id));
+      }
+      
+      // Update or Create
+      for (const row of tableRows) {
+        if (!row.fullCode || !row.ledger) continue; // skip incomplete rows
+        
+        const payload = {
+          workbench_id: activeWorkbench.id,
+          account_class: row.accountClass,
+          group_code: row.groupCode,
+          full_code: row.fullCode,
+          ledger: row.ledger,
+          label: row.label
+        };
+
+        if (row.isNew) {
+          promises.push(accountService.createAccount(payload));
+        } else {
+          promises.push(accountService.updateAccount(row.id, payload));
+        }
+      }
+
+      await Promise.all(promises);
+      
+      toast.success("Company Master synchronized successfully!");
+      loadAccounts(); // Reload to get actual UUIDs from DB
     } catch (err) {
       console.error(err);
-      toast.error("Failed to save Company Master to database.");
+      toast.error("Failed to sync Company Master with database.");
     } finally {
       setIsSaving(false);
     }
   };
+
+  if (isLoading) {
+    return <div className="p-8 text-center text-gray-400">Loading Company Master...</div>;
+  }
 
   return (
     <div className="space-y-6">

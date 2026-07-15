@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { diService } from "../../services/diService";
+import { accountService } from "../../services/accountService";
 import { toast } from "react-hot-toast";
 import { BsArrowRepeat } from "react-icons/bs";
 
@@ -37,6 +38,7 @@ export default function COA() {
   const [accounts, setAccounts] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [masterRows, setMasterRows] = useState([]);
 
   useEffect(() => {
     if (activeWorkbench) {
@@ -47,18 +49,30 @@ export default function COA() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const docs = await diService.getDocuments(activeWorkbench.id);
+      const [accountsData, docs] = await Promise.all([
+        accountService.getAccounts(activeWorkbench.id),
+        diService.getDocuments(activeWorkbench.id)
+      ]);
+      
+      const rows = accountsData || [];
+      setMasterRows(
+        rows.map(acc => ({
+          id: acc.id,
+          accountClass: acc.account_class,
+          groupCode: acc.group_code,
+          ledger: acc.ledger,
+          label: acc.label || '',
+          fullCode: acc.full_code,
+        }))
+      );
+      
       setDocuments(docs || []);
     } catch (err) {
-      toast.error("Failed to load COA documents");
+      toast.error("Failed to load COA data");
     } finally {
       setLoading(false);
     }
   };
-
-  const masterRows = (activeWorkbench?.companyMaster && Array.isArray(activeWorkbench.companyMaster))
-    ? activeWorkbench.companyMaster.filter(row => row.fullCode && row.ledger)
-    : [];
 
   // Mock KPI data for the 5 account types
   const kpis = [
