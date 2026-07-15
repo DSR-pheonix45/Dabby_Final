@@ -63,6 +63,7 @@ export default function COA() {
           ledger: acc.ledger,
           label: acc.label || '',
           fullCode: acc.full_code,
+          currentBalance: acc.current_balance || 0,
         }))
       );
       
@@ -148,7 +149,14 @@ export default function COA() {
                           <span className="text-teal-400/70 mr-2 font-mono">{row.fullCode}</span>
                           {row.ledger}
                         </span>
-                        <span className="text-[10px] px-2 py-1 bg-[#111111] border border-white/10 text-gray-400 rounded uppercase font-bold tracking-wider">{row.accountClass}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono text-emerald-400 font-medium">
+                            ${(row.currentBalance || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                          </span>
+                          <span className="text-[10px] px-2 py-1 bg-[#111111] border border-white/10 text-gray-400 rounded uppercase font-bold tracking-wider">
+                            {row.accountClass}
+                          </span>
+                        </div>
                       </div>
                       <div className="text-xs text-gray-500 mt-1">Label: <span className="capitalize">{row.label || "—"}</span> | Group: {row.groupCode}</div>
                     </li>
