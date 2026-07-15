@@ -235,31 +235,31 @@ export default function CompanyMaster() {
 
         {/* Flat Data Table Matrix */}
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
+          <table className="w-full border-collapse text-base">
             <thead>
               <tr className="border-b border-white/10 text-gray-400 bg-white/5">
-                <th className="p-3 text-left font-semibold">Code</th>
-                <th className="p-3 text-left font-semibold">Account Class</th>
-                <th className="p-3 text-left font-semibold">Sub-Account Group</th>
-                <th className="p-3 text-left font-semibold">Ledger</th>
-                <th className="p-3 text-left font-semibold">Label</th>
-                <th className="p-3 text-center font-semibold">Actions</th>
+                <th className="p-4 text-left font-semibold">Code</th>
+                <th className="p-4 text-left font-semibold">Account Class</th>
+                <th className="p-4 text-left font-semibold">Sub-Account Group</th>
+                <th className="p-4 text-left font-semibold">Ledger</th>
+                <th className="p-4 text-left font-semibold">Label</th>
+                <th className="p-4 text-center font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
               {tableRows.map((row) => (
                 <tr key={row.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
                   {/* Code Field */}
-                  <td className="p-3 font-mono text-teal-400 font-bold tracking-wider whitespace-nowrap">
+                  <td className="p-4 font-mono text-teal-400 font-bold tracking-wider whitespace-nowrap">
                     {row.fullCode || '—'}
                   </td>
 
                   {/* Account Selection */}
-                  <td className="p-3">
+                  <td className="p-4">
                     <select 
                       value={row.accountClass}
                       onChange={(e) => handleAccountChange(row.id, e.target.value)}
-                      className="w-full bg-[#1A1A1A] border border-white/10 rounded px-2 py-1.5 text-gray-200 focus:outline-none focus:border-teal-500 min-w-[150px]"
+                      className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-gray-200 focus:outline-none focus:border-teal-500 min-w-[150px]"
                     >
                       <option value="" disabled>Select Class</option>
                       {Object.values(ACCOUNT_CLASSES).map(cls => <option key={cls} value={cls}>{cls}</option>)}
@@ -267,12 +267,12 @@ export default function CompanyMaster() {
                   </td>
 
                   {/* Dynamic Sub-Account Dropdown mapping */}
-                  <td className="p-3">
+                  <td className="p-4">
                     <select 
                       value={row.groupCode}
                       disabled={!row.accountClass}
                       onChange={(e) => handleSubAccountChange(row.id, e.target.value)}
-                      className="w-full bg-[#1A1A1A] border border-white/10 rounded px-2 py-1.5 text-gray-200 focus:outline-none focus:border-teal-500 disabled:opacity-50 min-w-[200px]"
+                      className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-gray-200 focus:outline-none focus:border-teal-500 disabled:opacity-50 min-w-[200px]"
                     >
                       <option value="" disabled>Select Group</option>
                       {row.accountClass && SUB_ACCOUNT_GROUPS[row.accountClass]?.map(group => (
@@ -282,33 +282,33 @@ export default function CompanyMaster() {
                   </td>
 
                   {/* Custom Input Vectors */}
-                  <td className="p-3">
+                  <td className="p-4">
                     <input 
                       type="text" 
                       value={row.ledger} 
                       onChange={(e) => updateRowField(row.id, 'ledger', e.target.value)}
                       placeholder="e.g., ICICI Current" 
-                      className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-1.5 text-gray-200 placeholder-gray-600 focus:outline-none focus:border-teal-500 min-w-[150px]"
+                      className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-gray-200 placeholder-gray-600 focus:outline-none focus:border-teal-500 min-w-[180px]"
                     />
                   </td>
-                  <td className="p-3">
+                  <td className="p-4">
                     <input 
                       type="text" 
                       value={row.label} 
                       onChange={(e) => updateRowField(row.id, 'label', e.target.value)}
                       placeholder="e.g., Operating" 
-                      className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-1.5 text-gray-200 placeholder-gray-600 focus:outline-none focus:border-teal-500 min-w-[150px]"
+                      className="w-full bg-[#1A1A1A] border border-white/10 rounded px-3 py-2 text-gray-200 placeholder-gray-600 focus:outline-none focus:border-teal-500 min-w-[180px]"
                     />
                   </td>
 
                   {/* Delete Row Target */}
-                  <td className="p-3 text-center">
+                  <td className="p-4 text-center">
                     <button 
                       onClick={() => deleteRow(row.id)} 
-                      className="text-gray-500 hover:text-red-500 transition-colors p-1"
+                      className="text-gray-500 hover:text-red-500 transition-colors p-2"
                       title="Delete Row"
                     >
-                      <BsTrash size={16} />
+                      <BsTrash size={18} />
                     </button>
                   </td>
                 </tr>

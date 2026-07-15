@@ -8,7 +8,7 @@ export const accountService = {
   },
 
   async createAccount(accountData) {
-    const res = await apiFetch(`/api/workbench-accounts/`, {
+    const res = await apiFetch(`/api/workbench-accounts`, {
       method: "POST",
       body: JSON.stringify(accountData),
     });
