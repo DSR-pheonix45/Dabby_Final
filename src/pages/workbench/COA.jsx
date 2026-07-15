@@ -13,7 +13,7 @@ const KpiCard = ({ title, netValue, grossValue, color }) => {
         <div className={`absolute inset-0 w-full h-full [backface-visibility:hidden] flex flex-col justify-center px-6 rounded-xl border border-white/10 bg-[#181818]`}>
           <p className={`text-sm font-medium ${color.textTitle}`}>{title}</p>
           <h3 className={`text-2xl font-bold mt-1 text-white`}>
-            ${netValue.toLocaleString()} <span className="text-sm font-normal opacity-70">Net</span>
+            ₹{netValue.toLocaleString()} <span className="text-sm font-normal opacity-70">Net</span>
           </h3>
           <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
             <BsArrowRepeat className="animate-spin-slow" /> Hover for Gross
@@ -24,7 +24,7 @@ const KpiCard = ({ title, netValue, grossValue, color }) => {
         <div className={`absolute inset-0 w-full h-full [backface-visibility:hidden] [transform:rotateY(180deg)] flex flex-col justify-center px-6 rounded-xl border border-white/10 bg-[#1A1A1A]`}>
           <p className="text-sm font-medium text-gray-400">{title} (Gross)</p>
           <h3 className="text-2xl font-bold text-white mt-1">
-            ${grossValue.toLocaleString()}
+            ₹{grossValue.toLocaleString()}
           </h3>
           <p className="text-xs text-gray-500 mt-2">Total cumulative value</p>
         </div>
@@ -151,10 +151,7 @@ export default function COA() {
                         </span>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-mono text-emerald-400 font-medium">
-                            ${(row.currentBalance || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                          </span>
-                          <span className="text-[10px] px-2 py-1 bg-[#111111] border border-white/10 text-gray-400 rounded uppercase font-bold tracking-wider">
-                            {row.accountClass}
+                            ₹{(row.currentBalance || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                           </span>
                         </div>
                       </div>
@@ -205,10 +202,10 @@ export default function COA() {
                                 {entry.account}
                               </td>
                               <td className="py-2 text-right text-gray-300">
-                                {entry.type === 'debit' ? `$${entry.amount.toFixed(2)}` : '-'}
+                                {entry.type === 'debit' ? `₹${entry.amount.toFixed(2)}` : '-'}
                               </td>
                               <td className="py-2 text-right text-gray-300">
-                                {entry.type === 'credit' ? `$${entry.amount.toFixed(2)}` : '-'}
+                                {entry.type === 'credit' ? `₹${entry.amount.toFixed(2)}` : '-'}
                               </td>
                             </tr>
                           ))}
