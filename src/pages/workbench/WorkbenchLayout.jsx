@@ -39,8 +39,12 @@ export default function WorkbenchLayout() {
         <div className="max-w-7xl mx-auto flex flex-col space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="h-12 w-12 bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded-xl flex items-center justify-center text-2xl font-bold">
-                {activeWorkbench.name.charAt(0)}
+              <div className="h-12 w-12 bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded-xl flex items-center justify-center text-2xl font-bold overflow-hidden shrink-0">
+                {activeWorkbench.logo ? (
+                  <img src={activeWorkbench.logo} alt={`${activeWorkbench.name} Logo`} className="w-full h-full object-cover" />
+                ) : (
+                  activeWorkbench.name.charAt(0)
+                )}
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-white tracking-tight">{activeWorkbench.name}</h2>
