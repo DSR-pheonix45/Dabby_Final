@@ -6,6 +6,7 @@ export default function BusinessEngineFilters({ activeFilters, onFilterChange, s
   const stages = [
     { id: 'ready_to_post', label: 'Draft · Ready to Post' },
     { id: 'needs_review', label: 'Needs Review' },
+    { id: 'linked_snippet', label: 'Linked Snippet' },
     { id: 'partially_completed', label: 'Partially Completed' },
     { id: 'completed', label: 'Completed' }
   ];

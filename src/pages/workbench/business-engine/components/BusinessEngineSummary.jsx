@@ -1,17 +1,18 @@
 import React from 'react';
-import { BsCheckCircle, BsEye, BsHourglassSplit, BsCheck2All } from 'react-icons/bs';
+import { BsCheckCircle, BsEye, BsHourglassSplit, BsCheck2All, BsDiagram3 } from 'react-icons/bs';
 
 export default function BusinessEngineSummary({ kpis, loading }) {
   const cards = [
     { title: 'Ready to Post', value: kpis?.readyToPost || 0, icon: BsCheckCircle, color: 'text-teal-400', bg: 'bg-teal-500/10' },
     { title: 'Needs Review', value: kpis?.needsReview || 0, icon: BsEye, color: 'text-purple-400', bg: 'bg-purple-500/10' },
+    { title: 'Linked Snippets', value: kpis?.linkedSnippet || 0, icon: BsDiagram3, color: 'text-blue-400', bg: 'bg-blue-500/10' },
     { title: 'Partially Completed', value: kpis?.partiallyCompleted || 0, icon: BsHourglassSplit, color: 'text-amber-400', bg: 'bg-amber-500/10' },
     { title: 'Completed', value: kpis?.completed || 0, icon: BsCheck2All, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
   ];
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="bg-[#181818] border border-white/10 rounded-xl p-5 h-24 animate-pulse"></div>
         ))}
@@ -20,7 +21,7 @@ export default function BusinessEngineSummary({ kpis, loading }) {
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
       {cards.map((card, idx) => {
         const Icon = card.icon;
         return (
