@@ -7,7 +7,7 @@ import { BsDownload, BsArrowRepeat } from 'react-icons/bs';
 
 export default function OPS() {
   const { workbench } = useOutletContext() || {};
-  const workbenchId = workbench?.id || 'demo';
+  const workbenchId = workbench?.id;
   const [activeTab, setActiveTab] = useState('ar');
 
   const tabs = [

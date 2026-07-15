@@ -3,12 +3,7 @@ import { diService } from '../services/diService';
 
 // --- MOCK DATA (Budgeting only — no backing table yet) ---
 
-const MOCK_BUDGET_DATA = [
-  { id: 'b_001', name: 'Q3 Marketing', department: 'Marketing', category: 'Advertising', allocated: 50000.00, utilized: 15400.00, remaining: 34600.00, variance: '+5%' },
-  { id: 'b_002', name: 'Annual Software', department: 'IT', category: 'SaaS', allocated: 120000.00, utilized: 75000.00, remaining: 45000.00, variance: '-2%' },
-  { id: 'b_003', name: 'Q3 Travel', department: 'Sales', category: 'Travel', allocated: 30000.00, utilized: 28500.00, remaining: 1500.00, variance: '-15%' },
-  { id: 'b_004', name: 'Office Supplies', department: 'Operations', category: 'Supplies', allocated: 10000.00, utilized: 2500.00, remaining: 7500.00, variance: '0%' },
-];
+const MOCK_BUDGET_DATA = [];
 
 // --- HOOKS ---
 
@@ -107,10 +102,10 @@ export function useBudgets(workbenchId) {
   const [search, setSearch] = useState('');
 
   const kpis = {
-    allocated: 210000.00,
-    utilized: 121400.00,
-    remaining: 88600.00,
-    utilizationPercent: 57.8
+    allocated: 0.00,
+    utilized: 0.00,
+    remaining: 0.00,
+    utilizationPercent: 0
   };
 
   useEffect(() => {

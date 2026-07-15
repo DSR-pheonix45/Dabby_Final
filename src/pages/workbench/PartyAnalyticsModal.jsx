@@ -13,14 +13,12 @@ export default function PartyAnalyticsModal({ isOpen, onClose, party }) {
 
   const isOwner = party.party_type === 'internal';
 
-  // Generate realistic-looking placeholder metrics based on the party name length
-  const mockSeed = party.name.length;
-  const avgDSO = isOwner ? 0 : 30 + (mockSeed % 20); // Days Sales Outstanding
-  const avgDPO = isOwner ? 0 : 15 + (mockSeed % 30); // Days Payable Outstanding
-  const retentionRate = 85 + (mockSeed % 15);
-  const totalTrades = 42 + (mockSeed * 3);
-  const totalRevenue = 150000 + (mockSeed * 12500);
-  const receivables = 25000 + (mockSeed * 3000);
+  const avgDSO = 0;
+  const avgDPO = 0;
+  const retentionRate = 0;
+  const totalTrades = 0;
+  const totalRevenue = 0;
+  const receivables = 0;
   
   const settlements = [
     { type: 'Payment Receipt', count: Math.floor(totalTrades * 0.4) },
@@ -195,9 +193,9 @@ export default function PartyAnalyticsModal({ isOpen, onClose, party }) {
                   </div>
 
                   <div className="flex-1 flex flex-col justify-end space-y-4">
-                    <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Revenue over time (Mock)</div>
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Revenue over time</div>
                     <div className="flex items-end gap-2 h-32 w-full border-b border-white/5 pb-2">
-                      {[40, 65, 45, 80, 55, 90, 75, 100].map((height, i) => (
+                      {[0, 0, 0, 0, 0, 0, 0, 0].map((height, i) => (
                         <div key={i} className="flex-1 flex flex-col justify-end group">
                           <div 
                             className="w-full bg-yellow-500/20 group-hover:bg-yellow-500/40 border border-yellow-500/30 rounded-t-sm transition-all duration-300 relative"

@@ -132,7 +132,7 @@ export default function SnippetCard({ transaction, sourceDocument }) {
             </div>
             
             <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
-              {['INV-2024-089', 'BILL-AWS-07', 'INV-WW-892'].map(id => (
+              {[].map(id => (
                 <div 
                   key={id}
                   onClick={() => { setLinkedDoc(id); setIsLinkModalOpen(false); }}

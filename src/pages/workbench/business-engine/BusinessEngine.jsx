@@ -11,7 +11,7 @@ import { BsKanban, BsListUl, BsArrowRepeat, BsDiagram3 } from 'react-icons/bs';
 
 export default function BusinessEngine() {
   const { workbench } = useOutletContext() || {};
-  const workbenchId = workbench?.id || 'demo';
+  const workbenchId = workbench?.id;
   
   const [viewMode, setViewMode] = useState('pipeline'); // 'pipeline' | 'timeline' | 'snippets'
   const [selectedDoc, setSelectedDoc] = useState(null);

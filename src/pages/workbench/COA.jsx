@@ -77,11 +77,11 @@ export default function COA() {
 
   // Mock KPI data for the 5 account types
   const kpis = [
-    { type: 'Asset', net: 150000, gross: 250000, color: { textTitle: 'text-emerald-400' } },
-    { type: 'Liability', net: 45000, gross: 80000, color: { textTitle: 'text-rose-400' } },
-    { type: 'Equity', net: 105000, gross: 170000, color: { textTitle: 'text-blue-400' } },
-    { type: 'Revenue', net: 320000, gross: 400000, color: { textTitle: 'text-violet-400' } },
-    { type: 'Expense', net: 180000, gross: 210000, color: { textTitle: 'text-orange-400' } },
+    { type: 'Asset', net: 0, gross: 0, color: { textTitle: 'text-emerald-400' } },
+    { type: 'Liability', net: 0, gross: 0, color: { textTitle: 'text-rose-400' } },
+    { type: 'Equity', net: 0, gross: 0, color: { textTitle: 'text-blue-400' } },
+    { type: 'Revenue', net: 0, gross: 0, color: { textTitle: 'text-violet-400' } },
+    { type: 'Expense', net: 0, gross: 0, color: { textTitle: 'text-orange-400' } },
   ];
 
   // Extract all proposed journal entries from the documents' analysis notes
