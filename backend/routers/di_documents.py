@@ -391,15 +391,15 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
 
         # EITHER OR LOGIC
         try:
-            print("[DEBUG] Attempting Gemini pipeline...")
-            ocr_provider, extracted_text, predicted_label, analysis_data = await run_gemini_pipeline()
-        except Exception as e_gem:
-            print(f"[DEBUG] Gemini pipeline failed: {e_gem}. Falling back to Sarvam+Groq pipeline...")
+            print("[DEBUG] Attempting Sarvam+Groq pipeline...")
+            ocr_provider, extracted_text, predicted_label, analysis_data = await run_sarvam_groq_pipeline()
+        except Exception as e_sarvam:
+            print(f"[DEBUG] Sarvam+Groq pipeline failed: {e_sarvam}. Falling back to Gemini pipeline...")
             try:
-                ocr_provider, extracted_text, predicted_label, analysis_data = await run_sarvam_groq_pipeline()
-            except Exception as e_sarvam:
-                print(f"[DEBUG] Sarvam+Groq pipeline failed: {e_sarvam}")
-                raise Exception(f"Both Gemini and Sarvam pipelines failed. Gemini error: {e_gem} | Sarvam error: {e_sarvam}")
+                ocr_provider, extracted_text, predicted_label, analysis_data = await run_gemini_pipeline()
+            except Exception as e_gem:
+                print(f"[DEBUG] Gemini pipeline failed: {e_gem}")
+                raise Exception(f"Both Sarvam and Gemini pipelines failed. Sarvam error: {e_sarvam} | Gemini error: {e_gem}")
 
         # Save OCR raw text
         supabase.table("di_document_ocr").insert({
