@@ -86,13 +86,6 @@ async def process_document(document_id: str, hint: Optional[str] = None):
             raise HTTPException(status_code=404, detail="Document not found")
         doc_data = doc_res.data[0]
         
-        supabase.table("di_document_processing_logs").insert({
-            "document_id": document_id,
-            "stage": "ocr",
-            "provider": "groq",
-            "status": "started"
-        }).execute()
-        
         # 2. Download from storage via HTTP
         import httpx
         from supabase_client import url, key
@@ -110,175 +103,68 @@ async def process_document(document_id: str, hint: Optional[str] = None):
                 raise Exception(f"Failed to download from storage: {resp.text}")
             file_bytes = resp.content
         
-        extracted_text = ""
         is_pdf = doc_data['mime_type'] == 'application/pdf'
-        ocr_provider = "sarvam"
         
-        try:
-            from sarvamai.client import SarvamAI
-            import os
-            import time
-            import requests
-            import io
-            import zipfile
-            import asyncio
-            
-            api_key = os.getenv("SARVAM_API_KEY")
-            if api_key:
-                print(f"[DEBUG] Attempting Sarvam AI Document OCR for {doc_data['original_filename']}")
-                sarvam_client = SarvamAI(api_subscription_key=api_key)
-                file_name = doc_data['original_filename']
-                
-                job = sarvam_client.document_intelligence.create_job(language='en-IN', output_format='md')
-                job_id = job.id if hasattr(job, "id") else getattr(job, "job_id", getattr(job, "jobId", None))
-                
-                upload_resp = sarvam_client.document_intelligence.get_upload_links(job_id=job_id, files=[file_name])
-                
-                if hasattr(upload_resp, "upload_urls"):
-                    urls_dict = upload_resp.upload_urls
-                    upload_url = urls_dict[file_name].file_url if hasattr(urls_dict[file_name], "file_url") else urls_dict[file_name]["file_url"]
-                else:
-                    urls_dict = upload_resp["upload_urls"]
-                    upload_url = urls_dict[file_name]["file_url"]
-                    
-                headers = {"x-ms-blob-type": "BlockBlob"}
-                res = requests.put(upload_url, data=file_bytes, headers=headers)
-                
-                if res.status_code in [200, 201]:
-                    sarvam_client.document_intelligence.start(job_id=job_id)
-                    
-                    attempts = 0
-                    state = ""
-                    while attempts < 30: # 1 min timeout
-                        status = sarvam_client.document_intelligence.get_status(job_id=job_id)
-                        state = getattr(status, "job_state", getattr(status, "status", None))
-                        if state in ["Completed", "Failed", "Completed_with_errors"]:
-                            break
-                        await asyncio.sleep(2)
-                        attempts += 1
-                        
-                    if state in ["Completed", "Completed_with_errors"]:
-                        download = sarvam_client.document_intelligence.get_download_links(job_id=job_id)
-                        
-                        if hasattr(download, "download_urls"):
-                            zip_url = download.download_urls['document.zip'].file_url if hasattr(download.download_urls['document.zip'], "file_url") else download.download_urls['document.zip']["file_url"]
-                        else:
-                            zip_url = download["download_urls"]['document.zip']["file_url"]
-                            
-                        zip_res = requests.get(zip_url)
-                        with zipfile.ZipFile(io.BytesIO(zip_res.content)) as z:
-                            md_files = [n for n in z.namelist() if n.endswith('.md') or n.endswith('.txt')]
-                            if md_files:
-                                extracted_text = "\n".join(z.read(n).decode('utf-8') for n in md_files)
-                                print("[DEBUG] Sarvam AI OCR successful.")
-        except Exception as e:
-            print(f"[WARNING] Sarvam API extraction failed: {e}")
-            extracted_text = ""
-            
-        if not extracted_text:
-            ocr_provider = "gemini"
-            print("[DEBUG] Falling back to PyMuPDF/Gemini OCR logic.")
-            if is_pdf:
-                pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
-                for page in pdf_doc:
-                    extracted_text += page.get_text()
-                pdf_doc.close()
-
-        # Save OCR raw text
-        supabase.table("di_document_ocr").insert({
-            "document_id": document_id,
-            "provider": ocr_provider,
-            "language": "en",
-            "raw_text": extracted_text if extracted_text else "Image Document",
-            "confidence": 0.95
-        }).execute()
-        
-        supabase.table("di_document_processing_logs").insert({
-            "document_id": document_id,
-            "stage": "ocr",
-            "provider": ocr_provider,
-            "status": "success"
-        }).execute()
-
-        # 3. Analyze with Gemini (Fetch Workbench Labels to give to LLM)
         labels_res = supabase.table("di_workbench_labels").select("name").eq("workbench_id", doc_data['workbench_id']).execute()
         valid_labels = [l['name'] for l in labels_res.data] if labels_res.data else ["Purchase", "Sales"]
 
         import google.generativeai as genai
         import os
+        from services.groq_pool import GroqPool
+        from services.bank_statement_parser import BankStatementParser
+        import json
         
-        gemini_key = os.environ.get("GEMINI_API_KEY")
-        if not gemini_key:
-            raise Exception("GEMINI_API_KEY is missing in environment variables.")
+        # We will define the extraction pipelines as nested async functions for clarity
+        async def run_gemini_pipeline():
+            gemini_key = os.environ.get("GEMINI_API_KEY")
+            if not gemini_key:
+                raise Exception("GEMINI_API_KEY is missing")
+            genai.configure(api_key=gemini_key)
             
-        genai.configure(api_key=gemini_key)
-        
-        # --- Step 1: Fast Classification ---
-        if hint and hint in ["customer_payment_receipt", "vendor_payment_receipt", "expense_receipt"]:
-            doc_type = hint
-            print(f"[DEBUG] Using manual classification hint: {doc_type}")
-        else:
-            class_prompt = """
-            You are a document classification specialist. Identify the type of this financial document.
-            Return ONLY a JSON object with this exact schema:
-            {
-              "document_type": "bank_statement", // One of: sales_invoice, vendor_invoice, receipt, bank_statement, unknown
-              "confidence": 0.99
-            }
-            """
-            class_model = genai.GenerativeModel(
-                GEMINI_MODEL,
-                system_instruction=class_prompt,
-                generation_config={"response_mime_type": "application/json", "temperature": 0.1}
-            )
+            document_part = {"mime_type": doc_data['mime_type'], "data": file_bytes}
             
-            document_part = {
-                "mime_type": doc_data['mime_type'],
-                "data": file_bytes
-            }
-            classification_prompt = "Classify this document."
-            if extracted_text:
-                classification_prompt = f"Here is the high-quality OCR text from Sarvam AI:\n\n{extracted_text[:4000]}\n\n" + classification_prompt
-            class_res = class_model.generate_content([document_part, classification_prompt])
-                
-            try:
-                class_text = class_res.text.strip()
-                if class_text.startswith("```json"):
-                    class_text = class_text[7:-3].strip()
-                elif class_text.startswith("```"):
-                    class_text = class_text[3:-3].strip()
-                class_data = json.loads(class_text)
-                doc_type = class_data.get("document_type", "unknown").lower()
-            except:
-                doc_type = "unknown"
-                
-            print(f"[DEBUG] di_documents classified as: {doc_type}")
-        
-        # --- Step 2: Specialized Extraction ---
-        if doc_type == "bank_statement":
-            print(f"[DEBUG] Using dedicated BankStatementParser for {doc_data['original_filename']}")
-            from services.bank_statement_parser import BankStatementParser
-            from services.groq_pool import GroqPool
-            import google.generativeai as genai
-            
-            gemini_model = genai.GenerativeModel(GEMINI_MODEL)
-            parser = BankStatementParser(gemini_model, GroqPool.execute)
-            
-            if extracted_text and ocr_provider == "sarvam":
-                print("[DEBUG] Using Sarvam text with Llama-3.3-70b parser")
-                analysis_data = await parser.parse_text(extracted_text, doc_data['original_filename'])
+            # Fast Classification
+            doc_type = "unknown"
+            if hint and hint in ["customer_payment_receipt", "vendor_payment_receipt", "expense_receipt"]:
+                doc_type = hint
+                print(f"[DEBUG] Using manual classification hint: {doc_type}")
             else:
-                print("[DEBUG] Falling back to Gemini Vision parser")
-                analysis_data = await parser.parse_vision(file_bytes, doc_data['mime_type'], doc_data['original_filename'])
-                
-            predicted_label = "bank_statement"
-            overall_confidence = 0.99
-            analysis_data["analysis"] = "Bank Statement parsed successfully using dedicated extraction module."
+                class_prompt = """
+                You are a document classification specialist. Identify the type of this financial document.
+                Return ONLY a JSON object with this exact schema:
+                {
+                  "document_type": "bank_statement", // One of: sales_invoice, vendor_invoice, receipt, bank_statement, unknown
+                  "confidence": 0.99
+                }
+                """
+                class_model = genai.GenerativeModel(
+                    GEMINI_MODEL,
+                    system_instruction=class_prompt,
+                    generation_config={"response_mime_type": "application/json", "temperature": 0.1}
+                )
+                class_res = class_model.generate_content([document_part, "Classify this document."])
+                try:
+                    class_text = class_res.text.strip()
+                    if class_text.startswith("```json"): class_text = class_text[7:-3].strip()
+                    elif class_text.startswith("```"): class_text = class_text[3:-3].strip()
+                    class_data = json.loads(class_text)
+                    doc_type = class_data.get("document_type", "unknown").lower()
+                except:
+                    doc_type = "unknown"
+                    
+            print(f"[DEBUG] Gemini classified as: {doc_type}")
             
-            # Formatting as required by di_analysis_notes / ExtractedDataTab
-            analysis_data["document_type"] = "bank_statement"
-        else:
-            system_prompt = f"""
+            # Extraction
+            if doc_type == "bank_statement":
+                print("[DEBUG] Using dedicated BankStatementParser with Gemini Vision")
+                gemini_model = genai.GenerativeModel(GEMINI_MODEL)
+                parser = BankStatementParser(gemini_model, GroqPool.execute)
+                analysis_data = await parser.parse_vision(file_bytes, doc_data['mime_type'], doc_data['original_filename'])
+                predicted_label = "bank_statement"
+                analysis_data["analysis"] = "Bank Statement parsed successfully using dedicated extraction module."
+                analysis_data["document_type"] = "bank_statement"
+            else:
+                system_prompt = f"""
 You are an expert AI accounting agent. Analyze the invoice/receipt and extract detailed financial insights.
 You MUST classify this document into exactly one of these labels: {valid_labels}.
 
@@ -320,29 +206,216 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
     "analysis": "Human-readable interpretation of the financial impact (2-3 sentences)."
 }}
 """
+                model = genai.GenerativeModel(
+                    GEMINI_MODEL,
+                    system_instruction=system_prompt,
+                    generation_config={"response_mime_type": "application/json", "temperature": 0.1}
+                )
+                response = model.generate_content([document_part, "Extract the financial details from this document."])
+                analysis_text = response.text.strip()
+                if analysis_text.startswith("```json"): analysis_text = analysis_text[7:-3].strip()
+                elif analysis_text.startswith("```"): analysis_text = analysis_text[3:-3].strip()
+                analysis_data = json.loads(analysis_text)
+                predicted_label = analysis_data.get("predicted_label", "Purchase")
+                
+            return "gemini", "", predicted_label, analysis_data
 
-            model = genai.GenerativeModel(
-                GEMINI_MODEL,
-                system_instruction=system_prompt,
-                generation_config={"response_mime_type": "application/json", "temperature": 0.1}
-            )
+        async def run_sarvam_groq_pipeline():
+            from sarvamai.client import SarvamAI
+            import time, requests, io, zipfile, asyncio
             
-            extraction_prompt = "Extract the financial details from this document."
-            if extracted_text:
-                extraction_prompt = f"Here is the high-quality OCR text from Sarvam AI:\n\n{extracted_text[:80000]}\n\n" + extraction_prompt
+            # 1. OCR with Sarvam
+            extracted_text = ""
+            api_key = os.getenv("SARVAM_API_KEY")
+            if not api_key:
+                raise Exception("SARVAM_API_KEY missing")
                 
-            response = model.generate_content([
-                document_part,
-                extraction_prompt
-            ])
+            print(f"[DEBUG] Attempting Sarvam AI Document OCR for {doc_data['original_filename']}")
+            sarvam_client = SarvamAI(api_subscription_key=api_key)
+            file_name = doc_data['original_filename']
+            
+            job = sarvam_client.document_intelligence.create_job(language='en-IN', output_format='md')
+            job_id = job.id if hasattr(job, "id") else getattr(job, "job_id", getattr(job, "jobId", None))
+            
+            upload_resp = sarvam_client.document_intelligence.get_upload_links(job_id=job_id, files=[file_name])
+            if hasattr(upload_resp, "upload_urls"):
+                urls_dict = upload_resp.upload_urls
+                upload_url = urls_dict[file_name].file_url if hasattr(urls_dict[file_name], "file_url") else urls_dict[file_name]["file_url"]
+            else:
+                urls_dict = upload_resp["upload_urls"]
+                upload_url = urls_dict[file_name]["file_url"]
                 
-            analysis_text = response.text.strip()
-            if analysis_text.startswith("```json"):
-                analysis_text = analysis_text[7:-3].strip()
-            elif analysis_text.startswith("```"):
-                analysis_text = analysis_text[3:-3].strip()
-            analysis_data = json.loads(analysis_text)
-            predicted_label = analysis_data.get("predicted_label", "Purchase")
+            headers = {"x-ms-blob-type": "BlockBlob"}
+            res = requests.put(upload_url, data=file_bytes, headers=headers)
+            if res.status_code not in [200, 201]:
+                raise Exception("Failed to upload to Sarvam")
+                
+            sarvam_client.document_intelligence.start(job_id=job_id)
+            attempts = 0
+            state = ""
+            while attempts < 30: # 1 min timeout
+                status = sarvam_client.document_intelligence.get_status(job_id=job_id)
+                state = getattr(status, "job_state", getattr(status, "status", None))
+                if state in ["Completed", "Failed", "Completed_with_errors"]:
+                    break
+                await asyncio.sleep(2)
+                attempts += 1
+                
+            if state in ["Completed", "Completed_with_errors"]:
+                download = sarvam_client.document_intelligence.get_download_links(job_id=job_id)
+                if hasattr(download, "download_urls"):
+                    zip_url = download.download_urls['document.zip'].file_url if hasattr(download.download_urls['document.zip'], "file_url") else download.download_urls['document.zip']["file_url"]
+                else:
+                    zip_url = download["download_urls"]['document.zip']["file_url"]
+                    
+                zip_res = requests.get(zip_url)
+                with zipfile.ZipFile(io.BytesIO(zip_res.content)) as z:
+                    md_files = [n for n in z.namelist() if n.endswith('.md') or n.endswith('.txt')]
+                    if md_files:
+                        extracted_text = "\n".join(z.read(n).decode('utf-8') for n in md_files)
+                        print("[DEBUG] Sarvam AI OCR successful.")
+            
+            if not extracted_text:
+                if is_pdf:
+                    import fitz
+                    print("[DEBUG] Sarvam returned empty, using PyMuPDF")
+                    pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
+                    extracted_text = "".join(page.get_text() for page in pdf_doc)
+                    pdf_doc.close()
+                if not extracted_text:
+                    raise Exception("Sarvam/PyMuPDF could not extract text")
+                    
+            # 2. Fast Classification
+            doc_type = "unknown"
+            if hint and hint in ["customer_payment_receipt", "vendor_payment_receipt", "expense_receipt"]:
+                doc_type = hint
+            else:
+                class_prompt = """
+                You are a document classification specialist. Identify the type of this financial document.
+                Return ONLY a JSON object with this exact schema:
+                {
+                  "document_type": "bank_statement", // One of: sales_invoice, vendor_invoice, receipt, bank_statement, unknown
+                  "confidence": 0.99
+                }
+                """
+                completion = GroqPool.execute(
+                    lambda client: client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[
+                            {"role": "system", "content": class_prompt},
+                            {"role": "user", "content": f"Document text:\n{extracted_text[:80000]}"}
+                        ],
+                        response_format={"type": {"type": "json_object"}},
+                        temperature=0.1
+                    )
+                )
+                try:
+                    class_data = json.loads(completion.choices[0].message.content)
+                    doc_type = class_data.get("document_type", "unknown").lower()
+                except:
+                    doc_type = "unknown"
+            
+            # 3. Extraction
+            if doc_type == "bank_statement":
+                gemini_model = None
+                parser = BankStatementParser(gemini_model, GroqPool.execute)
+                analysis_data = await parser.parse_text(extracted_text, doc_data['original_filename'])
+                predicted_label = "bank_statement"
+                analysis_data["analysis"] = "Bank Statement parsed successfully using dedicated extraction module."
+                analysis_data["document_type"] = "bank_statement"
+            else:
+                system_prompt = f"""
+You are an expert AI accounting agent. Analyze the invoice/receipt and extract detailed financial insights.
+You MUST classify this document into exactly one of these labels: {valid_labels}.
+
+Return ONLY valid JSON matching this exact schema. For every value, provide a "value" and a "confidence" score (0.0 to 1.0).
+
+{{
+    "predicted_label": "String (Must be one of the provided labels)",
+    "document_type": "Invoice / Receipt / etc",
+    "parties": {{
+        "vendor": {{"value": "String", "confidence": 0.99}},
+        "customer": {{"value": "String", "confidence": 0.99}}
+    }},
+    "document": {{
+        "reference_number": {{"value": "String", "confidence": 0.99}},
+        "date": {{"value": "YYYY-MM-DD", "confidence": 0.99}}
+    }},
+    "financials": {{
+        "total_amount": {{"value": 1500.00, "confidence": 0.99}},
+        "tax_amount": {{"value": 100.00, "confidence": 0.99}},
+        "currency": {{"value": "USD", "confidence": 0.99}}
+    }},
+    "line_items": [
+        {{
+            "description": {{"value": "String", "confidence": 0.99}},
+            "quantity": {{"value": 1, "confidence": 0.99}},
+            "unit_price": {{"value": 100.00, "confidence": 0.99}},
+            "total": {{"value": 100.00, "confidence": 0.99}}
+        }}
+    ],
+    "financial_impact": [
+        {{ "account": "Expense", "amount": 1400.00, "type": "increase" }}
+    ],
+    "business_events": [
+        "Expense Incurred"
+    ],
+    "expected_journal": [
+        {{ "account": "Expense", "type": "debit", "amount": 1400.00 }}
+    ],
+    "analysis": "Human-readable interpretation of the financial impact (2-3 sentences)."
+}}
+"""
+                completion = GroqPool.execute(
+                    lambda client: client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": f"Document text:\n{extracted_text[:80000]}"}
+                        ],
+                        response_format={"type": {"type": "json_object"}},
+                        temperature=0.1
+                    )
+                )
+                analysis_data = json.loads(completion.choices[0].message.content)
+                predicted_label = analysis_data.get("predicted_label", "Purchase")
+                
+            return "sarvam", extracted_text, predicted_label, analysis_data
+
+        supabase.table("di_document_processing_logs").insert({
+            "document_id": document_id,
+            "stage": "ocr",
+            "provider": "system",
+            "status": "started"
+        }).execute()
+
+        # EITHER OR LOGIC
+        try:
+            print("[DEBUG] Attempting Gemini pipeline...")
+            ocr_provider, extracted_text, predicted_label, analysis_data = await run_gemini_pipeline()
+        except Exception as e_gem:
+            print(f"[DEBUG] Gemini pipeline failed: {e_gem}. Falling back to Sarvam+Groq pipeline...")
+            try:
+                ocr_provider, extracted_text, predicted_label, analysis_data = await run_sarvam_groq_pipeline()
+            except Exception as e_sarvam:
+                print(f"[DEBUG] Sarvam+Groq pipeline failed: {e_sarvam}")
+                raise Exception(f"Both Gemini and Sarvam pipelines failed. Gemini error: {e_gem} | Sarvam error: {e_sarvam}")
+
+        # Save OCR raw text
+        supabase.table("di_document_ocr").insert({
+            "document_id": document_id,
+            "provider": ocr_provider,
+            "language": "en",
+            "raw_text": extracted_text if extracted_text else "Image Document",
+            "confidence": 0.95
+        }).execute()
+        
+        supabase.table("di_document_processing_logs").insert({
+            "document_id": document_id,
+            "stage": "ocr",
+            "provider": ocr_provider,
+            "status": "success"
+        }).execute()
         
         # Calculate overall confidence based on field confidences
         confidences = []
@@ -376,7 +449,7 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
         supabase.table("di_document_processing_logs").insert({
             "document_id": document_id,
             "stage": "analysis",
-            "provider": "groq",
+            "provider": ocr_provider,
             "status": "success"
         }).execute()
 
