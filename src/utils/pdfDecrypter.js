@@ -20,57 +20,16 @@ export async function checkPdfPassword(file) {
   }
 }
 
-export async function unlockPdf(file, password) {
+export async function verifyPdfPassword(file, password) {
   const arrayBuffer = await file.arrayBuffer();
-  let pdf;
   try {
     const loadingTask = getDocument({ data: arrayBuffer, password });
-    pdf = await loadingTask.promise;
+    await loadingTask.promise;
+    return true; // Password is correct
   } catch (error) {
     if (error.name === 'PasswordException') {
       throw new Error('Incorrect password');
     }
     throw error;
   }
-
-  // Scan pages and create new PDF
-  const newPdf = new jsPDF('p', 'pt', 'a4');
-  
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-    const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 2.0 }); // High scale for better OCR quality
-    
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
-
-    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    
-    if (pageNum > 1) {
-      newPdf.addPage();
-    }
-    
-    // Scale image to fit A4 page
-    const pdfWidth = newPdf.internal.pageSize.getWidth();
-    const pdfHeight = newPdf.internal.pageSize.getHeight();
-    const imgRatio = canvas.width / canvas.height;
-    const pdfRatio = pdfWidth / pdfHeight;
-    
-    let drawWidth = pdfWidth;
-    let drawHeight = pdfHeight;
-    if (imgRatio > pdfRatio) {
-      drawHeight = pdfWidth / imgRatio;
-    } else {
-      drawWidth = pdfHeight * imgRatio;
-    }
-    
-    newPdf.addImage(imgData, 'JPEG', 0, 0, drawWidth, drawHeight);
-  }
-
-  const pdfBlob = newPdf.output('blob');
-  const newName = file.name.replace(/\.[^/.]+$/, "") + "_unlocked.pdf";
-  return new File([pdfBlob], newName, { type: 'application/pdf' });
 }

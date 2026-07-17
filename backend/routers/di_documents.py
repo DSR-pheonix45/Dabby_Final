@@ -78,7 +78,7 @@ async def upload_document(
         raise HTTPException(status_code=400, detail=f"Upload Error: {str(e)} | Traceback: {err_msg}")
 
 @router.post("/{document_id}/process")
-async def process_document(document_id: str, hint: Optional[str] = None):
+async def process_document(document_id: str, hint: Optional[str] = None, password: Optional[str] = None):
     try:
         # 1. Fetch document metadata
         doc_res = supabase.table("di_documents").select("*").eq("id", document_id).execute()
@@ -103,7 +103,19 @@ async def process_document(document_id: str, hint: Optional[str] = None):
                 raise Exception(f"Failed to download from storage: {resp.text}")
             file_bytes = resp.content
         
-        is_pdf = doc_data['mime_type'] == 'application/pdf'
+        is_pdf = doc_data['mime_type'] == 'application/pdf' or doc_data['original_filename'].lower().endswith('.pdf')
+        
+        # Decrypt if PDF is password protected
+        if is_pdf:
+            import fitz
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            if doc.needs_pass:
+                if not password:
+                    raise Exception("PDF is password protected but no password was provided.")
+                if not doc.authenticate(password):
+                    raise Exception("Incorrect PDF password.")
+                file_bytes = doc.tobytes()
+            doc.close()
         
         labels_res = supabase.table("di_workbench_labels").select("name").eq("workbench_id", doc_data['workbench_id']).execute()
         valid_labels = [l['name'] for l in labels_res.data] if labels_res.data else ["Purchase", "Sales"]

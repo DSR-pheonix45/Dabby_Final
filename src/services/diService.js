@@ -43,10 +43,13 @@ export const diService = {
     return res.json();
   },
 
-  async processDocument(documentId, hint = null) {
-    const url = hint 
-      ? `/api/di/documents/${documentId}/process?hint=${encodeURIComponent(hint)}`
-      : `/api/di/documents/${documentId}/process`;
+  async processDocument(documentId, hint = null, password = null) {
+    const params = new URLSearchParams();
+    if (hint) params.append('hint', hint);
+    if (password) params.append('password', password);
+    const queryString = params.toString();
+    
+    const url = `/api/di/documents/${documentId}/process${queryString ? '?' + queryString : ''}`;
     const res = await apiFetch(url, {
       method: 'POST',
     });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useWorkbench } from "../../../context/WorkbenchContext";
 import { diService } from "../../../services/diService";
-import { checkPdfPassword, unlockPdf } from "../../../utils/pdfDecrypter";
+import { checkPdfPassword, verifyPdfPassword } from "../../../utils/pdfDecrypter";
 import { toast } from "react-hot-toast";
 import { useDropzone } from "react-dropzone";
 import { BsCloudUpload, BsShieldLock } from "react-icons/bs";
@@ -102,11 +102,11 @@ export default function DocVaultIndex() {
     
     setUnlocking(true);
     try {
-      const unlockedFile = await unlockPdf(lockedFile, pdfPassword);
+      await verifyPdfPassword(lockedFile, pdfPassword);
       setShowPasswordModal(false);
-      setPdfPassword("");
+      // We do NOT clear pdfPassword here, as we need it for the upload!
+      setPendingFile(lockedFile);
       setLockedFile(null);
-      setPendingFile(unlockedFile);
       setShowClassModal(true);
     } catch (err) {
       toast.error(err.message || "Failed to unlock PDF. Incorrect password?");
@@ -118,8 +118,10 @@ export default function DocVaultIndex() {
   const handleUploadWithHint = async (hint) => {
     if (!pendingFile || !activeWorkbench) return;
     const file = pendingFile;
+    const currentPassword = pdfPassword;
     setPendingFile(null);
     setShowClassModal(false);
+    setPdfPassword(""); // Reset for next file
     
     setUploading(true);
     try {
@@ -128,7 +130,7 @@ export default function DocVaultIndex() {
       
       toast.loading("AI parsing in progress...", { id: "upload" });
       
-      await diService.processDocument(res.document_id, hint);
+      await diService.processDocument(res.document_id, hint, currentPassword);
       
       toast.success("Document parsed successfully!", { id: "upload" });
       loadDocuments();
