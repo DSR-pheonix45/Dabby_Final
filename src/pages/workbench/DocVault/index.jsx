@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useWorkbench } from "../../../context/WorkbenchContext";
 import { diService } from "../../../services/diService";
+import { checkPdfPassword, unlockPdf } from "../../../utils/pdfDecrypter";
 import { toast } from "react-hot-toast";
 import { useDropzone } from "react-dropzone";
 import { BsCloudUpload, BsShieldLock } from "react-icons/bs";
@@ -37,7 +38,10 @@ export default function DocVaultIndex() {
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [pendingFile, setPendingFile] = useState(null);
   const [showClassModal, setShowClassModal] = useState(false);
-
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [pdfPassword, setPdfPassword] = useState("");
+  const [unlocking, setUnlocking] = useState(false);
+  const [lockedFile, setLockedFile] = useState(null);
   const loadDocuments = async () => {
     if (!activeWorkbench) return;
     setLoading(true);
@@ -71,11 +75,45 @@ export default function DocVaultIndex() {
     loadDocuments();
   }, [activeWorkbench]);
 
-  const onDrop = useCallback((acceptedFiles) => {
+  const onDrop = useCallback(async (acceptedFiles) => {
     if (acceptedFiles.length === 0 || !activeWorkbench) return;
-    setPendingFile(acceptedFiles[0]);
+    const file = acceptedFiles[0];
+
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      try {
+        const isProtected = await checkPdfPassword(file);
+        if (isProtected) {
+          setLockedFile(file);
+          setShowPasswordModal(true);
+          return;
+        }
+      } catch (err) {
+        console.error("Error checking PDF password:", err);
+      }
+    }
+
+    setPendingFile(file);
     setShowClassModal(true);
   }, [activeWorkbench]);
+
+  const handleUnlockPdf = async (e) => {
+    e.preventDefault();
+    if (!pdfPassword || !lockedFile) return;
+    
+    setUnlocking(true);
+    try {
+      const unlockedFile = await unlockPdf(lockedFile, pdfPassword);
+      setShowPasswordModal(false);
+      setPdfPassword("");
+      setLockedFile(null);
+      setPendingFile(unlockedFile);
+      setShowClassModal(true);
+    } catch (err) {
+      toast.error(err.message || "Failed to unlock PDF. Incorrect password?");
+    } finally {
+      setUnlocking(false);
+    }
+  };
 
   const handleUploadWithHint = async (hint) => {
     if (!pendingFile || !activeWorkbench) return;
@@ -187,6 +225,50 @@ export default function DocVaultIndex() {
           </Panel>
         </PanelGroup>
       </div>
+
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-[#18181A] border border-white/10 rounded-2xl p-6 shadow-2xl relative">
+            <h3 className="text-lg font-bold text-white mb-2">Password Protected</h3>
+            <p className="text-xs text-gray-400 mb-6">This PDF is password protected. Please enter the password to scan its contents.</p>
+            
+            <form onSubmit={handleUnlockPdf} className="space-y-4">
+              <input
+                type="password"
+                value={pdfPassword}
+                onChange={(e) => setPdfPassword(e.target.value)}
+                placeholder="Enter document password"
+                className="w-full px-4 py-3 bg-[#0D0D0D] border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-teal-500/50"
+                autoFocus
+              />
+              
+              <button
+                type="submit"
+                disabled={unlocking || !pdfPassword}
+                className="w-full text-center px-4 py-3 bg-teal-500 hover:bg-teal-400 text-black rounded-xl transition-colors font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {unlocking ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin"></div>
+                    Scanning Document...
+                  </>
+                ) : (
+                  "Unlock & Scan"
+                )}
+              </button>
+              
+              <button 
+                type="button"
+                onClick={() => { setLockedFile(null); setShowPasswordModal(false); setPdfPassword(""); }}
+                className="w-full py-2 text-xs font-semibold text-gray-500 hover:text-white transition-colors"
+                disabled={unlocking}
+              >
+                Cancel
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {showClassModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
