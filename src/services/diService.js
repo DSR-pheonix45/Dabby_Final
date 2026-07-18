@@ -164,5 +164,21 @@ export const diService = {
     }
     return result;
   },
+
+  async addManualSettlement(workbenchId, eventId, eventType, amount, date, notes) {
+    const res = await apiFetch(`/api/settlements/manual`, {
+      method: 'POST',
+      body: JSON.stringify({
+        workbench_id: workbenchId,
+        event_id: eventId,
+        event_type: eventType,
+        amount,
+        date,
+        notes
+      }),
+    });
+    if (!res.ok) throw new Error(await this._err(res, 'Failed to add manual settlement'));
+    return res.json();
+  },
 };
 

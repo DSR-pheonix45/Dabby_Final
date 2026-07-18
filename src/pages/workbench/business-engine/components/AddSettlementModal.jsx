@@ -3,6 +3,7 @@ import { BsX, BsBank, BsReceipt, BsCash, BsUpload, BsLink45Deg } from 'react-ico
 import { toast } from 'react-hot-toast';
 import { formatCurrency } from '../../../../utils/currency';
 import { useWorkbench } from '../../../../context/WorkbenchContext';
+import { diService } from '../../../../services/diService';
 
 export default function AddSettlementModal({ isOpen, onClose, data }) {
   const { activeWorkbench } = useWorkbench();
@@ -18,15 +19,25 @@ export default function AddSettlementModal({ isOpen, onClose, data }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!activeWorkbench?.id || !data?.settlement?.eventId) {
+      toast.error('Missing invoice reference for settlement');
+      return;
+    }
     setLoading(true);
     try {
-      // Simulate API call to save settlement
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await diService.addManualSettlement(
+        activeWorkbench.id,
+        data.settlement.eventId,
+        data.settlement.eventType,
+        manualAmount,
+        manualDate,
+        manualNotes
+      );
       toast.success('Settlement entry added successfully');
       window.dispatchEvent(new CustomEvent('ledger:updated'));
       onClose();
     } catch (error) {
-      toast.error('Failed to add settlement');
+      toast.error(error.message || 'Failed to add settlement');
     } finally {
       setLoading(false);
     }

@@ -99,6 +99,8 @@ function mapDocToCard(doc, statusMap = {}) {
       paid: st.paid,
       difference: st.difference,
       status: st.status,
+      eventId: st.event_id,
+      eventType: st.event_type
     } : null,
     linkedDocs: (note?.line_items?.length) || 0,
     filename: doc.original_filename,
