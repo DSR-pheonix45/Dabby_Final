@@ -287,7 +287,8 @@ async def receivables(workbench_id: str):
         return {
             "data": [{
                 "id": r["id"], "customer": r["counterparty"], "invoiceNumber": r["reference"],
-                "date": r["date"], "dueDate": r["dueDate"], "amount": r["outstanding"],
+                "date": r["date"], "dueDate": r["dueDate"], "totalAmount": r["amount"],
+                "paid": r["paid"], "left": r["outstanding"],
                 "daysOutstanding": r["daysOutstanding"], "status": r["status"], "rep": "—",
             } for r in open_rows],
             "kpis": {"total": total, "overdue": overdue, "dso": dso, "customersWithOverdue": customers_overdue},

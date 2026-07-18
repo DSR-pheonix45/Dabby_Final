@@ -33,9 +33,19 @@ export default function AccountsReceivable({ workbenchId }) {
     { header: 'Date', accessor: 'date' },
     { header: 'Due Date', accessor: 'dueDate' },
     { 
-      header: 'Amount', 
+      header: 'Total', 
       align: 'right',
-      render: (row) => <span className="font-semibold">₹{row.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+      render: (row) => <span className="font-semibold">₹{(row.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+    },
+    { 
+      header: 'Paid', 
+      align: 'right',
+      render: (row) => <span className="font-medium text-emerald-400">₹{(row.paid || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+    },
+    { 
+      header: 'Left', 
+      align: 'right',
+      render: (row) => <span className="font-bold text-amber-400">₹{(row.left || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
     },
     { 
       header: 'Days Out.', 

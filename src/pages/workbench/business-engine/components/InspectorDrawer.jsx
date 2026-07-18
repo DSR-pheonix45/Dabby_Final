@@ -5,6 +5,7 @@ import { useWorkbench } from '../../../../context/WorkbenchContext';
 import { formatCurrency } from '../../../../utils/currency';
 import { diService } from '../../../../services/diService';
 import { financialRouting, ROUTING_TONE } from '../../../../utils/financialRouting';
+import AddSettlementModal from './AddSettlementModal';
 
 const lineDesc = (li, i) => li.description || li.desc || li.narration || li.particulars || li.name || `Line ${i + 1}`;
 const lineAmt = (li) => Number(li.amount ?? li.total ?? li.line_total ?? li.credit ?? li.debit ?? li.value ?? 0);
@@ -13,6 +14,7 @@ export default function InspectorDrawer({ isOpen, onClose, data, onPosted }) {
   const { activeWorkbench } = useWorkbench();
   const [posting, setPosting] = useState(false);
   const [posted, setPosted] = useState(null); // { status, debits, credits, entries }
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
 
   useEffect(() => { setPosted(null); }, [data?.id]);
 
@@ -146,6 +148,15 @@ export default function InspectorDrawer({ isOpen, onClose, data, onPosted }) {
                   </p>
                 </div>
               </div>
+              
+              {data.settlement.status !== 'completed' && (
+                <button 
+                  onClick={() => setShowSettlementModal(true)}
+                  className="w-full mt-3 py-1.5 text-[11px] font-bold text-teal-400 border border-teal-500/30 rounded hover:bg-teal-500/10 transition-colors uppercase tracking-wider"
+                >
+                  + Add Settlement
+                </button>
+              )}
             </div>
           )}
 
@@ -248,6 +259,12 @@ export default function InspectorDrawer({ isOpen, onClose, data, onPosted }) {
           </div>
         </div>
       </div>
+      
+      <AddSettlementModal 
+        isOpen={showSettlementModal} 
+        onClose={() => setShowSettlementModal(false)} 
+        data={data}
+      />
     </>
   );
 }
