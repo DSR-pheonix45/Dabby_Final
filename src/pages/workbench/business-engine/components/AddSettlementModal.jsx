@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { BsX, BsBank, BsReceipt, BsCash, BsUpload, BsLink45Deg } from 'react-icons/bs';
 import { toast } from 'react-hot-toast';
-import { formatCurrency } from '../../../../../utils/currency';
-import { useWorkbench } from '../../../../../context/WorkbenchContext';
+import { formatCurrency } from '../../../../utils/currency';
+import { useWorkbench } from '../../../../context/WorkbenchContext';
 
 export default function AddSettlementModal({ isOpen, onClose, data }) {
   const { activeWorkbench } = useWorkbench();
