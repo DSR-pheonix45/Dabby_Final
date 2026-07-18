@@ -82,7 +82,7 @@ async def add_manual_settlement(payload: dict, user=Depends(verify_user_access))
             "amount": amount,
             "currency": "INR",
             "event_status": "OPEN",
-            "event_metadata": {"is_manual_settlement": True, "notes": notes},
+            "event_metadata": {"is_manual_settlement": True, "notes": notes, "workbench_id": workbench_id},
             "is_superseded": False,
         }
         event_result = supabase.table("business_events").insert(payment_row).execute()

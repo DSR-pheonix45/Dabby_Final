@@ -48,7 +48,7 @@ COMMENT ON TABLE di_template_accounts IS 'Global ledger account templates';
 
 -- Seed Default Ledger Accounts
 INSERT INTO di_template_accounts (code, name, category_code, normal_balance, sort_order) VALUES
-('1000', 'Cash', 'AST', 'debit', 10),
+('1000', 'Petty Cash', 'AST', 'debit', 10),
 ('1100', 'Bank Accounts', 'AST', 'debit', 20),
 ('1200', 'Accounts Receivable', 'AST', 'debit', 30),
 ('1300', 'Inventory', 'AST', 'debit', 40),

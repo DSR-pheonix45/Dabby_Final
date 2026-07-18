@@ -52,10 +52,12 @@ NON_POSTING = {
 }
 
 
-def build_postings(event_type: str, total: float, tax: float, net: float) -> List[Tuple[str, str, float]]:
+def build_postings(event_type: str, total: float, tax: float, net: float, is_manual: bool = False) -> List[Tuple[str, str, float]]:
     """Return [(role, 'debit'|'credit', amount)] for an event type (GST-aware)."""
     t, x = q2(total), q2(tax)
     n = q2(net) if net else q2(t - x)
+    
+    asset_role = "cash" if is_manual else "bank"
 
     if event_type == "CUSTOMER_BILLED":
         if x > 0:
@@ -68,25 +70,25 @@ def build_postings(event_type: str, total: float, tax: float, net: float) -> Lis
         return [("expense", "debit", t), ("accounts_payable", "credit", t)]
 
     if event_type == "CUSTOMER_PAYMENT_RECEIVED":
-        return [("bank", "debit", t), ("accounts_receivable", "credit", t)]
+        return [(asset_role, "debit", t), ("accounts_receivable", "credit", t)]
     if event_type == "VENDOR_PAYMENT_MADE":
-        return [("accounts_payable", "debit", t), ("bank", "credit", t)]
+        return [("accounts_payable", "debit", t), (asset_role, "credit", t)]
     if event_type == "PAYROLL_INCURRED":
         return [("salary_expense", "debit", t), ("salary_payable", "credit", t)]
     if event_type == "PAYROLL_PAID":
-        return [("salary_payable", "debit", t), ("bank", "credit", t)]
+        return [("salary_payable", "debit", t), (asset_role, "credit", t)]
     if event_type == "LOAN_RECEIVED":
-        return [("bank", "debit", t), ("loans", "credit", t)]
+        return [(asset_role, "debit", t), ("loans", "credit", t)]
     if event_type == "LOAN_REPAID":
-        return [("loans", "debit", t), ("bank", "credit", t)]
+        return [("loans", "debit", t), (asset_role, "credit", t)]
     if event_type == "INVESTMENT_RECEIVED":
-        return [("bank", "debit", t), ("capital", "credit", t)]
+        return [(asset_role, "debit", t), ("capital", "credit", t)]
     if event_type == "TAX_PAID":
-        return [("tax_payable", "debit", t), ("bank", "credit", t)]
+        return [("tax_payable", "debit", t), (asset_role, "credit", t)]
     if event_type == "TAX_LIABILITY_CREATED":
         return [("expense", "debit", t), ("tax_payable", "credit", t)]
     if event_type == "EXPENSE_INCURRED":
-        return [("expense", "debit", t), ("bank", "credit", t)]
+        return [("expense", "debit", t), (asset_role, "credit", t)]
     if event_type == "CREDIT_NOTE_ISSUED":
         return [("revenue", "debit", t), ("accounts_receivable", "credit", t)]
     if event_type == "DEBIT_NOTE_ISSUED":
@@ -145,13 +147,14 @@ class LedgerCompiler:
         meta = ev.get("event_metadata") or {}
         tax = q2((meta.get("taxes") or {}).get("total_tax"))
         net = q2((meta.get("money") or {}).get("subtotal"))
+        is_manual = meta.get("is_manual_settlement", False)
 
         # Resolve workbench (events are user-scoped; ledger is workbench-scoped)
         workbench_id = self._resolve_workbench(ev)
         if not workbench_id:
             raise ValueError("Could not resolve workbench for this event (no document linkage)")
 
-        legs = build_postings(event_type, q2(total), tax, net)
+        legs = build_postings(event_type, q2(total), tax, net, is_manual=is_manual)
         if not legs:
             return {"status": "no_entry", "reason": f"no posting rule for {event_type}"}
 
@@ -231,6 +234,10 @@ class LedgerCompiler:
         }
 
     def _resolve_workbench(self, event: Dict) -> Optional[str]:
+        meta = event.get("event_metadata") or {}
+        if meta.get("workbench_id"):
+            return meta["workbench_id"]
+            
         doc_id = event.get("document_id")
         if doc_id:
             d = supabase.table("di_documents").select("workbench_id").eq("id", doc_id).limit(1).execute()

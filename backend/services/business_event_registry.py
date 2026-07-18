@@ -190,7 +190,7 @@ class BusinessEventRegistry:
         """Fetch a Business Event with its Trade Draft and Analysis Note summary."""
         result = (
             supabase.table("business_events")
-                    .select("*, trade_drafts(status, reviewer_notes), di_analysis_notes(document_type, classification_type, confidence)")
+                    .select("*, trade_drafts!business_events_trade_draft_id_fkey(status, reviewer_notes), di_analysis_notes(document_type, classification_type, confidence)")
                     .eq("id", event_id)
                     .single()
                     .execute()
