@@ -7,51 +7,55 @@ import { useTheme } from "../../context/ThemeContext";
 const featuresData = [
     {
         id: 1,
-        title: "Profit & Loss AI Ingestion (Business MRI)",
-        highlight: "Get an instant diagnostic of business health",
-        description: "Dabby parses messy P&L sheets and statements instantly, extracting key KPIs and flagging margins, expense anomalies, and potential leakage points in seconds.",
+        forWho: "For Individual Consultants & Freelancers",
+        title: "Dabby Consultant AI",
+        theNeed: "You need a simple way to track your income and expenses without learning complex accounting software.",
+        theValue: "Dabby acts as your personal AI consultant, automatically parsing your receipts, invoices, and bank statements. It organizes your finances instantly, giving you a clear picture of your cash flow and tax deductibles without manual data entry.",
         details: [
-            "Dual-layer validation checks to prevent incorrect uploads",
-            "Automated cost-leak diagnostics and gross margin reviews",
-            "Key metrics (Revenue, COGS, EBITDA) extraction in seconds"
+            "Instant receipt & invoice parsing",
+            "Automated expense categorization",
+            "Real-time cash flow insights"
         ],
         workflowType: "grid-output"
     },
     {
         id: 2,
-        title: "AI-Native Finance Chat (RAG)",
-        highlight: "Chat directly with your financial records",
-        description: "Use natural language to query your general ledgers, invoices, and accounts spreadsheets. Dabby uses a secure RAG engine to find exact numbers, calculate runway, or check transaction trends.",
+        forWho: "For Startups & Growing Businesses",
+        title: "Collaborative Finance Workbench",
+        theNeed: "You need a structured financial environment to manage members, chart of accounts (COA), and track Accounts Receivable (AR) & Accounts Payable (AP).",
+        theValue: "Dabby provides a shared workspace for your team. It deterministically transforms unstructured documents into a universal ledger, automatically managing your COA, reconciling AR/AP, and keeping your team aligned on business health.",
         details: [
-            "No complex SQL queries or database experience needed",
-            "Runway, burn rate, and cash projections calculated live",
-            "Direct reference citations tracing back to specific ledger lines"
+            "Multi-member workbench collaboration",
+            "Automated AR/AP tracking & reconciliation",
+            "Customizable Chart of Accounts (COA)"
         ],
         workflowType: "branching-right"
     },
     {
         id: 3,
-        title: "Automated Document Template Instantiation",
-        highlight: "Generate models, invoices, and trackers in one click",
-        description: "Generate ready-to-use professional templates directly from the workbench. Quickly spawn structured Financial Models, Quotation cards, Receivable trackers, and professional Invoices.",
+        forWho: "For Finance Teams & Fractional CFOs",
+        title: "AI-Native Financial Intelligence",
+        theNeed: "You need deep insights, anomaly detection, and runway forecasting across multiple client portfolios without spending hours in Excel.",
+        theValue: "Query your general ledgers using natural language with our secure RAG engine. Instantly calculate runways, perform variance analysis, and identify cost-leakage across any structured dataset.",
         details: [
-            "Ready-to-use interactive template worksheets",
-            "Auto-filled data rows derived from user conversational prompts",
-            "Clean CSV and PDF exports for instant sharing"
+            "Natural language ledger queries (RAG)",
+            "Automated anomaly & expense leakage flags",
+            "Live cash burn & runway forecasting"
         ],
-        workflowType: "horizontal-flow"
+        workflowType: "converging"
     },
     {
         id: 4,
-        title: "Advanced Analytics & Runway Forecasting",
-        highlight: "Predict cash trends and plan runways",
-        description: "Generate cash burn analysis and forward-looking runway forecasts using historical ledger records. Dabby runs predictive analysis to map out future cash flows and monthly balances.",
+        forWho: "For Agencies & Service Providers",
+        title: "Automated Document Instantiation",
+        theNeed: "You need to quickly generate models, invoices, and trackers in one click, without starting from scratch every time.",
+        theValue: "Generate ready-to-use professional templates directly from the workbench. Quickly spawn structured Financial Models, Quotation cards, Receivable trackers, and professional Invoices.",
         details: [
-            "Live runway and cash burn analytics calculation",
-            "Predictive cash flow projections based on patterns",
-            "Detailed forecast charts and diagnostic summaries"
+            "Ready-to-use interactive template worksheets",
+            "Auto-filled data rows derived from prompts",
+            "Clean CSV and PDF exports for instant sharing"
         ],
-        workflowType: "converging"
+        workflowType: "horizontal-flow"
     }
 ];
 
@@ -633,10 +637,19 @@ const FeatureSection = ({ feature, index, isDark }) => {
                             transition={{ duration: 0.6 }}
                             className={isReversed ? "lg:order-2" : ""}
                         >
-                            <span className={`text-xs font-semibold uppercase tracking-wider ${isDark ? "text-gray-500" : "text-gray-500"}`}>Feature {String(index + 1).padStart(2, '0')}</span>
-                            <h2 className={`text-3xl md:text-4xl font-bold mt-2 mb-4 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>{feature.title}</h2>
-                            <p className="text-[#81E6D9] text-lg font-medium mb-4">{feature.highlight}</p>
-                            <p className={`text-base leading-relaxed mb-6 ${isDark ? "text-gray-400" : "text-gray-600"}`}>{feature.description}</p>
+                            <span className={`text-xs font-semibold uppercase tracking-wider ${isDark ? "text-gray-500" : "text-gray-500"}`}>{feature.forWho}</span>
+                            <h2 className={`text-3xl md:text-4xl font-bold mt-2 mb-6 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>{feature.title}</h2>
+                            
+                            <div className="mb-5">
+                                <h3 className={`text-sm font-semibold uppercase tracking-wider mb-2 ${isDark ? "text-gray-400" : "text-gray-500"}`}>The Challenge</h3>
+                                <p className={`text-base leading-relaxed ${isDark ? "text-gray-300" : "text-gray-600"}`}>{feature.theNeed}</p>
+                            </div>
+
+                            <div className="mb-6">
+                                <h3 className={`text-sm font-semibold uppercase tracking-wider mb-2 ${isDark ? "text-[#81E6D9]" : "text-[#0D9488]"}`}>Our Solution</h3>
+                                <p className={`text-base leading-relaxed ${isDark ? "text-gray-300" : "text-gray-600"}`}>{feature.theValue}</p>
+                            </div>
+
                             <ul className="space-y-3 mb-8">
                                 {feature.details.map((detail, idx) => (
                                     <motion.li key={idx} initial={{ opacity: 0, x: -20 }} animate={isInView ? { opacity: 1, x: 0 } : {}} transition={{ delay: 0.3 + idx * 0.1 }} className="flex items-center gap-3">
