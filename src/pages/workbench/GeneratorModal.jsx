@@ -1,88 +1,128 @@
 import React, { useState } from "react";
-import { BsX, BsFileEarmarkText, BsCart, BsArrowReturnLeft, BsTag, BsFileEarmarkPdf, BsFileEarmarkWord, BsType } from "react-icons/bs";
-import { toast } from "react-hot-toast";
+import { 
+  BsX, BsFileEarmarkText, BsCartCheck, BsArrowReturnLeft, BsTag, 
+  BsChevronRight, BsLightningCharge, BsShieldCheck
+} from "react-icons/bs";
+import SalesInvoiceModal from "../../components/Generator/SalesInvoiceModal";
+import PurchaseOrderModal from "../../components/Generator/PurchaseOrderModal";
+import CreditNoteModal from "../../components/Generator/CreditNoteModal";
+import DiscountCouponModal from "../../components/Generator/DiscountCouponModal";
 
 export default function GeneratorModal({ isOpen, onClose }) {
-  const [format, setFormat] = useState("pdf");
+  const [activeModal, setActiveModal] = useState(null); // 'sales_invoice', 'purchase_order', 'credit_note', 'coupons'
 
   if (!isOpen) return null;
 
   const options = [
-    { id: "sales_invoice", name: "Sales Invoice", icon: BsFileEarmarkText, desc: "Generate a new sales invoice for a customer" },
-    { id: "purchase_order", name: "Purchase Order", icon: BsCart, desc: "Create a purchase order for a vendor" },
-    { id: "credit_note", name: "Credit Note", icon: BsArrowReturnLeft, desc: "Issue a credit note against an invoice" },
-    { id: "coupons", name: "Discount & Referral", icon: BsTag, desc: "Generate promotional discount coupons" },
+    { 
+      id: "sales_invoice", 
+      name: "Sales Invoice & Quotations", 
+      icon: BsFileEarmarkText, 
+      color: "from-teal-500/20 to-emerald-500/10 text-teal-400 border-teal-500/30",
+      desc: "3-Stage generator: Quotation (Initial estimate), Proforma Invoice (Tentative costing), & Sales Invoice (Locked-in tax value). Links Party, Payment Snippets, GST records, & Inventory SKUs with Delivery Challan." 
+    },
+    { 
+      id: "purchase_order", 
+      name: "Purchase Order (PO)", 
+      icon: BsCartCheck, 
+      color: "from-blue-500/20 to-indigo-500/10 text-blue-400 border-blue-500/30",
+      desc: "Create simple vendor requisition lists detailing required SKUs, quantities, target pricing, delivery dates, and vendor terms." 
+    },
+    { 
+      id: "credit_note", 
+      name: "Credit Note & Settlement", 
+      icon: BsArrowReturnLeft, 
+      color: "from-red-500/20 to-rose-500/10 text-red-400 border-red-500/30",
+      desc: "Link to ANY existing invoice to issue credit notes with settlement add-on value discounts, returns, and GST tax reversals." 
+    },
+    { 
+      id: "coupons", 
+      name: "Discount & Referral Coupons", 
+      icon: BsTag, 
+      color: "from-amber-500/20 to-yellow-500/10 text-amber-400 border-amber-500/30",
+      desc: "Generate promotional & referral coupon tags for sales pricing with custom rules, percentage/flat discounts, and copy-paste codes." 
+    },
   ];
 
-  const handleGenerate = (option) => {
-    toast.success(`Generating ${option.name} as ${format.toUpperCase()}...`);
-    onClose();
+  const handleSelectOption = (optId) => {
+    setActiveModal(optId);
+  };
+
+  const handleCloseSubModal = () => {
+    setActiveModal(null);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm font-dm-sans">
-      <div className="bg-[#181818] border border-white/10 rounded-xl w-full max-w-2xl overflow-hidden shadow-2xl">
-        <div className="flex items-center justify-between p-6 border-b border-white/10">
-          <h2 className="text-lg font-bold text-white tracking-tight">Generators</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
-            <BsX size={24} />
-          </button>
-        </div>
-        <div className="p-6">
-          <div className="mb-8">
-            <label className="block text-sm font-medium text-gray-400 mb-3">Select Export Format</label>
-            <div className="grid grid-cols-3 gap-3">
-              <button
-                onClick={() => setFormat("pdf")}
-                className={`flex items-center justify-center space-x-2 py-2.5 rounded-lg border transition-colors ${
-                  format === "pdf" ? "bg-teal-500/10 border-teal-500/30 text-teal-400" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"
-                }`}
-              >
-                <BsFileEarmarkPdf className="text-lg" />
-                <span className="font-semibold text-sm">PDF</span>
-              </button>
-              <button
-                onClick={() => setFormat("word")}
-                className={`flex items-center justify-center space-x-2 py-2.5 rounded-lg border transition-colors ${
-                  format === "word" ? "bg-teal-500/10 border-teal-500/30 text-teal-400" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"
-                }`}
-              >
-                <BsFileEarmarkWord className="text-lg" />
-                <span className="font-semibold text-sm">Word</span>
-              </button>
-              <button
-                onClick={() => setFormat("text")}
-                className={`flex items-center justify-center space-x-2 py-2.5 rounded-lg border transition-colors ${
-                  format === "text" ? "bg-teal-500/10 border-teal-500/30 text-teal-400" : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10"
-                }`}
-              >
-                <BsType className="text-lg" />
-                <span className="font-semibold text-sm">Text String</span>
-              </button>
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-dm-sans">
+        <div className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl">
+          
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-white/10 bg-[#181818]">
+            <div className="flex items-center space-x-3">
+              <div className="h-10 w-10 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+                <BsLightningCharge size={20} />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white tracking-tight">Workbench Document Generators</h2>
+                <p className="text-xs text-gray-400">Select a document builder to configure and generate structured records</p>
+              </div>
             </div>
+            <button onClick={onClose} className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors">
+              <BsX size={26} />
+            </button>
           </div>
 
-          <p className="text-sm text-gray-400 mb-4">Select a document type to generate.</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Generator Cards */}
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             {options.map((opt) => {
               const Icon = opt.icon;
               return (
                 <button
                   key={opt.id}
-                  onClick={() => handleGenerate(opt)}
-                  className="flex flex-col text-left p-5 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 hover:border-teal-500/30 transition-all group"
+                  onClick={() => handleSelectOption(opt.id)}
+                  className={`flex flex-col text-left p-5 rounded-2xl border bg-gradient-to-br ${opt.color} hover:scale-[1.02] transition-all duration-200 group relative overflow-hidden`}
                 >
-                  <div className="h-12 w-12 rounded-lg bg-[#222] group-hover:bg-teal-500/10 flex items-center justify-center mb-4 transition-colors">
-                    <Icon className="text-gray-400 group-hover:text-teal-400 text-2xl transition-colors" />
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="h-12 w-12 rounded-xl bg-[#1e1e1e] border border-white/10 flex items-center justify-center transition-colors">
+                      <Icon className="text-2xl" />
+                    </div>
+                    <BsChevronRight className="text-gray-400 group-hover:text-white group-hover:translate-x-1 transition-all" />
                   </div>
                   <h3 className="text-base font-bold text-white mb-1">{opt.name}</h3>
-                  <p className="text-sm text-gray-500">{opt.desc}</p>
+                  <p className="text-xs text-gray-300 line-clamp-3 leading-relaxed">{opt.desc}</p>
                 </button>
               );
             })}
           </div>
+
+          {/* Quick info banner */}
+          <div className="px-6 py-4 bg-[#181818] border-t border-white/10 flex items-center justify-between text-xs text-gray-400">
+            <span className="flex items-center gap-1.5">
+              <BsShieldCheck className="text-teal-400 text-sm" />
+              All generated invoices, POs & credit notes are saved to your active workspace session.
+            </span>
+            <button onClick={onClose} className="text-gray-400 hover:text-white font-medium">
+              Dismiss
+            </button>
+          </div>
+
         </div>
       </div>
-    </div>
+
+      {/* Sub-Modals */}
+      {activeModal === "sales_invoice" && (
+        <SalesInvoiceModal isOpen={true} onClose={handleCloseSubModal} />
+      )}
+      {activeModal === "purchase_order" && (
+        <PurchaseOrderModal isOpen={true} onClose={handleCloseSubModal} />
+      )}
+      {activeModal === "credit_note" && (
+        <CreditNoteModal isOpen={true} onClose={handleCloseSubModal} />
+      )}
+      {activeModal === "coupons" && (
+        <DiscountCouponModal isOpen={true} onClose={handleCloseSubModal} />
+      )}
+    </>
   );
 }

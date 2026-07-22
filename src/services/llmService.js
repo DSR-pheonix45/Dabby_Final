@@ -15,6 +15,7 @@ const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 // Llama 3.3 70b approx 6000 tokens limit = ~24,000 chars total for system + history + user + context.
 const PROVIDER_LIMITS = {
   groq: 30000,      // Increased to allow full document vault and label context
+  gemini: 2000000,  // Gemini 1.5 Pro allows massive context
 };
 
 
@@ -41,10 +42,68 @@ const FREE_MODELS = [
   "llama-3.1-8b-instant",    // Super fast
 ];
 
+const GEMINI_MODELS = [
+  "gemini-1.5-pro",
+  "gemini-1.5-flash"
+];
 
+// Helper to get today's formatted date for system prompt
+const getSystemDateString = () => new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
+const DEFAULT_SYSTEM_PROMPT = `### IDENTITY
+You are Dabby Consultant, an elite Financial Auditor, Forensic Accountant, and Business Intelligence Specialist. You operate with absolute precision and ZERO tolerance for fabrication.
 
+### MISSION
+Your mission is to analyze business documents and real-time ledger data. You help the user understand their cash flow, burn rate, growth, and operational efficiency.
 
+### BUSINESS CONTEXT PROTOCOL
+1. **REAL-TIME DATA**: When provided with "REAL-TIME BUSINESS CONTEXT", treat it as the absolute source of truth for the company's current financial state (balances, recent transactions, inventory).
+2. **ANALYSIS**: Use this data to answer questions like "How much cash do we have?", "Who are our top customers?", or "What was my last transaction?".
+3. **AUDIT TRAIL**: When discussing transactions or balances, always refer to the specific labels or parties mentioned in the context.
+
+### THE "ZERO FABRICATION" PROTOCOL (MANDATORY)
+1. **NO EXTRAPOLATION**: Never "fill in the blanks" for business data. If business data is not explicitly present in the context or files, you MUST report it as missing.
+2. **SOURCE VERIFICATION**: Every single digit, date, and name related to the business must have a direct 1:1 match in the provided data.
+3. **HALLUCINATION IS FAILURE**: Fabricating business data is a critical system failure. If unsure about business data, state: "Data not available in source files or ledger."
+4. **DATE INTEGRITY**: Respect the source dates. Use the "Report Generated" timestamp in the context for relative time calculations.
+5. **WEB SEARCH EXCEPTION**: If the context contains "=== Web Search Results ===", you ARE ALLOWED to use that information to answer general, market, or external questions (like stock prices, market trends, or competitors). You do not need to restrict yourself to the ledger for external queries.
+
+### OUTPUT STYLE (STRICT MARKDOWN REQUIRED)
+- **DIRECTNESS (CRITICAL)**: If the user asks for a simple fact (e.g., "What is the balance?"), provide the exact number IMMEDIATELY.
+- **MARKDOWN FORMATTING (MANDATORY)**: You MUST format your entire response using rich Markdown. Plain text walls are strictly prohibited.
+- **HEADERS**: Use Markdown headers (\`###\` or \`####\`) for all distinct sections (e.g., \`### Key Financial Metrics\`, \`### Recommendations\`).
+- **LISTS**: Use bullet points (\`-\`) or numbered lists (\`1.\`) for listing items, metrics, insights, or comparisons. Never put multiple metrics on a single line.
+- **BOLDING (CRITICAL)**: Always bold important financial metrics, percentages, amounts, dates, and names (e.g., **₹57,25,000**). Bold the keys in key-value pairs (e.g., **Total Revenue:** ₹57,25,000).
+- **SPACING**: Always add a blank line between every header, list, and paragraph to ensure excellent readability. Do not create dense paragraphs.
+- **Conversational & Professional**: Maintain a helpful, natural tone for complex analysis. Explain what numbers mean only when asked.
+- **Evidence-Based**: Answers must be strictly derived from the provided context.
+
+### DYNAMIC VISUAL LAYOUT COMPONENTS (OPTIONAL & ON-DEMAND ONLY)
+1. **CHARTS**: Do NOT generate any visual charts (using \`json-chart\` blocks) UNLESS the user explicitly asks for a chart, graph, or visual plot. When explicitly requested, you may output a chart block of language "json-chart" in this format:
+\`\`\`json-chart
+{
+  "title": "YoY Profit and Loss Summary",
+  "type": "bar", // "line" | "bar" | "area" | "pie"
+  "data": [
+    {"name": "2023", "Revenue": 175500, "Expenses": 27120, "Net Profit": 105147},
+    {"name": "2024", "Revenue": 192000, "Expenses": 26100, "Net Profit": 120070}
+  ],
+  "keys": ["Revenue", "Expenses", "Net Profit"],
+  "colors": ["#81E6D9", "#E53E3E", "#48BB78"]
+}
+\`\`\`
+2. **INTERACTIVE SCENARIO ANALYSIS**: Do NOT generate any scenario analysis blocks (using \`scenario-analysis\` blocks) UNLESS the user explicitly asks to run a scenario analysis, growth model, or interactive simulator. When explicitly requested, append a scenario analysis block of language "scenario-analysis" in this format:
+\`\`\`scenario-analysis
+{
+  "revenue": 192000,
+  "opex": 26100,
+  "cogs": 36000,
+  "cashBalance": 150000
+}
+\`\`\`
+Ensure all values represent the actual company balance sheet figures parsed. This will render an interactive scenario modeling widget in the chat interface.
+
+Current System Date: ${getSystemDateString()}`;
 
 /**
  * Read file content based on file type
@@ -262,60 +321,7 @@ async function callGroqAPI(request, model) {
         messages: [
           {
             role: "system",
-            content: request.systemPrompt || `### IDENTITY
-You are Dabby Consultant, an elite Financial Auditor, Forensic Accountant, and Business Intelligence Specialist. You operate with absolute precision and ZERO tolerance for fabrication.
-
-### MISSION
-Your mission is to analyze business documents and real-time ledger data. You help the user understand their cash flow, burn rate, growth, and operational efficiency.
-
-### BUSINESS CONTEXT PROTOCOL
-1. **REAL-TIME DATA**: When provided with "REAL-TIME BUSINESS CONTEXT", treat it as the absolute source of truth for the company's current financial state (balances, recent transactions, inventory).
-2. **ANALYSIS**: Use this data to answer questions like "How much cash do we have?", "Who are our top customers?", or "What was my last transaction?".
-3. **AUDIT TRAIL**: When discussing transactions or balances, always refer to the specific labels or parties mentioned in the context.
-
-### THE "ZERO FABRICATION" PROTOCOL (MANDATORY)
-1. **NO EXTRAPOLATION**: Never "fill in the blanks" for business data. If business data is not explicitly present in the context or files, you MUST report it as missing.
-2. **SOURCE VERIFICATION**: Every single digit, date, and name related to the business must have a direct 1:1 match in the provided data.
-3. **HALLUCINATION IS FAILURE**: Fabricating business data is a critical system failure. If unsure about business data, state: "Data not available in source files or ledger."
-4. **DATE INTEGRITY**: Respect the source dates. Use the "Report Generated" timestamp in the context for relative time calculations.
-5. **WEB SEARCH EXCEPTION**: If the context contains "=== Web Search Results ===", you ARE ALLOWED to use that information to answer general, market, or external questions (like stock prices, market trends, or competitors). You do not need to restrict yourself to the ledger for external queries.
-
-### OUTPUT STYLE (STRICT MARKDOWN REQUIRED)
-- **DIRECTNESS (CRITICAL)**: If the user asks for a simple fact (e.g., "What is the balance?"), provide the exact number IMMEDIATELY.
-- **MARKDOWN FORMATTING (MANDATORY)**: You MUST format your entire response using rich Markdown. Plain text walls are strictly prohibited.
-- **HEADERS**: Use Markdown headers (\`###\` or \`####\`) for all distinct sections (e.g., \`### Key Financial Metrics\`, \`### Recommendations\`).
-- **LISTS**: Use bullet points (\`-\`) or numbered lists (\`1.\`) for listing items, metrics, insights, or comparisons. Never put multiple metrics on a single line.
-- **BOLDING (CRITICAL)**: Always bold important financial metrics, percentages, amounts, dates, and names (e.g., **₹57,25,000**). Bold the keys in key-value pairs (e.g., **Total Revenue:** ₹57,25,000).
-- **SPACING**: Always add a blank line between every header, list, and paragraph to ensure excellent readability. Do not create dense paragraphs.
-- **Conversational & Professional**: Maintain a helpful, natural tone for complex analysis. Explain what numbers mean only when asked.
-- **Evidence-Based**: Answers must be strictly derived from the provided context.
-
-### DYNAMIC VISUAL LAYOUT COMPONENTS (OPTIONAL & ON-DEMAND ONLY)
-1. **CHARTS**: Do NOT generate any visual charts (using \`json-chart\` blocks) UNLESS the user explicitly asks for a chart, graph, or visual plot. When explicitly requested, you may output a chart block of language "json-chart" in this format:
-\`\`\`json-chart
-{
-  "title": "YoY Profit and Loss Summary",
-  "type": "bar", // "line" | "bar" | "area" | "pie"
-  "data": [
-    {"name": "2023", "Revenue": 175500, "Expenses": 27120, "Net Profit": 105147},
-    {"name": "2024", "Revenue": 192000, "Expenses": 26100, "Net Profit": 120070}
-  ],
-  "keys": ["Revenue", "Expenses", "Net Profit"],
-  "colors": ["#81E6D9", "#E53E3E", "#48BB78"]
-}
-\`\`\`
-2. **INTERACTIVE SCENARIO ANALYSIS**: Do NOT generate any scenario analysis blocks (using \`scenario-analysis\` blocks) UNLESS the user explicitly asks to run a scenario analysis, growth model, or interactive simulator. When explicitly requested, append a scenario analysis block of language "scenario-analysis" in this format:
-\`\`\`scenario-analysis
-{
-  "revenue": 192000,
-  "opex": 26100,
-  "cogs": 36000,
-  "cashBalance": 150000
-}
-\`\`\`
-Ensure all values represent the actual company balance sheet figures parsed. This will render an interactive scenario modeling widget in the chat interface.
-
-Current System Date: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`,
+            content: request.systemPrompt || DEFAULT_SYSTEM_PROMPT,
           },
           ...formattedHistory,
           {
@@ -369,16 +375,111 @@ USER QUERY: ${request.query}` +
 
 
 
+/**
+ * Call Gemini API for large contexts or as fallback
+ */
+async function callGeminiAPI(request, model) {
+  try {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("VITE_GEMINI_API_KEY not configured!");
+    }
+
+    const formattedHistory = (request.history || []).map(msg => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    }));
+
+    const truncatedContext = getTruncatedContext(request.context, "gemini");
+
+    const userContent = `SOURCE DATA CHECK: I am providing you with files. Do not use your internal knowledge to create fake data. Only use the provided context.\n\nUSER QUERY: ${request.query}` +
+      (truncatedContext ? `\n\n=== RELEVANT DATA / FILE CONTENT ===\n${truncatedContext}` : "\n\n(No file context provided. Do not invent any data.)");
+
+    formattedHistory.push({
+      role: "user",
+      parts: [{ text: userContent }]
+    });
+
+    const systemPrompt = request.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: systemPrompt }]
+        },
+        contents: formattedHistory,
+        generationConfig: {
+          maxOutputTokens: 4096,
+          temperature: 0.1,
+        }
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Gemini API error with ${model}:`, response.status, errorText);
+      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!responseText) {
+      console.error(`No response text found in Gemini data:`, data);
+      throw new Error(`No response from Gemini API using ${model}`);
+    }
+
+    return {
+      response: responseText,
+      context: request.context,
+      model: model
+    };
+  } catch (error) {
+    console.error(`❌ Gemini API call failed with ${model}:`, error);
+    throw error;
+  }
+}
+
 export async function callLLMDirectly(request) {
-  // 1. Try FREE Groq models first
+  const contextLength = (request.context || "").length + (request.query || "").length;
+  
+  // 0. Automatically switch to Gemini if context is large (e.g. > 25,000 chars)
+  if (contextLength > 25000) {
+    console.log(`Large context detected (${contextLength} chars). Shifting to Gemini...`);
+    for (const model of GEMINI_MODELS) {
+      try {
+        return await callGeminiAPI(request, model);
+      } catch (error) {
+        console.warn(`Gemini model ${model} failed:`, error.message);
+      }
+    }
+  }
+
+  // 1. Try FREE Groq models first for fast, smaller requests
   for (let i = 0; i < FREE_MODELS.length; i++) {
     const model = FREE_MODELS[i];
     try {
       const result = await callGroqAPI(request, model);
       return result;
     } catch (error) {
-      const isAuthError = error.message.includes("401") || error.message.toLowerCase().includes("invalid api key");
+      const errorMsg = (error.message || "").toLowerCase();
+      const isAuthError = errorMsg.includes("401") || errorMsg.includes("invalid api key");
+      const isRateLimit = errorMsg.includes("413") || errorMsg.includes("rate limit") || errorMsg.includes("request too large") || errorMsg.includes("tokens per minute");
+      
       console.warn(`❌ Groq model ${model} failed:`, error.message);
+
+      if (isRateLimit) {
+        console.warn(`Groq rate limit/size limit hit. Shifting to Gemini for model ${model}...`);
+        try {
+          return await callGeminiAPI(request, "gemini-1.5-flash");
+        } catch (geminiError) {
+          console.warn("Gemini fallback also failed:", geminiError.message);
+        }
+      }
 
       if (isAuthError) {
         console.warn("Auth error detected, skipping other Groq models...");
@@ -386,19 +487,21 @@ export async function callLLMDirectly(request) {
       }
 
       if (i === FREE_MODELS.length - 1) {
-        console.log("All Groq models failed.");
+        console.log("All Groq models failed. Attempting Gemini as final fallback...");
+        try {
+          return await callGeminiAPI(request, "gemini-1.5-flash");
+        } catch (finalGeminiError) {
+          console.error("Final Gemini fallback failed.");
+        }
       }
     }
   }
 
   return {
-    response: "I'm sorry, I'm having trouble connecting to the Groq AI engine. This could be due to an invalid API key or rate limits. Please check your configuration in the .env file.",
-    error: "Groq API call failed"
+    response: "I'm sorry, I'm having trouble connecting to the AI engines. This could be due to an invalid API key, context size limits (413), or rate limits. Please check your configuration in the .env file.",
+    error: "All LLM APIs failed"
   };
 }
-
-
-
 
 /**
  * Main function that handles RAG context retrieval and LLM calls
