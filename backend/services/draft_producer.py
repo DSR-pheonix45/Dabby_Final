@@ -29,6 +29,10 @@ DOC_TYPE_MAP: Dict[str, Tuple[str, str]] = {
     "vendor_invoice":        ("VENDOR_BILLED", "issuer"),
     "purchase_invoice":      ("VENDOR_BILLED", "issuer"),
     "bill":                  ("VENDOR_BILLED", "issuer"),
+    "quotation":             ("QUOTATION_OFFERED", "recipient"),
+    "quote":                 ("QUOTATION_OFFERED", "recipient"),
+    "proforma_invoice":      ("PROFORMA_ESTIMATE_ISSUED", "recipient"),
+    "estimate":              ("PROFORMA_ESTIMATE_ISSUED", "recipient"),
     "customer_payment":      ("CUSTOMER_PAYMENT_RECEIVED", "issuer"),
     "receipt":               ("CUSTOMER_PAYMENT_RECEIVED", "issuer"),
     "vendor_payment":        ("VENDOR_PAYMENT_MADE", "recipient"),
@@ -41,6 +45,9 @@ DOC_TYPE_MAP: Dict[str, Tuple[str, str]] = {
     "purchase_order":        ("PURCHASE_ORDER_CREATED", "issuer"),
     "sales_order":           ("SALES_ORDER_CREATED", "recipient"),
     "expense_receipt":       ("EXPENSE_INCURRED", "issuer"),
+    "opex_expense":          ("OPEX_EXPENSE_INCURRED", "issuer"),
+    "cogs_expense":          ("COGS_EXPENSE_INCURRED", "issuer"),
+    "petty_cash_topup":      ("PETTY_CASH_TOPUP", "issuer"),
     "loan_agreement":        ("LOAN_RECEIVED", "either"),
     "investment_agreement":  ("INVESTMENT_RECEIVED", "either"),
     "tax_document":          ("TAX_PAID", "either"),
@@ -72,7 +79,7 @@ def _num(v):
 class DraftProducer:
     async def generate_from_document(self, document_id: str, user_id: Optional[str] = None) -> Dict:
         """
-        Build a PENDING_REVIEW trade_draft from a document's latest UFO note.
+        Build a PENDING_REVIEW trade_draft from a document's latest UFO note (Path B).
         Idempotent: reuses an existing pending draft for the same document.
         """
         # 1. Document + its analysis notes
@@ -144,5 +151,25 @@ class DraftProducer:
         print(f"[DraftProducer] draft {res.data[0]['id']} | {event_type} | {counterparty} | {amount} {currency}")
         return res.data[0]
 
+    async def generate_from_payload(self, payload: Dict, user_id: str) -> Dict:
+        """Create a PENDING_REVIEW trade draft directly from a Stage 0 Generator payload (Path A)."""
+        doc_type = payload.get("document_type") or payload.get("type") or "sales_invoice"
+        event_type, side = infer_event(doc_type)
+
+        draft_row = {
+            "user_id":           user_id,
+            "document_id":       payload.get("document_id"),
+            "event_type":        event_type,
+            "counterparty_name": payload.get("party") or payload.get("counterparty_name") or "Direct Expense",
+            "amount":            _num(payload.get("amount") or payload.get("total_amount")),
+            "event_date":        _clean_date(payload.get("date") or payload.get("event_date")),
+            "currency":          payload.get("currency") or "INR",
+            "status":            "PENDING_REVIEW",
+            "metadata":          payload.get("metadata") or {}
+        }
+        res = supabase.table("trade_drafts").insert(draft_row).execute()
+        return res.data[0] if res.data and len(res.data) > 0 else draft_row
+
 
 draft_producer = DraftProducer()
+

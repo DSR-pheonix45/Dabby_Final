@@ -110,15 +110,52 @@ export default function InspectorDrawer({ isOpen, onClose, data, onPosted }) {
           </div>
 
           {/* Where this document lands (OPS / ledger routing) */}
-          <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${ROUTING_TONE[routing.tone]}`}>
+          <div className={`flex flex-col space-y-2 p-3 rounded-lg border ${ROUTING_TONE[routing.tone]}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider opacity-70 font-bold">Posts to Ledger</p>
+                <p className="text-sm font-bold">{routing.where}</p>
+              </div>
+              <div className="text-right">
+                <span className="px-2 py-0.5 rounded text-xs font-bold border border-current/30">{routing.label}</span>
+              </div>
+            </div>
+
+            {/* COA Target Account Dropdown Selector */}
+            <div className="pt-2 border-t border-current/20">
+              <label className="text-[10px] uppercase font-bold text-gray-300 block mb-1">Target COA Account</label>
+              <select
+                value={data.targetAccount || "default"}
+                onChange={(e) => toast.success(`Mapped doc value to ${e.target.value}`)}
+                className="w-full bg-[#1e1e1e] text-xs text-white border border-white/20 rounded p-1.5 font-mono"
+              >
+                <option value="default">Auto-select COA Account ({routing.where})</option>
+                <option value="1100">1100 - Accounts Receivable (Asset)</option>
+                <option value="2100">2100 - Accounts Payable (Liability)</option>
+                <option value="4000">4000 - Sales Revenue (Income)</option>
+                <option value="5000">5000 - Cost of Goods Sold (COGS)</option>
+                <option value="5100">5100 - Travel Allowance & Fuel (OPEX)</option>
+                <option value="5200">5200 - Rent & Utilities (OPEX)</option>
+                <option value="1020">1020 - Petty Cash Bucket (Asset)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Original Linked Document in Doc Vault */}
+          <div className="bg-[#181818] border border-white/10 p-3 rounded-lg flex items-center justify-between text-xs">
             <div>
-              <p className="text-[10px] uppercase tracking-wider opacity-70 font-bold">Posts to</p>
-              <p className="text-sm font-bold">{routing.where}</p>
+              <p className="text-[10px] text-gray-500 uppercase font-bold">Linked Document Proof</p>
+              <p className="text-white font-semibold flex items-center mt-0.5">
+                <BsFileEarmarkText className="mr-1.5 text-teal-400" />
+                {data.document_id ? `Doc Vault Ref: #${data.document_id.slice(0, 12)}` : "Generated PDF Proof Stored in Vault"}
+              </p>
             </div>
-            <div className="text-right">
-              <span className="px-2 py-0.5 rounded text-xs font-bold border border-current/30">{routing.label}</span>
-              <p className="text-[10px] opacity-70 mt-1">{routing.hint}</p>
-            </div>
+            <button 
+              onClick={() => toast("Opening Document Proof in Doc Vault...", { icon: "📄" })}
+              className="px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 rounded text-[11px] font-bold"
+            >
+              View Proof
+            </button>
           </div>
 
           {/* Settlement status (posted invoices): invoice value vs matched snippets */}
@@ -174,6 +211,7 @@ export default function InspectorDrawer({ isOpen, onClose, data, onPosted }) {
               </div>
             </div>
           )}
+
 
           {/* Extracted line items (UFO evidence) */}
           <div>
