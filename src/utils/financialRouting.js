@@ -15,12 +15,13 @@ const DOC_TYPE_TO_EVENT = {
   vendor_invoice: 'VENDOR_BILLED',
   purchase_invoice: 'VENDOR_BILLED',
   bill: 'VENDOR_BILLED',
-  customer_payment: 'CUSTOMER_PAYMENT_RECEIVED',
-  customer_payment_receipt: 'CUSTOMER_PAYMENT_RECEIVED',
-  receipt: 'CUSTOMER_PAYMENT_RECEIVED',
-  vendor_payment: 'VENDOR_PAYMENT_MADE',
-  vendor_payment_receipt: 'VENDOR_PAYMENT_MADE',
-  payment_advice: 'VENDOR_PAYMENT_MADE',
+  customer_payment: 'PAYMENT_SNIPPET',
+  customer_payment_receipt: 'PAYMENT_SNIPPET',
+  receipt: 'PAYMENT_SNIPPET',
+  vendor_payment: 'PAYMENT_SNIPPET',
+  vendor_payment_receipt: 'PAYMENT_SNIPPET',
+  payment_advice: 'PAYMENT_SNIPPET',
+  expense_receipt: 'PAYMENT_SNIPPET',
   bank_statement: 'BANK_ACTIVITY_RECORDED',
   payroll_register: 'PAYROLL_INCURRED',
   payroll: 'PAYROLL_INCURRED',
@@ -28,7 +29,6 @@ const DOC_TYPE_TO_EVENT = {
   debit_note: 'DEBIT_NOTE_ISSUED',
   purchase_order: 'PURCHASE_ORDER_CREATED',
   sales_order: 'SALES_ORDER_CREATED',
-  expense_receipt: 'EXPENSE_INCURRED',
   loan_agreement: 'LOAN_RECEIVED',
   investment_agreement: 'INVESTMENT_RECEIVED',
   tax_document: 'TAX_PAID',
@@ -38,12 +38,13 @@ const DOC_TYPE_TO_EVENT = {
 // event_type -> where it shows up + how to describe it
 const EVENT_ROUTING = {
   CUSTOMER_BILLED:            { key: 'receivable',        label: 'Receivable',        where: 'Accounts Receivable', hint: 'Customer owes you',      tone: 'teal' },
-  CUSTOMER_PAYMENT_RECEIVED:  { key: 'settles_receivable', label: 'Receipt Draft',     where: 'Drafts (Pending Link)', hint: 'In draft. Link to an invoice to settle AR.', tone: 'green' },
   VENDOR_BILLED:             { key: 'payable',           label: 'Payable',           where: 'Accounts Payable',    hint: 'You owe the vendor',     tone: 'amber' },
-  VENDOR_PAYMENT_MADE:       { key: 'settles_payable',   label: 'Receipt Draft',     where: 'Drafts (Pending Link)', hint: 'In draft. Link to an invoice to settle AP.', tone: 'blue' },
+  PAYMENT_SNIPPET:           { key: 'snippet',           label: 'Payment Snippet',   where: 'Draft Snippet (Unlinked)', hint: 'Snippet in draft. Use to: 1. Settle AR, 2. Settle AP, or 3. Direct Expense.', tone: 'blue' },
+  CUSTOMER_PAYMENT_RECEIVED:  { key: 'settles_receivable', label: 'Settles Receivable', where: 'Accounts Receivable', hint: 'Reduces what a customer owes', tone: 'green' },
+  VENDOR_PAYMENT_MADE:       { key: 'settles_payable',   label: 'Settles Payable',   where: 'Accounts Payable',    hint: 'Reduces what you owe vendor', tone: 'blue' },
   CREDIT_NOTE_ISSUED:        { key: 'receivable',        label: 'Credit Note',       where: 'Accounts Receivable', hint: 'Reduces a receivable',   tone: 'green' },
   DEBIT_NOTE_ISSUED:         { key: 'payable',           label: 'Debit Note',        where: 'Accounts Payable',    hint: 'Reduces a payable',      tone: 'blue' },
-  EXPENSE_INCURRED:          { key: 'expense',           label: 'Expense Draft',     where: 'Drafts (Pending Link)', hint: 'In draft. Link to an invoice or expense.', tone: 'rose' },
+  EXPENSE_INCURRED:          { key: 'expense',           label: 'Expense Snippet',   where: 'Draft Snippet (Unlinked)', hint: 'Snippet in draft. Link to settle AR, AP, or expense.', tone: 'rose' },
   PAYROLL_INCURRED:          { key: 'payroll',           label: 'Payroll',           where: 'Profit & Loss',       hint: 'Salary expense',         tone: 'purple' },
   BANK_ACTIVITY_RECORDED:    { key: 'bank',              label: 'Bank Activity',     where: 'Bank / Ledger',       hint: 'Bank movement',          tone: 'slate' },
   TAX_PAID:                  { key: 'tax',               label: 'Tax',               where: 'Tax Ledger',          hint: 'Tax payment',            tone: 'slate' },
@@ -75,8 +76,10 @@ export function financialRouting(documentType, eventType, partyName) {
   let ev = eventType;
   if (!ev) {
     const dtKey = norm(documentType);
-    const p = (partyName || '').toLowerCase().trim();
-    if (dtKey.includes('invoice') || dtKey.includes('bill')) {
+    if (dtKey.includes('receipt') || dtKey.includes('payment') || dtKey.includes('snippet')) {
+      ev = 'PAYMENT_SNIPPET';
+    } else if (dtKey.includes('invoice') || dtKey.includes('bill')) {
+      const p = (partyName || '').toLowerCase().trim();
       if (p && !p.includes('archzona')) {
         ev = 'VENDOR_BILLED';
       } else if (p && p.includes('archzona')) {
@@ -91,6 +94,7 @@ export function financialRouting(documentType, eventType, partyName) {
   const meta = EVENT_ROUTING[ev] || UNCLASSIFIED;
   return { ...meta, eventType: ev };
 }
+
 
 
 // Tailwind class sets per tone (kept here so cards/inspector stay consistent)

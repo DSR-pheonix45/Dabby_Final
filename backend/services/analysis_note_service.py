@@ -31,11 +31,13 @@ from supabase_client import supabase
 
 INTENT_MAP: Dict[str, str] = {
     "sales_invoice":             "CUSTOMER_BILLED",
-    "customer_payment_receipt":  "CUSTOMER_PAYMENT_RECEIVED",
+    "customer_payment_receipt":  "PAYMENT_SNIPPET",
     "vendor_invoice":            "VENDOR_BILLED",
-    "vendor_payment_receipt":    "VENDOR_PAYMENT_MADE",
-    "expense_receipt":           "EXPENSE_INCURRED",
+    "vendor_payment_receipt":    "PAYMENT_SNIPPET",
+    "expense_receipt":           "PAYMENT_SNIPPET",
+    "receipt":                   "PAYMENT_SNIPPET",
     "payroll_register":          "PAYROLL_INCURRED",
+
     "credit_note":               "REVENUE_REVERSED",
     "debit_note":                "VENDOR_ADJUSTMENT_ISSUED",
     "bank_statement":            "BANK_ACTIVITY_RECORDED",

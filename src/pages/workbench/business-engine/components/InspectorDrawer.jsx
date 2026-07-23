@@ -136,12 +136,28 @@ export default function InspectorDrawer({ isOpen, onClose, data, onPosted }) {
                 <option value="5000">5000 - Cost of Goods Sold (COGS)</option>
                 <option value="5100">5100 - Travel Allowance & Fuel (OPEX)</option>
                 <option value="5200">5200 - Rent & Utilities (OPEX)</option>
-                <option value="1020">1020 - Petty Cash Bucket (Asset)</option>
               </select>
             </div>
           </div>
 
+
+          {/* Action button for Snippets: Apply snippet to 1 of 3 uses */}
+          {(routing.eventType === 'PAYMENT_SNIPPET' || String(data.type).toLowerCase().includes('receipt') || String(data.type).toLowerCase().includes('snippet')) && (
+            <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg flex flex-col space-y-2">
+              <p className="text-xs text-blue-300 font-bold">Payment Snippet Options</p>
+              <p className="text-[11px] text-gray-400">Use snippet to: 1. Settle AR, 2. Settle AP, or 3. Direct Expense.</p>
+              <button
+                onClick={() => setShowSettlementModal(true)}
+                className="w-full py-2 bg-blue-500 hover:bg-blue-400 text-black font-bold text-xs rounded transition-colors"
+              >
+                Apply Payment Snippet
+              </button>
+            </div>
+          )}
+
+
           {/* Original Linked Document in Doc Vault */}
+
           <div className="bg-[#181818] border border-white/10 p-3 rounded-lg flex items-center justify-between text-xs">
             <div>
               <p className="text-[10px] text-gray-500 uppercase font-bold">Linked Document Proof</p>
