@@ -151,8 +151,8 @@ LLM_CLASSIFICATION_PROMPT = """
 You are a document classification specialist. Your ONLY job is to identify the type of a financial document.
 
 You must classify into EXACTLY ONE of these types:
-- sales_invoice         : Invoice issued by us to a customer
-- vendor_invoice        : Invoice received from a supplier/vendor
+- sales_invoice         : Invoice issued by us (letterhead has Archzona / Archzona LLP / our company details) to a customer/vendor
+- vendor_invoice        : Invoice received from a supplier/vendor (letterhead has anyone else's details)
 - customer_payment_receipt : Proof of payment received from a customer
 - vendor_payment_receipt   : Proof of payment made to a vendor
 - expense_receipt       : Receipt for a small expense (meals, fuel, travel, etc.)
@@ -167,6 +167,11 @@ You must classify into EXACTLY ONE of these types:
 - tax_document          : Tax filing, TDS certificate, GST return, income tax return (Excludes bank statements)
 - unknown               : Cannot classify with confidence
 
+LETTERHEAD / ISSUER RULES FOR INVOICES:
+1. Look at the top of the invoice (the letterhead, logo, header, or issuing party details):
+   - If the letterhead / issuer details contain "Archzona", "Archzona LLP", or our company name -> classify as 'sales_invoice' (invoice sent by us).
+   - If the letterhead / issuer details belong to ANY OTHER vendor/company (and our details appear under 'Bill To' / 'Customer') -> classify as 'vendor_invoice' (invoice received from vendor).
+
 RULES:
 1. Return ONLY a JSON object. No explanation outside the JSON.
 2. Do NOT suggest accounting treatment, journal entries, or COA accounts.
@@ -180,6 +185,7 @@ Return this exact schema:
   "reasoning": "..."
 }
 """
+
 
 
 class DocumentClassifier:
@@ -282,12 +288,30 @@ class DocumentClassifier:
         if len(sorted_scores) >= 2 and (sorted_scores[0][0] - sorted_scores[1][0]) < 0.05:
             best_conf = round(best_conf * 0.80, 3)  # penalise ambiguity
 
+        # Letterhead rule for invoices: Check if Archzona / Archzona LLP is the issuer vs recipient
+        if best_type in ("sales_invoice", "vendor_invoice"):
+            header_text = (raw_text or "")[:1000].lower()
+            # If Archzona appears in header before "bill to" / "customer" / "billed to"
+            has_our_name_in_header = "archzona" in header_text or "archzona llp" in header_text
+            bill_to_pos = min([header_text.find(kw) for kw in ["bill to", "billed to", "customer:", "buyer:"] if kw in header_text] or [9999])
+            our_name_pos = min([header_text.find(kw) for kw in ["archzona", "archzona llp"] if kw in header_text] or [9999])
+
+            if has_our_name_in_header and our_name_pos < bill_to_pos:
+                best_type = "sales_invoice"
+                best_conf = max(best_conf, 0.92)
+                best_signals.append("letterhead: issuer is Archzona/Archzona LLP")
+            elif our_name_pos > bill_to_pos and bill_to_pos < 9999:
+                best_type = "vendor_invoice"
+                best_conf = max(best_conf, 0.90)
+                best_signals.append("letterhead: recipient is Archzona, issuer is vendor")
+
         return {
             "document_type":          best_type,
             "confidence":             best_conf,
             "reasoning":              f"Heuristic: matched {len(best_signals)} pattern(s) for '{best_type}'",
             "classification_signals": best_signals,
         }
+
 
     # ──────────────────────────────────────────────────────────────────────
     # Private: LLM pass

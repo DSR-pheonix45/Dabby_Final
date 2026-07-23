@@ -37,9 +37,9 @@ class AIService:
         You are an expert financial AI. Analyze the document text content and extract the fields according to the Dabby OCR Contract (v1).
         
         Classify the document into one of the following exact 'document_type' string values:
-        - 'sales_invoice' (Create Revenue event)
+        - 'sales_invoice' (Create Revenue event - Invoice issued by us where letterhead has Archzona / Archzona LLP details)
         - 'customer_payment_receipt' (Receive Customer Payment event)
-        - 'vendor_invoice' (Receive Vendor Bill event)
+        - 'vendor_invoice' (Receive Vendor Bill event - Invoice received from vendor where letterhead has vendor details)
         - 'vendor_payment_receipt' (Pay Vendor event)
         - 'bank_statement' (Import Bank Transactions event)
         - 'expense_receipt' (Record Expense event)
@@ -52,6 +52,10 @@ class AIService:
         - 'purchase_order' (Procurement Commitment event)
         - 'sales_order' (Revenue Pipeline event)
 
+        INVOICE LETTERHEAD CLASSIFICATION RULE:
+        - Inspect the document letterhead / header (issuing party):
+        - If the letterhead / issuer name contains "Archzona", "Archzona LLP", or our entity details -> classify as 'sales_invoice' (invoice sent by us).
+        - If the letterhead / issuer contains ANY OTHER company details -> classify as 'vendor_invoice' (invoice received from vendor).
 
         RULES:
         1. OCR is ONLY responsible for extracting facts and metadata. Do NOT output ledger accounts (e.g. do not suggest debit_account or credit_account keys).
@@ -122,7 +126,22 @@ class AIService:
             extracted = json.loads(completion.choices[0].message.content)
             if doc_type != "unknown" and extracted.get("document_type") in ("unknown", None, "vendor_invoice", "sales_invoice"):
                 extracted["document_type"] = doc_type
+
+            # Enforce letterhead rule post-extraction for invoices
+            extracted_dt = extracted.get("document_type") or doc_type
+            if extracted_dt in ("vendor_invoice", "sales_invoice"):
+                parties = extracted.get("parties") or {}
+                vendor_name = (parties.get("vendor_name") or "").lower()
+                customer_name = (parties.get("customer_name") or "").lower()
+                content_head = (file_content or "")[:1500].lower()
+                
+                if "archzona" in vendor_name or "archzona llp" in vendor_name or "archzona" in content_head[:500]:
+                    extracted["document_type"] = "sales_invoice"
+                elif "archzona" in customer_name:
+                    extracted["document_type"] = "vendor_invoice"
+
             return extracted
+
         except Exception as e:
             print(f"[WARNING] Groq scan failed, attempting fallback to Gemini: {str(e)}")
             # Fallback to gemini if groq fails or has no keys configured
@@ -344,7 +363,21 @@ class AIService:
                 extracted = json.loads(text)
                 if doc_type != "unknown" and extracted.get("document_type") in ("unknown", None, "vendor_invoice", "sales_invoice"):
                     extracted["document_type"] = doc_type
+
+                # Enforce letterhead rule post-extraction for invoices
+                extracted_dt = extracted.get("document_type") or doc_type
+                if extracted_dt in ("vendor_invoice", "sales_invoice"):
+                    parties = extracted.get("parties") or {}
+                    vendor_name = (parties.get("vendor_name") or "").lower()
+                    customer_name = (parties.get("customer_name") or "").lower()
+                    
+                    if "archzona" in vendor_name or "archzona llp" in vendor_name:
+                        extracted["document_type"] = "sales_invoice"
+                    elif "archzona" in customer_name:
+                        extracted["document_type"] = "vendor_invoice"
+
                 return extracted
+
             except json.JSONDecodeError as je:
                 print(f"[ERROR] Failed to parse Gemini JSON: {je}")
                 print(f"Full Text: {text}")
