@@ -48,7 +48,7 @@ export default function InspectorDrawer({ isOpen, onClose, data, onPosted }) {
 
   if (!isOpen || !data) return null;
 
-  const routing = financialRouting(data.type, data.eventType);
+  const routing = financialRouting(data.type, data.eventType, data.party);
 
   // Prefer freshly-posted entries; fall back to any card-provided journal
   const journalEntries = posted?.entries

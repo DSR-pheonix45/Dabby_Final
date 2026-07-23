@@ -68,13 +68,30 @@ export function inferEventType(documentType) {
 /**
  * @param {string} documentType e.g. "sales_invoice"
  * @param {string} [eventType]  optional pre-resolved event type
+ * @param {string} [partyName]  optional issuer/party name for letterhead check
  * @returns routing meta: { key, label, where, hint, tone, eventType }
  */
-export function financialRouting(documentType, eventType) {
-  const ev = eventType || inferEventType(documentType);
+export function financialRouting(documentType, eventType, partyName) {
+  let ev = eventType;
+  if (!ev) {
+    const dtKey = norm(documentType);
+    const p = (partyName || '').toLowerCase().trim();
+    if (dtKey.includes('invoice') || dtKey.includes('bill')) {
+      if (p && !p.includes('archzona')) {
+        ev = 'VENDOR_BILLED';
+      } else if (p && p.includes('archzona')) {
+        ev = 'CUSTOMER_BILLED';
+      } else {
+        ev = inferEventType(documentType);
+      }
+    } else {
+      ev = inferEventType(documentType);
+    }
+  }
   const meta = EVENT_ROUTING[ev] || UNCLASSIFIED;
   return { ...meta, eventType: ev };
 }
+
 
 // Tailwind class sets per tone (kept here so cards/inspector stay consistent)
 export const ROUTING_TONE = {

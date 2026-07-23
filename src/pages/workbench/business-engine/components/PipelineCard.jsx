@@ -6,7 +6,7 @@ import { financialRouting, ROUTING_TONE } from '../../../../utils/financialRouti
 
 export default function PipelineCard({ card, onDragStart, onClick }) {
   const { activeWorkbench } = useWorkbench();
-  const routing = financialRouting(card.type, card.eventType);
+  const routing = financialRouting(card.type, card.eventType, card.party);
 
   const getConfidenceColor = (conf) => {
     if (conf >= 90) return 'text-teal-400 bg-teal-500/10';

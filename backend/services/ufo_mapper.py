@@ -43,6 +43,19 @@ class UFOMapper:
             }
         }
 
+        # Letterhead rule for invoices: check issuer vs recipient
+        doc_type_str = str(doc_type).lower().replace(" ", "_")
+        if doc_type_str in ("invoice", "tax_invoice", "sales_invoice", "vendor_invoice", "purchase_invoice", "bill", "unknown"):
+            issuer_name = (parties["issuer"]["name"] or "").lower()
+            recipient_name = (parties["recipient"]["name"] or "").lower()
+            if "archzona" in issuer_name:
+                doc_type = "sales_invoice"
+            elif issuer_name and "archzona" not in issuer_name:
+                doc_type = "vendor_invoice"
+            elif "archzona" in recipient_name:
+                doc_type = "vendor_invoice"
+
+
         # 2. Money  (schema: financials.total_amount / tax_amount / currency)
         raw_financials = analysis_data.get("financials", {})
 
