@@ -22,6 +22,7 @@ export default function FinancialImpactTab({ doc, onUpdate }) {
   const taxes = note.taxes || {};
   const total = Number(money.total_amount ?? money.subtotal ?? 0);
   const tax = Number(taxes.total_tax ?? 0);
+  const net = Number(money.subtotal ?? (total > tax ? total - tax : 0));
   const parties = note.parties || {};
   const partyName = parties.issuer?.name || legacy.parties?.vendor?.value || legacy.parties?.vendor_name || '';
   const routing = financialRouting(docType, null, partyName);
