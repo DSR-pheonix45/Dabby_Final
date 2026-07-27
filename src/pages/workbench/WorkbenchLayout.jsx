@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useWorkbench } from "../../context/WorkbenchContext";
+import { apiFetch } from "../../lib/apiClient";
 import { BsPerson, BsBuilding, BsGear, BsFileEarmarkText, BsDiagram3, BsGraphUp, BsCpu, BsJournalText, BsLightningCharge, BsFileEarmarkBarGraph, BsArrowRepeat } from "react-icons/bs";
 import GeneratorModal from "./GeneratorModal";
 import ReportsModal from "./ReportsModal";
@@ -20,10 +21,8 @@ export default function WorkbenchLayout() {
     setSyncing(true);
     const toastId = toast.loading("Executing sync with Zoho Books...");
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
-      const resp = await fetch(`${backendUrl}/api/integrations/zoho/sync`, {
+      const resp = await apiFetch("/api/integrations/zoho/sync", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ workbench_id: activeWorkbench.id, sync_type: "manual" })
       });
       const result = await resp.json();

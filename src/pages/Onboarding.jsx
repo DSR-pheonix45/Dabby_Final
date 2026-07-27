@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useWorkbench } from '../context/WorkbenchContext';
 import { supabase } from '../lib/supabase';
+import { apiFetch } from '../lib/apiClient';
 import { User, Phone, Building, CheckCircle, ArrowRight, Loader, Shield, FileText, Zap, Globe, DollarSign, Layers } from 'lucide-react';
 import BrandLogo from '../components/common/BrandLogo';
 import { toast } from 'react-hot-toast';
@@ -120,11 +121,9 @@ export default function Onboarding() {
     setLoading(true);
     try {
       if (ingestionMethod === 'zoho') {
-        // Connect Zoho Books mock / live flow
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
-        await fetch(`${backendUrl}/api/integrations/zoho/connect`, {
+        // Connect Zoho Books OAuth / org mapping
+        await apiFetch("/api/integrations/zoho/connect", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             workbench_id: createdWorkbenchId,
             provider_org_id: "90001827",
