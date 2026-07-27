@@ -20,7 +20,6 @@ import DocVault from "../pages/workbench/DocVault";
 import OPS from "../pages/workbench/ops/OPS";
 import BusinessEngine from "../pages/workbench/business-engine/BusinessEngine";
 import LedgerView from "../pages/workbench/LedgerView";
-import Integrations from "../pages/workbench/Integrations";
 import OnboardingTour from "./Onboarding/OnboardingTour";
 import FeedbackModal from "./ChatArea/FeedbackModal";
 import { backendService } from "../services/backendService";
@@ -714,7 +713,6 @@ Based on the Profit & Loss statement provided, the business shows stable operati
             <Route path="workbench" element={<WorkbenchLayout />}>
               <Route path="business-engine" element={<BusinessEngine />} />
               <Route path="ledger" element={<LedgerView />} />
-              <Route path="integrations" element={<Integrations />} />
               <Route path="members" element={<Members />} />
               <Route path="parties" element={<Parties />} />
               <Route path="coa" element={<COA />} />

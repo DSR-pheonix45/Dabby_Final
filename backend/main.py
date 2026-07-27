@@ -17,7 +17,7 @@ else:
 
 
 import auth
-from routers import ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, assets, rulesets, plans, superadmin, ingestion, business_events, settlements, collaboration, di_coa, di_documents, di_ledger, workbench_accounts, petty_cash, zoho
+from routers import ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, assets, rulesets, plans, superadmin, ingestion, business_events, settlements, collaboration, di_coa, di_documents, di_ledger, workbench_accounts, petty_cash
 
 app = FastAPI(title="Datalis API", description="FastAPI Backend for Datalis", version="1.0.0")
 
@@ -66,7 +66,6 @@ app.include_router(di_ledger.router, prefix="/api/di/ledger", tags=["Universal L
 app.include_router(settlements.router, prefix="/api/settlements", tags=["Settlements"])
 app.include_router(workbench_accounts.router, prefix="/api/workbench-accounts", tags=["Workbench Accounts"])
 app.include_router(petty_cash.router, prefix="/api/petty-cash", tags=["Petty Cash"])
-app.include_router(zoho.router, prefix="/api/integrations/zoho", tags=["Zoho Integration"])
 
 @app.get("/health")
 def health_check():

@@ -1,11 +1,9 @@
 import React, { useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useWorkbench } from "../../context/WorkbenchContext";
-import { apiFetch } from "../../lib/apiClient";
-import { BsPerson, BsBuilding, BsGear, BsFileEarmarkText, BsDiagram3, BsGraphUp, BsCpu, BsJournalText, BsLightningCharge, BsFileEarmarkBarGraph, BsArrowRepeat } from "react-icons/bs";
+import { BsPerson, BsBuilding, BsGear, BsFileEarmarkText, BsDiagram3, BsGraphUp, BsCpu, BsJournalText, BsLightningCharge, BsFileEarmarkBarGraph } from "react-icons/bs";
 import GeneratorModal from "./GeneratorModal";
 import ReportsModal from "./ReportsModal";
-import { toast } from "react-hot-toast";
 
 export default function WorkbenchLayout() {
   const { activeWorkbench } = useWorkbench();
@@ -14,31 +12,6 @@ export default function WorkbenchLayout() {
   
   const [isGeneratorModalOpen, setIsGeneratorModalOpen] = useState(false);
   const [isReportsModalOpen, setIsReportsModalOpen] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-
-  const handleQuickSync = async () => {
-    if (!activeWorkbench?.id) return;
-    setSyncing(true);
-    const toastId = toast.loading("Executing sync with Zoho Books...");
-    try {
-      const resp = await apiFetch("/api/integrations/zoho/sync", {
-        method: "POST",
-        body: JSON.stringify({ workbench_id: activeWorkbench.id, sync_type: "manual" })
-      });
-      const result = await resp.json();
-      if (resp.ok && result.status === "success") {
-        toast.success(`Sync complete! ${result.records_imported} records imported.`, { id: toastId });
-      } else {
-        toast.error("No active Zoho connection found. Opening Integrations...", { id: toastId });
-        navigate("/dashboard/workbench/integrations");
-      }
-    } catch (err) {
-      toast.error("Opening Integrations setup...", { id: toastId });
-      navigate("/dashboard/workbench/integrations");
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   if (!activeWorkbench) {
     return (
@@ -51,7 +24,6 @@ export default function WorkbenchLayout() {
   const navItems = [
     { label: "Business Engine", path: "/dashboard/workbench/business-engine", icon: BsCpu },
     { label: "Financials", path: "/dashboard/workbench/ledger", icon: BsJournalText },
-    { label: "Integrations", path: "/dashboard/workbench/integrations", icon: BsLightningCharge },
     { label: "Members", path: "/dashboard/workbench/members", icon: BsPerson },
     { label: "Parties", path: "/dashboard/workbench/parties", icon: BsBuilding },
     { label: "COA", path: "/dashboard/workbench/coa", icon: BsDiagram3 },
@@ -110,15 +82,6 @@ export default function WorkbenchLayout() {
             
             <div className="flex items-center space-x-3 pb-4 shrink-0">
               <div className="h-6 w-[1px] bg-white/10 mr-2 hidden md:block"></div>
-              <button 
-                onClick={handleQuickSync}
-                disabled={syncing}
-                className="flex items-center space-x-2 px-3 py-1.5 bg-teal-500 hover:bg-teal-400 text-black rounded-lg text-sm font-bold transition-colors shadow-sm disabled:opacity-50"
-                title="Sync Zoho Books ERP"
-              >
-                <BsArrowRepeat className={syncing ? "animate-spin" : ""} />
-                <span>{syncing ? "Syncing..." : "Sync Zoho"}</span>
-              </button>
               <button 
                 onClick={() => setIsGeneratorModalOpen(true)}
                 className="flex items-center space-x-2 px-3 py-1.5 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 rounded-lg text-sm font-semibold transition-colors"
