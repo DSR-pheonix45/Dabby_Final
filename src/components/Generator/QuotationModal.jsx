@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { BsX, BsSend, BsFileEarmarkPdf, BsTag, BsGear, BsTrash, BsPlusLg } from "react-icons/bs";
+import { BsX, BsSend, BsFileEarmarkPdf, BsTag, BsGear, BsTrash, BsPlusLg, BsBuilding } from "react-icons/bs";
 import { toast } from "react-hot-toast";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { formatCurrency } from "../../utils/currency";
@@ -13,7 +13,17 @@ export default function QuotationModal({ isOpen, onClose }) {
   const [expiryDate, setExpiryDate] = useState(
     new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
   );
+  
+  // Billing Details
   const [partyName, setPartyName] = useState("RATNA DEEP CHS");
+  const [clientAddress, setClientAddress] = useState("Mulund");
+  const [placeOfSupply, setPlaceOfSupply] = useState("Maharashtra");
+
+  // Shipping Details
+  const [shipToSameAsBilling, setShipToSameAsBilling] = useState(true);
+  const [shipToName, setShipToName] = useState("RATNA DEEP CHS");
+  const [shipToAddress, setShipToAddress] = useState("Mulund");
+
   const [quoteStatus, setQuoteStatus] = useState("SENT"); // SENT | NEGOTIATING | ACCEPTED | REJECTED
 
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
@@ -23,6 +33,8 @@ export default function QuotationModal({ isOpen, onClose }) {
     { description: "100 MM x 50 MM UPVC louver Profile", subDetails: "100 – 75 – 100 – 75 – 100", hsn: "39162019", qty: 6900, unit: "RFT", rate: 115 },
     { description: "MS FABRICATION WORK 115'X30'", subDetails: "", hsn: "7308", qty: 1, unit: "pcs", rate: 240000 },
   ]);
+
+  const [notes, setNotes] = useState("T-Patti for top,bottom & center support\n2\"X 2\" Pipe Ms Fabrication For Fins Support With Material And installation");
   const [terms, setTerms] = useState("50% Advance\n30% ongoing work\n20% after completion");
 
   if (!isOpen) return null;
@@ -53,14 +65,14 @@ export default function QuotationModal({ isOpen, onClose }) {
       senderMobile: activeWorkbench?.metadata?.mobile || "9870048082",
       senderEmail: activeWorkbench?.metadata?.email || "info.archzona@gmail.com",
       clientName: partyName,
-      clientAddress: "Mulund",
-      placeOfSupply: "Maharashtra",
-      shipToName: partyName,
-      shipToAddress: "Mulund",
+      clientAddress: clientAddress,
+      placeOfSupply: placeOfSupply,
+      shipToName: shipToSameAsBilling ? partyName : shipToName,
+      shipToAddress: shipToSameAsBilling ? clientAddress : shipToAddress,
       items,
       columns,
       taxRate: 0,
-      notes: "T-Patti for top,bottom & center support\n2\"X 2\" Pipe Ms Fabrication For Fins Support With Material And installation",
+      notes: notes,
       terms: terms,
       bankDetails: {
         name: activeWorkbench?.name || "Archzona",
@@ -86,7 +98,19 @@ export default function QuotationModal({ isOpen, onClose }) {
         total_amount: totalAmount,
         date: quoteDate,
         currency: activeWorkbench?.country === "IN" ? "INR" : "USD",
-        metadata: { quoteNumber, expiryDate, status: quoteStatus, terms, items, columns }
+        metadata: {
+          quoteNumber,
+          expiryDate,
+          status: quoteStatus,
+          clientAddress,
+          placeOfSupply,
+          shipToName: shipToSameAsBilling ? partyName : shipToName,
+          shipToAddress: shipToSameAsBilling ? clientAddress : shipToAddress,
+          notes,
+          terms,
+          items,
+          columns
+        }
       };
 
       await fetch("/api/events/from-document/draft", {
@@ -106,6 +130,7 @@ export default function QuotationModal({ isOpen, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
       <div className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl">
+        {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-white/10 bg-[#1a1a1a]">
           <h3 className="text-lg font-bold text-white flex items-center">
             <BsTag className="mr-2 text-blue-400" /> Stage 0: Quotation Generator
@@ -114,18 +139,12 @@ export default function QuotationModal({ isOpen, onClose }) {
         </div>
 
         <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto custom-scrollbar">
-          <div className="grid grid-cols-2 gap-4">
+          {/* Quote Meta */}
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="text-xs text-gray-400 block mb-1">Quote Number</label>
               <input value={quoteNumber} onChange={e => setQuoteNumber(e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-sm text-white" />
             </div>
-            <div>
-              <label className="text-xs text-gray-400 block mb-1">Target Party / Client</label>
-              <input value={partyName} onChange={e => setPartyName(e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-sm text-white" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="text-xs text-gray-400 block mb-1">Quote Date</label>
               <input type="date" value={quoteDate} onChange={e => setQuoteDate(e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-sm text-white" />
@@ -134,14 +153,92 @@ export default function QuotationModal({ isOpen, onClose }) {
               <label className="text-xs text-gray-400 block mb-1">Valid Until</label>
               <input type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-sm text-white" />
             </div>
-            <div>
-              <label className="text-xs text-gray-400 block mb-1">Negotiation Status</label>
-              <select value={quoteStatus} onChange={e => setQuoteStatus(e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-sm text-white font-bold">
-                <option value="SENT">SENT</option>
-                <option value="NEGOTIATING">NEGOTIATING</option>
-                <option value="ACCEPTED">ACCEPTED</option>
-                <option value="REJECTED">REJECTED</option>
-              </select>
+          </div>
+
+          {/* Billing & Shipping Section */}
+          <div className="p-4 bg-[#181818] border border-white/10 rounded-xl space-y-3">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+              <span className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                <BsBuilding className="text-sm" /> Client Billing & Shipping Details
+              </span>
+              <label className="flex items-center space-x-2 cursor-pointer text-xs text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={shipToSameAsBilling}
+                  onChange={(e) => setShipToSameAsBilling(e.target.checked)}
+                  className="rounded border-white/10 text-blue-600 focus:ring-0"
+                />
+                <span>Ship To same as Bill To</span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* BILL TO */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold text-gray-300 block uppercase">Bill To</span>
+                <div>
+                  <label className="text-[10px] text-gray-400 block mb-0.5">Client Name / Business</label>
+                  <input
+                    value={partyName}
+                    onChange={e => setPartyName(e.target.value)}
+                    placeholder="e.g. RATNA DEEP CHS"
+                    className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400 block mb-0.5">Billing Address</label>
+                  <textarea
+                    rows={2}
+                    value={clientAddress}
+                    onChange={e => setClientAddress(e.target.value)}
+                    placeholder="Full billing address..."
+                    className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400 block mb-0.5">Place of Supply</label>
+                  <input
+                    value={placeOfSupply}
+                    onChange={e => setPlaceOfSupply(e.target.value)}
+                    placeholder="e.g. Maharashtra"
+                    className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-xs text-white"
+                  />
+                </div>
+              </div>
+
+              {/* SHIP TO */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold text-gray-300 block uppercase">Ship To</span>
+                {shipToSameAsBilling ? (
+                  <div className="p-3 bg-white/5 border border-white/5 rounded-lg text-xs text-gray-400 space-y-1">
+                    <div><span className="text-gray-300 font-semibold">Consignee:</span> {partyName}</div>
+                    <div><span className="text-gray-300 font-semibold">Address:</span> {clientAddress}</div>
+                    <div className="text-[11px] text-blue-400 italic pt-1">Shipping details match billing address</div>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="text-[10px] text-gray-400 block mb-0.5">Consignee Name</label>
+                      <input
+                        value={shipToName}
+                        onChange={e => setShipToName(e.target.value)}
+                        placeholder="e.g. RATNA DEEP CHS Site"
+                        className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-400 block mb-0.5">Shipping Address</label>
+                      <textarea
+                        rows={3}
+                        value={shipToAddress}
+                        onChange={e => setShipToAddress(e.target.value)}
+                        placeholder="Full delivery / site address..."
+                        className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-xs text-white"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -241,9 +338,28 @@ export default function QuotationModal({ isOpen, onClose }) {
             <span className="text-lg font-bold text-blue-400">{formatCurrency(totalAmount, activeWorkbench?.country)}</span>
           </div>
 
-          <div>
-            <label className="text-xs text-gray-400 block mb-1">Commercial Terms</label>
-            <textarea value={terms} onChange={e => setTerms(e.target.value)} rows={2} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-xs text-white" />
+          {/* Notes & Commercial Terms Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">Notes & Scope Details</label>
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                rows={3}
+                placeholder="Scope notes, support specs, installation details..."
+                className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2.5 text-xs text-white"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">Commercial Terms & Conditions</label>
+              <textarea
+                value={terms}
+                onChange={e => setTerms(e.target.value)}
+                rows={3}
+                placeholder="Payment terms, advance schedule..."
+                className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2.5 text-xs text-white"
+              />
+            </div>
           </div>
         </div>
 

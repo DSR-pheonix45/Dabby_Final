@@ -136,8 +136,12 @@ export function generateStandardDocumentPDF(docData) {
 
   // Right Side: Document Details
   let rightY = y + 25;
-  const docNumLabel = documentType.includes("QUOTE") ? "Quotation No." : (documentType.includes("PROFORMA") ? "Proforma No." : "Invoice No.");
-  const docDateLabel = documentType.includes("QUOTE") ? "Quotation Date" : (documentType.includes("PROFORMA") ? "Proforma Date" : "Invoice Date");
+  const docTypeUpper = (documentType || "").toUpperCase();
+  const isQuoteDoc = docTypeUpper.includes("QUOTE") || docTypeUpper.includes("QUOT");
+  const isProformaDoc = docTypeUpper.includes("PROFORMA");
+
+  const docNumLabel = isQuoteDoc ? "Quotation No." : (isProformaDoc ? "Proforma No." : "Invoice No.");
+  const docDateLabel = isQuoteDoc ? "Quotation Date" : (isProformaDoc ? "Proforma Date" : "Invoice Date");
 
   const rightColWidth = (margin + contentWidth) - splitX;
   const col1X = splitX + 20;

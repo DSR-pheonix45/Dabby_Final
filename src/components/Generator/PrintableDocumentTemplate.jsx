@@ -78,8 +78,12 @@ export default function PrintableDocumentTemplate({ data }) {
 
   const hsnEntries = Object.entries(hsnMap);
 
-  const docNumLabel = documentType.includes("QUOTE") ? "Quotation No." : (documentType.includes("PROFORMA") ? "Proforma No." : "Invoice No.");
-  const docDateLabel = documentType.includes("QUOTE") ? "Quotation Date" : (documentType.includes("PROFORMA") ? "Proforma Date" : "Invoice Date");
+  const docTypeUpper = (documentType || "").toUpperCase();
+  const isQuoteDoc = docTypeUpper.includes("QUOTE") || docTypeUpper.includes("QUOT");
+  const isProformaDoc = docTypeUpper.includes("PROFORMA");
+
+  const docNumLabel = isQuoteDoc ? "Quotation No." : (isProformaDoc ? "Proforma No." : "Invoice No.");
+  const docDateLabel = isQuoteDoc ? "Quotation Date" : (isProformaDoc ? "Proforma Date" : "Invoice Date");
 
   return (
     <div className="w-full bg-white text-black font-sans p-6 rounded-lg shadow-lg border border-gray-300 max-w-4xl mx-auto print:p-0 print:shadow-none print:border-none">

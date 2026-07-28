@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { BsX, BsSend, BsFileEarmarkPdf, BsCalculator, BsGear, BsTrash, BsPlusLg } from "react-icons/bs";
+import { BsX, BsSend, BsFileEarmarkPdf, BsCalculator, BsGear, BsTrash, BsPlusLg, BsBuilding } from "react-icons/bs";
 import { toast } from "react-hot-toast";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { formatCurrency } from "../../utils/currency";
@@ -10,7 +10,17 @@ export default function ProformaInvoiceModal({ isOpen, onClose }) {
   const { activeWorkbench } = useWorkbench();
   const [proformaNumber, setProformaNumber] = useState(`PI-${Math.floor(1000 + Math.random() * 9000)}`);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  
+  // Billing Details
   const [partyName, setPartyName] = useState("RATNA DEEP CHS");
+  const [clientAddress, setClientAddress] = useState("Mulund");
+  const [placeOfSupply, setPlaceOfSupply] = useState("Maharashtra");
+
+  // Shipping Details
+  const [shipToSameAsBilling, setShipToSameAsBilling] = useState(true);
+  const [shipToName, setShipToName] = useState("RATNA DEEP CHS");
+  const [shipToAddress, setShipToAddress] = useState("Mulund");
+
   const [projectEstimateName, setProjectEstimateName] = useState("Site Excavation & Foundation Phase 1");
   const [advancePercent, setAdvancePercent] = useState(20);
 
@@ -21,6 +31,9 @@ export default function ProformaInvoiceModal({ isOpen, onClose }) {
     { description: "100 MM x 50 MM UPVC louver Profile", subDetails: "100 – 75 – 100 – 75 – 100", hsn: "39162019", qty: 6900, unit: "RFT", rate: 115 },
     { description: "MS FABRICATION WORK 115'X30'", subDetails: "", hsn: "7308", qty: 1, unit: "pcs", rate: 240000 },
   ]);
+
+  const [notes, setNotes] = useState("T-Patti for top,bottom & center support\n2\"X 2\" Pipe Ms Fabrication For Fins Support With Material And installation");
+  const [terms, setTerms] = useState("50% Advance\n30% ongoing work\n20% after completion");
 
   if (!isOpen) return null;
 
@@ -50,15 +63,15 @@ export default function ProformaInvoiceModal({ isOpen, onClose }) {
       senderMobile: activeWorkbench?.metadata?.mobile || "9870048082",
       senderEmail: activeWorkbench?.metadata?.email || "info.archzona@gmail.com",
       clientName: partyName,
-      clientAddress: "Mulund",
-      placeOfSupply: "Maharashtra",
-      shipToName: partyName,
-      shipToAddress: "Mulund",
+      clientAddress: clientAddress,
+      placeOfSupply: placeOfSupply,
+      shipToName: shipToSameAsBilling ? partyName : shipToName,
+      shipToAddress: shipToSameAsBilling ? clientAddress : shipToAddress,
       items,
       columns,
       taxRate: 18,
-      notes: `Project/Contract: ${projectEstimateName}\nT-Patti for top,bottom & center support\n2"X 2" Pipe Ms Fabrication For Fins Support With Material And installation`,
-      terms: `${advancePercent}% Advance\n30% ongoing work\n20% after completion`,
+      notes: `Project/Contract: ${projectEstimateName}\n${notes}`,
+      terms: `${advancePercent}% Advance\n${terms}`,
       bankDetails: {
         name: activeWorkbench?.name || "Archzona",
         ifsc: "UTIB000125",
@@ -83,7 +96,20 @@ export default function ProformaInvoiceModal({ isOpen, onClose }) {
         total_amount: totalEstimate,
         date: date,
         currency: activeWorkbench?.country === "IN" ? "INR" : "USD",
-        metadata: { proformaNumber, projectEstimateName, advancePercent, requiredAdvance, items, columns }
+        metadata: {
+          proformaNumber,
+          projectEstimateName,
+          advancePercent,
+          requiredAdvance,
+          clientAddress,
+          placeOfSupply,
+          shipToName: shipToSameAsBilling ? partyName : shipToName,
+          shipToAddress: shipToSameAsBilling ? clientAddress : shipToAddress,
+          notes,
+          terms,
+          items,
+          columns
+        }
       };
 
       await fetch("/api/events/from-document/draft", {
@@ -117,14 +143,101 @@ export default function ProformaInvoiceModal({ isOpen, onClose }) {
               <input value={proformaNumber} onChange={e => setProformaNumber(e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-sm text-white" />
             </div>
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Party / Contractor</label>
-              <input value={partyName} onChange={e => setPartyName(e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-sm text-white" />
+              <label className="text-xs text-gray-400 block mb-1">Date</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-sm text-white" />
             </div>
           </div>
 
           <div>
             <label className="text-xs text-gray-400 block mb-1">Project / Contract Scope Name</label>
             <input value={projectEstimateName} onChange={e => setProjectEstimateName(e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-sm text-white" />
+          </div>
+
+          {/* Billing & Shipping Section */}
+          <div className="p-4 bg-[#181818] border border-white/10 rounded-xl space-y-3">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+              <span className="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                <BsBuilding className="text-sm" /> Client Billing & Shipping Details
+              </span>
+              <label className="flex items-center space-x-2 cursor-pointer text-xs text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={shipToSameAsBilling}
+                  onChange={(e) => setShipToSameAsBilling(e.target.checked)}
+                  className="rounded border-white/10 text-purple-600 focus:ring-0"
+                />
+                <span>Ship To same as Bill To</span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* BILL TO */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold text-gray-300 block uppercase">Bill To</span>
+                <div>
+                  <label className="text-[10px] text-gray-400 block mb-0.5">Party / Client Name</label>
+                  <input
+                    value={partyName}
+                    onChange={e => setPartyName(e.target.value)}
+                    placeholder="e.g. RATNA DEEP CHS"
+                    className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400 block mb-0.5">Billing Address</label>
+                  <textarea
+                    rows={2}
+                    value={clientAddress}
+                    onChange={e => setClientAddress(e.target.value)}
+                    placeholder="Full billing address..."
+                    className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400 block mb-0.5">Place of Supply</label>
+                  <input
+                    value={placeOfSupply}
+                    onChange={e => setPlaceOfSupply(e.target.value)}
+                    placeholder="e.g. Maharashtra"
+                    className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-xs text-white"
+                  />
+                </div>
+              </div>
+
+              {/* SHIP TO */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold text-gray-300 block uppercase">Ship To</span>
+                {shipToSameAsBilling ? (
+                  <div className="p-3 bg-white/5 border border-white/5 rounded-lg text-xs text-gray-400 space-y-1">
+                    <div><span className="text-gray-300 font-semibold">Consignee:</span> {partyName}</div>
+                    <div><span className="text-gray-300 font-semibold">Address:</span> {clientAddress}</div>
+                    <div className="text-[11px] text-purple-400 italic pt-1">Shipping details match billing address</div>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="text-[10px] text-gray-400 block mb-0.5">Consignee Name</label>
+                      <input
+                        value={shipToName}
+                        onChange={e => setShipToName(e.target.value)}
+                        placeholder="e.g. RATNA DEEP CHS Site"
+                        className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-400 block mb-0.5">Shipping Address</label>
+                      <textarea
+                        rows={3}
+                        value={shipToAddress}
+                        onChange={e => setShipToAddress(e.target.value)}
+                        placeholder="Full delivery / site address..."
+                        className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-xs text-white"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Dynamic Line Items Section */}
@@ -227,6 +340,30 @@ export default function ProformaInvoiceModal({ isOpen, onClose }) {
                 <input type="number" value={advancePercent} onChange={e => setAdvancePercent(Number(e.target.value))} className="w-12 bg-black/40 border border-white/10 rounded text-center text-xs text-white" />
               </div>
               <span className="text-lg font-bold text-amber-400">{formatCurrency(requiredAdvance, activeWorkbench?.country)}</span>
+            </div>
+          </div>
+
+          {/* Notes & Commercial Terms Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">Notes & Scope Details</label>
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                rows={3}
+                placeholder="Scope notes, support specs, installation details..."
+                className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2.5 text-xs text-white"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">Commercial Terms & Conditions</label>
+              <textarea
+                value={terms}
+                onChange={e => setTerms(e.target.value)}
+                rows={3}
+                placeholder="Payment terms, advance schedule..."
+                className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2.5 text-xs text-white"
+              />
             </div>
           </div>
         </div>
