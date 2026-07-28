@@ -6,6 +6,8 @@ import autoTable from "jspdf-autotable";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { formatCurrency } from "../../utils/currency";
 
+import { generateStandardDocumentPDF } from "../../utils/documentPdfGenerator";
+
 export default function QuotationModal({ isOpen, onClose }) {
   const { activeWorkbench } = useWorkbench();
   const [quoteNumber, setQuoteNumber] = useState(`QT-${Math.floor(1000 + Math.random() * 9000)}`);
@@ -13,20 +15,31 @@ export default function QuotationModal({ isOpen, onClose }) {
   const [expiryDate, setExpiryDate] = useState(
     new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
   );
-  const [partyName, setPartyName] = useState("Acme Construction Pvt Ltd");
+  const [partyName, setPartyName] = useState("RATNA DEEP CHS");
   const [quoteStatus, setQuoteStatus] = useState("SENT"); // SENT | NEGOTIATING | ACCEPTED | REJECTED
   const [items, setItems] = useState([
-    { description: "Architectural Design & Blueprint Drafting", qty: 1, rate: 45000 },
-    { description: "Structural Load Estimation Analysis", qty: 1, rate: 30000 },
+    { description: "100 MM x 50 MM UPVC louver Profile", subDetails: "100 – 75 – 100 – 75 – 100", hsn: "39162019", qty: 6900, unit: "RFT", rate: 115 },
+    { description: "MS FABRICATION WORK 115'X30'", subDetails: "", hsn: "7308", qty: 1, unit: "pcs", rate: 240000 },
   ]);
-  const [terms, setTerms] = useState("50% Advance upon approval, 50% upon final delivery.");
+  const [terms, setTerms] = useState("50% Advance\n30% ongoing work\n20% after completion");
+
+  const [columnLabels, setColumnLabels] = useState({
+    sno: "S.NO.",
+    items: "ITEMS",
+    hsn: "HSN",
+    qty: "AREA / QTY",
+    unit: "UNIT",
+    rate: "UNIT RATE",
+    amount: "DERIVING AMOUNT"
+  });
+  const [showSeparateUnitCol, setShowSeparateUnitCol] = useState(false);
 
   if (!isOpen) return null;
 
-  const addItem = () => setItems([...items, { description: "New Item", qty: 1, rate: 5000 }]);
+  const addItem = () => setItems([...items, { description: "New Item", subDetails: "", hsn: "7308", qty: 1, unit: "pcs", rate: 5000 }]);
   const updateItem = (idx, field, val) => {
     const updated = [...items];
-    updated[idx][field] = field === "description" ? val : Number(val) || 0;
+    updated[idx][field] = field === "qty" || field === "rate" ? Number(val) || 0 : val;
     setItems(updated);
   };
   const removeItem = (idx) => setItems(items.filter((_, i) => i !== idx));
@@ -34,41 +47,43 @@ export default function QuotationModal({ isOpen, onClose }) {
   const totalAmount = items.reduce((acc, it) => acc + (it.qty * it.rate), 0);
 
   const generatePDFDoc = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.setTextColor(37, 99, 235);
-    doc.text(activeWorkbench?.name || "DABBY WORKBENCH", 14, 20);
-
-    doc.setFontSize(14);
-    doc.setTextColor(40, 40, 40);
-    doc.text("QUOTATION / OFFER", 14, 28);
-
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Quote No: ${quoteNumber}`, 14, 36);
-    doc.text(`Date: ${quoteDate}  |  Valid Until: ${expiryDate}`, 14, 42);
-    doc.text(`Status: ${quoteStatus}`, 14, 48);
-    doc.text(`To: ${partyName}`, 14, 54);
-
-    const tableData = items.map((it, i) => [
-      i + 1,
-      it.description,
-      it.qty,
-      formatCurrency(it.rate, activeWorkbench?.country),
-      formatCurrency(it.qty * it.rate, activeWorkbench?.country),
-    ]);
-
-    autoTable(doc, {
-      startY: 60,
-      head: [["#", "Description", "Qty", "Rate", "Total"]],
-      body: tableData,
+    return generateStandardDocumentPDF({
+      documentType: "QUOTATION",
+      docNumber: quoteNumber,
+      docDate: quoteDate,
+      dueDate: expiryDate,
+      senderName: activeWorkbench?.name || "Archzona",
+      senderAddress: activeWorkbench?.metadata?.address || "105, PRISM INDUSTRIAL ESTATE, BEHIND PENDARKAR COLLEGE, DOMBIVLI(EAST)421201",
+      senderGstin: activeWorkbench?.gstin || "7ACDFA4175F1ZJ",
+      senderMobile: activeWorkbench?.metadata?.mobile || "9870048082",
+      senderEmail: activeWorkbench?.metadata?.email || "info.archzona@gmail.com",
+      clientName: partyName,
+      clientAddress: "Mulund",
+      placeOfSupply: "Maharashtra",
+      shipToName: partyName,
+      shipToAddress: "Mulund",
+      items: items.map((it, idx) => ({
+        sno: idx + 1,
+        description: it.description,
+        subDetails: it.subDetails || "",
+        hsn: it.hsn || "39162019",
+        qty: it.qty,
+        unit: it.unit || "pcs",
+        rate: it.rate
+      })),
+      taxRate: 18,
+      columnLabels,
+      showSeparateUnitCol,
+      notes: "T-Patti for top,bottom & center support\n2\"X 2\" Pipe Ms Fabrication For Fins Support With Material And installation",
+      terms: terms,
+      bankDetails: {
+        name: activeWorkbench?.name || "Archzona",
+        ifsc: "UTIB000125",
+        accountNo: "923020053039794",
+        bankName: "AXIS BANK, Dombivli"
+      },
+      authorisedSignatory: activeWorkbench?.name || "Archzona"
     });
-
-    const finalY = doc.lastAutoTable.finalY || 100;
-    doc.text(`Total Estimate: ${formatCurrency(totalAmount, activeWorkbench?.country)}`, 14, finalY + 12);
-    doc.text(`Terms: ${terms}`, 14, finalY + 20);
-
-    return doc;
   };
 
   const handleExportPDF = () => {

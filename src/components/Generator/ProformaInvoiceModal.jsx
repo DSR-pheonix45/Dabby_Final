@@ -5,25 +5,26 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { formatCurrency } from "../../utils/currency";
+import { generateStandardDocumentPDF } from "../../utils/documentPdfGenerator";
 
 export default function ProformaInvoiceModal({ isOpen, onClose }) {
   const { activeWorkbench } = useWorkbench();
   const [proformaNumber, setProformaNumber] = useState(`PI-${Math.floor(1000 + Math.random() * 9000)}`);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [partyName, setPartyName] = useState("Vanguard Infra Developers");
+  const [partyName, setPartyName] = useState("RATNA DEEP CHS");
   const [projectEstimateName, setProjectEstimateName] = useState("Site Excavation & Foundation Phase 1");
   const [items, setItems] = useState([
-    { description: "Site Clearing & Soil Grading (Est. 200 hrs)", qty: 200, rate: 450 },
-    { description: "Concrete Pouring & Reinforcement Mesh", qty: 1, rate: 85000 },
+    { description: "100 MM x 50 MM UPVC louver Profile", subDetails: "100 – 75 – 100 – 75 – 100", hsn: "39162019", qty: 6900, unit: "RFT", rate: 115 },
+    { description: "MS FABRICATION WORK 115'X30'", subDetails: "", hsn: "7308", qty: 1, unit: "pcs", rate: 240000 },
   ]);
   const [advancePercent, setAdvancePercent] = useState(20);
 
   if (!isOpen) return null;
 
-  const addItem = () => setItems([...items, { description: "New Estimate Item", qty: 1, rate: 10000 }]);
+  const addItem = () => setItems([...items, { description: "New Estimate Item", subDetails: "", hsn: "7308", qty: 1, unit: "pcs", rate: 10000 }]);
   const updateItem = (idx, field, val) => {
     const updated = [...items];
-    updated[idx][field] = field === "description" ? val : Number(val) || 0;
+    updated[idx][field] = field === "qty" || field === "rate" ? Number(val) || 0 : val;
     setItems(updated);
   };
   const removeItem = (idx) => setItems(items.filter((_, i) => i !== idx));
@@ -32,46 +33,46 @@ export default function ProformaInvoiceModal({ isOpen, onClose }) {
   const requiredAdvance = (totalEstimate * advancePercent) / 100;
 
   const generatePDFDoc = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.setTextColor(147, 51, 234);
-    doc.text(activeWorkbench?.name || "DABBY WORKBENCH", 14, 20);
-
-    doc.setFontSize(14);
-    doc.setTextColor(40, 40, 40);
-    doc.text("PROFORMA INVOICE / ESTIMATE", 14, 28);
-
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Proforma No: ${proformaNumber}  |  Date: ${date}`, 14, 36);
-    doc.text(`Project/Contract: ${projectEstimateName}`, 14, 42);
-    doc.text(`Client: ${partyName}`, 14, 48);
-
-    const tableData = items.map((it, i) => [
-      i + 1,
-      it.description,
-      it.qty,
-      formatCurrency(it.rate, activeWorkbench?.country),
-      formatCurrency(it.qty * it.rate, activeWorkbench?.country),
-    ]);
-
-    autoTable(doc, {
-      startY: 55,
-      head: [["#", "Work Description", "Qty/Hrs", "Rate", "Total"]],
-      body: tableData,
+    return generateStandardDocumentPDF({
+      documentType: "PROFORMA INVOICE",
+      docNumber: proformaNumber,
+      docDate: date,
+      senderName: activeWorkbench?.name || "Archzona",
+      senderAddress: activeWorkbench?.metadata?.address || "105, PRISM INDUSTRIAL ESTATE, BEHIND PENDARKAR COLLEGE, DOMBIVLI(EAST)421201",
+      senderGstin: activeWorkbench?.gstin || "7ACDFA4175F1ZJ",
+      senderMobile: activeWorkbench?.metadata?.mobile || "9870048082",
+      senderEmail: activeWorkbench?.metadata?.email || "info.archzona@gmail.com",
+      clientName: partyName,
+      clientAddress: "Mulund",
+      placeOfSupply: "Maharashtra",
+      shipToName: partyName,
+      shipToAddress: "Mulund",
+      items: items.map((it, idx) => ({
+        sno: idx + 1,
+        description: it.description,
+        subDetails: it.subDetails || "",
+        hsn: it.hsn || "39162019",
+        qty: it.qty,
+        unit: it.unit || "pcs",
+        rate: it.rate
+      })),
+      taxRate: 18,
+      notes: `Project/Contract: ${projectEstimateName}\nT-Patti for top,bottom & center support\n2"X 2" Pipe Ms Fabrication For Fins Support With Material And installation`,
+      terms: `${advancePercent}% Advance\n30% ongoing work\n20% after completion`,
+      bankDetails: {
+        name: activeWorkbench?.name || "Archzona",
+        ifsc: "UTIB000125",
+        accountNo: "923020053039794",
+        bankName: "AXIS BANK, Dombivli"
+      },
+      authorisedSignatory: activeWorkbench?.name || "Archzona"
     });
-
-    const finalY = doc.lastAutoTable.finalY || 100;
-    doc.text(`Total Working Estimate: ${formatCurrency(totalEstimate, activeWorkbench?.country)}`, 14, finalY + 12);
-    doc.text(`Required Advance (${advancePercent}%): ${formatCurrency(requiredAdvance, activeWorkbench?.country)}`, 14, finalY + 20);
-
-    return doc;
   };
 
   const handleExportPDF = () => {
     const doc = generatePDFDoc();
     doc.save(`${proformaNumber}_${partyName.replace(/\s+/g, '_')}.pdf`);
-    toast.success("Proforma Invoice PDF exported!");
+    toast.success("Proforma Invoice PDF downloaded!");
   };
 
   const handleSendToTrade = async () => {

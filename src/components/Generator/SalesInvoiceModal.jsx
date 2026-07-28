@@ -7,6 +7,7 @@ import { toast } from "react-hot-toast";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { saveInvoice, getStoredDiscountTags } from "./generatorStore";
+import { generateStandardDocumentPDF } from "../../utils/documentPdfGenerator";
 
 const STAGES = [
   {
@@ -190,79 +191,46 @@ export default function SalesInvoiceModal({ isOpen, onClose }) {
   // PDF Exporter
   const handleExportPDF = () => {
     try {
-      const doc = new jsPDF();
-      doc.setFontSize(20);
-      doc.setTextColor(20, 184, 166);
-      doc.text("DABBY ENTERPRISE PVT LTD", 14, 20);
-
-      doc.setFontSize(14);
-      doc.setTextColor(40, 40, 40);
-      doc.text(currentStageObj.title.toUpperCase(), 14, 28);
-
-      doc.setFontSize(10);
-      doc.setTextColor(100, 100, 100);
-      doc.text(`Doc #: ${docNumber}`, 14, 35);
-      doc.text(`Date: ${docDate}`, 14, 40);
-      doc.text(`Stage Status: ${currentStageObj.badge}`, 14, 45);
-
-      // Customer Block
-      doc.setFontSize(11);
-      doc.setTextColor(0, 0, 0);
-      doc.text("BILLED TO (BENEFICIARY):", 120, 28);
-      doc.setFontSize(10);
-      doc.setTextColor(60, 60, 60);
-      doc.text(party.name, 120, 34);
-      doc.text(`GSTIN: ${party.gstin}`, 120, 39);
-      doc.text(`Place of Supply: ${party.placeOfSupply}`, 120, 44);
-
-      // Table data
-      const tableData = lineItems.map((item, idx) => [
-        idx + 1,
-        item.description || item.sku,
-        item.hsnSac,
-        item.qty,
-        `Rs. ${Number(item.rate).toLocaleString('en-IN')}`,
-        `${item.taxRate}%`,
-        `Rs. ${(item.qty * item.rate).toLocaleString('en-IN')}`
-      ]);
-
-      autoTable(doc, {
-        startY: 52,
-        head: [['#', 'Item / SKU Description', 'HSN/SAC', 'Qty', 'Rate', 'Tax %', 'Total']],
-        body: tableData,
-        theme: 'striped',
-        headStyles: { fillColor: [20, 184, 166] }
+      const docType = stage === "QUOTATION" ? "QUOTATION" : (stage === "PROFORMA" ? "PROFORMA INVOICE" : "TAX INVOICE");
+      const doc = generateStandardDocumentPDF({
+        documentType: docType,
+        docNumber: docNumber,
+        docDate: docDate,
+        dueDate: dueDate,
+        senderName: "Archzona",
+        senderAddress: "105, PRISM INDUSTRIAL ESTATE, BEHIND PENDARKAR COLLEGE, DOMBIVLI(EAST)421201",
+        senderGstin: "7ACDFA4175F1ZJ",
+        senderMobile: "9870048082",
+        senderEmail: "info.archzona@gmail.com",
+        clientName: party.name || "RATNA DEEP CHS",
+        clientAddress: party.address || "Mulund",
+        placeOfSupply: party.placeOfSupply || "Maharashtra",
+        clientGstin: party.gstin,
+        shipToName: includeShipping && deliveryChallan.shippingAddress ? party.name : (party.name || "RATNA DEEP CHS"),
+        shipToAddress: includeShipping && deliveryChallan.shippingAddress ? deliveryChallan.shippingAddress : (party.address || "Mulund"),
+        items: lineItems.map((item, idx) => ({
+          sno: idx + 1,
+          description: item.description || item.sku,
+          subDetails: "",
+          hsn: item.hsnSac || "39162019",
+          qty: Number(item.qty) || 1,
+          unit: "pcs",
+          rate: Number(item.rate) || 0
+        })),
+        taxRate: 18,
+        isIgst: gstDetails.taxType === "IGST",
+        columnLabels: { sno: "S.NO.", items: "ITEMS", hsn: "HSN", qty: "AREA / QTY", unit: "UNIT", rate: "UNIT RATE", amount: "DERIVING AMOUNT" },
+        showSeparateUnitCol: false,
+        notes: "T-Patti for top,bottom & center support\n2\"X 2\" Pipe Ms Fabrication For Fins Support With Material And installation",
+        terms: paymentSnippet.paymentTerms || "50% Advance\n30% ongoing work\n20% after completion",
+        bankDetails: {
+          name: paymentSnippet.accountName || "Archzona",
+          ifsc: paymentSnippet.ifsc || "UTIB000125",
+          accountNo: paymentSnippet.accountNumber || "923020053039794",
+          bankName: paymentSnippet.bankName || "AXIS BANK, Dombivli"
+        },
+        authorisedSignatory: "Archzona"
       });
-
-      let finalY = doc.lastAutoTable.finalY + 10;
-      doc.text(`Subtotal: Rs. ${subtotal.toLocaleString('en-IN')}`, 140, finalY);
-      if (discountAmount > 0) {
-        finalY += 5;
-        doc.text(`Discount (${selectedDiscountTag?.code}): -Rs. ${discountAmount.toLocaleString('en-IN')}`, 140, finalY);
-      }
-      finalY += 5;
-      doc.text(`GST Total: Rs. ${totalTax.toLocaleString('en-IN')}`, 140, finalY);
-      finalY += 7;
-      doc.setFontSize(12);
-      doc.setTextColor(20, 184, 166);
-      doc.text(`Grand Total: Rs. ${grandTotal.toLocaleString('en-IN')}`, 140, finalY);
-
-      // Payment snippet
-      finalY += 15;
-      doc.setFontSize(10);
-      doc.setTextColor(0, 0, 0);
-      doc.text("PAYMENT DETAILS & BANK SNIPPET:", 14, finalY);
-      doc.setTextColor(80, 80, 80);
-      doc.text(`Bank: ${paymentSnippet.bankName} | A/C: ${paymentSnippet.accountNumber} | IFSC: ${paymentSnippet.ifsc}`, 14, finalY + 5);
-      doc.text(`UPI VPA: ${paymentSnippet.upiId} | Terms: ${paymentSnippet.paymentTerms}`, 14, finalY + 10);
-
-      if (includeShipping) {
-        finalY += 20;
-        doc.setTextColor(0, 0, 0);
-        doc.text("DELIVERY CHALLAN & LOGISTICS LINK:", 14, finalY);
-        doc.setTextColor(80, 80, 80);
-        doc.text(`Challan #: ${deliveryChallan.challanNo} | Vehicle #: ${deliveryChallan.vehicleNo} | LR #: ${deliveryChallan.biltyLrNo}`, 14, finalY + 5);
-      }
 
       doc.save(`${docNumber}_${stage}.pdf`);
       toast.success(`Exported ${currentStageObj.title} PDF!`);

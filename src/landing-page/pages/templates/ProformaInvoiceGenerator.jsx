@@ -1,612 +1,567 @@
-import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import React, { useState } from "react";
 import { useTheme } from "../../../context/ThemeContext";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Download, Plus, Trash2, Globe, ChevronDown, Upload, X } from "lucide-react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle, ImageRun } from "docx";
-import { saveAs } from "file-saver";
+import { ArrowLeft, Download, Plus, Trash2, Printer } from "lucide-react";
+import { generateStandardDocumentPDF } from "../../../utils/documentPdfGenerator";
+import PrintableDocumentTemplate from "../../../components/Generator/PrintableDocumentTemplate";
+import ColumnConfigurator from "../../../components/Generator/ColumnConfigurator";
 
 export default function ProformaInvoiceGenerator() {
   const { theme } = useTheme();
   const [invoiceData, setInvoiceData] = useState({
-    invoiceNumber: "PI-001",
+    documentType: "PROFORMA INVOICE",
+    invoiceNumber: "PI-101",
     date: new Date().toISOString().split('T')[0],
-    senderName: "",
-    senderGstin: "",
-    senderCin: "",
-    senderAddress: "",
-    clientName: "",
-    clientGstin: "",
-    clientAddress: "",
-    items: [{ description: "", quantity: 1, price: 0 }],
-    notes: "",
-    taxRate: 18,
+    dueDate: "",
+
+    // Sender / Business
+    senderName: "Archzona",
+    senderAddress: "105, PRISM INDUSTRIAL ESTATE, BEHIND PENDARKAR COLLEGE, DOMBIVLI(EAST)421201",
+    senderGstin: "7ACDFA4175F1ZJ",
+    senderMobile: "9870048082",
+    senderEmail: "info.archzona@gmail.com",
     logo: null,
-    letterhead: null,
-    footer: null,
+
+    // Client / Bill To & Ship To
+    clientName: "RATNA DEEP CHS",
+    clientAddress: "Mulund",
+    placeOfSupply: "Maharashtra",
+    clientGstin: "",
+
+    shipToName: "RATNA DEEP CHS",
+    shipToAddress: "Mulund",
+
+    // Items
+    items: [
+      {
+        description: "100 MM x 50 MM UPVC louver Profile",
+        subDetails: "100 – 75 – 100 – 75 – 100",
+        hsn: "39162019",
+        qty: 6900,
+        unit: "RFT",
+        rate: 115
+      },
+      {
+        description: "MS FABRICATION WORK 115'X30'",
+        subDetails: "",
+        hsn: "7308",
+        qty: 1,
+        unit: "pcs",
+        rate: 240000
+      }
+    ],
+
+    taxRate: 18,
+    isIgst: false,
+
+    notes: "T-Patti for top,bottom & center support\n2\"X 2\" Pipe Ms Fabrication For Fins Support With Material And installation",
+    terms: "50% Advance\n30% ongoing work\n20% after completion",
+
+    bankDetails: {
+      name: "Archzona",
+      ifsc: "UTIB000125",
+      accountNo: "923020053039794",
+      bankName: "AXIS BANK, Dombivli"
+    },
+    authorisedSignatory: "Archzona"
   });
 
-  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [columnLabels, setColumnLabels] = useState({
+    sno: "S.NO.",
+    items: "ITEMS",
+    hsn: "HSN",
+    qty: "QTY.",
+    unit: "UNIT",
+    rate: "RATE",
+    amount: "AMOUNT"
+  });
+  const [showSeparateUnitCol, setShowSeparateUnitCol] = useState(false);
+
+  const [activeTab, setActiveTab] = useState("edit"); // edit | preview
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setInvoiceData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleImageUpload = (e, type) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setInvoiceData(prev => ({ ...prev, [type]: reader.result }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeImage = (type) => {
-    setInvoiceData(prev => ({ ...prev, [type]: null }));
-  };
-
-  const base64ToUint8Array = (base64) => {
-    const binaryString = window.atob(base64.split(',')[1]);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
-  };
-
-  const handleItemChange = (index, e) => {
+  const handleBankChange = (e) => {
     const { name, value } = e.target;
+    setInvoiceData(prev => ({
+      ...prev,
+      bankDetails: { ...prev.bankDetails, [name]: value }
+    }));
+  };
+
+  const handleItemChange = (index, field, value) => {
     const newItems = [...invoiceData.items];
-    newItems[index][name] = name === "description" ? value : parseFloat(value) || 0;
+    newItems[index][field] = field === "qty" || field === "rate" ? parseFloat(value) || 0 : value;
     setInvoiceData(prev => ({ ...prev, items: newItems }));
   };
 
   const addItem = () => {
     setInvoiceData(prev => ({
       ...prev,
-      items: [...prev.items, { description: "", quantity: 1, price: 0 }]
+      items: [
+        ...prev.items,
+        { description: "", subDetails: "", hsn: "", qty: 1, unit: "pcs", rate: 0 }
+      ]
     }));
   };
 
-  const calculateSubtotal = () => invoiceData.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-  const calculateTax = () => calculateSubtotal() * (invoiceData.taxRate / 100);
-
-  const generatePDF = () => {
-    const doc = new jsPDF();
-    const subtotal = calculateSubtotal();
-    const tax = calculateTax();
-    const total = subtotal + tax;
-    const symbol = "Rs. ";
-
-    // Professional Colors
-    const primaryColor = [0, 71, 171]; // Deep Blue
-    const textColor = [33, 33, 33];
-    const lightGrey = [128, 128, 128];
-    const pageWidth = doc.internal.pageSize.width;
-    let currentY = 0;
-
-    // Add Letterhead or Default Header
-    if (invoiceData.letterhead) {
-      doc.addImage(invoiceData.letterhead, 'PNG', 0, 0, pageWidth, 40);
-      currentY = 45;
-    } else {
-      // Header Bar
-      doc.setFillColor(...primaryColor);
-      doc.rect(0, 0, pageWidth, 40, 'F');
-
-      // Title
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(24);
-      doc.setFont("helvetica", "bold");
-      doc.text("PROFORMA INVOICE", pageWidth / 2, 25, { align: "center" });
-      currentY = 50;
-    }
-
-    // Logo (if uploaded and no letterhead)
-    if (invoiceData.logo && !invoiceData.letterhead) {
-      doc.addImage(invoiceData.logo, 'PNG', 20, 10, 20, 20);
-    }
-
-    // Info (Top Right)
-    if (invoiceData.letterhead) {
-      doc.setTextColor(...textColor);
-    } else {
-      doc.setTextColor(255, 255, 255);
-    }
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Proforma #: ${invoiceData.invoiceNumber}`, pageWidth - 20, 20, { align: "right" });
-    doc.text(`Date: ${invoiceData.date}`, pageWidth - 20, 27, { align: "right" });
-
-    // Reset Text Color
-    doc.setTextColor(...textColor);
-
-    // Layout Columns
-    currentY += 10;
-    const startY = currentY;
-
-    // Left Column: Exporter
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("EXPORTER", 20, currentY);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    currentY += 7;
-    doc.text(invoiceData.senderName || "Exporter Name", 20, currentY);
-    currentY += 5;
-    if (invoiceData.senderGstin) {
-      doc.text(`GSTIN: ${invoiceData.senderGstin}`, 20, currentY);
-      currentY += 5;
-    }
-    doc.setTextColor(...lightGrey);
-    doc.text(invoiceData.senderAddress || "Address", 20, currentY, { maxWidth: 80 });
-
-    // Right Column: Importer
-    let rightY = startY;
-    doc.setTextColor(...textColor);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("IMPORTER / BILL TO", 120, rightY);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    rightY += 7;
-    doc.text(invoiceData.clientName || "Importer Name", 120, rightY);
-    rightY += 5;
-    if (invoiceData.clientGstin) {
-      doc.text(`GSTIN: ${invoiceData.clientGstin}`, 120, rightY);
-      rightY += 5;
-    }
-    doc.setTextColor(...lightGrey);
-    doc.text(invoiceData.clientAddress || "Address", 120, rightY, { maxWidth: 80 });
-
-    const startTableY = Math.max(currentY, rightY) + 15;
-
-    const tableData = invoiceData.items.map(item => [
-      item.description,
-      item.quantity.toString(),
-      `${symbol}${item.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      `${symbol}${(item.quantity * item.price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    ]);
-
-    autoTable(doc, {
-      startY: startTableY,
-      head: [["Description", "Qty", "Unit Price", "Amount"]],
-      body: tableData,
-      theme: 'striped',
-      headStyles: {
-        fillColor: primaryColor,
-        textColor: [255, 255, 255],
-        fontSize: 10,
-        fontStyle: 'bold',
-        halign: 'left'
-      },
-      bodyStyles: {
-        fontSize: 9,
-        textColor: textColor
-      },
-      columnStyles: {
-        1: { halign: 'center' },
-        2: { halign: 'right' },
-        3: { halign: 'right' }
-      }
-    });
-
-    let finalY = doc.lastAutoTable.finalY + 15;
-
-    // Summary Section
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-
-    doc.text("Subtotal:", 140, finalY);
-    doc.text(`${symbol}${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 190, finalY, { align: "right" });
-
-    finalY += 7;
-    doc.text(`GST (${invoiceData.taxRate}%):`, 140, finalY);
-    doc.text(`${symbol}${tax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 190, finalY, { align: "right" });
-
-    // Total
-    finalY += 10;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.setFillColor(...primaryColor);
-    // Box for the total amount
-    doc.rect(130, finalY - 7, 70, 11, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.text("Total Estimate:", 135, finalY);
-    // Aligning the amount with the column total above
-    doc.text(`${symbol}${total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 190, finalY, { align: "right" });
-
-    // Add Branding / Footer Image
-    const pageHeightVal = doc.internal.pageSize.height;
-    const pageWidthVal = doc.internal.pageSize.width;
-
-    if (invoiceData.footer) {
-      doc.addImage(invoiceData.footer, 'PNG', 0, pageHeightVal - 40, pageWidthVal, 40);
-    } else {
-      doc.setFontSize(9);
-      doc.setTextColor(150, 150, 150);
-      doc.text("Professional Document Generated via Dabby", pageWidthVal / 2, pageHeightVal - 10, { align: "center" });
-    }
-
-    doc.save(`Proforma_Invoice_${invoiceData.invoiceNumber}.pdf`);
+  const removeItem = (index) => {
+    const newItems = invoiceData.items.filter((_, i) => i !== index);
+    setInvoiceData(prev => ({ ...prev, items: newItems }));
   };
 
-  const generateWord = () => {
-    const subtotal = calculateSubtotal();
-    const tax = calculateTax();
-    const total = subtotal + tax;
-    const symbol = "Rs. ";
-
-    const children = [];
-
-    // Letterhead or Default Header
-    if (invoiceData.letterhead) {
-      children.push(
-        new Paragraph({
-          children: [
-            new ImageRun({
-              data: base64ToUint8Array(invoiceData.letterhead),
-              transformation: { width: 600, height: 100 },
-            }),
-          ],
-          alignment: AlignmentType.CENTER,
-        })
-      );
-    } else {
-      children.push(
-        new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          borders: BorderStyle.NONE,
-          rows: [
-            new TableRow({
-              children: [
-                new TableCell({
-                  shading: { fill: "0047AB" },
-                  margins: { top: 400, bottom: 400, left: 400, right: 400 },
-                  children: [
-                    new Paragraph({
-                      children: [
-                        ...(invoiceData.logo ? [
-                          new ImageRun({
-                            data: base64ToUint8Array(invoiceData.logo),
-                            transformation: { width: 50, height: 50 },
-                          }),
-                          new TextRun({ text: "  ", size: 48 }),
-                        ] : []),
-                        new TextRun({ text: "PROFORMA INVOICE", bold: true, size: 48, color: "FFFFFF" }),
-                      ],
-                      alignment: AlignmentType.CENTER,
-                    }),
-                  ],
-                }),
-              ],
-            }),
-          ],
-        })
-      );
-    }
-
-    children.push(new Paragraph({ text: "", spacing: { before: 400 } }));
-
-    // Top Info
-    children.push(
-      new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        borders: BorderStyle.NONE,
-        rows: [
-          new TableRow({
-            children: [
-              new TableCell({ children: [] }),
-              new TableCell({
-                children: [
-                  new Paragraph({
-                    children: [new TextRun({ text: `Proforma #: ${invoiceData.invoiceNumber}`, bold: true, size: 20 })],
-                    alignment: AlignmentType.RIGHT,
-                  }),
-                  new Paragraph({
-                    children: [new TextRun({ text: `Date: ${invoiceData.date}`, size: 18 })],
-                    alignment: AlignmentType.RIGHT,
-                  }),
-                ],
-              }),
-            ],
-          }),
-        ],
-      })
-    );
-
-    children.push(new Paragraph({ text: "", spacing: { before: 600 } }));
-
-    // Exporter / Importer Section
-    children.push(
-      new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        borders: BorderStyle.NONE,
-        rows: [
-          new TableRow({
-            children: [
-              new TableCell({
-                width: { size: 50, type: WidthType.PERCENTAGE },
-                children: [
-                  new Paragraph({ children: [new TextRun({ text: "EXPORTER", bold: true, size: 22, color: "0047AB" })] }),
-                  new Paragraph({ children: [new TextRun({ text: invoiceData.senderName || "Exporter Name", bold: true, size: 20 })] }),
-                  new Paragraph({ children: [new TextRun({ text: `GSTIN: ${invoiceData.senderGstin}`, size: 18 })] }),
-                  new Paragraph({ children: [new TextRun({ text: invoiceData.senderAddress || "Address", color: "808080", size: 18 })] }),
-                ],
-              }),
-              new TableCell({
-                width: { size: 50, type: WidthType.PERCENTAGE },
-                children: [
-                  new Paragraph({ children: [new TextRun({ text: "IMPORTER / BILL TO", bold: true, size: 22, color: "0047AB" })] }),
-                  new Paragraph({ children: [new TextRun({ text: invoiceData.clientName || "Importer Name", bold: true, size: 20 })] }),
-                  new Paragraph({ children: [new TextRun({ text: `GSTIN: ${invoiceData.clientGstin}`, size: 18 })] }),
-                  new Paragraph({ children: [new TextRun({ text: invoiceData.clientAddress || "Address", color: "808080", size: 18 })] }),
-                ],
-              }),
-            ],
-          }),
-        ],
-      })
-    );
-
-    children.push(new Paragraph({ text: "", spacing: { before: 600 } }));
-
-    // Items Table
-    children.push(
-      new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        rows: [
-          new TableRow({
-            tableHeader: true,
-            children: [
-              new TableCell({ shading: { fill: "0047AB" }, children: [new Paragraph({ children: [new TextRun({ text: "Description", bold: true, color: "FFFFFF" })] })] }),
-              new TableCell({ shading: { fill: "0047AB" }, children: [new Paragraph({ children: [new TextRun({ text: "Qty", bold: true, color: "FFFFFF" })] })], alignment: AlignmentType.CENTER }),
-              new TableCell({ shading: { fill: "0047AB" }, children: [new Paragraph({ children: [new TextRun({ text: "Unit Price (Rs.)", bold: true, color: "FFFFFF" })] })], alignment: AlignmentType.RIGHT }),
-              new TableCell({ shading: { fill: "0047AB" }, children: [new Paragraph({ children: [new TextRun({ text: "Amount (Rs.)", bold: true, color: "FFFFFF" })] })], alignment: AlignmentType.RIGHT }),
-            ],
-          }),
-          ...invoiceData.items.map(item => new TableRow({
-            children: [
-              new TableCell({ children: [new Paragraph(item.description)] }),
-              new TableCell({ children: [new Paragraph(item.quantity.toString())], alignment: AlignmentType.CENTER }),
-              new TableCell({ children: [new Paragraph(`${symbol}${item.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)], alignment: AlignmentType.RIGHT }),
-              new TableCell({ children: [new Paragraph(`${symbol}${(item.quantity * item.price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)], alignment: AlignmentType.RIGHT }),
-            ],
-          })),
-        ],
-      })
-    );
-
-    children.push(new Paragraph({ text: "", spacing: { before: 600 } }));
-
-    // Totals
-    children.push(
-      new Paragraph({
-        children: [new TextRun({ text: `Subtotal: ${symbol}${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, size: 20 })],
-        alignment: AlignmentType.RIGHT,
-      })
-    );
-    children.push(
-      new Paragraph({
-        children: [new TextRun({ text: `GST (${invoiceData.taxRate}%): ${symbol}${tax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, size: 20 })],
-        alignment: AlignmentType.RIGHT,
-      })
-    );
-    children.push(
-      new Paragraph({
-        children: [new TextRun({ text: `Total Estimate: ${symbol}${total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, bold: true, size: 24, color: "0047AB" })],
-        alignment: AlignmentType.RIGHT,
-      })
-    );
-
-    // Footer Image or Default Branding
-    if (invoiceData.footer) {
-      children.push(new Paragraph({ text: "", spacing: { before: 1200 } }));
-      children.push(
-        new Paragraph({
-          children: [
-            new ImageRun({
-              data: base64ToUint8Array(invoiceData.footer),
-              transformation: { width: 600, height: 100 },
-            }),
-          ],
-          alignment: AlignmentType.CENTER,
-        })
-      );
-    } else {
-      children.push(new Paragraph({ text: "", spacing: { before: 1200 } }));
-      children.push(
-        new Paragraph({
-          children: [new TextRun({ text: "Professional Document Generated via Dabby", color: "808080", size: 18, italic: true })],
-          alignment: AlignmentType.CENTER,
-        })
-      );
-    }
-
-    const doc = new Document({
-      sections: [{
-        properties: {},
-        children: children,
-      }],
+  const handleExportPDF = () => {
+    const doc = generateStandardDocumentPDF({
+      documentType: "PROFORMA INVOICE",
+      docNumber: invoiceData.invoiceNumber,
+      docDate: invoiceData.date,
+      dueDate: invoiceData.dueDate,
+      senderName: invoiceData.senderName,
+      senderAddress: invoiceData.senderAddress,
+      senderGstin: invoiceData.senderGstin,
+      senderMobile: invoiceData.senderMobile,
+      senderEmail: invoiceData.senderEmail,
+      logo: invoiceData.logo,
+      clientName: invoiceData.clientName,
+      clientAddress: invoiceData.clientAddress,
+      placeOfSupply: invoiceData.placeOfSupply,
+      shipToName: invoiceData.shipToName,
+      shipToAddress: invoiceData.shipToAddress,
+      items: invoiceData.items,
+      taxRate: invoiceData.taxRate,
+      isIgst: invoiceData.isIgst,
+      columnLabels,
+      showSeparateUnitCol,
+      notes: invoiceData.notes,
+      terms: invoiceData.terms,
+      bankDetails: invoiceData.bankDetails,
+      authorisedSignatory: invoiceData.authorisedSignatory
     });
 
-    Packer.toBlob(doc).then(blob => {
-      saveAs(blob, `Proforma_Invoice_${invoiceData.invoiceNumber}.docx`);
-    });
+    doc.save(`${invoiceData.invoiceNumber}_ProformaInvoice.pdf`);
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   return (
-    <div className={`min-h-screen py-24 px-6 md:px-12 ${theme === "dark" ? "bg-black text-white" : "bg-gray-50 text-gray-900"}`}>
-      <div className="max-w-4xl mx-auto">
-        <Link to="/templates" className="flex items-center gap-2 text-[#81E6D9] mb-8 hover:underline"><ArrowLeft className="w-4 h-4" /> Back to Templates</Link>
-        <div className={`rounded-3xl border p-8 md:p-12 ${theme === "dark" ? "bg-[#111] border-white/10" : "bg-white border-gray-200 shadow-xl"}`}>
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
+    <div className={`min-h-screen ${theme === "dark" ? "bg-[#0b0f19] text-white" : "bg-gray-50 text-gray-900"} font-sans pb-16`}>
+      {/* Top Header Bar */}
+      <div className={`border-b ${theme === "dark" ? "border-white/10 bg-[#111827]" : "border-gray-200 bg-white"} sticky top-0 z-30 shadow-sm print:hidden`}>
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Link to="/templates" className="p-2 rounded-lg hover:bg-white/5 transition-colors">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
             <div>
-              <h1 className="text-3xl font-bold">Proforma Invoice Generator</h1>
-              <p className="text-sm opacity-60 mt-2">Generate GST-compliant proforma invoices for India</p>
+              <h1 className="text-xl font-bold">Proforma Invoice Generator</h1>
+              <p className="text-xs opacity-60">Generate structured, professional Proforma Invoice PDFs</p>
             </div>
-            <div className="relative">
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <div className="flex rounded-lg bg-gray-200 dark:bg-white/10 p-1">
               <button
-                onClick={() => setShowExportMenu(!showExportMenu)}
-                className="flex items-center gap-2 bg-[#81E6D9] text-black px-6 py-3 rounded-full font-semibold hover:bg-[#71d6c9] transition-all transform hover:scale-105 shadow-lg"
+                onClick={() => setActiveTab("edit")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                  activeTab === "edit" ? "bg-purple-600 text-white shadow" : "text-gray-600 dark:text-gray-300"
+                }`}
               >
-                <Download className="w-5 h-5" /> Download <ChevronDown className={`w-4 h-4 transition-transform ${showExportMenu ? "rotate-180" : ""}`} />
+                Form Editor
               </button>
+              <button
+                onClick={() => setActiveTab("preview")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                  activeTab === "preview" ? "bg-purple-600 text-white shadow" : "text-gray-600 dark:text-gray-300"
+                }`}
+              >
+                Document Preview
+              </button>
+            </div>
 
-              {showExportMenu && (
-                <div className={`absolute right-0 mt-2 w-48 rounded-2xl shadow-xl border z-10 overflow-hidden ${theme === "dark" ? "bg-[#1a1a1a] border-white/10" : "bg-white border-gray-200"
-                  }`}>
-                  <button
-                    onClick={() => {
-                      generatePDF();
-                      setShowExportMenu(false);
-                    }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${theme === "dark" ? "hover:bg-white/5" : "hover:bg-gray-50"
-                      }`}
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center">
-                      <span className="text-red-500 font-bold text-xs">PDF</span>
-                    </div>
-                    <span>Download PDF</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      generateWord();
-                      setShowExportMenu(false);
-                    }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors border-t ${theme === "dark" ? "hover:bg-white/5 border-white/10" : "hover:bg-gray-50 border-gray-100"
-                      }`}
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                      <span className="text-blue-500 font-bold text-xs">DOC</span>
-                    </div>
-                    <span>Download Word</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+            <button
+              onClick={handlePrint}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-lg text-xs flex items-center gap-2"
+            >
+              <Printer className="w-4 h-4" /> Print
+            </button>
 
-          <div className="mb-12">
-            <h2 className="text-lg font-semibold border-b pb-2 mb-6">Branding (Optional)</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Logo Upload */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium opacity-70">Company Logo</label>
-                <div className={`relative h-32 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center transition-all ${invoiceData.logo ? "border-[#81E6D9] bg-[#81E6D9]/5" : "border-white/10 hover:border-white/30"
-                  }`}>
-                  {invoiceData.logo ? (
-                    <>
-                      <img src={invoiceData.logo} alt="Logo" className="h-20 object-contain" />
-                      <button onClick={() => removeImage('logo')} className="absolute top-2 right-2 p-1 bg-red-500 rounded-full text-white hover:bg-red-600">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-6 h-6 mb-2 opacity-50" />
-                      <span className="text-xs opacity-50">Upload Logo</span>
-                      <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'logo')} className="absolute inset-0 opacity-0 cursor-pointer" />
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Letterhead Upload */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium opacity-70">Letterhead (Top)</label>
-                <div className={`relative h-32 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center transition-all ${invoiceData.letterhead ? "border-[#81E6D9] bg-[#81E6D9]/5" : "border-white/10 hover:border-white/30"
-                  }`}>
-                  {invoiceData.letterhead ? (
-                    <>
-                      <img src={invoiceData.letterhead} alt="Letterhead" className="h-20 object-contain" />
-                      <button onClick={() => removeImage('letterhead')} className="absolute top-2 right-2 p-1 bg-red-500 rounded-full text-white hover:bg-red-600">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-6 h-6 mb-2 opacity-50" />
-                      <span className="text-xs opacity-50">Upload Letterhead</span>
-                      <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'letterhead')} className="absolute inset-0 opacity-0 cursor-pointer" />
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Footer Upload */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium opacity-70">Footer Image (Bottom)</label>
-                <div className={`relative h-32 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center transition-all ${invoiceData.footer ? "border-[#81E6D9] bg-[#81E6D9]/5" : "border-white/10 hover:border-white/30"
-                  }`}>
-                  {invoiceData.footer ? (
-                    <>
-                      <img src={invoiceData.footer} alt="Footer" className="h-20 object-contain" />
-                      <button onClick={() => removeImage('footer')} className="absolute top-2 right-2 p-1 bg-red-500 rounded-full text-white hover:bg-red-600">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-6 h-6 mb-2 opacity-50" />
-                      <span className="text-xs opacity-50">Upload Footer</span>
-                      <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'footer')} className="absolute inset-0 opacity-0 cursor-pointer" />
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold border-b pb-2 mb-4">Invoice Details</h2>
-              <input type="text" name="invoiceNumber" placeholder="Proforma Number" value={invoiceData.invoiceNumber} onChange={handleInputChange} className={`w-full p-3 rounded-xl border ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-200"}`} />
-              <input type="date" name="date" value={invoiceData.date} onChange={handleInputChange} className={`w-full p-3 rounded-xl border ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-200"}`} />
-            </div>
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold border-b pb-2 mb-4">GST (%)</h2>
-              <input type="number" name="taxRate" value={invoiceData.taxRate} onChange={handleInputChange} className={`w-full p-3 rounded-xl border ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-200"}`} />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold border-b pb-2 mb-4">Exporter</h2>
-              <input type="text" name="senderName" placeholder="Business Name" value={invoiceData.senderName} onChange={handleInputChange} className={`w-full p-3 rounded-xl border ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-200"}`} />
-              <input type="text" name="senderGstin" placeholder="Your GSTIN" value={invoiceData.senderGstin} onChange={handleInputChange} className={`w-full p-3 rounded-xl border ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-200"}`} />
-              <input type="text" name="senderCin" placeholder="Your CIN (Optional)" value={invoiceData.senderCin} onChange={handleInputChange} className={`w-full p-3 rounded-xl border ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-200"}`} />
-              <textarea name="senderAddress" placeholder="Address" value={invoiceData.senderAddress} onChange={handleInputChange} className={`w-full p-3 rounded-xl border ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-200"}`} />
-            </div>
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold border-b pb-2 mb-4">Importer</h2>
-              <input type="text" name="clientName" placeholder="Client Name" value={invoiceData.clientName} onChange={handleInputChange} className={`w-full p-3 rounded-xl border ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-200"}`} />
-              <input type="text" name="clientGstin" placeholder="Client GSTIN" value={invoiceData.clientGstin} onChange={handleInputChange} className={`w-full p-3 rounded-xl border ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-200"}`} />
-              <textarea name="clientAddress" placeholder="Address" value={invoiceData.clientAddress} onChange={handleInputChange} className={`w-full p-3 rounded-xl border ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-200"}`} />
-            </div>
-          </div>
-          <div className="mb-12">
-            <h2 className="text-lg font-semibold border-b pb-4 mb-6">Items (INR)</h2>
-            <div className="space-y-4">
-              {invoiceData.items.map((item, index) => (
-                <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                  <div className="col-span-full md:col-span-6"><input type="text" name="description" placeholder="Description" value={item.description} onChange={(e) => handleItemChange(index, e)} className={`w-full p-3 rounded-xl border ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-200"}`} /></div>
-                  <div className="col-span-full md:col-span-2"><input type="number" name="quantity" placeholder="Qty" value={item.quantity} onChange={(e) => handleItemChange(index, e)} className={`w-full p-3 rounded-xl border ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-200"}`} /></div>
-                  <div className="col-span-full md:col-span-3"><input type="number" name="price" placeholder="Price (₹)" value={item.price} onChange={(e) => handleItemChange(index, e)} className={`w-full p-3 rounded-xl border ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-200"}`} /></div>
-                  <div className="col-span-full md:col-span-1 pb-3 text-center"><button onClick={() => setInvoiceData(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }))} className="text-red-500 hover:text-red-400 transition-colors"><Trash2 className="w-5 h-5" /></button></div>
-                </div>
-              ))}
-              <button onClick={addItem} className="text-[#81E6D9] font-semibold flex items-center gap-2 hover:underline transition-all"><Plus className="w-4 h-4" /> Add Item</button>
-            </div>
+            <button
+              onClick={handleExportPDF}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg text-xs flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" /> Download PDF
+            </button>
           </div>
         </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {activeTab === "preview" ? (
+          <div className="p-4 bg-gray-200 dark:bg-gray-900 rounded-2xl border border-gray-300 dark:border-white/10 shadow-2xl">
+            <PrintableDocumentTemplate
+              data={{
+                documentType: "PROFORMA INVOICE",
+                docNumber: invoiceData.invoiceNumber,
+                docDate: invoiceData.date,
+                senderName: invoiceData.senderName,
+                senderAddress: invoiceData.senderAddress,
+                senderGstin: invoiceData.senderGstin,
+                senderMobile: invoiceData.senderMobile,
+                senderEmail: invoiceData.senderEmail,
+                logo: invoiceData.logo,
+                clientName: invoiceData.clientName,
+                clientAddress: invoiceData.clientAddress,
+                placeOfSupply: invoiceData.placeOfSupply,
+                shipToName: invoiceData.shipToName,
+                shipToAddress: invoiceData.shipToAddress,
+                items: invoiceData.items,
+                taxRate: invoiceData.taxRate,
+                isIgst: invoiceData.isIgst,
+                columnLabels,
+                showSeparateUnitCol,
+                notes: invoiceData.notes,
+                terms: invoiceData.terms,
+                bankDetails: invoiceData.bankDetails,
+                authorisedSignatory: invoiceData.authorisedSignatory
+              }}
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Left Column: Form Controls */}
+            <div className="lg:col-span-6 space-y-6">
+              {/* Document Info */}
+              <div className={`p-6 rounded-2xl border ${theme === "dark" ? "bg-[#111827] border-white/10" : "bg-white border-gray-200"} shadow-sm`}>
+                <h2 className="text-base font-bold border-b pb-2 mb-4 text-purple-400">1. Proforma Invoice Details</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 opacity-70">Proforma No.</label>
+                    <input
+                      type="text"
+                      name="invoiceNumber"
+                      value={invoiceData.invoiceNumber}
+                      onChange={handleInputChange}
+                      className={`w-full p-2.5 rounded-lg border text-sm ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 opacity-70">Proforma Date</label>
+                    <input
+                      type="date"
+                      name="date"
+                      value={invoiceData.date}
+                      onChange={handleInputChange}
+                      className={`w-full p-2.5 rounded-lg border text-sm ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Your Business Details */}
+              <div className={`p-6 rounded-2xl border ${theme === "dark" ? "bg-[#111827] border-white/10" : "bg-white border-gray-200"} shadow-sm space-y-3`}>
+                <h2 className="text-base font-bold border-b pb-2 mb-4 text-purple-400">2. Your Business Details (Header)</h2>
+                <div>
+                  <label className="block text-xs font-semibold mb-1 opacity-70">Business Name</label>
+                  <input
+                    type="text"
+                    name="senderName"
+                    value={invoiceData.senderName}
+                    onChange={handleInputChange}
+                    className={`w-full p-2.5 rounded-lg border text-sm ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1 opacity-70">Business Address</label>
+                  <textarea
+                    name="senderAddress"
+                    rows="2"
+                    value={invoiceData.senderAddress}
+                    onChange={handleInputChange}
+                    className={`w-full p-2.5 rounded-lg border text-sm ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 opacity-70">GSTIN</label>
+                    <input
+                      type="text"
+                      name="senderGstin"
+                      value={invoiceData.senderGstin}
+                      onChange={handleInputChange}
+                      className={`w-full p-2.5 rounded-lg border text-sm ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 opacity-70">Mobile</label>
+                    <input
+                      type="text"
+                      name="senderMobile"
+                      value={invoiceData.senderMobile}
+                      onChange={handleInputChange}
+                      className={`w-full p-2.5 rounded-lg border text-sm ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 opacity-70">Email</label>
+                    <input
+                      type="email"
+                      name="senderEmail"
+                      value={invoiceData.senderEmail}
+                      onChange={handleInputChange}
+                      className={`w-full p-2.5 rounded-lg border text-sm ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Billing & Shipping Details */}
+              <div className={`p-6 rounded-2xl border ${theme === "dark" ? "bg-[#111827] border-white/10" : "bg-white border-gray-200"} shadow-sm space-y-4`}>
+                <h2 className="text-base font-bold border-b pb-2 text-purple-400">3. Billing & Shipping Details</h2>
+                
+                <div className="space-y-3">
+                  <span className="text-xs font-bold uppercase text-gray-400">Bill To</span>
+                  <input
+                    type="text"
+                    name="clientName"
+                    placeholder="Client Name / Business"
+                    value={invoiceData.clientName}
+                    onChange={handleInputChange}
+                    className={`w-full p-2.5 rounded-lg border text-sm ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                  />
+                  <input
+                    type="text"
+                    name="clientAddress"
+                    placeholder="Billing Address"
+                    value={invoiceData.clientAddress}
+                    onChange={handleInputChange}
+                    className={`w-full p-2.5 rounded-lg border text-sm ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                  />
+                  <input
+                    type="text"
+                    name="placeOfSupply"
+                    placeholder="Place of Supply (e.g. Maharashtra)"
+                    value={invoiceData.placeOfSupply}
+                    onChange={handleInputChange}
+                    className={`w-full p-2.5 rounded-lg border text-sm ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                  />
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <span className="text-xs font-bold uppercase text-gray-400">Ship To</span>
+                  <input
+                    type="text"
+                    name="shipToName"
+                    placeholder="Consignee Name"
+                    value={invoiceData.shipToName}
+                    onChange={handleInputChange}
+                    className={`w-full p-2.5 rounded-lg border text-sm ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                  />
+                  <input
+                    type="text"
+                    name="shipToAddress"
+                    placeholder="Shipping Address"
+                    value={invoiceData.shipToAddress}
+                    onChange={handleInputChange}
+                    className={`w-full p-2.5 rounded-lg border text-sm ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                  />
+                </div>
+              </div>
+
+              {/* Items & Tax */}
+              <div className={`p-6 rounded-2xl border ${theme === "dark" ? "bg-[#111827] border-white/10" : "bg-white border-gray-200"} shadow-sm space-y-4`}>
+                <div className="flex justify-between items-center border-b pb-2">
+                  <h2 className="text-base font-bold text-purple-400">4. Items & Tax Configuration</h2>
+                  <button onClick={addItem} className="text-xs font-bold text-purple-400 hover:underline flex items-center gap-1">
+                    <Plus className="w-3.5 h-3.5" /> Add Item
+                  </button>
+                </div>
+
+                {/* Column Configurator Panel */}
+                <ColumnConfigurator
+                  columnLabels={columnLabels}
+                  setColumnLabels={setColumnLabels}
+                  showSeparateUnitCol={showSeparateUnitCol}
+                  setShowSeparateUnitCol={setShowSeparateUnitCol}
+                  theme={theme}
+                />
+
+                <div className="space-y-4">
+                  {invoiceData.items.map((item, idx) => (
+                    <div key={idx} className="p-3 rounded-lg border border-white/10 bg-white/5 space-y-2 relative">
+                      <button onClick={() => removeItem(idx)} className="absolute top-2 right-2 text-red-400 hover:text-red-300">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <input
+                        type="text"
+                        placeholder="Item Description"
+                        value={item.description}
+                        onChange={(e) => handleItemChange(idx, "description", e.target.value)}
+                        className={`w-full p-2 rounded border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-white border-gray-300"}`}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Sub Details / Specs"
+                        value={item.subDetails}
+                        onChange={(e) => handleItemChange(idx, "subDetails", e.target.value)}
+                        className={`w-full p-2 rounded border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-white border-gray-300"}`}
+                      />
+                      <div className="grid grid-cols-4 gap-2">
+                        <input
+                          type="text"
+                          placeholder="HSN Code"
+                          value={item.hsn}
+                          onChange={(e) => handleItemChange(idx, "hsn", e.target.value)}
+                          className={`p-2 rounded border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-white border-gray-300"}`}
+                        />
+                        <input
+                          type="number"
+                          placeholder={columnLabels?.qty || "Qty"}
+                          value={item.qty}
+                          onChange={(e) => handleItemChange(idx, "qty", e.target.value)}
+                          className={`p-2 rounded border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-white border-gray-300"}`}
+                        />
+                        <input
+                          type="text"
+                          placeholder={columnLabels?.unit || "Unit (RFT, sqft, pcs)"}
+                          value={item.unit}
+                          onChange={(e) => handleItemChange(idx, "unit", e.target.value)}
+                          className={`p-2 rounded border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-white border-gray-300"}`}
+                        />
+                        <input
+                          type="number"
+                          placeholder={columnLabels?.rate || "Rate (₹)"}
+                          value={item.rate}
+                          onChange={(e) => handleItemChange(idx, "rate", e.target.value)}
+                          className={`p-2 rounded border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-white border-gray-300"}`}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 opacity-70">GST Rate (%)</label>
+                    <input
+                      type="number"
+                      name="taxRate"
+                      value={invoiceData.taxRate}
+                      onChange={handleInputChange}
+                      className={`w-full p-2.5 rounded-lg border text-sm ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bank Details & Terms */}
+              <div className={`p-6 rounded-2xl border ${theme === "dark" ? "bg-[#111827] border-white/10" : "bg-white border-gray-200"} shadow-sm space-y-4`}>
+                <h2 className="text-base font-bold border-b pb-2 text-purple-400">5. Bank Details & Terms</h2>
+                <div className="space-y-3">
+                  <span className="text-xs font-bold uppercase text-gray-400">Bank Details</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      name="name"
+                      placeholder="Account Name"
+                      value={invoiceData.bankDetails.name}
+                      onChange={handleBankChange}
+                      className={`p-2 rounded border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                    />
+                    <input
+                      type="text"
+                      name="ifsc"
+                      placeholder="IFSC Code"
+                      value={invoiceData.bankDetails.ifsc}
+                      onChange={handleBankChange}
+                      className={`p-2 rounded border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                    />
+                    <input
+                      type="text"
+                      name="accountNo"
+                      placeholder="Account Number"
+                      value={invoiceData.bankDetails.accountNo}
+                      onChange={handleBankChange}
+                      className={`p-2 rounded border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                    />
+                    <input
+                      type="text"
+                      name="bankName"
+                      placeholder="Bank & Branch Name"
+                      value={invoiceData.bankDetails.bankName}
+                      onChange={handleBankChange}
+                      className={`p-2 rounded border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold mb-1 opacity-70">Notes</label>
+                  <textarea
+                    name="notes"
+                    rows="2"
+                    value={invoiceData.notes}
+                    onChange={handleInputChange}
+                    className={`w-full p-2.5 rounded-lg border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold mb-1 opacity-70">Terms and Conditions</label>
+                  <textarea
+                    name="terms"
+                    rows="2"
+                    value={invoiceData.terms}
+                    onChange={handleInputChange}
+                    className={`w-full p-2.5 rounded-lg border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Live Document Preview */}
+            <div className="lg:col-span-6 sticky top-24 self-start">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Live Paper Preview</span>
+                <span className="text-[11px] text-purple-400 font-semibold">Updates real-time</span>
+              </div>
+              <div className="transform scale-[0.9] origin-top-left">
+                <PrintableDocumentTemplate
+                  data={{
+                    documentType: "PROFORMA INVOICE",
+                    docNumber: invoiceData.invoiceNumber,
+                    docDate: invoiceData.date,
+                    senderName: invoiceData.senderName,
+                    senderAddress: invoiceData.senderAddress,
+                    senderGstin: invoiceData.senderGstin,
+                    senderMobile: invoiceData.senderMobile,
+                    senderEmail: invoiceData.senderEmail,
+                    logo: invoiceData.logo,
+                    clientName: invoiceData.clientName,
+                    clientAddress: invoiceData.clientAddress,
+                    placeOfSupply: invoiceData.placeOfSupply,
+                    shipToName: invoiceData.shipToName,
+                    shipToAddress: invoiceData.shipToAddress,
+                    items: invoiceData.items,
+                    taxRate: invoiceData.taxRate,
+                    isIgst: invoiceData.isIgst,
+                    columnLabels,
+                    showSeparateUnitCol,
+                    notes: invoiceData.notes,
+                    terms: invoiceData.terms,
+                    bankDetails: invoiceData.bankDetails,
+                    authorisedSignatory: invoiceData.authorisedSignatory
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
-
