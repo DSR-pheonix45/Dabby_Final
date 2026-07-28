@@ -51,7 +51,7 @@ export default function QuotationGenerator() {
       }
     ],
 
-    taxRate: 18,
+    taxRate: 0,
     isIgst: false,
 
     notes: "T-Patti for top,bottom & center support\n2\"X 2\" Pipe Ms Fabrication For Fins Support With Material And installation",

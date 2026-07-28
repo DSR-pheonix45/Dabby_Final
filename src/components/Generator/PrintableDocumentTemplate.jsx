@@ -251,8 +251,8 @@ export default function PrintableDocumentTemplate({ data }) {
         {/* Left Side: HSN Table & Amount in Words */}
         <div className="col-span-7 p-3 border-r border-black space-y-3">
           
-          {/* HSN Summary */}
-          {hsnEntries.length > 0 && (
+          {/* HSN Summary (Rendered only when taxRate > 0) */}
+          {taxPct > 0 && hsnEntries.length > 0 && (
             <div>
               <div className="font-bold text-[10px] uppercase mb-1">HSN/SAC SUMMARY</div>
               <table className="w-full text-[10px] text-left border border-gray-300 border-collapse">

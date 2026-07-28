@@ -336,95 +336,96 @@ export function generateStandardDocumentPDF(docData) {
 
   y = doc.lastAutoTable.finalY + 5;
 
-  // 5. HSN/SAC TAX BREAKDOWN TABLE
-  // Group items by HSN
-  const hsnGroupMap = {};
-  items.forEach(it => {
-    const code = it.hsn || "N/A";
-    const amt = (Number(it.qty) || 0) * (Number(it.rate) || 0);
-    if (!hsnGroupMap[code]) {
-      hsnGroupMap[code] = 0;
-    }
-    hsnGroupMap[code] += amt;
-  });
-
-  const hsnRows = [];
-  let hsnTaxableTotal = 0;
-  let hsnCgstTotal = 0;
-  let hsnSgstTotal = 0;
-  let hsnTaxTotal = 0;
-
-  Object.entries(hsnGroupMap).forEach(([hsnCode, taxableVal]) => {
-    const cgstAmt = (taxableVal * halfTaxPct) / 100;
-    const sgstAmt = (taxableVal * halfTaxPct) / 100;
-    const totTax = cgstAmt + sgstAmt;
-
-    hsnTaxableTotal += taxableVal;
-    hsnCgstTotal += cgstAmt;
-    hsnSgstTotal += sgstAmt;
-    hsnTaxTotal += totTax;
-
-    hsnRows.push([
-      hsnCode,
-      taxableVal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      `${halfTaxPct}%`,
-      cgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      `${halfTaxPct}%`,
-      sgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      `Rs. ${totTax.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    ]);
-  });
-
-  // Total summary row for HSN table
-  hsnRows.push([
-    "Total",
-    hsnTaxableTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-    "",
-    hsnCgstTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-    "",
-    hsnSgstTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-    `Rs. ${hsnTaxTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  ]);
-
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    tableWidth: contentWidth,
-    head: [
-      [
-        { content: "HSN/SAC", rowSpan: 2 },
-        { content: "Taxable Value", rowSpan: 2 },
-        { content: "CGST", colSpan: 2 },
-        { content: "SGST", colSpan: 2 },
-        { content: "Total Tax Amount", rowSpan: 2 }
-      ],
-      ["Rate", "Amount", "Rate", "Amount"]
-    ],
-    body: hsnRows,
-    theme: "grid",
-    styles: {
-      font: "helvetica",
-      fontSize: 8,
-      textColor: [0, 0, 0],
-      lineColor: [0, 0, 0],
-      lineWidth: 0.5,
-      cellPadding: 3,
-      halign: "center"
-    },
-    headStyles: {
-      fillColor: [245, 245, 245],
-      textColor: [0, 0, 0],
-      fontStyle: "bold",
-      halign: "center"
-    },
-    didParseCell: (data) => {
-      if (data.row.index === hsnRows.length - 1) {
-        data.cell.styles.fontStyle = "bold";
+  // 5. HSN/SAC TAX BREAKDOWN TABLE (Rendered only when taxRate > 0)
+  if (taxPct > 0) {
+    const hsnGroupMap = {};
+    items.forEach(it => {
+      const code = it.hsn || "N/A";
+      const amt = (Number(it.qty) || 0) * (Number(it.rate) || 0);
+      if (!hsnGroupMap[code]) {
+        hsnGroupMap[code] = 0;
       }
-    }
-  });
+      hsnGroupMap[code] += amt;
+    });
 
-  y = doc.lastAutoTable.finalY + 5;
+    const hsnRows = [];
+    let hsnTaxableTotal = 0;
+    let hsnCgstTotal = 0;
+    let hsnSgstTotal = 0;
+    let hsnTaxTotal = 0;
+
+    Object.entries(hsnGroupMap).forEach(([hsnCode, taxableVal]) => {
+      const cgstAmt = (taxableVal * halfTaxPct) / 100;
+      const sgstAmt = (taxableVal * halfTaxPct) / 100;
+      const totTax = cgstAmt + sgstAmt;
+
+      hsnTaxableTotal += taxableVal;
+      hsnCgstTotal += cgstAmt;
+      hsnSgstTotal += sgstAmt;
+      hsnTaxTotal += totTax;
+
+      hsnRows.push([
+        hsnCode,
+        taxableVal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        `${halfTaxPct}%`,
+        cgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        `${halfTaxPct}%`,
+        sgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        `Rs. ${totTax.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      ]);
+    });
+
+    // Total summary row for HSN table
+    hsnRows.push([
+      "Total",
+      hsnTaxableTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      "",
+      hsnCgstTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      "",
+      hsnSgstTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      `Rs. ${hsnTaxTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    ]);
+
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      tableWidth: contentWidth,
+      head: [
+        [
+          { content: "HSN/SAC", rowSpan: 2 },
+          { content: "Taxable Value", rowSpan: 2 },
+          { content: "CGST", colSpan: 2 },
+          { content: "SGST", colSpan: 2 },
+          { content: "Total Tax Amount", rowSpan: 2 }
+        ],
+        ["Rate", "Amount", "Rate", "Amount"]
+      ],
+      body: hsnRows,
+      theme: "grid",
+      styles: {
+        font: "helvetica",
+        fontSize: 8,
+        textColor: [0, 0, 0],
+        lineColor: [0, 0, 0],
+        lineWidth: 0.5,
+        cellPadding: 3,
+        halign: "center"
+      },
+      headStyles: {
+        fillColor: [245, 245, 245],
+        textColor: [0, 0, 0],
+        fontStyle: "bold",
+        halign: "center"
+      },
+      didParseCell: (data) => {
+        if (data.row.index === hsnRows.length - 1) {
+          data.cell.styles.fontStyle = "bold";
+        }
+      }
+    });
+
+    y = doc.lastAutoTable.finalY + 5;
+  }
 
   // 6. TOTAL AMOUNT IN WORDS BOX
   const amountInWordsText = numberToWords(grandTotal);
