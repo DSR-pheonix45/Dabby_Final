@@ -97,9 +97,22 @@ export default function SalesInvoiceModal({ isOpen, onClose }) {
   const [discountTags, setDiscountTags] = useState([]);
   const [selectedTagId, setSelectedTagId] = useState("");
 
+  // Column Configuration
+  const [columnLabels, setColumnLabels] = useState({
+    sno: "S.NO.",
+    items: "ITEMS",
+    hsn: "HSN",
+    qty: "AREA / QTY",
+    unit: "UNIT",
+    rate: "UNIT RATE",
+    amount: "DERIVING AMOUNT"
+  });
+  const [showColConfig, setShowColConfig] = useState(false);
+  const [showSeparateUnitCol, setShowSeparateUnitCol] = useState(false);
+
   // Line Items
   const [lineItems, setLineItems] = useState([
-    { id: 1, sku: "SKU-CONV-88", description: "Industrial Conveyor Belt (Heavy Duty)", hsnSac: "8428", qty: 2, rate: 45000, taxRate: 18 }
+    { id: 1, sku: "SKU-CONV-88", description: "Industrial Conveyor Belt (Heavy Duty)", hsnSac: "8428", qty: 2, unit: "pcs", rate: 45000, taxRate: 18 }
   ]);
 
   useEffect(() => {
@@ -219,8 +232,8 @@ export default function SalesInvoiceModal({ isOpen, onClose }) {
         })),
         taxRate: 18,
         isIgst: gstDetails.taxType === "IGST",
-        columnLabels: { sno: "S.NO.", items: "ITEMS", hsn: "HSN", qty: "AREA / QTY", unit: "UNIT", rate: "UNIT RATE", amount: "DERIVING AMOUNT" },
-        showSeparateUnitCol: false,
+        columnLabels,
+        showSeparateUnitCol,
         notes: "T-Patti for top,bottom & center support\n2\"X 2\" Pipe Ms Fabrication For Fins Support With Material And installation",
         terms: paymentSnippet.paymentTerms || "50% Advance\n30% ongoing work\n20% after completion",
         bankDetails: {
@@ -438,13 +451,55 @@ export default function SalesInvoiceModal({ isOpen, onClose }) {
                 <BsTag className="text-teal-400" />
                 2. Particulars & Line Items
               </h3>
-              <button
-                onClick={addLineItem}
-                className="flex items-center gap-1.5 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 px-3 py-1.5 rounded-lg text-xs font-semibold border border-teal-500/30 transition-colors"
-              >
-                <BsPlus className="text-lg" /> Add Line Item
-              </button>
+              <div className="flex items-center space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowColConfig(!showColConfig)}
+                  className="text-xs text-teal-400 font-bold hover:underline flex items-center gap-1"
+                >
+                  ⚙ {showColConfig ? "Hide Column Settings" : "Configure Column Labels"}
+                </button>
+                <button
+                  onClick={addLineItem}
+                  className="flex items-center gap-1.5 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 px-3 py-1.5 rounded-lg text-xs font-semibold border border-teal-500/30 transition-colors"
+                >
+                  <BsPlus className="text-lg" /> Add Line Item
+                </button>
+              </div>
             </div>
+
+            {/* Column Configuration Drawer */}
+            {showColConfig && (
+              <div className="bg-[#181818] p-3.5 rounded-xl border border-white/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-gray-300 uppercase tracking-wider">Presets</span>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => { setColumnLabels({ sno: "S.NO.", items: "ITEMS", hsn: "HSN", qty: "QTY.", unit: "UNIT", rate: "RATE", amount: "AMOUNT" }); setShowSeparateUnitCol(false); }} className="px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-gray-300 font-medium">Standard Goods</button>
+                    <button type="button" onClick={() => { setColumnLabels({ sno: "S.NO.", items: "ITEMS", hsn: "HSN", qty: "AREA", unit: "UNIT", rate: "UNIT RATE", amount: "DERIVING AMOUNT" }); setShowSeparateUnitCol(false); }} className="px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-gray-300 font-medium">Construction (Area & Rate)</button>
+                    <button type="button" onClick={() => { setColumnLabels({ sno: "S.NO.", items: "ITEMS", hsn: "HSN", qty: "AREA VALUE", unit: "AREA UNIT", rate: "UNIT RATE", amount: "DERIVING AMOUNT" }); setShowSeparateUnitCol(true); }} className="px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-gray-300 font-medium">Architectural (Area Value, Unit, Rate)</button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2 pt-1 border-t border-white/5">
+                  <div>
+                    <label className="text-[10px] text-gray-400 block mb-0.5">Qty / Area Header</label>
+                    <input value={columnLabels.qty} onChange={e => setColumnLabels({...columnLabels, qty: e.target.value})} className="w-full bg-[#1e1e1e] border border-white/10 rounded p-1.5 text-xs text-white" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-400 block mb-0.5">Unit Header</label>
+                    <input value={columnLabels.unit} onChange={e => setColumnLabels({...columnLabels, unit: e.target.value})} className="w-full bg-[#1e1e1e] border border-white/10 rounded p-1.5 text-xs text-white" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-400 block mb-0.5">Rate Header</label>
+                    <input value={columnLabels.rate} onChange={e => setColumnLabels({...columnLabels, rate: e.target.value})} className="w-full bg-[#1e1e1e] border border-white/10 rounded p-1.5 text-xs text-white" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-400 block mb-0.5">Amount Header</label>
+                    <input value={columnLabels.amount} onChange={e => setColumnLabels({...columnLabels, amount: e.target.value})} className="w-full bg-[#1e1e1e] border border-white/10 rounded p-1.5 text-xs text-white" />
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-3">
               {lineItems.map((item, idx) => (
