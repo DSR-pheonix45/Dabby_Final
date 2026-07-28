@@ -205,9 +205,18 @@ export function generateStandardDocumentPDF(docData) {
   let subtotal = 0;
   let totalQty = 0;
 
-  const tableHead = showSeparateUnitCol 
-    ? [[colSno, colItems, colHsn, colQty, colUnit, colRate, colAmount]]
-    : [[colSno, colItems, colHsn, colQty, colRate, colAmount]];
+  const { columns = null } = docData;
+
+  const activeCols = columns && columns.length > 0 ? columns : [
+    { id: "description", label: colItems, type: "text" },
+    { id: "hsn", label: colHsn, type: "text" },
+    { id: "qty", label: colQty, type: "number" },
+    ...(showSeparateUnitCol ? [{ id: "unit", label: colUnit, type: "text" }] : []),
+    { id: "rate", label: colRate, type: "number" },
+    { id: "amount", label: colAmount, type: "amount" }
+  ];
+
+  const tableHead = [[colSno, ...activeCols.map(c => c.label.toUpperCase())]];
 
   const tableBody = items.map((it, idx) => {
     const qtyNum = Number(it.qty) || 0;
@@ -216,34 +225,29 @@ export function generateStandardDocumentPDF(docData) {
     subtotal += amtNum;
     totalQty += qtyNum;
 
-    const descCell = it.subDetails 
-      ? `${it.description || ""}\n${it.subDetails}`
-      : (it.description || "");
+    const row = [idx + 1];
 
-    const amtStr = amtNum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const rateStr = rateNum.toLocaleString("en-IN");
+    activeCols.forEach(col => {
+      if (col.id === "description") {
+        row.push(it.subDetails ? `${it.description || ""}\n${it.subDetails}` : (it.description || ""));
+      } else if (col.id === "subDetails") {
+        row.push(it.subDetails || "-");
+      } else if (col.id === "hsn") {
+        row.push(it.hsn || "-");
+      } else if (col.id === "qty") {
+        row.push(showSeparateUnitCol || activeCols.some(c => c.id === "unit") ? qtyNum : (it.unit ? `${qtyNum} ${it.unit}` : `${qtyNum}`));
+      } else if (col.id === "unit") {
+        row.push(it.unit || "-");
+      } else if (col.id === "rate") {
+        row.push(rateNum.toLocaleString("en-IN"));
+      } else if (col.id === "amount") {
+        row.push(amtNum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+      } else {
+        row.push(it[col.id] ?? (it.customValues ? it.customValues[col.id] : "-"));
+      }
+    });
 
-    if (showSeparateUnitCol) {
-      return [
-        idx + 1,
-        descCell,
-        it.hsn || "-",
-        qtyNum,
-        it.unit || "-",
-        rateStr,
-        amtStr
-      ];
-    } else {
-      const qtyCell = it.unit ? `${qtyNum} ${it.unit}` : `${qtyNum}`;
-      return [
-        idx + 1,
-        descCell,
-        it.hsn || "-",
-        qtyCell,
-        rateStr,
-        amtStr
-      ];
-    }
+    return row;
   });
 
   // Calculate Taxes
@@ -254,34 +258,34 @@ export function generateStandardDocumentPDF(docData) {
   const grandTotal = subtotal + totalTaxAmt;
 
   if (taxPct > 0) {
+    const taxColSpan = activeCols.length - 1;
     if (isIgst) {
-      tableBody.push(showSeparateUnitCol ? [
-        "", `IGST @${taxPct}%`, "-", "-", "-", "-", `Rs. ${totalTaxAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-      ] : [
-        "", `IGST @${taxPct}%`, "-", "-", "-", `Rs. ${totalTaxAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-      ]);
+      const igstRow = Array(activeCols.length + 1).fill("");
+      igstRow[1] = `IGST @${taxPct}%`;
+      igstRow[activeCols.length] = `Rs. ${totalTaxAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      tableBody.push(igstRow);
     } else {
-      tableBody.push(
-        showSeparateUnitCol ? [
-          "", `CGST @${halfTaxPct}%`, "-", "-", "-", "-", `Rs. ${halfTaxAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-        ] : [
-          "", `CGST @${halfTaxPct}%`, "-", "-", "-", `Rs. ${halfTaxAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-        ],
-        showSeparateUnitCol ? [
-          "", `SGST @${halfTaxPct}%`, "-", "-", "-", "-", `Rs. ${halfTaxAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-        ] : [
-          "", `SGST @${halfTaxPct}%`, "-", "-", "-", `Rs. ${halfTaxAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-        ]
-      );
+      const cgstRow = Array(activeCols.length + 1).fill("");
+      cgstRow[1] = `CGST @${halfTaxPct}%`;
+      cgstRow[activeCols.length] = `Rs. ${halfTaxAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+      const sgstRow = Array(activeCols.length + 1).fill("");
+      sgstRow[1] = `SGST @${halfTaxPct}%`;
+      sgstRow[activeCols.length] = `Rs. ${halfTaxAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+      tableBody.push(cgstRow, sgstRow);
     }
   }
 
   // Add TOTAL Row to items table
-  tableBody.push(showSeparateUnitCol ? [
-    "", "TOTAL", "", totalQty > 0 ? String(totalQty) : "", "", "", `Rs. ${grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  ] : [
-    "", "TOTAL", "", totalQty > 0 ? String(totalQty) : "", "", `Rs. ${grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  ]);
+  const totalRow = Array(activeCols.length + 1).fill("");
+  totalRow[1] = "TOTAL";
+  const qtyIdx = activeCols.findIndex(c => c.id === "qty");
+  if (qtyIdx !== -1 && totalQty > 0) {
+    totalRow[qtyIdx + 1] = String(totalQty);
+  }
+  totalRow[activeCols.length] = `Rs. ${grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  tableBody.push(totalRow);
 
   const columnStylesConfig = showSeparateUnitCol ? {
     0: { cellWidth: 32, halign: "center" },

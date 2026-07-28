@@ -1,14 +1,12 @@
 import React from "react";
 import { numberToWords } from "../../utils/numberToWords";
 
-/**
- * High-fidelity, clean React template component supporting customizable column labels
- * (e.g. Area, Area Unit, Unit Rate, Deriving Amount) & optional separate Unit column.
- */
-export default function PrintableDocumentTemplate({ data = {} }) {
+export default function PrintableDocumentTemplate({ data }) {
+  if (!data) return null;
+
   const {
-    documentType = "QUOTATION", // QUOTATION | TAX INVOICE | PROFORMA INVOICE
-    docNumber = "10",
+    documentType = "QUOTATION",
+    docNumber = "QT-10",
     docDate = "15/07/2026",
     senderName = "Archzona",
     senderAddress = "105, PRISM INDUSTRIAL ESTATE, BEHIND PENDARKAR COLLEGE, DOMBIVLI(EAST)421201",
@@ -16,71 +14,42 @@ export default function PrintableDocumentTemplate({ data = {} }) {
     senderMobile = "9870048082",
     senderEmail = "info.archzona@gmail.com",
     logo = null,
-
     clientName = "RATNA DEEP CHS",
     clientAddress = "Mulund",
     placeOfSupply = "Maharashtra",
-    
     shipToName = "RATNA DEEP CHS",
     shipToAddress = "Mulund",
-
-    items = [
-      {
-        sno: 1,
-        description: "100 MM x 50 MM UPVC louver Profile",
-        subDetails: "100 – 75 – 100 – 75 – 100",
-        hsn: "39162019",
-        qty: 6900,
-        unit: "RFT",
-        rate: 115
-      },
-      {
-        sno: 2,
-        description: "MS FABRICATION WORK 115'X30'",
-        subDetails: "",
-        hsn: "7308",
-        qty: 1,
-        unit: "pcs",
-        rate: 240000
-      }
-    ],
-
+    items = [],
+    columns = null,
     taxRate = 18,
     isIgst = false,
-
-    // Column Label Configuration
-    columnLabels = {
-      sno: "S.NO.",
-      items: "ITEMS",
-      hsn: "HSN",
-      qty: "QTY.",
-      unit: "UNIT",
-      rate: "RATE",
-      amount: "AMOUNT"
-    },
+    columnLabels = {},
     showSeparateUnitCol = false,
-
-    notes = "T-Patti for top,bottom & center support\n2\"X 2\" Pipe Ms Fabrication For Fins Support With Material And installation",
-    terms = "50% Advance\n30% ongoing work\n20% after completion",
-    
-    bankDetails = {
-      name: "Archzona",
-      ifsc: "UTIB000125",
-      accountNo: "923020053039794",
-      bankName: "AXIS BANK, Dombivli"
-    },
+    notes = "",
+    terms = "",
+    bankDetails = {},
     authorisedSignatory = "Archzona"
   } = data;
 
-  const colSno = columnLabels?.sno || "S.NO.";
-  const colItems = columnLabels?.items || "ITEMS";
-  const colHsn = columnLabels?.hsn || "HSN";
-  const colQty = columnLabels?.qty || "QTY.";
-  const colUnit = columnLabels?.unit || "UNIT";
-  const colRate = columnLabels?.rate || "RATE";
-  const colAmount = columnLabels?.amount || "AMOUNT";
+  const colSno = columnLabels.sno || "S.NO.";
+  const colItems = columnLabels.items || "ITEMS";
+  const colHsn = columnLabels.hsn || "HSN";
+  const colQty = columnLabels.qty || "QTY.";
+  const colUnit = columnLabels.unit || "UNIT";
+  const colRate = columnLabels.rate || "RATE";
+  const colAmount = columnLabels.amount || "AMOUNT";
 
-  // Compute Subtotal & Total Qty
+  // Build active columns array
+  const activeCols = columns && columns.length > 0 ? columns : [
+    { id: "description", label: colItems, type: "text" },
+    { id: "hsn", label: colHsn, type: "text" },
+    { id: "qty", label: colQty, type: "number" },
+    ...(showSeparateUnitCol ? [{ id: "unit", label: colUnit, type: "text" }] : []),
+    { id: "rate", label: colRate, type: "number" },
+    { id: "amount", label: colAmount, type: "amount" }
+  ];
+
+  // Calculate Subtotal & Total Qty
   let subtotal = 0;
   let totalQty = 0;
 
@@ -96,6 +65,8 @@ export default function PrintableDocumentTemplate({ data = {} }) {
   const totalTaxAmt = (subtotal * taxPct) / 100;
   const halfTaxAmt = totalTaxAmt / 2;
   const grandTotal = subtotal + totalTaxAmt;
+
+  const totalInWords = numberToWords(grandTotal);
 
   // Group by HSN
   const hsnMap = {};
@@ -173,14 +144,16 @@ export default function PrintableDocumentTemplate({ data = {} }) {
           <thead>
             <tr className="border-b border-black bg-gray-100 text-black font-bold uppercase text-[11px]">
               <th className="py-2 px-2 border-r border-black text-center w-10">{colSno}</th>
-              <th className="py-2 px-3 border-r border-black">{colItems}</th>
-              <th className="py-2 px-2 border-r border-black text-center w-20">{colHsn}</th>
-              <th className="py-2 px-2 border-r border-black text-center w-24">{colQty}</th>
-              {showSeparateUnitCol && (
-                <th className="py-2 px-2 border-r border-black text-center w-20">{colUnit}</th>
-              )}
-              <th className="py-2 px-3 border-r border-black text-right w-24">{colRate}</th>
-              <th className="py-2 px-3 text-right w-28">{colAmount}</th>
+              {activeCols.map((col) => (
+                <th
+                  key={col.id}
+                  className={`py-2 px-2 border-r border-black ${
+                    col.type === "number" || col.type === "amount" ? "text-right" : col.id === "hsn" || col.id === "qty" || col.id === "unit" ? "text-center" : "text-left"
+                  }`}
+                >
+                  {col.label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -191,25 +164,44 @@ export default function PrintableDocumentTemplate({ data = {} }) {
               return (
                 <tr key={idx} className="align-top">
                   <td className="py-2 px-2 border-r border-black text-center font-medium">{idx + 1}</td>
-                  <td className="py-2 px-3 border-r border-black">
-                    <div className="font-bold text-black uppercase">{it.description}</div>
-                    {it.subDetails && <div className="text-[11px] text-gray-700 mt-0.5">{it.subDetails}</div>}
-                  </td>
-                  <td className="py-2 px-2 border-r border-black text-center">{it.hsn || "-"}</td>
-                  <td className="py-2 px-2 border-r border-black text-center font-medium">
-                    {showSeparateUnitCol ? q : `${q} ${it.unit || ""}`}
-                  </td>
-                  {showSeparateUnitCol && (
-                    <td className="py-2 px-2 border-r border-black text-center font-medium">
-                      {it.unit || "-"}
-                    </td>
-                  )}
-                  <td className="py-2 px-3 border-r border-black text-right font-medium">
-                    {r.toLocaleString("en-IN")}
-                  </td>
-                  <td className="py-2 px-3 text-right font-bold text-black">
-                    {amt.toLocaleString("en-IN")}
-                  </td>
+                  {activeCols.map((col) => {
+                    if (col.id === "description") {
+                      return (
+                        <td key={col.id} className="py-2 px-3 border-r border-black">
+                          <div className="font-bold text-black uppercase">{it.description}</div>
+                          {it.subDetails && <div className="text-[11px] text-gray-700 mt-0.5">{it.subDetails}</div>}
+                        </td>
+                      );
+                    }
+                    if (col.id === "subDetails") {
+                      return <td key={col.id} className="py-2 px-2 border-r border-black text-center">{it.subDetails || "-"}</td>;
+                    }
+                    if (col.id === "hsn") {
+                      return <td key={col.id} className="py-2 px-2 border-r border-black text-center">{it.hsn || "-"}</td>;
+                    }
+                    if (col.id === "qty") {
+                      return (
+                        <td key={col.id} className="py-2 px-2 border-r border-black text-center font-medium">
+                          {showSeparateUnitCol || activeCols.some(c => c.id === "unit") ? q : (it.unit ? `${q} ${it.unit}` : q)}
+                        </td>
+                      );
+                    }
+                    if (col.id === "unit") {
+                      return <td key={col.id} className="py-2 px-2 border-r border-black text-center font-medium">{it.unit || "-"}</td>;
+                    }
+                    if (col.id === "rate") {
+                      return <td key={col.id} className="py-2 px-3 border-r border-black text-right font-medium">{r.toLocaleString("en-IN")}</td>;
+                    }
+                    if (col.id === "amount") {
+                      return <td key={col.id} className="py-2 px-3 border-r border-black text-right font-bold text-black">{amt.toLocaleString("en-IN")}</td>;
+                    }
+                    // Custom added column
+                    return (
+                      <td key={col.id} className="py-2 px-2 border-r border-black text-center font-medium">
+                        {it[col.id] ?? (it.customValues ? it.customValues[col.id] : "-")}
+                      </td>
+                    );
+                  })}
                 </tr>
               );
             })}
@@ -219,19 +211,19 @@ export default function PrintableDocumentTemplate({ data = {} }) {
               isIgst ? (
                 <tr className="border-t border-gray-300 font-semibold text-gray-800">
                   <td className="py-1.5 px-2 border-r border-black"></td>
-                  <td className="py-1.5 px-3 border-r border-black text-right italic" colSpan={showSeparateUnitCol ? 5 : 4}>IGST @{taxPct}%</td>
+                  <td className="py-1.5 px-3 border-r border-black text-right italic" colSpan={activeCols.length - 1}>IGST @{taxPct}%</td>
                   <td className="py-1.5 px-3 text-right font-semibold">₹ {totalTaxAmt.toLocaleString("en-IN")}</td>
                 </tr>
               ) : (
                 <>
                   <tr className="border-t border-gray-300 font-semibold text-gray-800">
                     <td className="py-1.5 px-2 border-r border-black"></td>
-                    <td className="py-1.5 px-3 border-r border-black text-right italic" colSpan={showSeparateUnitCol ? 5 : 4}>CGST @{halfTaxPct}%</td>
+                    <td className="py-1.5 px-3 border-r border-black text-right italic" colSpan={activeCols.length - 1}>CGST @{halfTaxPct}%</td>
                     <td className="py-1.5 px-3 text-right font-semibold">₹ {halfTaxAmt.toLocaleString("en-IN")}</td>
                   </tr>
-                  <tr className="border-t border-gray-200 font-semibold text-gray-800">
+                  <tr className="border-t border-gray-300 font-semibold text-gray-800">
                     <td className="py-1.5 px-2 border-r border-black"></td>
-                    <td className="py-1.5 px-3 border-r border-black text-right italic" colSpan={showSeparateUnitCol ? 5 : 4}>SGST @{halfTaxPct}%</td>
+                    <td className="py-1.5 px-3 border-r border-black text-right italic" colSpan={activeCols.length - 1}>SGST @{halfTaxPct}%</td>
                     <td className="py-1.5 px-3 text-right font-semibold">₹ {halfTaxAmt.toLocaleString("en-IN")}</td>
                   </tr>
                 </>
@@ -239,119 +231,109 @@ export default function PrintableDocumentTemplate({ data = {} }) {
             )}
 
             {/* TOTAL Row */}
-            <tr className="border-t border-black bg-gray-100 font-bold text-black uppercase text-[11px]">
-              <td className="py-2 px-2 border-r border-black"></td>
-              <td className="py-2 px-3 border-r border-black">TOTAL</td>
-              <td className="py-2 px-2 border-r border-black"></td>
-              <td className="py-2 px-2 border-r border-black text-center">{totalQty > 0 ? totalQty : ""}</td>
-              {showSeparateUnitCol && <td className="py-2 px-2 border-r border-black"></td>}
-              <td className="py-2 px-3 border-r border-black"></td>
-              <td className="py-2 px-3 text-right text-sm font-extrabold">₹{grandTotal.toLocaleString("en-IN")}</td>
+            <tr className="border-t-2 border-black bg-gray-100 font-bold text-black text-xs">
+              <td className="py-2 px-2 border-r border-black text-center"></td>
+              <td className="py-2 px-3 border-r border-black uppercase">TOTAL</td>
+              {activeCols.slice(1, -1).map(col => (
+                <td key={col.id} className="py-2 px-2 border-r border-black text-center">
+                  {col.id === "qty" && totalQty > 0 ? totalQty : ""}
+                </td>
+              ))}
+              <td className="py-2 px-3 text-right text-sm">₹ {grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      {/* 5. HSN/SAC TAX BREAKDOWN TABLE */}
-      <div className="border-x border-b border-black overflow-x-auto text-[11px]">
-        <table className="w-full border-collapse text-center">
-          <thead>
-            <tr className="border-b border-black bg-gray-100 font-bold uppercase text-[10px]">
-              <th className="py-1.5 px-2 border-r border-black row-span-2">HSN/SAC</th>
-              <th className="py-1.5 px-2 border-r border-black row-span-2">Taxable Value</th>
-              <th className="py-1.5 px-2 border-r border-black" colSpan={2}>CGST</th>
-              <th className="py-1.5 px-2 border-r border-black" colSpan={2}>SGST</th>
-              <th className="py-1.5 px-2">Total Tax Amount</th>
-            </tr>
-            <tr className="border-b border-black bg-gray-50 font-bold text-[10px]">
-              <th className="py-1 px-1 border-r border-black">Rate</th>
-              <th className="py-1 px-1 border-r border-black">Amount</th>
-              <th className="py-1 px-1 border-r border-black">Rate</th>
-              <th className="py-1 px-1 border-r border-black">Amount</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {hsnEntries.map(([hsnCode, taxableVal], i) => {
-              const cgstVal = (taxableVal * halfTaxPct) / 100;
-              const sgstVal = (taxableVal * halfTaxPct) / 100;
-              const totTax = cgstVal + sgstVal;
-              return (
-                <tr key={i}>
-                  <td className="py-1.5 px-2 border-r border-black font-semibold">{hsnCode}</td>
-                  <td className="py-1.5 px-2 border-r border-black">{taxableVal.toLocaleString("en-IN")}</td>
-                  <td className="py-1.5 px-1 border-r border-black">{halfTaxPct}%</td>
-                  <td className="py-1.5 px-2 border-r border-black">{cgstVal.toLocaleString("en-IN")}</td>
-                  <td className="py-1.5 px-1 border-r border-black">{halfTaxPct}%</td>
-                  <td className="py-1.5 px-2 border-r border-black">{sgstVal.toLocaleString("en-IN")}</td>
-                  <td className="py-1.5 px-2 font-bold text-black">₹ {totTax.toLocaleString("en-IN")}</td>
-                </tr>
-              );
-            })}
-            <tr className="border-t border-black bg-gray-100 font-bold text-black text-[11px]">
-              <td className="py-1.5 px-2 border-r border-black">Total</td>
-              <td className="py-1.5 px-2 border-r border-black">{subtotal.toLocaleString("en-IN")}</td>
-              <td className="py-1.5 px-1 border-r border-black"></td>
-              <td className="py-1.5 px-2 border-r border-black">{halfTaxAmt.toLocaleString("en-IN")}</td>
-              <td className="py-1.5 px-1 border-r border-black"></td>
-              <td className="py-1.5 px-2 border-r border-black">{halfTaxAmt.toLocaleString("en-IN")}</td>
-              <td className="py-1.5 px-2 text-right font-extrabold">₹ {totalTaxAmt.toLocaleString("en-IN")}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* 6. TOTAL AMOUNT IN WORDS */}
-      <div className="border-x border-b border-black p-2.5 bg-white text-xs">
-        <div className="font-bold text-[11px] text-gray-800">Total Amount (in words)</div>
-        <div className="font-medium text-sm text-black mt-0.5">{numberToWords(grandTotal)}</div>
-      </div>
-
-      {/* 7. BOTTOM GRID: NOTES & TERMS (LEFT) vs BANK DETAILS & SIGNATURE (RIGHT) */}
+      {/* 5. SUMMARY HSN TABLE & AMOUNT IN WORDS & BANK DETAILS */}
       <div className="border-x border-b border-black grid grid-cols-12 text-xs">
-        {/* Left Side: Notes & Terms */}
-        <div className="col-span-7 p-3 border-r border-black flex flex-col justify-between">
-          <div>
-            <div className="font-bold text-[11px] text-black mb-1">Notes</div>
-            <div className="text-[11px] text-gray-800 whitespace-pre-line leading-snug mb-3">
-              {notes || "-"}
+        
+        {/* Left Side: HSN Table & Amount in Words */}
+        <div className="col-span-7 p-3 border-r border-black space-y-3">
+          
+          {/* HSN Summary */}
+          {hsnEntries.length > 0 && (
+            <div>
+              <div className="font-bold text-[10px] uppercase mb-1">HSN/SAC SUMMARY</div>
+              <table className="w-full text-[10px] text-left border border-gray-300 border-collapse">
+                <thead>
+                  <tr className="bg-gray-100 border-b border-gray-300 font-bold">
+                    <th className="p-1 border-r border-gray-300">HSN/SAC</th>
+                    <th className="p-1 border-r border-gray-300 text-right">Taxable Val</th>
+                    {isIgst ? (
+                      <th className="p-1 text-right">IGST Amt</th>
+                    ) : (
+                      <>
+                        <th className="p-1 border-r border-gray-300 text-right">CGST Amt</th>
+                        <th className="p-1 text-right">SGST Amt</th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {hsnEntries.map(([code, val]) => {
+                    const hsnTax = (val * taxPct) / 100;
+                    const hsnHalf = hsnTax / 2;
+                    return (
+                      <tr key={code} className="border-b border-gray-200">
+                        <td className="p-1 border-r border-gray-300 font-medium">{code}</td>
+                        <td className="p-1 border-r border-gray-300 text-right">₹ {val.toLocaleString("en-IN")}</td>
+                        {isIgst ? (
+                          <td className="p-1 text-right">₹ {hsnTax.toLocaleString("en-IN")}</td>
+                        ) : (
+                          <>
+                            <td className="p-1 border-r border-gray-300 text-right">₹ {hsnHalf.toLocaleString("en-IN")}</td>
+                            <td className="p-1 text-right">₹ {hsnHalf.toLocaleString("en-IN")}</td>
+                          </>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
+          )}
 
-            <div className="font-bold text-[11px] text-black mb-1">Terms and Conditions</div>
-            <div className="text-[11px] text-gray-800 whitespace-pre-line leading-snug">
-              {terms || "-"}
+          {/* Amount in Words */}
+          <div>
+            <span className="font-bold text-[11px] uppercase">Amount Chargeable (in words):</span>
+            <p className="font-semibold text-gray-900 capitalize text-[11px] mt-0.5">{totalInWords}</p>
+          </div>
+
+          {/* Bank Details */}
+          <div className="pt-1 border-t border-gray-200">
+            <span className="font-bold text-[11px] uppercase block mb-1">Company Bank Details</span>
+            <div className="text-[11px] space-y-0.5">
+              <div><span className="font-semibold">Bank Name:</span> {bankDetails.bankName || "AXIS BANK, Dombivli"}</div>
+              <div><span className="font-semibold">A/c No:</span> {bankDetails.accountNo || "923020053039794"}</div>
+              <div><span className="font-semibold">IFSC Code:</span> {bankDetails.ifsc || "UTIB000125"}</div>
+              <div><span className="font-semibold">Beneficiary Name:</span> {bankDetails.name || senderName || "Archzona"}</div>
             </div>
           </div>
         </div>
 
-        {/* Right Side: Bank Details & Signature */}
-        <div className="col-span-5 p-3 flex flex-col justify-between bg-gray-50/30">
+        {/* Right Side: Notes, Terms & Authorised Signatory */}
+        <div className="col-span-5 p-3 flex flex-col justify-between space-y-3">
           <div>
-            <div className="font-bold text-[11px] text-black mb-1.5">Bank Details</div>
-            <div className="space-y-1 text-[11px]">
-              <div className="grid grid-cols-3">
-                <span className="font-semibold text-gray-700">Name:</span>
-                <span className="col-span-2 font-medium text-black">{bankDetails?.name || senderName}</span>
+            {notes && (
+              <div className="mb-2">
+                <span className="font-bold text-[10px] uppercase block">Notes</span>
+                <p className="text-[10px] text-gray-700 whitespace-pre-line leading-tight">{notes}</p>
               </div>
-              <div className="grid grid-cols-3">
-                <span className="font-semibold text-gray-700">IFSC Code:</span>
-                <span className="col-span-2 font-mono font-medium text-black">{bankDetails?.ifsc || "UTIB000125"}</span>
+            )}
+
+            {terms && (
+              <div>
+                <span className="font-bold text-[10px] uppercase block">Terms and Conditions</span>
+                <p className="text-[10px] text-gray-700 whitespace-pre-line leading-tight">{terms}</p>
               </div>
-              <div className="grid grid-cols-3">
-                <span className="font-semibold text-gray-700">Account No:</span>
-                <span className="col-span-2 font-mono font-medium text-black">{bankDetails?.accountNo || "923020053039794"}</span>
-              </div>
-              <div className="grid grid-cols-3">
-                <span className="font-semibold text-gray-700">Bank:</span>
-                <span className="col-span-2 font-medium text-black">{bankDetails?.bankName || "AXIS BANK, Dombivli"}</span>
-              </div>
-            </div>
+            )}
           </div>
 
-          <div className="mt-8 text-center pt-4">
-            <div className="font-bold text-[11px] text-black">Authorised Signatory For</div>
-            <div className="font-bold text-xs text-black uppercase mt-1">{authorisedSignatory || senderName}</div>
-            <div className="h-10 border-b border-gray-300 border-dashed w-3/4 mx-auto my-2"></div>
-            <div className="text-[10px] text-gray-500 italic">Authorized Signature / Stamp</div>
+          <div className="text-right pt-6">
+            <div className="font-bold text-[11px] uppercase">For {authorisedSignatory || senderName || "Archzona"}</div>
+            <div className="h-10"></div>
+            <div className="font-bold text-[11px] border-t border-black inline-block pt-1 px-4">Authorised Signatory</div>
           </div>
         </div>
       </div>

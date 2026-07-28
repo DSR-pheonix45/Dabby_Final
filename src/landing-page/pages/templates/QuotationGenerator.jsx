@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Download, Plus, Trash2, Printer } from "lucide-react";
 import { generateStandardDocumentPDF } from "../../../utils/documentPdfGenerator";
 import PrintableDocumentTemplate from "../../../components/Generator/PrintableDocumentTemplate";
-import ColumnConfigurator from "../../../components/Generator/ColumnConfigurator";
+import DynamicColumnConfigurator, { DEFAULT_COLUMNS } from "../../../components/Generator/DynamicColumnConfigurator";
 
 export default function QuotationGenerator() {
   const { theme } = useTheme();
@@ -66,17 +66,7 @@ export default function QuotationGenerator() {
     authorisedSignatory: "Archzona"
   });
 
-  const [columnLabels, setColumnLabels] = useState({
-    sno: "S.NO.",
-    items: "ITEMS",
-    hsn: "HSN",
-    qty: "QTY.",
-    unit: "UNIT",
-    rate: "RATE",
-    amount: "AMOUNT"
-  });
-  const [showSeparateUnitCol, setShowSeparateUnitCol] = useState(false);
-
+  const [columns, setColumns] = useState(DEFAULT_COLUMNS);
   const [activeTab, setActiveTab] = useState("edit"); // edit | preview
 
   const handleInputChange = (e) => {
@@ -131,10 +121,9 @@ export default function QuotationGenerator() {
       shipToName: quotationData.shipToName,
       shipToAddress: quotationData.shipToAddress,
       items: quotationData.items,
+      columns,
       taxRate: quotationData.taxRate,
       isIgst: quotationData.isIgst,
-      columnLabels,
-      showSeparateUnitCol,
       notes: quotationData.notes,
       terms: quotationData.terms,
       bankDetails: quotationData.bankDetails,
@@ -220,10 +209,9 @@ export default function QuotationGenerator() {
                 shipToName: quotationData.shipToName,
                 shipToAddress: quotationData.shipToAddress,
                 items: quotationData.items,
+                columns,
                 taxRate: quotationData.taxRate,
                 isIgst: quotationData.isIgst,
-                columnLabels,
-                showSeparateUnitCol,
                 notes: quotationData.notes,
                 terms: quotationData.terms,
                 bankDetails: quotationData.bankDetails,
@@ -372,79 +360,64 @@ export default function QuotationGenerator() {
                 </div>
               </div>
 
-              {/* Items & Tax */}
+              {/* Dynamic Items & Tax Section */}
               <div className={`p-6 rounded-2xl border ${theme === "dark" ? "bg-[#111827] border-white/10" : "bg-white border-gray-200"} shadow-sm space-y-4`}>
                 <div className="flex justify-between items-center border-b pb-2">
-                  <h2 className="text-base font-bold text-blue-400">4. Items & Tax Configuration</h2>
+                  <h2 className="text-base font-bold text-blue-400">4. Items & Dynamic Table Layout</h2>
                   <button onClick={addItem} className="text-xs font-bold text-blue-400 hover:underline flex items-center gap-1">
                     <Plus className="w-3.5 h-3.5" /> Add Item
                   </button>
                 </div>
 
-                {/* Column Configurator Panel */}
-                <ColumnConfigurator
-                  columnLabels={columnLabels}
-                  setColumnLabels={setColumnLabels}
-                  showSeparateUnitCol={showSeparateUnitCol}
-                  setShowSeparateUnitCol={setShowSeparateUnitCol}
+                {/* Dynamic Column Configurator Panel */}
+                <DynamicColumnConfigurator
+                  columns={columns}
+                  setColumns={setColumns}
                   theme={theme}
                 />
 
+                {/* Items Input Rows matching columns */}
                 <div className="space-y-4">
                   {quotationData.items.map((item, idx) => (
-                    <div key={idx} className="p-3 rounded-lg border border-white/10 bg-white/5 space-y-2 relative">
+                    <div key={idx} className="p-3.5 rounded-xl border border-white/10 bg-white/5 space-y-2 relative">
                       <button onClick={() => removeItem(idx)} className="absolute top-2 right-2 text-red-400 hover:text-red-300">
                         <Trash2 className="w-4 h-4" />
                       </button>
                       <input
                         type="text"
-                        placeholder="Item Description (e.g. 100 MM x 50 MM UPVC louver Profile)"
-                        value={item.description}
+                        placeholder="Item Description"
+                        value={item.description || ""}
                         onChange={(e) => handleItemChange(idx, "description", e.target.value)}
-                        className={`w-full p-2 rounded border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-white border-gray-300"}`}
+                        className={`w-full p-2 rounded border text-xs font-semibold ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-white border-gray-300"}`}
                       />
                       <input
                         type="text"
-                        placeholder="Sub Details / Specs (e.g. 100 – 75 – 100 – 75 – 100)"
-                        value={item.subDetails}
+                        placeholder="Sub Details / Specifications"
+                        value={item.subDetails || ""}
                         onChange={(e) => handleItemChange(idx, "subDetails", e.target.value)}
                         className={`w-full p-2 rounded border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-white border-gray-300"}`}
                       />
-                      <div className="grid grid-cols-4 gap-2">
-                        <input
-                          type="text"
-                          placeholder="HSN Code"
-                          value={item.hsn}
-                          onChange={(e) => handleItemChange(idx, "hsn", e.target.value)}
-                          className={`p-2 rounded border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-white border-gray-300"}`}
-                        />
-                        <input
-                          type="number"
-                          placeholder={columnLabels?.qty || "Qty"}
-                          value={item.qty}
-                          onChange={(e) => handleItemChange(idx, "qty", e.target.value)}
-                          className={`p-2 rounded border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-white border-gray-300"}`}
-                        />
-                        <input
-                          type="text"
-                          placeholder={columnLabels?.unit || "Unit (RFT, sqft, pcs)"}
-                          value={item.unit}
-                          onChange={(e) => handleItemChange(idx, "unit", e.target.value)}
-                          className={`p-2 rounded border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-white border-gray-300"}`}
-                        />
-                        <input
-                          type="number"
-                          placeholder={columnLabels?.rate || "Rate (₹)"}
-                          value={item.rate}
-                          onChange={(e) => handleItemChange(idx, "rate", e.target.value)}
-                          className={`p-2 rounded border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-white border-gray-300"}`}
-                        />
+
+                      {/* Dynamic Column Cells Grid */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1">
+                        {columns.filter(c => c.id !== "description" && c.id !== "amount").map(col => (
+                          <div key={col.id}>
+                            <label className="text-[10px] text-gray-400 block mb-0.5">{col.label}</label>
+                            <input
+                              type={col.type === "number" ? "number" : "text"}
+                              placeholder={col.label}
+                              value={item[col.id] !== undefined ? item[col.id] : ""}
+                              onChange={(e) => handleItemChange(idx, col.id, e.target.value)}
+                              className={`w-full p-2 rounded border text-xs ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-white border-gray-300"}`}
+                            />
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 pt-2">
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-white/10">
                   <div>
                     <label className="block text-xs font-semibold mb-1 opacity-70">GST Rate (%)</label>
                     <input
@@ -547,10 +520,9 @@ export default function QuotationGenerator() {
                     shipToName: quotationData.shipToName,
                     shipToAddress: quotationData.shipToAddress,
                     items: quotationData.items,
+                    columns,
                     taxRate: quotationData.taxRate,
                     isIgst: quotationData.isIgst,
-                    columnLabels,
-                    showSeparateUnitCol,
                     notes: quotationData.notes,
                     terms: quotationData.terms,
                     bankDetails: quotationData.bankDetails,
