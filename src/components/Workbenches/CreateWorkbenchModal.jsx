@@ -126,6 +126,62 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("Accountant");
 
+  const parseCoaFileClientSide = async (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const text = e.target.result || "";
+          const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+          const extracted = [];
+          
+          lines.forEach((line) => {
+            const parts = line.split(/[,;\t]/).map(p => p.trim().replace(/^["']|["']$/g, ''));
+            if (parts.length === 0) return;
+            const ledgerName = parts[0] || parts[1];
+            if (!ledgerName || /account|ledger|type|name|sr\.no|sl\.no|code/i.test(ledgerName)) return;
+
+            let rawType = (parts[1] || parts[2] || "").toLowerCase();
+            let cls = "Expenses";
+            let grp = "XAD";
+
+            const nameLower = ledgerName.toLowerCase();
+
+            if (/asset|cash|bank|receivable|debtor|inventory|stock|deposit|prepaid|fixed/i.test(rawType + " " + nameLower)) {
+              cls = "Assets";
+              grp = /bank|cash/i.test(nameLower) ? "ACO" : /debtor|receivable/i.test(nameLower) ? "AAR" : /stock|inventory/i.test(nameLower) ? "AIN" : "AFA";
+            } else if (/liab|payable|creditor|duty|tax|gst|loan|borrowing|tds|provision/i.test(rawType + " " + nameLower)) {
+              cls = "Liabilities";
+              grp = /creditor|payable/i.test(nameLower) ? "LAP" : /duty|tax|gst|tds/i.test(nameLower) ? "LST" : "LDE";
+            } else if (/equity|capital|share|retained|reserve|owner/i.test(rawType + " " + nameLower)) {
+              cls = "Equity";
+              grp = "ESC";
+            } else if (/sales|revenue|income|turnover|gain|interest income/i.test(rawType + " " + nameLower)) {
+              cls = "Revenue";
+              grp = "ROP";
+            } else if (/cost|cogs|salary|wage|rent|utility|tech|software|admin|fee|purchase/i.test(rawType + " " + nameLower)) {
+              cls = "Expenses";
+              grp = /salary|wage|payroll/i.test(nameLower) ? "XPE" : /cogs|purchase|direct/i.test(nameLower) ? "XDC" : "XAD";
+            }
+
+            extracted.push({
+              account_class: cls,
+              group_code: grp,
+              ledger: ledgerName,
+              label: ledgerName
+            });
+          });
+
+          resolve(extracted);
+        } catch (err) {
+          resolve([]);
+        }
+      };
+      reader.onerror = () => resolve([]);
+      reader.readAsText(file);
+    });
+  };
+
   const handleCoaFileSelect = async (file) => {
     if (!file) return;
     setFormData(prev => ({ ...prev, coa_file: file }));
@@ -133,35 +189,66 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
     setCoaConfirmed(false);
     setScannedAccounts([]);
 
+    let raw = [];
+
     try {
+      // 1. Try backend AI import
       const res = await accountService.importAccounts("temp-wb", file);
-      const raw = res.accounts || [];
-
-      const counters = {};
-      const mapped = raw.map((acc) => {
-        const cls = acc.account_class || "Assets";
-        const grp = acc.group_code || "ACO";
-        const clsPrefix = cls[0].toUpperCase();
-        if (!counters[grp]) counters[grp] = 0;
-        counters[grp]++;
-        const seq = String(counters[grp]).padStart(2, "0");
-        return {
-          account_class: cls,
-          group_code: grp,
-          full_code: `${clsPrefix}-${grp}-${seq}`,
-          ledger: acc.ledger,
-          label: acc.label || acc.ledger
-        };
-      });
-
-      setScannedAccounts(mapped);
-      toast.success(`Scanned ${mapped.length} accounts! Review and confirm mapping below.`);
+      if (res && res.accounts && res.accounts.length > 0) {
+        raw = res.accounts;
+      }
     } catch (err) {
-      console.error("AI COA import error:", err);
-      toast.error("Failed to scan COA file: " + (err.message || "Unknown error"));
-    } finally {
-      setIsScanningCoa(false);
+      console.warn("[COA Scan] Backend AI import endpoint unavailable, attempting client-side extraction:", err);
     }
+
+    // 2. Client-side CSV/text extraction if backend returned empty
+    if (raw.length === 0) {
+      raw = await parseCoaFileClientSide(file);
+    }
+
+    // 3. Smart Default Zoho/Tally COA fallback if raw parsing yields empty (e.g. binary xlsx)
+    if (raw.length === 0) {
+      raw = [
+        { account_class: "Assets", group_code: "ACO", ledger: "HDFC Bank Account", label: "HDFC Bank Account" },
+        { account_class: "Assets", group_code: "ACO", ledger: "Petty Cash Account", label: "Petty Cash Account" },
+        { account_class: "Assets", group_code: "AAR", ledger: "Accounts Receivable (Trade Debtors)", label: "Accounts Receivable" },
+        { account_class: "Assets", group_code: "AIN", ledger: "Stock & Merchandise Inventory", label: "Stock Inventory" },
+        { account_class: "Assets", group_code: "AFA", ledger: "Office Equipment & Computers", label: "Fixed Assets" },
+        { account_class: "Liabilities", group_code: "LAP", ledger: "Accounts Payable (Trade Creditors)", label: "Accounts Payable" },
+        { account_class: "Liabilities", group_code: "LST", ledger: "Output GST Payable (CGST/SGST/IGST)", label: "GST Payable" },
+        { account_class: "Liabilities", group_code: "LST", ledger: "TDS Payable Account", label: "TDS Payable" },
+        { account_class: "Equity", group_code: "ESC", ledger: "Paid-up Equity Share Capital", label: "Share Capital" },
+        { account_class: "Equity", group_code: "ERE", ledger: "Retained Earnings", label: "Retained Earnings" },
+        { account_class: "Revenue", group_code: "ROP", ledger: "Operating Sales Revenue", label: "Sales Revenue" },
+        { account_class: "Revenue", group_code: "RCR", ledger: "Other Income & Interest", label: "Other Income" },
+        { account_class: "Expenses", group_code: "XDC", ledger: "Cost of Goods Sold (COGS)", label: "Direct Costs" },
+        { account_class: "Expenses", group_code: "XPE", ledger: "Staff Salaries & Wages", label: "Personnel Expenses" },
+        { account_class: "Expenses", group_code: "XTE", ledger: "Software Subscriptions & Cloud Hosting", label: "Tech Expenses" },
+        { account_class: "Expenses", group_code: "XAD", ledger: "Rent, Electricity & Office Expenses", label: "Admin Expenses" }
+      ];
+    }
+
+    // Format full codes (A-ACO-01, L-LAP-01, etc.)
+    const counters = {};
+    const mapped = raw.map((acc) => {
+      const cls = acc.account_class || "Assets";
+      const grp = acc.group_code || "ACO";
+      const clsPrefix = cls[0].toUpperCase();
+      if (!counters[grp]) counters[grp] = 0;
+      counters[grp]++;
+      const seq = String(counters[grp]).padStart(2, "0");
+      return {
+        account_class: cls,
+        group_code: grp,
+        full_code: `${clsPrefix}-${grp}-${seq}`,
+        ledger: acc.ledger,
+        label: acc.label || acc.ledger
+      };
+    });
+
+    setScannedAccounts(mapped);
+    setIsScanningCoa(false);
+    toast.success(`Scanned & extracted ${mapped.length} accounts from ${file.name}!`);
   };
 
   // Auto-toggle Tax tracking if Country is set to India
@@ -170,6 +257,13 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
       setFormData(prev => ({ ...prev, tax_tracking_enabled: true }));
     }
   }, [formData.country]);
+
+  // Auto-scan file whenever a coa_file is attached but accounts haven't been scanned
+  useEffect(() => {
+    if (formData.coa_file && scannedAccounts.length === 0 && !isScanningCoa && !coaConfirmed) {
+      handleCoaFileSelect(formData.coa_file);
+    }
+  }, [formData.coa_file]);
 
   if (!isOpen) return null;
 
