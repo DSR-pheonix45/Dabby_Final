@@ -122,9 +122,17 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
     inventory_file: null
   });
 
-  // State for member invite inputs
+  // State for member invite inputs & copy link feedback
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("Accountant");
+  const [isLinkCopied, setIsLinkCopied] = useState(false);
+
+  const isBinaryGarbage = (str) => {
+    if (!str || typeof str !== "string") return true;
+    if (/PK\x03\x04|\[Content_Types\]|xl\/worksheets|xml|\ufffd/i.test(str)) return true;
+    const cleanAscii = str.replace(/[^\x20-\x7E]/g, "");
+    return cleanAscii.length < str.length * 0.75 || cleanAscii.trim().length === 0;
+  };
 
   const parseCoaFileClientSide = async (file) => {
     return new Promise((resolve) => {
@@ -139,7 +147,7 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
             const parts = line.split(/[,;\t]/).map(p => p.trim().replace(/^["']|["']$/g, ''));
             if (parts.length === 0) return;
             const ledgerName = parts[0] || parts[1];
-            if (!ledgerName || /account|ledger|type|name|sr\.no|sl\.no|code/i.test(ledgerName)) return;
+            if (!ledgerName || isBinaryGarbage(ledgerName) || /account|ledger|type|name|sr\.no|sl\.no|code/i.test(ledgerName)) return;
 
             let rawType = (parts[1] || parts[2] || "").toLowerCase();
             let cls = "Expenses";
@@ -206,7 +214,10 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
       raw = await parseCoaFileClientSide(file);
     }
 
-    // 3. Smart Default Zoho/Tally COA fallback if raw parsing yields empty (e.g. binary xlsx)
+    // Filter out any binary garbage lines
+    raw = raw.filter(acc => !isBinaryGarbage(acc.ledger));
+
+    // 3. Smart Default Zoho/Tally COA fallback if raw parsing yields empty or binary garbage
     if (raw.length === 0) {
       raw = [
         { account_class: "Assets", group_code: "ACO", ledger: "HDFC Bank Account", label: "HDFC Bank Account" },
@@ -314,7 +325,9 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
   const handleCopyLink = () => {
     const link = `${window.location.origin}/invite/workbench?temp_ref=${Date.now()}`;
     navigator.clipboard.writeText(link);
+    setIsLinkCopied(true);
     toast.success("Invite link copied to clipboard!");
+    setTimeout(() => setIsLinkCopied(false), 2500);
   };
 
   const validateStep = (step) => {
@@ -383,31 +396,17 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
     setLoading(true);
 
     try {
+      // Send ONLY columns that exist on the workbenches table in Supabase
       const payload = {
         name: formData.name.trim(),
         legal_name: formData.legal_name.trim() || null,
-        country: formData.country,
-        location: formData.country,
-        currency: formData.currency,
+        country: formData.country || "India",
+        currency: formData.currency || "INR",
         industry: formData.industry,
-        sector: formData.sector,
         business_type: formData.business_type,
-        books_start_date: formData.books_start_date,
         fiscal_year_start: formData.fiscal_year_start,
-        incorporation_date: formData.incorporation_date || null,
-        gstin: formData.gstin || null,
-        pan: formData.pan || null,
-        created_by: user.id,
-        settings: {
-          cin: formData.cin || null,
-          tax_tracking_enabled: formData.tax_tracking_enabled,
-          coa_source: formData.coa_source,
-          coa_file_name: formData.coa_file ? formData.coa_file.name : null,
-          invited_members: formData.invited_members,
-          inventory_required: formData.inventory_required,
-          inventory_source: formData.inventory_source,
-          inventory_file_name: formData.inventory_file ? formData.inventory_file.name : null,
-        }
+        books_start_date: formData.books_start_date,
+        created_by: user.id
       };
 
       const { data, error } = await supabase
@@ -1147,9 +1146,21 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
                   <button
                     type="button"
                     onClick={handleCopyLink}
-                    className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+                    className={`px-3.5 py-1.5 border rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                      isLinkCopied
+                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-lg shadow-emerald-500/10"
+                        : "bg-white/5 hover:bg-white/10 text-gray-200 border-white/10"
+                    }`}
                   >
-                    <BsCopy className="w-3.5 h-3.5" /> Copy Invite Link
+                    {isLinkCopied ? (
+                      <>
+                        <BsCheckCircleFill className="w-3.5 h-3.5 text-emerald-400" /> Copied!
+                      </>
+                    ) : (
+                      <>
+                        <BsCopy className="w-3.5 h-3.5" /> Copy Invite Link
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
