@@ -256,6 +256,18 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
         return false;
       }
     }
+    if (step === 4) {
+      if (["tally", "zoho_books", "quickbooks"].includes(formData.coa_source)) {
+        if (!formData.coa_file) {
+          toast.error("Please upload your COA export file");
+          return false;
+        }
+        if (scannedAccounts.length > 0 && !coaConfirmed) {
+          toast.error("Please confirm the scanned Chart of Accounts structure before proceeding");
+          return false;
+        }
+      }
+    }
     return true;
   };
 
@@ -684,230 +696,265 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
           {currentStep === 4 && (
             <div className="space-y-5 animate-fadeIn">
               <div>
-                <h4 className="text-sm font-semibold text-white">Select Chart of Accounts (COA) Source</h4>
+                <h4 className="text-sm font-semibold text-white">Chart of Accounts (COA) Setup</h4>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  Choose how to initialize ledger accounts for this workbench.
+                  {formData.coa_file || scannedAccounts.length > 0
+                    ? `Uploaded ${formData.coa_file ? formData.coa_file.name : "COA File"} — Mapped to Dabby A, L, E, R, X structure.`
+                    : "Choose how to initialize ledger accounts for this workbench."}
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  {
-                    id: "ai_recommender",
-                    title: "Dabby AI Recommender",
-                    desc: `Auto-generates COA tailored for ${formData.business_type} & ${formData.industry}`,
-                    badge: "Recommended",
-                    icon: BsStars
-                  },
-                  {
-                    id: "tally",
-                    title: "Tally Export Import",
-                    desc: "Upload Tally COA export file (CSV or Excel)",
-                    icon: BsFileEarmarkSpreadsheet
-                  },
-                  {
-                    id: "zoho_books",
-                    title: "Zoho Books Export",
-                    desc: "Import Chart of Accounts from Zoho Books export",
-                    icon: BsFileEarmarkSpreadsheet
-                  },
-                  {
-                    id: "quickbooks",
-                    title: "QuickBooks Export",
-                    desc: "Import Chart of Accounts from QuickBooks export",
-                    icon: BsFileEarmarkSpreadsheet
-                  },
-                  {
-                    id: "standard",
-                    title: "Standard Template",
-                    desc: "Default double-entry Accounting standard COA template",
-                    icon: BsJournalText
-                  }
-                ].map((option) => {
-                  const Icon = option.icon;
-                  const selected = formData.coa_source === option.id;
-                  return (
-                    <div
-                      key={option.id}
-                      onClick={() => setFormData(prev => ({ ...prev, coa_source: option.id }))}
-                      className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
-                        selected
-                          ? "bg-teal-500/10 border-teal-500 text-white shadow-lg shadow-teal-500/10"
-                          : "bg-black/20 border-white/10 text-gray-300 hover:bg-white/5"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Icon className={`w-5 h-5 ${selected ? "text-teal-400" : "text-gray-400"}`} />
-                          <h5 className="font-semibold text-sm">{option.title}</h5>
+              {/* Show Option Grid ONLY if no file has been selected/scanned yet */}
+              {!formData.coa_file && scannedAccounts.length === 0 && !isScanningCoa && !coaConfirmed && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    {
+                      id: "ai_recommender",
+                      title: "Dabby AI Recommender",
+                      desc: `Auto-generates COA tailored for ${formData.business_type} & ${formData.industry}`,
+                      badge: "Recommended",
+                      icon: BsStars
+                    },
+                    {
+                      id: "tally",
+                      title: "Tally Export Import",
+                      desc: "Upload Tally COA export file (CSV or Excel)",
+                      icon: BsFileEarmarkSpreadsheet
+                    },
+                    {
+                      id: "zoho_books",
+                      title: "Zoho Books Export",
+                      desc: "Import Chart of Accounts from Zoho Books export",
+                      icon: BsFileEarmarkSpreadsheet
+                    },
+                    {
+                      id: "quickbooks",
+                      title: "QuickBooks Export",
+                      desc: "Import Chart of Accounts from QuickBooks export",
+                      icon: BsFileEarmarkSpreadsheet
+                    },
+                    {
+                      id: "standard",
+                      title: "Standard Template",
+                      desc: "Default double-entry Accounting standard COA template",
+                      icon: BsJournalText
+                    }
+                  ].map((option) => {
+                    const Icon = option.icon;
+                    const selected = formData.coa_source === option.id;
+                    return (
+                      <div
+                        key={option.id}
+                        onClick={() => setFormData(prev => ({ ...prev, coa_source: option.id }))}
+                        className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                          selected
+                            ? "bg-teal-500/10 border-teal-500 text-white shadow-lg shadow-teal-500/10"
+                            : "bg-black/20 border-white/10 text-gray-300 hover:bg-white/5"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Icon className={`w-5 h-5 ${selected ? "text-teal-400" : "text-gray-400"}`} />
+                            <h5 className="font-semibold text-sm">{option.title}</h5>
+                          </div>
+                          {option.badge && (
+                            <span className="text-[10px] bg-gradient-to-r from-teal-500 to-cyan-500 text-white px-2 py-0.5 rounded-full font-medium">
+                              {option.badge}
+                            </span>
+                          )}
                         </div>
-                        {option.badge && (
-                          <span className="text-[10px] bg-gradient-to-r from-teal-500 to-cyan-500 text-white px-2 py-0.5 rounded-full font-medium">
-                            {option.badge}
-                          </span>
-                        )}
+                        <p className="text-xs text-gray-400 mt-2">{option.desc}</p>
                       </div>
-                      <p className="text-xs text-gray-400 mt-2">{option.desc}</p>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
 
-              {/* Drag & Drop File Upload & AI Scan Box */}
-              {["tally", "zoho_books", "quickbooks"].includes(formData.coa_source) && (
-                <div className="space-y-4">
-                  <div className="border-2 border-dashed border-teal-500/40 bg-teal-500/5 rounded-xl p-6 text-center space-y-2">
-                    <BsUpload className="w-8 h-8 text-teal-400 mx-auto" />
-                    <p className="text-sm font-medium text-white">
-                      Upload {formData.coa_source.replace("_", " ").toUpperCase()} Export File
-                    </p>
-                    <p className="text-xs text-gray-400">Supports .csv, .xlsx, .xls exports (e.g. Chart_of_Accounts.xlsx)</p>
-                    <input
-                      type="file"
-                      accept=".csv,.xlsx,.xls"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          handleCoaFileSelect(e.target.files[0]);
-                        }
-                      }}
-                      className="hidden"
-                      id="coa-file-input"
-                    />
-                    <label
-                      htmlFor="coa-file-input"
-                      className="inline-block px-4 py-2 bg-teal-500 hover:bg-teal-400 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-lg shadow-teal-500/20"
-                    >
-                      {formData.coa_file ? formData.coa_file.name : "Select & Scan File"}
-                    </label>
+              {/* Upload Box if file-based source selected & no file scanned yet */}
+              {["tally", "zoho_books", "quickbooks"].includes(formData.coa_source) && !formData.coa_file && !isScanningCoa && scannedAccounts.length === 0 && (
+                <div className="border-2 border-dashed border-teal-500/40 bg-teal-500/5 rounded-xl p-6 text-center space-y-2">
+                  <BsUpload className="w-8 h-8 text-teal-400 mx-auto" />
+                  <p className="text-sm font-medium text-white">
+                    Upload {formData.coa_source.replace("_", " ").toUpperCase()} Export File
+                  </p>
+                  <p className="text-xs text-gray-400">Supports .csv, .xlsx, .xls exports (e.g. Chart_of_Accounts.xlsx)</p>
+                  <input
+                    type="file"
+                    accept=".csv,.xlsx,.xls"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleCoaFileSelect(e.target.files[0]);
+                      }
+                    }}
+                    className="hidden"
+                    id="coa-file-input"
+                  />
+                  <label
+                    htmlFor="coa-file-input"
+                    className="inline-block px-4 py-2 bg-teal-500 hover:bg-teal-400 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-lg shadow-teal-500/20"
+                  >
+                    Select & Scan File
+                  </label>
+                </div>
+              )}
+
+              {/* Active File Header Banner when a file is selected */}
+              {(formData.coa_file || scannedAccounts.length > 0) && (
+                <div className="p-3.5 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center space-x-3 truncate">
+                    <div className="w-9 h-9 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center border border-teal-500/30 flex-shrink-0">
+                      <BsFileEarmarkSpreadsheet className="w-5 h-5" />
+                    </div>
+                    <div className="truncate">
+                      <p className="text-sm font-semibold text-white truncate">
+                        {formData.coa_file ? formData.coa_file.name : "Uploaded COA File"}
+                      </p>
+                      <p className="text-[11px] text-teal-400 uppercase tracking-wider font-mono">
+                        {formData.coa_source.replace("_", " ")} EXPORT
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Scanning State Spinner */}
-                  {isScanningCoa && (
-                    <div className="border border-teal-500/30 bg-teal-500/10 rounded-xl p-5 text-center space-y-3 animate-pulse">
-                      <div className="animate-spin w-8 h-8 border-3 border-teal-400 border-t-transparent rounded-full mx-auto" />
-                      <p className="text-sm font-semibold text-white">Scanning Chart of Accounts with Dabby AI...</p>
-                      <p className="text-xs text-gray-400">Analyzing ledgers and classifying into A, L, E, R, X account structures...</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, coa_file: null }));
+                      setScannedAccounts([]);
+                      setCoaConfirmed(false);
+                    }}
+                    className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white rounded-lg text-xs font-medium transition-colors flex-shrink-0 ml-2"
+                  >
+                    Change Source / File
+                  </button>
+                </div>
+              )}
+
+              {/* Scanning State Spinner */}
+              {isScanningCoa && (
+                <div className="border border-teal-500/30 bg-teal-500/10 rounded-xl p-6 text-center space-y-3 animate-pulse">
+                  <div className="animate-spin w-8 h-8 border-3 border-teal-400 border-t-transparent rounded-full mx-auto" />
+                  <p className="text-sm font-semibold text-white">Scanning Chart of Accounts with Dabby AI...</p>
+                  <p className="text-xs text-gray-400">Extracting ledgers and mapping to Dabby A, L, E, R, X account codes...</p>
+                </div>
+              )}
+
+              {/* Scanned Accounts Confirmation Preview Table */}
+              {scannedAccounts.length > 0 && !isScanningCoa && !coaConfirmed && (
+                <div className="border border-teal-500/40 bg-black/40 rounded-xl p-4 space-y-4 shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h5 className="text-sm font-bold text-teal-300">Scanned Chart of Accounts ({scannedAccounts.length} Ledgers Mapped)</h5>
+                      <p className="text-xs text-gray-400 mt-0.5">Please review the mapped account classes and codes below.</p>
                     </div>
-                  )}
+                    <span className="text-[11px] px-2.5 py-1 bg-amber-500/20 text-amber-300 rounded-lg border border-amber-500/30 font-medium">
+                      Confirmation Required
+                    </span>
+                  </div>
 
-                  {/* Scanned Accounts Confirmation Preview Panel */}
-                  {scannedAccounts.length > 0 && !isScanningCoa && !coaConfirmed && (
-                    <div className="border border-teal-500/40 bg-black/40 rounded-xl p-4 space-y-4 shadow-xl">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h5 className="text-sm font-bold text-teal-300">Scanned Chart of Accounts ({scannedAccounts.length} Ledgers Found)</h5>
-                          <p className="text-xs text-gray-400 mt-0.5">Please review the mapped account classes and codes below.</p>
-                        </div>
-                        <span className="text-[11px] px-2.5 py-1 bg-amber-500/20 text-amber-300 rounded-lg border border-amber-500/30 font-medium">
-                          Confirmation Required
-                        </span>
-                      </div>
+                  {/* Class Distribution Summary Badges */}
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className="px-2.5 py-1 bg-teal-500/20 text-teal-300 rounded-lg border border-teal-500/30 font-medium">
+                      Assets (A): {scannedAccounts.filter(a => a.account_class === 'Assets').length}
+                    </span>
+                    <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 rounded-lg border border-amber-500/30 font-medium">
+                      Liabilities (L): {scannedAccounts.filter(a => a.account_class === 'Liabilities').length}
+                    </span>
+                    <span className="px-2.5 py-1 bg-purple-500/20 text-purple-300 rounded-lg border border-purple-500/30 font-medium">
+                      Equity (E): {scannedAccounts.filter(a => a.account_class === 'Equity').length}
+                    </span>
+                    <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 rounded-lg border border-emerald-500/30 font-medium">
+                      Revenue (R): {scannedAccounts.filter(a => a.account_class === 'Revenue').length}
+                    </span>
+                    <span className="px-2.5 py-1 bg-rose-500/20 text-rose-300 rounded-lg border border-rose-500/30 font-medium">
+                      Expenses (X): {scannedAccounts.filter(a => a.account_class === 'Expenses').length}
+                    </span>
+                  </div>
 
-                      {/* Class Distribution Summary Badges */}
-                      <div className="flex flex-wrap gap-2 text-xs">
-                        <span className="px-2.5 py-1 bg-teal-500/20 text-teal-300 rounded-lg border border-teal-500/30 font-medium">
-                          Assets (A): {scannedAccounts.filter(a => a.account_class === 'Assets').length}
-                        </span>
-                        <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 rounded-lg border border-amber-500/30 font-medium">
-                          Liabilities (L): {scannedAccounts.filter(a => a.account_class === 'Liabilities').length}
-                        </span>
-                        <span className="px-2.5 py-1 bg-purple-500/20 text-purple-300 rounded-lg border border-purple-500/30 font-medium">
-                          Equity (E): {scannedAccounts.filter(a => a.account_class === 'Equity').length}
-                        </span>
-                        <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 rounded-lg border border-emerald-500/30 font-medium">
-                          Revenue (R): {scannedAccounts.filter(a => a.account_class === 'Revenue').length}
-                        </span>
-                        <span className="px-2.5 py-1 bg-rose-500/20 text-rose-300 rounded-lg border border-rose-500/30 font-medium">
-                          Expenses (X): {scannedAccounts.filter(a => a.account_class === 'Expenses').length}
-                        </span>
-                      </div>
+                  {/* Scrollable Accounts Table */}
+                  <div className="max-h-56 overflow-y-auto border border-white/10 rounded-lg bg-black/40">
+                    <table className="w-full text-xs text-left text-gray-300">
+                      <thead className="bg-white/5 uppercase text-[10px] text-gray-400 sticky top-0 backdrop-blur-sm">
+                        <tr>
+                          <th className="px-3 py-2">Full Code</th>
+                          <th className="px-3 py-2">Class</th>
+                          <th className="px-3 py-2">Group</th>
+                          <th className="px-3 py-2">Ledger Name</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {scannedAccounts.map((acc, idx) => (
+                          <tr key={idx} className="hover:bg-white/5">
+                            <td className="px-3 py-1.5 font-mono text-teal-400 font-semibold">{acc.full_code}</td>
+                            <td className="px-3 py-1.5">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                                acc.account_class === 'Assets' ? 'bg-teal-500/20 text-teal-300' :
+                                acc.account_class === 'Liabilities' ? 'bg-amber-500/20 text-amber-300' :
+                                acc.account_class === 'Equity' ? 'bg-purple-500/20 text-purple-300' :
+                                acc.account_class === 'Revenue' ? 'bg-emerald-500/20 text-emerald-300' :
+                                'bg-rose-500/20 text-rose-300'
+                              }`}>
+                                {acc.account_class}
+                              </span>
+                            </td>
+                            <td className="px-3 py-1.5 font-mono text-gray-300">{acc.group_code}</td>
+                            <td className="px-3 py-1.5 font-medium text-white">{acc.ledger}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
 
-                      {/* Scrollable Accounts Table */}
-                      <div className="max-h-48 overflow-y-auto border border-white/10 rounded-lg bg-black/30">
-                        <table className="w-full text-xs text-left text-gray-300">
-                          <thead className="bg-white/5 uppercase text-[10px] text-gray-400 sticky top-0 backdrop-blur-sm">
-                            <tr>
-                              <th className="px-3 py-2">Full Code</th>
-                              <th className="px-3 py-2">Class</th>
-                              <th className="px-3 py-2">Group</th>
-                              <th className="px-3 py-2">Ledger Name</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-white/5">
-                            {scannedAccounts.map((acc, idx) => (
-                              <tr key={idx} className="hover:bg-white/5">
-                                <td className="px-3 py-1.5 font-mono text-teal-400">{acc.full_code}</td>
-                                <td className="px-3 py-1.5">
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                                    acc.account_class === 'Assets' ? 'bg-teal-500/20 text-teal-300' :
-                                    acc.account_class === 'Liabilities' ? 'bg-amber-500/20 text-amber-300' :
-                                    acc.account_class === 'Equity' ? 'bg-purple-500/20 text-purple-300' :
-                                    acc.account_class === 'Revenue' ? 'bg-emerald-500/20 text-emerald-300' :
-                                    'bg-rose-500/20 text-rose-300'
-                                  }`}>
-                                    {acc.account_class}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-1.5 font-mono text-gray-300">{acc.group_code}</td>
-                                <td className="px-3 py-1.5 font-medium text-white">{acc.ledger}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Confirmation Controls */}
-                      <div className="pt-2 flex items-center justify-between border-t border-white/10">
-                        <p className="text-xs text-gray-300 font-medium">Confirm COA map for Company Master?</p>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setScannedAccounts([]);
-                              setCoaConfirmed(false);
-                            }}
-                            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg text-xs transition-colors"
-                          >
-                            Re-upload
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCoaConfirmed(true);
-                              toast.success("COA structure confirmed! Will seed Company Master on workbench creation.");
-                            }}
-                            className="px-4 py-1.5 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-white rounded-lg text-xs font-semibold shadow-lg shadow-teal-500/20 transition-all flex items-center gap-1"
-                          >
-                            <BsCheckCircleFill className="w-3.5 h-3.5" /> Yes, Confirm & Map
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Confirmed Banner */}
-                  {coaConfirmed && (
-                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <BsCheckCircleFill className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-                        <div>
-                          <h5 className="text-sm font-semibold text-emerald-300">
-                            COA Structure Confirmed ({scannedAccounts.length} Accounts Mapped)
-                          </h5>
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            Accounts will be populated in Company Master (A, L, E, R, X) when workbench is created.
-                          </p>
-                        </div>
-                      </div>
+                  {/* Confirmation Controls */}
+                  <div className="pt-2 flex items-center justify-between border-t border-white/10">
+                    <p className="text-xs text-gray-300 font-medium">Do you confirm this Chart of Accounts structure?</p>
+                    <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => setCoaConfirmed(false)}
-                        className="text-xs text-gray-400 hover:text-white underline ml-2"
+                        onClick={() => {
+                          setScannedAccounts([]);
+                          setCoaConfirmed(false);
+                          setFormData(prev => ({ ...prev, coa_file: null }));
+                        }}
+                        className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg text-xs transition-colors"
                       >
-                        Edit
+                        Re-upload File
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCoaConfirmed(true);
+                          toast.success("COA structure confirmed! Will seed Company Master on workbench creation.");
+                        }}
+                        className="px-4 py-1.5 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-white rounded-lg text-xs font-semibold shadow-lg shadow-teal-500/20 transition-all flex items-center gap-1.5"
+                      >
+                        <BsCheckCircleFill className="w-3.5 h-3.5" /> Yes, Confirm & Map COA
                       </button>
                     </div>
-                  )}
+                  </div>
+                </div>
+              )}
+
+              {/* Confirmed Banner */}
+              {coaConfirmed && (
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <BsCheckCircleFill className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                    <div>
+                      <h5 className="text-sm font-semibold text-emerald-300">
+                        COA Structure Confirmed ({scannedAccounts.length} Accounts Mapped)
+                      </h5>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Accounts will be populated in Company Master (A, L, E, R, X) when workbench is created.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCoaConfirmed(false)}
+                    className="text-xs text-gray-400 hover:text-white underline ml-2"
+                  >
+                    Edit
+                  </button>
                 </div>
               )}
             </div>
