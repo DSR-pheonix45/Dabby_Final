@@ -1579,9 +1579,21 @@ class AIService:
                 pdf_doc.close()
             except Exception as e:
                 print(f"[WARNING] PDF text extraction failed: {e}")
+        elif filename_lower.endswith((".xlsx", ".xls")):
+            try:
+                import pandas as pd
+                import io
+                df = pd.read_excel(io.BytesIO(file_bytes))
+                text_content = df.to_csv(index=False)
+            except Exception as xl_err:
+                print(f"[WARNING] Excel parsing failed: {xl_err}")
+                try:
+                    text_content = file_bytes.decode("utf-8", errors="ignore")
+                except Exception:
+                    pass
         else:
             try:
-                text_content = file_bytes.decode("utf-8")
+                text_content = file_bytes.decode("utf-8", errors="ignore")
             except Exception:
                 pass
         

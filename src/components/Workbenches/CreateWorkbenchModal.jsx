@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../hooks/useAuth";
 import { toast } from "react-hot-toast";
+import { accountService } from "../../services/accountService";
 import { 
   BsX, 
   BsBuilding, 
@@ -81,6 +82,11 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
+  // COA File AI Scanning State
+  const [isScanningCoa, setIsScanningCoa] = useState(false);
+  const [scannedAccounts, setScannedAccounts] = useState([]);
+  const [coaConfirmed, setCoaConfirmed] = useState(false);
+
   // Form state across 6 steps
   const [formData, setFormData] = useState({
     // Step 1: Basic Details
@@ -119,6 +125,44 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
   // State for member invite inputs
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("Accountant");
+
+  const handleCoaFileSelect = async (file) => {
+    if (!file) return;
+    setFormData(prev => ({ ...prev, coa_file: file }));
+    setIsScanningCoa(true);
+    setCoaConfirmed(false);
+    setScannedAccounts([]);
+
+    try {
+      const res = await accountService.importAccounts("temp-wb", file);
+      const raw = res.accounts || [];
+
+      const counters = {};
+      const mapped = raw.map((acc) => {
+        const cls = acc.account_class || "Assets";
+        const grp = acc.group_code || "ACO";
+        const clsPrefix = cls[0].toUpperCase();
+        if (!counters[grp]) counters[grp] = 0;
+        counters[grp]++;
+        const seq = String(counters[grp]).padStart(2, "0");
+        return {
+          account_class: cls,
+          group_code: grp,
+          full_code: `${clsPrefix}-${grp}-${seq}`,
+          ledger: acc.ledger,
+          label: acc.label || acc.ledger
+        };
+      });
+
+      setScannedAccounts(mapped);
+      toast.success(`Scanned ${mapped.length} accounts! Review and confirm mapping below.`);
+    } catch (err) {
+      console.error("AI COA import error:", err);
+      toast.error("Failed to scan COA file: " + (err.message || "Unknown error"));
+    } finally {
+      setIsScanningCoa(false);
+    }
+  };
 
   // Auto-toggle Tax tracking if Country is set to India
   useEffect(() => {
@@ -278,6 +322,23 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
           status: "active"
         })
         .catch(err => console.warn("Member insert warning:", err));
+
+      // Auto-insert scanned COA accounts into workbench_accounts (Company Master)
+      if (scannedAccounts.length > 0 && coaConfirmed) {
+        const coaRows = scannedAccounts.map(acc => ({
+          workbench_id: data.id,
+          account_class: acc.account_class,
+          group_code: acc.group_code,
+          full_code: acc.full_code,
+          ledger: acc.ledger,
+          label: acc.label,
+          current_balance: 0
+        }));
+        await supabase
+          .from("workbench_accounts")
+          .insert(coaRows)
+          .catch(err => console.warn("COA database seed error:", err));
+      }
 
       toast.success("Workbench created successfully!");
       if (onSuccess) onSuccess(data);
@@ -692,32 +753,161 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
                 })}
               </div>
 
-              {/* Drag & Drop File Upload Box if file-based source selected */}
+              {/* Drag & Drop File Upload & AI Scan Box */}
               {["tally", "zoho_books", "quickbooks"].includes(formData.coa_source) && (
-                <div className="border-2 border-dashed border-teal-500/40 bg-teal-500/5 rounded-xl p-6 text-center space-y-2">
-                  <BsUpload className="w-8 h-8 text-teal-400 mx-auto" />
-                  <p className="text-sm font-medium text-white">
-                    Upload {formData.coa_source.replace("_", " ").toUpperCase()} Export File
-                  </p>
-                  <p className="text-xs text-gray-400">Supports .csv, .xlsx, .xls exports</p>
-                  <input
-                    type="file"
-                    accept=".csv,.xlsx,.xls"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setFormData(prev => ({ ...prev, coa_file: e.target.files[0] }));
-                        toast.success(`Selected file: ${e.target.files[0].name}`);
-                      }
-                    }}
-                    className="hidden"
-                    id="coa-file-input"
-                  />
-                  <label
-                    htmlFor="coa-file-input"
-                    className="inline-block px-4 py-2 bg-teal-500 hover:bg-teal-400 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors"
-                  >
-                    {formData.coa_file ? formData.coa_file.name : "Browse File"}
-                  </label>
+                <div className="space-y-4">
+                  <div className="border-2 border-dashed border-teal-500/40 bg-teal-500/5 rounded-xl p-6 text-center space-y-2">
+                    <BsUpload className="w-8 h-8 text-teal-400 mx-auto" />
+                    <p className="text-sm font-medium text-white">
+                      Upload {formData.coa_source.replace("_", " ").toUpperCase()} Export File
+                    </p>
+                    <p className="text-xs text-gray-400">Supports .csv, .xlsx, .xls exports (e.g. Chart_of_Accounts.xlsx)</p>
+                    <input
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleCoaFileSelect(e.target.files[0]);
+                        }
+                      }}
+                      className="hidden"
+                      id="coa-file-input"
+                    />
+                    <label
+                      htmlFor="coa-file-input"
+                      className="inline-block px-4 py-2 bg-teal-500 hover:bg-teal-400 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-lg shadow-teal-500/20"
+                    >
+                      {formData.coa_file ? formData.coa_file.name : "Select & Scan File"}
+                    </label>
+                  </div>
+
+                  {/* Scanning State Spinner */}
+                  {isScanningCoa && (
+                    <div className="border border-teal-500/30 bg-teal-500/10 rounded-xl p-5 text-center space-y-3 animate-pulse">
+                      <div className="animate-spin w-8 h-8 border-3 border-teal-400 border-t-transparent rounded-full mx-auto" />
+                      <p className="text-sm font-semibold text-white">Scanning Chart of Accounts with Dabby AI...</p>
+                      <p className="text-xs text-gray-400">Analyzing ledgers and classifying into A, L, E, R, X account structures...</p>
+                    </div>
+                  )}
+
+                  {/* Scanned Accounts Confirmation Preview Panel */}
+                  {scannedAccounts.length > 0 && !isScanningCoa && !coaConfirmed && (
+                    <div className="border border-teal-500/40 bg-black/40 rounded-xl p-4 space-y-4 shadow-xl">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h5 className="text-sm font-bold text-teal-300">Scanned Chart of Accounts ({scannedAccounts.length} Ledgers Found)</h5>
+                          <p className="text-xs text-gray-400 mt-0.5">Please review the mapped account classes and codes below.</p>
+                        </div>
+                        <span className="text-[11px] px-2.5 py-1 bg-amber-500/20 text-amber-300 rounded-lg border border-amber-500/30 font-medium">
+                          Confirmation Required
+                        </span>
+                      </div>
+
+                      {/* Class Distribution Summary Badges */}
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <span className="px-2.5 py-1 bg-teal-500/20 text-teal-300 rounded-lg border border-teal-500/30 font-medium">
+                          Assets (A): {scannedAccounts.filter(a => a.account_class === 'Assets').length}
+                        </span>
+                        <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 rounded-lg border border-amber-500/30 font-medium">
+                          Liabilities (L): {scannedAccounts.filter(a => a.account_class === 'Liabilities').length}
+                        </span>
+                        <span className="px-2.5 py-1 bg-purple-500/20 text-purple-300 rounded-lg border border-purple-500/30 font-medium">
+                          Equity (E): {scannedAccounts.filter(a => a.account_class === 'Equity').length}
+                        </span>
+                        <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 rounded-lg border border-emerald-500/30 font-medium">
+                          Revenue (R): {scannedAccounts.filter(a => a.account_class === 'Revenue').length}
+                        </span>
+                        <span className="px-2.5 py-1 bg-rose-500/20 text-rose-300 rounded-lg border border-rose-500/30 font-medium">
+                          Expenses (X): {scannedAccounts.filter(a => a.account_class === 'Expenses').length}
+                        </span>
+                      </div>
+
+                      {/* Scrollable Accounts Table */}
+                      <div className="max-h-48 overflow-y-auto border border-white/10 rounded-lg bg-black/30">
+                        <table className="w-full text-xs text-left text-gray-300">
+                          <thead className="bg-white/5 uppercase text-[10px] text-gray-400 sticky top-0 backdrop-blur-sm">
+                            <tr>
+                              <th className="px-3 py-2">Full Code</th>
+                              <th className="px-3 py-2">Class</th>
+                              <th className="px-3 py-2">Group</th>
+                              <th className="px-3 py-2">Ledger Name</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/5">
+                            {scannedAccounts.map((acc, idx) => (
+                              <tr key={idx} className="hover:bg-white/5">
+                                <td className="px-3 py-1.5 font-mono text-teal-400">{acc.full_code}</td>
+                                <td className="px-3 py-1.5">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                                    acc.account_class === 'Assets' ? 'bg-teal-500/20 text-teal-300' :
+                                    acc.account_class === 'Liabilities' ? 'bg-amber-500/20 text-amber-300' :
+                                    acc.account_class === 'Equity' ? 'bg-purple-500/20 text-purple-300' :
+                                    acc.account_class === 'Revenue' ? 'bg-emerald-500/20 text-emerald-300' :
+                                    'bg-rose-500/20 text-rose-300'
+                                  }`}>
+                                    {acc.account_class}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-1.5 font-mono text-gray-300">{acc.group_code}</td>
+                                <td className="px-3 py-1.5 font-medium text-white">{acc.ledger}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Confirmation Controls */}
+                      <div className="pt-2 flex items-center justify-between border-t border-white/10">
+                        <p className="text-xs text-gray-300 font-medium">Confirm COA map for Company Master?</p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setScannedAccounts([]);
+                              setCoaConfirmed(false);
+                            }}
+                            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg text-xs transition-colors"
+                          >
+                            Re-upload
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCoaConfirmed(true);
+                              toast.success("COA structure confirmed! Will seed Company Master on workbench creation.");
+                            }}
+                            className="px-4 py-1.5 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-white rounded-lg text-xs font-semibold shadow-lg shadow-teal-500/20 transition-all flex items-center gap-1"
+                          >
+                            <BsCheckCircleFill className="w-3.5 h-3.5" /> Yes, Confirm & Map
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Confirmed Banner */}
+                  {coaConfirmed && (
+                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <BsCheckCircleFill className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                        <div>
+                          <h5 className="text-sm font-semibold text-emerald-300">
+                            COA Structure Confirmed ({scannedAccounts.length} Accounts Mapped)
+                          </h5>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            Accounts will be populated in Company Master (A, L, E, R, X) when workbench is created.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCoaConfirmed(false)}
+                        className="text-xs text-gray-400 hover:text-white underline ml-2"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
