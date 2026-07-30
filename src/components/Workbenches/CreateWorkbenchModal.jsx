@@ -1,39 +1,264 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../hooks/useAuth";
 import { toast } from "react-hot-toast";
-import { BsX } from "react-icons/bs";
+import { 
+  BsX, 
+  BsBuilding, 
+  BsGeoAlt, 
+  BsReceipt, 
+  BsJournalText, 
+  BsPeople, 
+  BsBoxSeam, 
+  BsChevronRight, 
+  BsChevronLeft, 
+  BsUpload, 
+  BsCopy, 
+  BsPersonPlus, 
+  BsStars, 
+  BsCheckCircleFill,
+  BsTrash,
+  BsFileEarmarkSpreadsheet
+} from "react-icons/bs";
+
+const STEPS = [
+  { id: 1, title: "Basic Details", icon: BsBuilding },
+  { id: 2, title: "Region & Financials", icon: BsGeoAlt },
+  { id: 3, title: "Taxes", icon: BsReceipt },
+  { id: 4, title: "COA Setup", icon: BsJournalText },
+  { id: 5, title: "Users & Roles", icon: BsPeople },
+  { id: 6, title: "Inventory", icon: BsBoxSeam }
+];
+
+const BUSINESS_TYPES = [
+  "Sole Proprietorship",
+  "Partnership",
+  "LLC",
+  "Corporation",
+  "Private Limited",
+  "LLP",
+  "Non-Profit"
+];
+
+const INDUSTRIES = [
+  "Software & Technology",
+  "Retail & E-commerce",
+  "Manufacturing & Production",
+  "Professional & Legal Services",
+  "Healthcare & Life Sciences",
+  "Real Estate & Construction",
+  "Financial Services & Banking",
+  "Food & Beverage",
+  "Others"
+];
+
+const SECTORS = [
+  "Technology",
+  "Retail & E-Commerce",
+  "Financial Services",
+  "Healthcare & Pharma",
+  "Manufacturing & Logistics",
+  "Construction & Real Estate",
+  "Education & Training",
+  "Media & Entertainment",
+  "Energy & Utilities",
+  "Others"
+];
+
+const COUNTRIES = [
+  { name: "India", code: "IN", currency: "INR" },
+  { name: "United States", code: "US", currency: "USD" },
+  { name: "United Kingdom", code: "UK", currency: "GBP" },
+  { name: "United Arab Emirates", code: "AE", currency: "AED" },
+  { name: "Singapore", code: "SG", currency: "SGD" },
+  { name: "Canada", code: "CA", currency: "CAD" },
+  { name: "Australia", code: "AU", currency: "AUD" },
+  { name: "Other", code: "OTHER", currency: "USD" }
+];
 
 export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
   const { user } = useAuth();
+  const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
+
+  // Form state across 6 steps
   const [formData, setFormData] = useState({
+    // Step 1: Basic Details
     name: "",
     legal_name: "",
-    country: "",
-    industry: "",
-    business_type: "",
+    business_type: "Private Limited",
+    industry: "Software & Technology",
+
+    // Step 2: Region & Financials
+    country: "India",
     currency: "INR",
-    fiscal_year_start: new Date().toISOString().split("T")[0],
+    sector: "Technology",
     books_start_date: new Date().toISOString().split("T")[0],
+    fiscal_year_start: new Date().toISOString().split("T")[0],
+    incorporation_date: "",
+
+    // Step 3: Taxes
+    tax_tracking_enabled: true,
+    cin: "",
+    gstin: "",
+    pan: "",
+
+    // Step 4: COA Creation / Import
+    coa_source: "ai_recommender", // 'ai_recommender', 'tally', 'zoho_books', 'quickbooks', 'standard'
+    coa_file: null,
+
+    // Step 5: Users & Roles
+    invited_members: [],
+
+    // Step 6: Inventory Module
+    inventory_required: false,
+    inventory_source: "manual", // 'tally', 'zoho_inventory', 'custom_crm', 'manual'
+    inventory_file: null
   });
+
+  // State for member invite inputs
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("Accountant");
+
+  // Auto-toggle Tax tracking if Country is set to India
+  useEffect(() => {
+    if (formData.country === "India" || formData.country === "IN") {
+      setFormData(prev => ({ ...prev, tax_tracking_enabled: true }));
+    }
+  }, [formData.country]);
 
   if (!isOpen) return null;
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value
+    }));
+  };
+
+  const handleCountryChange = (e) => {
+    const selectedCountry = e.target.value;
+    const countryObj = COUNTRIES.find(c => c.name === selectedCountry);
+    setFormData(prev => ({
+      ...prev,
+      country: selectedCountry,
+      currency: countryObj ? countryObj.currency : prev.currency,
+      tax_tracking_enabled: selectedCountry === "India"
+    }));
+  };
+
+  const addInviteMember = () => {
+    if (!inviteEmail.trim()) return;
+    if (!inviteEmail.includes("@")) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+    if (formData.invited_members.some(m => m.email.toLowerCase() === inviteEmail.trim().toLowerCase())) {
+      toast.error("This email has already been added");
+      return;
+    }
+    setFormData(prev => ({
+      ...prev,
+      invited_members: [...prev.invited_members, { email: inviteEmail.trim(), role: inviteRole }]
+    }));
+    setInviteEmail("");
+    toast.success(`Added ${inviteEmail} as ${inviteRole}`);
+  };
+
+  const removeInviteMember = (email) => {
+    setFormData(prev => ({
+      ...prev,
+      invited_members: prev.invited_members.filter(m => m.email !== email)
+    }));
+  };
+
+  const handleCopyLink = () => {
+    const link = `${window.location.origin}/invite/workbench?temp_ref=${Date.now()}`;
+    navigator.clipboard.writeText(link);
+    toast.success("Invite link copied to clipboard!");
+  };
+
+  const validateStep = (step) => {
+    if (step === 1) {
+      if (!formData.name.trim()) {
+        toast.error("Workbench Name is required");
+        return false;
+      }
+      if (!formData.business_type) {
+        toast.error("Please select a Business Type");
+        return false;
+      }
+      if (!formData.industry) {
+        toast.error("Please select an Industry");
+        return false;
+      }
+    }
+    if (step === 2) {
+      if (!formData.country) {
+        toast.error("Country is required");
+        return false;
+      }
+      if (!formData.currency) {
+        toast.error("Currency is required");
+        return false;
+      }
+      if (!formData.books_start_date) {
+        toast.error("Books Start Date is required");
+        return false;
+      }
+      if (!formData.fiscal_year_start) {
+        toast.error("Fiscal Year Start Date is required");
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const nextStep = () => {
+    if (validateStep(currentStep)) {
+      setCurrentStep(prev => Math.min(prev + 1, 6));
+    }
+  };
+
+  const prevStep = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) return;
+    if (!validateStep(1) || !validateStep(2)) return;
+
     setLoading(true);
 
     try {
-      const payload = { ...formData, created_by: user.id };
-      if (!payload.legal_name) {
-        payload.legal_name = null;
-      }
+      const payload = {
+        name: formData.name.trim(),
+        legal_name: formData.legal_name.trim() || null,
+        country: formData.country,
+        location: formData.country,
+        currency: formData.currency,
+        industry: formData.industry,
+        sector: formData.sector,
+        business_type: formData.business_type,
+        books_start_date: formData.books_start_date,
+        fiscal_year_start: formData.fiscal_year_start,
+        incorporation_date: formData.incorporation_date || null,
+        gstin: formData.gstin || null,
+        pan: formData.pan || null,
+        created_by: user.id,
+        settings: {
+          cin: formData.cin || null,
+          tax_tracking_enabled: formData.tax_tracking_enabled,
+          coa_source: formData.coa_source,
+          coa_file_name: formData.coa_file ? formData.coa_file.name : null,
+          invited_members: formData.invited_members,
+          inventory_required: formData.inventory_required,
+          inventory_source: formData.inventory_source,
+          inventory_file_name: formData.inventory_file ? formData.inventory_file.name : null,
+        }
+      };
 
       const { data, error } = await supabase
         .from("workbenches")
@@ -42,6 +267,17 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
         .single();
 
       if (error) throw error;
+
+      // Auto-assign owner in workbench_members
+      await supabase
+        .from("workbench_members")
+        .insert({
+          workbench_id: data.id,
+          user_id: user.id,
+          role: "owner",
+          status: "active"
+        })
+        .catch(err => console.warn("Member insert warning:", err));
 
       toast.success("Workbench created successfully!");
       if (onSuccess) onSuccess(data);
@@ -55,14 +291,19 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-[#0E1117] border border-[#1F242C] rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
+      <div className="bg-[#0E1117] border border-[#1F242C] rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh]">
         
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10 bg-black/20">
-          <h2 className="text-xl font-bold bg-gradient-to-r from-teal-400 to-cyan-500 bg-clip-text text-transparent">
-            Create New Workbench
-          </h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black/40">
+          <div>
+            <h2 className="text-xl font-bold bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent">
+              Create New Workbench
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Step {currentStep} of 6 — {STEPS[currentStep - 1].title}
+            </p>
+          </div>
           <button
             onClick={onClose}
             className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
@@ -71,156 +312,659 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
           </button>
         </div>
 
-        {/* Form Content */}
-        <div className="p-4 sm:p-6 overflow-y-auto">
-          <form id="create-workbench-form" onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Workbench Name <span className="text-red-500">*</span></label>
-              <input
-                type="text"
-                name="name"
-                required
-                value={formData.name}
-                onChange={handleChange}
-                placeholder="e.g. Acme Corp"
-                className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-colors"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Legal Name</label>
-              <input
-                type="text"
-                name="legal_name"
-                value={formData.legal_name}
-                onChange={handleChange}
-                placeholder="e.g. Acme Corporation Pvt. Ltd."
-                className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-colors"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Country <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  name="country"
-                  required
-                  value={formData.country}
-                  onChange={handleChange}
-                  placeholder="e.g. India"
-                  className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-colors"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Currency <span className="text-red-500">*</span></label>
-                <select
-                  name="currency"
-                  required
-                  value={formData.currency}
-                  onChange={handleChange}
-                  className="w-full bg-[#1A1D24] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-colors"
+        {/* Step Progress Indicator Bar */}
+        <div className="bg-black/30 border-b border-white/5 px-6 py-3">
+          <div className="flex items-center justify-between">
+            {STEPS.map((step) => {
+              const Icon = step.icon;
+              const isCompleted = currentStep > step.id;
+              const isCurrent = currentStep === step.id;
+              return (
+                <button
+                  key={step.id}
+                  type="button"
+                  onClick={() => {
+                    if (step.id < currentStep || validateStep(currentStep)) {
+                      setCurrentStep(step.id);
+                    }
+                  }}
+                  className={`flex flex-col items-center flex-1 transition-all ${
+                    isCurrent
+                      ? "text-teal-400 font-semibold scale-105"
+                      : isCompleted
+                      ? "text-cyan-500 hover:text-cyan-400"
+                      : "text-gray-600 hover:text-gray-400"
+                  }`}
                 >
-                  <option value="INR">INR (₹)</option>
-                  <option value="USD">USD ($)</option>
-                  <option value="EUR">EUR (€)</option>
-                  <option value="GBP">GBP (£)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Industry <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  name="industry"
-                  required
-                  value={formData.industry}
-                  onChange={handleChange}
-                  placeholder="e.g. Software, Retail"
-                  className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-colors"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Business Type <span className="text-red-500">*</span></label>
-                <select
-                  name="business_type"
-                  required
-                  value={formData.business_type}
-                  onChange={handleChange}
-                  className="w-full bg-[#1A1D24] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-colors"
-                >
-                  <option value="">Select Type</option>
-                  <option value="Sole Proprietorship">Sole Proprietorship</option>
-                  <option value="Partnership">Partnership</option>
-                  <option value="LLC">LLC</option>
-                  <option value="Corporation">Corporation</option>
-                  <option value="Private Limited">Private Limited</option>
-                  <option value="Non-Profit">Non-Profit</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Fiscal Year Start <span className="text-red-500">*</span></label>
-                <input
-                  type="date"
-                  name="fiscal_year_start"
-                  required
-                  value={formData.fiscal_year_start}
-                  onChange={handleChange}
-                  className="w-full bg-[#1A1D24] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-colors [color-scheme:dark]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Books Start Date <span className="text-red-500">*</span></label>
-                <input
-                  type="date"
-                  name="books_start_date"
-                  required
-                  value={formData.books_start_date}
-                  onChange={handleChange}
-                  className="w-full bg-[#1A1D24] border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-colors [color-scheme:dark]"
-                />
-              </div>
-            </div>
-          </form>
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm mb-1 transition-all ${
+                      isCurrent
+                        ? "bg-teal-500/20 border-2 border-teal-400 text-teal-300 shadow-lg shadow-teal-500/20"
+                        : isCompleted
+                        ? "bg-cyan-950 border border-cyan-500 text-cyan-400"
+                        : "bg-white/5 border border-white/10 text-gray-500"
+                    }`}
+                  >
+                    {isCompleted ? <BsCheckCircleFill className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
+                  </div>
+                  <span className="text-[10px] hidden sm:block text-center truncate max-w-[70px]">
+                    {step.title}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {/* Progress Bar Line */}
+          <div className="w-full bg-white/10 h-1 rounded-full mt-3 overflow-hidden">
+            <div
+              className="bg-gradient-to-r from-teal-500 to-cyan-400 h-full transition-all duration-300 ease-out"
+              style={{ width: `${(currentStep / 6) * 100}%` }}
+            />
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-white/10 bg-black/20 flex justify-end space-x-3">
+        {/* Step Body Content */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-5">
+          
+          {/* STEP 1: Basic Details */}
+          {currentStep === 1 && (
+            <div className="space-y-4 animate-fadeIn">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Workbench Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  required
+                  value={formData.name}
+                  onChange={handleChange}
+                  placeholder="e.g. Acme Corporation"
+                  className="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Legal Name <span className="text-xs text-gray-500">(Optional registered entity name)</span>
+                </label>
+                <input
+                  type="text"
+                  name="legal_name"
+                  value={formData.legal_name}
+                  onChange={handleChange}
+                  placeholder="e.g. Acme Technologies India Private Limited"
+                  className="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-colors"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Business Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="business_type"
+                    value={formData.business_type}
+                    onChange={handleChange}
+                    className="w-full bg-[#1A1D24] border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-teal-500 transition-colors"
+                  >
+                    {BUSINESS_TYPES.map(bt => (
+                      <option key={bt} value={bt}>{bt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Industry <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="industry"
+                    value={formData.industry}
+                    onChange={handleChange}
+                    className="w-full bg-[#1A1D24] border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-teal-500 transition-colors"
+                  >
+                    {INDUSTRIES.map(ind => (
+                      <option key={ind} value={ind}>{ind}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: Region & Financials */}
+          {currentStep === 2 && (
+            <div className="space-y-4 animate-fadeIn">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Country <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="country"
+                    value={formData.country}
+                    onChange={handleCountryChange}
+                    className="w-full bg-[#1A1D24] border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-teal-500 transition-colors"
+                  >
+                    {COUNTRIES.map(c => (
+                      <option key={c.name} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Currency <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="currency"
+                    value={formData.currency}
+                    onChange={handleChange}
+                    className="w-full bg-[#1A1D24] border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-teal-500 transition-colors"
+                  >
+                    <option value="INR">INR (₹)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="GBP">GBP (£)</option>
+                    <option value="AED">AED (د.إ)</option>
+                    <option value="CAD">CAD ($)</option>
+                    <option value="AUD">AUD ($)</option>
+                    <option value="SGD">SGD ($)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Sector <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="sector"
+                  value={formData.sector}
+                  onChange={handleChange}
+                  className="w-full bg-[#1A1D24] border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-teal-500 transition-colors"
+                >
+                  {SECTORS.map(sec => (
+                    <option key={sec} value={sec}>{sec}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-300 mb-1">
+                    Books Start Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="books_start_date"
+                    required
+                    value={formData.books_start_date}
+                    onChange={handleChange}
+                    className="w-full bg-[#1A1D24] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-teal-500 [color-scheme:dark]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-300 mb-1">
+                    Fiscal Year Start <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="fiscal_year_start"
+                    required
+                    value={formData.fiscal_year_start}
+                    onChange={handleChange}
+                    className="w-full bg-[#1A1D24] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-teal-500 [color-scheme:dark]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-300 mb-1">
+                    Incorporation Date
+                  </label>
+                  <input
+                    type="date"
+                    name="incorporation_date"
+                    value={formData.incorporation_date}
+                    onChange={handleChange}
+                    className="w-full bg-[#1A1D24] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-teal-500 [color-scheme:dark]"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: Taxes & Statutory Compliance */}
+          {currentStep === 3 && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="p-4 bg-teal-500/10 border border-teal-500/30 rounded-xl flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-semibold text-teal-300">Tax Tracking & Compliance</h4>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {formData.country === "India"
+                      ? "Tax tracking is automatically enabled for businesses in India (GST/PAN/CIN)."
+                      : "Enable tax compliance tracking and identification numbers for this workbench."}
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="tax_tracking_enabled"
+                    checked={formData.tax_tracking_enabled}
+                    onChange={handleChange}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-500"></div>
+                </label>
+              </div>
+
+              {formData.tax_tracking_enabled ? (
+                <div className="space-y-4 pt-2">
+                  <h5 className="text-xs font-semibold uppercase tracking-wider text-gray-400 border-b border-white/10 pb-2">
+                    Statutory Identifiers
+                  </h5>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      CIN <span className="text-xs text-gray-500">(Company Identification Number - 21 digits)</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="cin"
+                      value={formData.cin}
+                      onChange={handleChange}
+                      placeholder="e.g. U72200MH2023PTC123456"
+                      className="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-2.5 text-white uppercase placeholder-gray-500 focus:outline-none focus:border-teal-500 transition-colors font-mono text-sm"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        GSTIN <span className="text-xs text-gray-500">(GST Number)</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="gstin"
+                        value={formData.gstin}
+                        onChange={handleChange}
+                        placeholder="e.g. 27AAAAA0000A1Z5"
+                        className="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-2.5 text-white uppercase placeholder-gray-500 focus:outline-none focus:border-teal-500 transition-colors font-mono text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        PAN <span className="text-xs text-gray-500">(Permanent Account Number)</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="pan"
+                        value={formData.pan}
+                        onChange={handleChange}
+                        placeholder="e.g. AAAAA0000A"
+                        className="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-2.5 text-white uppercase placeholder-gray-500 focus:outline-none focus:border-teal-500 transition-colors font-mono text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 text-center bg-black/20 rounded-xl border border-white/5 text-gray-400">
+                  Tax tracking is currently disabled. You can configure statutory details later in Workbench Settings.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* STEP 4: COA Creation / Import */}
+          {currentStep === 4 && (
+            <div className="space-y-5 animate-fadeIn">
+              <div>
+                <h4 className="text-sm font-semibold text-white">Select Chart of Accounts (COA) Source</h4>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Choose how to initialize ledger accounts for this workbench.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  {
+                    id: "ai_recommender",
+                    title: "Dabby AI Recommender",
+                    desc: `Auto-generates COA tailored for ${formData.business_type} & ${formData.industry}`,
+                    badge: "Recommended",
+                    icon: BsStars
+                  },
+                  {
+                    id: "tally",
+                    title: "Tally Export Import",
+                    desc: "Upload Tally COA export file (CSV or Excel)",
+                    icon: BsFileEarmarkSpreadsheet
+                  },
+                  {
+                    id: "zoho_books",
+                    title: "Zoho Books Export",
+                    desc: "Import Chart of Accounts from Zoho Books export",
+                    icon: BsFileEarmarkSpreadsheet
+                  },
+                  {
+                    id: "quickbooks",
+                    title: "QuickBooks Export",
+                    desc: "Import Chart of Accounts from QuickBooks export",
+                    icon: BsFileEarmarkSpreadsheet
+                  },
+                  {
+                    id: "standard",
+                    title: "Standard Template",
+                    desc: "Default double-entry Accounting standard COA template",
+                    icon: BsJournalText
+                  }
+                ].map((option) => {
+                  const Icon = option.icon;
+                  const selected = formData.coa_source === option.id;
+                  return (
+                    <div
+                      key={option.id}
+                      onClick={() => setFormData(prev => ({ ...prev, coa_source: option.id }))}
+                      className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                        selected
+                          ? "bg-teal-500/10 border-teal-500 text-white shadow-lg shadow-teal-500/10"
+                          : "bg-black/20 border-white/10 text-gray-300 hover:bg-white/5"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Icon className={`w-5 h-5 ${selected ? "text-teal-400" : "text-gray-400"}`} />
+                          <h5 className="font-semibold text-sm">{option.title}</h5>
+                        </div>
+                        {option.badge && (
+                          <span className="text-[10px] bg-gradient-to-r from-teal-500 to-cyan-500 text-white px-2 py-0.5 rounded-full font-medium">
+                            {option.badge}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-2">{option.desc}</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Drag & Drop File Upload Box if file-based source selected */}
+              {["tally", "zoho_books", "quickbooks"].includes(formData.coa_source) && (
+                <div className="border-2 border-dashed border-teal-500/40 bg-teal-500/5 rounded-xl p-6 text-center space-y-2">
+                  <BsUpload className="w-8 h-8 text-teal-400 mx-auto" />
+                  <p className="text-sm font-medium text-white">
+                    Upload {formData.coa_source.replace("_", " ").toUpperCase()} Export File
+                  </p>
+                  <p className="text-xs text-gray-400">Supports .csv, .xlsx, .xls exports</p>
+                  <input
+                    type="file"
+                    accept=".csv,.xlsx,.xls"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setFormData(prev => ({ ...prev, coa_file: e.target.files[0] }));
+                        toast.success(`Selected file: ${e.target.files[0].name}`);
+                      }
+                    }}
+                    className="hidden"
+                    id="coa-file-input"
+                  />
+                  <label
+                    htmlFor="coa-file-input"
+                    className="inline-block px-4 py-2 bg-teal-500 hover:bg-teal-400 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                  >
+                    {formData.coa_file ? formData.coa_file.name : "Browse File"}
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* STEP 5: Users & Roles */}
+          {currentStep === 5 && (
+            <div className="space-y-5 animate-fadeIn">
+              <div>
+                <h4 className="text-sm font-semibold text-white">Team Members & Access Roles</h4>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  You are assigned as <span className="text-teal-400 font-semibold">Admin (Owner)</span>. Add or invite team members.
+                </p>
+              </div>
+
+              {/* Creator Card */}
+              <div className="p-3 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center font-bold text-xs border border-teal-500/30">
+                    {user?.email ? user.email.slice(0, 2).toUpperCase() : "ME"}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-white">{user?.email || "Current User"}</p>
+                    <p className="text-[11px] text-teal-400">Workbench Creator</p>
+                  </div>
+                </div>
+                <span className="text-xs font-semibold px-2.5 py-1 bg-teal-500/20 text-teal-300 rounded-lg border border-teal-500/30">
+                  Admin (Owner)
+                </span>
+              </div>
+
+              {/* Invite Member Inputs */}
+              <div className="space-y-3 pt-2">
+                <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  Invite Member via Email
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="teammate@company.com"
+                    className="flex-1 bg-black/30 border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-teal-500"
+                  />
+                  <select
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value)}
+                    className="bg-[#1A1D24] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-teal-500"
+                  >
+                    <option value="Admin">Admin</option>
+                    <option value="Accountant">Accountant</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Viewer">Viewer</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={addInviteMember}
+                    className="px-4 py-2 bg-teal-500 hover:bg-teal-400 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
+                  >
+                    <BsPersonPlus className="w-4 h-4" /> Add
+                  </button>
+                </div>
+              </div>
+
+              {/* Pending Invites List */}
+              {formData.invited_members.length > 0 && (
+                <div className="space-y-2">
+                  <h5 className="text-xs font-semibold text-gray-400">Pending Invitations</h5>
+                  <div className="space-y-2 max-h-36 overflow-y-auto">
+                    {formData.invited_members.map((m) => (
+                      <div key={m.email} className="p-2.5 bg-black/20 border border-white/10 rounded-lg flex items-center justify-between">
+                        <span className="text-sm text-gray-200">{m.email}</span>
+                        <div className="flex items-center space-x-3">
+                          <span className="text-xs text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/20">{m.role}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeInviteMember(m.email)}
+                            className="text-gray-500 hover:text-red-400 transition-colors"
+                          >
+                            <BsTrash className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Copy Invite Link Section */}
+              <div className="pt-2 border-t border-white/10">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h5 className="text-xs font-semibold text-gray-300">Invite via Link</h5>
+                    <p className="text-xs text-gray-400">Copy shareable link to invite team members later.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+                  >
+                    <BsCopy className="w-3.5 h-3.5" /> Copy Invite Link
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 6: Inventory Module */}
+          {currentStep === 6 && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="p-4 bg-gradient-to-r from-cyan-950/40 to-blue-950/40 border border-cyan-500/30 rounded-xl flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-semibold text-cyan-300">Inventory Management Module</h4>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Is the Inventory module required for managing stock, items, and warehouses?
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="inventory_required"
+                    checked={formData.inventory_required}
+                    onChange={handleChange}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
+                </label>
+              </div>
+
+              {formData.inventory_required ? (
+                <div className="space-y-4">
+                  <h5 className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                    Inventory Import & Source
+                  </h5>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { id: "tally", title: "Tally Inventory Export", desc: "Import item master & stock values from Tally" },
+                      { id: "zoho_inventory", title: "Zoho Inventory", desc: "Import stock items from Zoho Inventory CSV/Excel" },
+                      { id: "custom_crm", title: "Custom CRM/ERP CSV", desc: "Upload stock items in standard CSV format" },
+                      { id: "manual", title: "Setup Manually", desc: "Configure items and warehouses later in workspace" }
+                    ].map((opt) => {
+                      const selected = formData.inventory_source === opt.id;
+                      return (
+                        <div
+                          key={opt.id}
+                          onClick={() => setFormData(prev => ({ ...prev, inventory_source: opt.id }))}
+                          className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                            selected
+                              ? "bg-cyan-500/10 border-cyan-500 text-white"
+                              : "bg-black/20 border-white/10 text-gray-400 hover:bg-white/5"
+                          }`}
+                        >
+                          <h6 className="font-semibold text-xs text-white">{opt.title}</h6>
+                          <p className="text-[11px] text-gray-400 mt-1">{opt.desc}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {["tally", "zoho_inventory", "custom_crm"].includes(formData.inventory_source) && (
+                    <div className="border-2 border-dashed border-cyan-500/40 bg-cyan-500/5 rounded-xl p-5 text-center space-y-2">
+                      <BsUpload className="w-6 h-6 text-cyan-400 mx-auto" />
+                      <p className="text-xs font-medium text-white">
+                        Upload {formData.inventory_source.replace("_", " ").toUpperCase()} Inventory File
+                      </p>
+                      <input
+                        type="file"
+                        accept=".csv,.xlsx,.xls"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            setFormData(prev => ({ ...prev, inventory_file: e.target.files[0] }));
+                            toast.success(`Inventory File Selected: ${e.target.files[0].name}`);
+                          }
+                        }}
+                        className="hidden"
+                        id="inv-file-input"
+                      />
+                      <label
+                        htmlFor="inv-file-input"
+                        className="inline-block px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                      >
+                        {formData.inventory_file ? formData.inventory_file.name : "Select Inventory File"}
+                      </label>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-6 text-center bg-black/20 rounded-xl border border-white/5 text-gray-400 text-xs">
+                  Inventory module is currently disabled for this workbench. You can activate inventory tracking at any time from Settings.
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
+
+        {/* Footer Navigation Buttons */}
+        <div className="p-4 border-t border-white/10 bg-black/40 flex items-center justify-between">
           <button
             type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+            onClick={currentStep === 1 ? onClose : prevStep}
+            className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-1.5"
           >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            form="create-workbench-form"
-            disabled={loading}
-            className="px-6 py-2 text-sm font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-400 hover:to-cyan-500 rounded-lg transition-all shadow-lg shadow-teal-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-          >
-            {loading ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Creating...
-              </>
+            {currentStep === 1 ? (
+              "Cancel"
             ) : (
-              "Create Workbench"
+              <>
+                <BsChevronLeft className="w-4 h-4" /> Back
+              </>
             )}
           </button>
+
+          <div className="flex items-center space-x-3">
+            {currentStep < 6 ? (
+              <button
+                type="button"
+                onClick={nextStep}
+                className="px-6 py-2 text-sm font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-400 hover:to-cyan-500 rounded-lg transition-all shadow-lg shadow-teal-500/20 flex items-center gap-1.5"
+              >
+                Next <BsChevronRight className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={loading}
+                className="px-7 py-2 text-sm font-semibold text-white bg-gradient-to-r from-teal-500 via-cyan-500 to-blue-600 hover:from-teal-400 hover:to-blue-500 rounded-lg transition-all shadow-lg shadow-teal-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Creating Workbench...
+                  </>
+                ) : (
+                  "Create Workbench"
+                )}
+              </button>
+            )}
+          </div>
         </div>
+
       </div>
     </div>
   );
 }
+
