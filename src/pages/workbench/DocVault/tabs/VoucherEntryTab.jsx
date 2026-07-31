@@ -13,13 +13,51 @@ import {
   BsFileEarmarkSpreadsheet,
   BsArrowRightShort,
   BsShieldCheck,
-  BsDiagram3
+  BsDiagram3,
+  BsLink45Deg
 } from 'react-icons/bs';
 import { useWorkbench } from '../../../../context/WorkbenchContext';
 import { formatCurrency } from '../../../../utils/currency';
+import { apiFetch } from '../../../../lib/apiClient';
 
 export default function VoucherEntryTab({ doc }) {
   const { activeWorkbench } = useWorkbench();
+  const [mappedAccounts, setMappedAccounts] = useState({});
+  const [mappingLoading, setMappingLoading] = useState({});
+
+  const handleAccountMap = async (idx, isCredit, targetName, targetType) => {
+    if (!targetName) return;
+    setMappingLoading(prev => ({ ...prev, [idx]: true }));
+    try {
+      const res = await apiFetch('/api/ops/vouchers/map-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: activeWorkbench?.id,
+          voucher_type: isCredit ? 'receipt' : 'payment',
+          target_type: targetType,
+          target_account_name: targetName,
+          amount: 0
+        })
+      });
+      if (res?.status === 'success') {
+        setMappedAccounts(prev => ({
+          ...prev,
+          [idx]: {
+            targetName,
+            targetType,
+            entryText: res.posting?.entry_text,
+            labelId: res.label_id,
+            code: res.account?.account_code
+          }
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to map voucher account:', err);
+    } finally {
+      setMappingLoading(prev => ({ ...prev, [idx]: false }));
+    }
+  };
 
   const note = doc?.di_analysis_notes?.[0] || {};
   const ufo = note.extracted_data || {};
@@ -222,14 +260,14 @@ export default function VoucherEntryTab({ doc }) {
             </div>
           </section>
 
-          {/* 📑 SECTION 2: DERIVED VOUCHERS TABLE */}
+          {/* 📑 SECTION 2: DERIVED VOUCHERS TABLE WITH ACCOUNT MAPPING */}
           <section>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
                 <BsFileEarmarkSpreadsheet className="text-blue-400" />
                 Derived Transaction Vouchers ({transactions.length})
               </h3>
-              <span className="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded font-mono font-bold">Auto-Derived</span>
+              <span className="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded font-mono font-bold">Interactive COA Mapping</span>
             </div>
 
             <div className="bg-[#141414] border border-white/10 rounded-xl overflow-hidden">
@@ -241,19 +279,21 @@ export default function VoucherEntryTab({ doc }) {
                       <th className="py-2.5 px-3">Description / Particulars</th>
                       <th className="py-2.5 px-3">Voucher Type</th>
                       <th className="py-2.5 px-3">Accounting Entry</th>
+                      <th className="py-2.5 px-3">Map Target COA Account</th>
                       <th className="py-2.5 px-3 text-right">Amount</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 text-gray-300">
                     {transactions.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-6 text-center text-gray-500">No bank transactions extracted yet.</td>
+                        <td colSpan={6} className="py-6 text-center text-gray-500">No bank transactions extracted yet.</td>
                       </tr>
                     ) : (
                       transactions.map((tx, idx) => {
                         const isCredit = Number(tx.credit_amount || tx.credit || 0) > 0;
                         const amt = isCredit ? Number(tx.credit_amount || tx.credit) : Number(tx.debit_amount || tx.debit || 0);
                         const vType = isCredit ? 'Receipt Voucher' : 'Payment Voucher';
+                        const mapState = mappedAccounts[idx];
                         
                         return (
                           <tr key={idx} className="hover:bg-white/[0.02]">
@@ -265,11 +305,59 @@ export default function VoucherEntryTab({ doc }) {
                               </span>
                             </td>
                             <td className="py-2.5 px-3 text-gray-300 text-[11px]">
-                              {isCredit ? (
+                              {mapState?.entryText ? (
+                                <span className="text-teal-300 font-bold flex items-center gap-1">
+                                  <BsCheckCircleFill className="text-teal-400 text-[10px]" />
+                                  {mapState.entryText}
+                                </span>
+                              ) : isCredit ? (
                                 <span><strong className="text-teal-400">Dr Bank</strong> / Cr Accounts Receivable</span>
                               ) : (
                                 <span><strong className="text-rose-400">Dr Expense/AP</strong> / Cr Bank</span>
                               )}
+                            </td>
+                            {/* Interactive COA Mapping Selector */}
+                            <td className="py-2 px-3">
+                              <div className="flex items-center gap-2">
+                                <select 
+                                  value={mapState?.targetName || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (!val) return;
+                                    const type = isCredit 
+                                      ? (val.includes('Receivable') ? 'customer_ar' : 'revenue')
+                                      : (val.includes('Payable') ? 'vendor_ap' : val.includes('COGS') ? 'cogs' : 'expense');
+                                    handleAccountMap(idx, isCredit, val, type);
+                                  }}
+                                  className="bg-[#1a1a1a] text-xs text-gray-200 border border-white/10 rounded px-2 py-1 focus:outline-none focus:border-teal-500 font-sans"
+                                >
+                                  <option value="">-- Map Target Account --</option>
+                                  {isCredit ? (
+                                    <>
+                                      <option value="Accounts Receivable — Customer (AR)">👤 Accounts Receivable — Customer Invoice</option>
+                                      <option value="Sales Revenue Account">💰 Sales Revenue Account</option>
+                                      <option value="Consulting Revenue">📈 Consulting Revenue</option>
+                                      <option value="Interest & Financial Income">🏦 Interest & Financial Income</option>
+                                      <option value="Capital Investment / Equity">🏛️ Capital Investment / Share Equity</option>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <option value="Accounts Payable — Vendor (AP)">🏢 Accounts Payable — Vendor Bill</option>
+                                      <option value="Software & Subscriptions Expense">💻 Software & Subscriptions Expense</option>
+                                      <option value="Office Rent & Utilities">🏢 Office Rent & Utilities</option>
+                                      <option value="Salaries & Wages Expense">👥 Salaries & Wages Expense</option>
+                                      <option value="Cost of Goods Sold (COGS)">📦 Cost of Goods Sold (COGS)</option>
+                                      <option value="Travel & Business Expenses">✈️ Travel & Business Expenses</option>
+                                      <option value="Legal & Professional Fees">⚖️ Legal & Professional Fees</option>
+                                    </>
+                                  )}
+                                </select>
+                                {mapState?.mapped && (
+                                  <span className="text-[10px] text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded font-mono font-bold">
+                                    Mapped
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className={`py-2.5 px-3 text-right font-bold ${isCredit ? 'text-green-400' : 'text-rose-400'}`}>
                               {isCredit ? `+${formatCurrency(amt, country)}` : `-${formatCurrency(amt, country)}`}

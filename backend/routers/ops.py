@@ -683,3 +683,56 @@ async def list_workbench_entities(user_id: str):
     except Exception as e:
         print(f"[ERROR] list_workbench_entities: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class VoucherMappingRequest(BaseModel):
+    user_id: str
+    voucher_type: str  # 'payment' or 'receipt'
+    target_type: str   # 'expense', 'vendor_ap', 'customer_ar', 'revenue', 'cogs', 'asset'
+    target_account_name: str  # e.g. "Software Subscriptions", "Accounts Payable - Wetacre", "Sales Revenue"
+    sub_account_hint: Optional[str] = None
+    amount: float = 0.0
+
+@router.post("/vouchers/map-account")
+async def map_voucher_account(req: VoucherMappingRequest):
+    """
+    Explicitly maps a payment or receipt voucher line to a specific COA account, vendor AP, customer AR, or expense category.
+    Auto-provisions the exact label in user_accounts if it does not exist, and returns the resolved account ID and posting.
+    """
+    try:
+        label_id = ledger_service.get_or_create_exact_label(
+            user_id=req.user_id,
+            role=req.target_type,
+            account_name=req.target_account_name,
+            sub_account_hint=req.sub_account_hint
+        )
+        
+        # Resolve user_account details
+        acc_res = supabase.table("user_accounts").select("*, master_accounts(account_name)").eq("id", label_id).single().execute()
+        acc = acc_res.data or {}
+        
+        posting_summary = {}
+        if req.voucher_type.lower() == "payment":
+            posting_summary = {
+                "debit_account": acc.get("full_account_name", req.target_account_name),
+                "debit_label_id": label_id,
+                "credit_account": "Bank Account",
+                "entry_text": f"Dr {acc.get('full_account_name', req.target_account_name)} / Cr Bank Account"
+            }
+        else:
+            posting_summary = {
+                "debit_account": "Bank Account",
+                "credit_account": acc.get("full_account_name", req.target_account_name),
+                "credit_label_id": label_id,
+                "entry_text": f"Dr Bank Account / Cr {acc.get('full_account_name', req.target_account_name)}"
+            }
+            
+        return {
+            "status": "success",
+            "label_id": label_id,
+            "account": acc,
+            "posting": posting_summary
+        }
+    except Exception as e:
+        print(f"[ERROR] map_voucher_account: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
