@@ -86,6 +86,147 @@ class LedgerService:
         response = self.supabase.table("user_accounts").insert(insert_payload).execute()
         return response.data[0]
 
+    def get_or_create_exact_label(
+        self,
+        user_id: str,
+        role: str,
+        account_name: str,
+        sub_account_hint: Optional[str] = None
+    ) -> str:
+        """
+        Ensures an exact label (user_accounts) exists for the given workbench and role/name.
+        If a matching label exists, returns its ID.
+        If not, auto-provisions a new label under the appropriate Master & Sub account.
+        """
+        if not user_id or not account_name:
+            raise ValueError("user_id and account_name are required to resolve/create exact label")
+            
+        clean_name = account_name.strip()
+        
+        # 1. Look for existing account label by exact or substring match
+        try:
+            existing_res = self.supabase.table("user_accounts")\
+                .select("id, full_account_name")\
+                .eq("user_id", user_id)\
+                .eq("is_active", True)\
+                .execute()
+            
+            for acc in (existing_res.data or []):
+                fn = (acc.get("full_account_name") or "").strip()
+                if fn.lower() == clean_name.lower():
+                    return acc["id"]
+                # Substring match for counterparty name
+                if len(clean_name) > 3 and clean_name.lower() in fn.lower():
+                    return acc["id"]
+        except Exception as e:
+            print(f"[DEBUG] Error searching existing user_accounts: {e}")
+
+        # 2. Determine Master Pillar Name
+        role_lower = (role or "").lower()
+        if role_lower in ("asset", "ar", "bank", "cash", "input_gst", "input_tax_credit", "receivable"):
+            pillar_name = "ASSETS"
+        elif role_lower in ("liability", "ap", "output_gst", "tax_payable", "payable", "loans"):
+            pillar_name = "LIABILITIES"
+        elif role_lower in ("equity", "capital"):
+            pillar_name = "EQUITY"
+        elif role_lower in ("revenue", "income", "sales"):
+            pillar_name = "REVENUE"
+        else:
+            pillar_name = "EXPENSES"
+
+        # 3. Query Master Accounts & Sub-Accounts
+        try:
+            master_acc_res = self.supabase.table("master_accounts")\
+                .select("id, account_code")\
+                .eq("account_name", pillar_name)\
+                .limit(1)\
+                .execute()
+            
+            master_data = master_acc_res.data if master_acc_res.data else []
+            if not master_data:
+                # Fallback to any master account
+                master_data = self.supabase.table("master_accounts").select("id, account_code").limit(1).execute().data or []
+                
+            if master_data:
+                master_acc = master_data[0]
+                master_id = master_acc["id"]
+                master_code = master_acc["account_code"]
+                
+                master_subs_res = self.supabase.table("master_sub_accounts")\
+                    .select("id, sub_account_code, sub_account_name")\
+                    .eq("master_account_id", master_id)\
+                    .execute()
+                
+                subs = master_subs_res.data or []
+                selected_sub = None
+                
+                # Match sub_account_hint if provided
+                if sub_account_hint:
+                    selected_sub = next((s for s in subs if sub_account_hint.lower() in s["sub_account_name"].lower()), None)
+                    
+                # Match by role if hint not found
+                if not selected_sub:
+                    if role_lower in ("ar", "receivable"):
+                        selected_sub = next((s for s in subs if "receivable" in s["sub_account_name"].lower()), None)
+                    elif role_lower in ("ap", "payable"):
+                        selected_sub = next((s for s in subs if "payable" in s["sub_account_name"].lower()), None)
+                    elif role_lower in ("bank", "cash"):
+                        selected_sub = next((s for s in subs if "bank" in s["sub_account_name"].lower() or "cash" in s["sub_account_name"].lower()), None)
+                    elif role_lower in ("input_gst", "input_tax_credit"):
+                        selected_sub = next((s for s in subs if "gst" in s["sub_account_name"].lower() or "tax" in s["sub_account_name"].lower()), None)
+                    elif role_lower in ("output_gst", "tax_payable"):
+                        selected_sub = next((s for s in subs if "gst" in s["sub_account_name"].lower() or "tax" in s["sub_account_name"].lower()), None)
+                    elif role_lower == "revenue":
+                        selected_sub = next((s for s in subs if "operating" in s["sub_account_name"].lower() or "revenue" in s["sub_account_name"].lower()), None)
+                    elif role_lower == "expense":
+                        selected_sub = next((s for s in subs if "operating" in s["sub_account_name"].lower() or "cogs" in s["sub_account_name"].lower() or "expense" in s["sub_account_name"].lower()), None)
+
+                if not selected_sub and subs:
+                    selected_sub = subs[0]
+                    
+                if selected_sub:
+                    sub_id = selected_sub["id"]
+                    sub_code = selected_sub["sub_account_code"]
+
+                    account_code = f"{master_code}{sub_code}"[:4]
+                    existing_res = self.supabase.table("user_accounts").select("account_code").eq("user_id", user_id).execute()
+                    existing_codes = {row["account_code"] for row in (existing_res.data or [])}
+                    
+                    if account_code in existing_codes:
+                        for char in "123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0":
+                            cand = f"{master_code}{sub_code[:2]}{char}"[:4]
+                            if cand not in existing_codes:
+                                account_code = cand
+                                break
+
+                    insert_payload = {
+                        "user_id": user_id,
+                        "master_account_id": master_id,
+                        "master_sub_account_id": sub_id,
+                        "account_code": account_code,
+                        "full_account_name": clean_name,
+                        "description": f"Auto-provisioned label for {clean_name}",
+                        "current_amount": 0.0,
+                        "is_active": True
+                    }
+                    
+                    ins_res = self.supabase.table("user_accounts").insert(insert_payload).execute()
+                    if ins_res.data:
+                        print(f"[LedgerService] Provisioned exact label '{clean_name}' ({account_code}) for workbench {user_id}")
+                        return ins_res.data[0]["id"]
+        except Exception as err:
+            print(f"[ERROR] Failed to auto-provision exact label '{clean_name}': {err}")
+
+        # Fallback to any existing label in the workbench if insertion fails
+        try:
+            fb = self.supabase.table("user_accounts").select("id").eq("user_id", user_id).eq("is_active", True).limit(1).execute()
+            if fb.data:
+                return fb.data[0]["id"]
+        except Exception:
+            pass
+
+        raise RuntimeError(f"Could not resolve or create exact label for '{clean_name}'")
+
     async def get_labels(self, user_id: str, include_deleted: bool = False):
         """
         Fetches all workbench accounts (labels) for a workbench,

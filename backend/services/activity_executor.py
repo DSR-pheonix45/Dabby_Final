@@ -123,7 +123,25 @@ class ActivityExecutor:
                         pass
                 
                 if not label_id:
-                    # Last resort: find a default expense/revenue account in the workbench
+                    try:
+                        from services.ledger_service import LedgerService
+                        ls = LedgerService(supabase)
+                        target_name = activity.get("description") or trade.get("description") or trade.get("party_name") or "Operating Account"
+                        role_map = {
+                            "ADD_EXPENSE": "expense",
+                            "ADD_INPUT_GST": "input_gst",
+                            "ADD_REVENUE": "revenue",
+                            "ADD_OUTPUT_GST": "output_gst",
+                            "INCREASE_LABEL": "expense",
+                            "DECREASE_LABEL": "liability"
+                        }
+                        r = role_map.get(activity_type, "expense")
+                        label_id = ls.get_or_create_exact_label(user_id, r, target_name)
+                    except Exception as res_err:
+                        print(f"[ActivityExecutor] Label resolution error: {res_err}")
+
+                if not label_id:
+                    # Last resort fallback lookup
                     accs = supabase.table("user_accounts").select("id, full_account_name, master_accounts(account_name)").eq("user_id", user_id).eq("is_active", True).execute()
                     for acc in (accs.data or []):
                         master_name = (acc.get("master_accounts") or {}).get("account_name", "").lower()

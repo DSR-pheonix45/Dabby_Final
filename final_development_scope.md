@@ -22,24 +22,6 @@ flowchart TD
 
 ---
 
-## 🟢 What We Have Completed (100% Functional)
-
-### Phase 0: AI Extraction & Sync
-- **Supabase Realtime Sync:** The Doc Vault accurately reads from the `di_documents` table in Supabase.
-- **AI Engine (Groq):** Documents (Bank Statements, Invoices, Receipts) are sent to Groq and extracted into a structured, schema-agnostic JSON format.
-
-### Phase 1: Universal Financial Object (UFO) ✅ *(Just Completed)*
-- **The Problem:** The frontend UI and backend pipeline were previously reading raw AI JSON directly. This made the app fragile because AI occasionally hallucinates schema keys (e.g., nesting values under `{ value: '...', confidence: 0.99 }`).
-- **The Solution:** We introduced the `UFOMapper` utility in the backend. 
-- **Current State:** The AI output is now strictly flattened into deterministic database columns in the `di_analysis_notes` table: `document_type`, `parties`, `money`, `taxes`, `dates`, and `line_items`. The UI (Extracted Data Tab & Snippets Tab) reads perfectly from this reliable UFO contract.
-
-### Foundational UI
-- **Dynamic Extracted Data Tab:** Dynamically renders the UFO structure and allows the user to save edits back to Supabase.
-- **Snippets Tab:** Parses the `line_items` array (from Bank Statements) and renders verified transaction cards.
-- **Internationalization:** Complete dynamic currency formatting (`Intl` API) across the entire platform based on the Workbench's selected country.
-
----
-
 ## 🟡 Structurally Built but Incomplete (UI Mocked)
 
 These features have premium UI components built, but their underlying logic is disconnected or mocked:

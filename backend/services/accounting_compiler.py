@@ -99,6 +99,49 @@ class AccountingCompiler:
             except Exception:
                 pass
 
+        # Auto-provision exact labels for trade counterparty, revenue/expense, and taxes if not already mapped
+        try:
+            from services.ledger_service import LedgerService
+            ls = LedgerService(supabase)
+            party_name = trade.get("party_name") or trade.get("counterparty") or trade.get("description")
+            trade_type = trade.get("trade_type", "")
+            desc = trade.get("description") or trade_type
+
+            if trade_type in ("CUSTOMER_BILLED", "SALES_INVOICE"):
+                if not labels_map.get("asset"):
+                    ar_name = f"Accounts Receivable - {party_name}" if party_name else "Accounts Receivable"
+                    labels_map["asset"] = ls.get_or_create_exact_label(user_id, "ar", ar_name, "Accounts Receivable (AR)")
+                if not labels_map.get("revenue"):
+                    rev_name = desc if desc else "Sales Revenue"
+                    labels_map["revenue"] = ls.get_or_create_exact_label(user_id, "revenue", rev_name, "Operating Revenue")
+            elif trade_type in ("VENDOR_BILLED", "PURCHASE_BILL", "BILL"):
+                if not labels_map.get("liability"):
+                    ap_name = f"Accounts Payable - {party_name}" if party_name else "Accounts Payable"
+                    labels_map["liability"] = ls.get_or_create_exact_label(user_id, "ap", ap_name, "Accounts Payable (AP)")
+                if not labels_map.get("expense"):
+                    exp_name = desc if desc else "Operating Expenses"
+                    labels_map["expense"] = ls.get_or_create_exact_label(user_id, "expense", exp_name, "Operating Expenses (OPEX)")
+            elif trade_type in ("CUSTOMER_PAID", "CUSTOMER_PAYMENT", "PAYMENT_RECEIVED"):
+                if not labels_map.get("asset"):
+                    labels_map["asset"] = ls.get_or_create_exact_label(user_id, "bank", "Bank Account", "Bank Accounts")
+                if not labels_map.get("liability"):
+                    ar_name = f"Accounts Receivable - {party_name}" if party_name else "Accounts Receivable"
+                    labels_map["liability"] = ls.get_or_create_exact_label(user_id, "ar", ar_name, "Accounts Receivable (AR)")
+            elif trade_type in ("VENDOR_PAID", "VENDOR_PAYMENT", "PAYMENT_MADE"):
+                if not labels_map.get("liability"):
+                    ap_name = f"Accounts Payable - {party_name}" if party_name else "Accounts Payable"
+                    labels_map["liability"] = ls.get_or_create_exact_label(user_id, "ap", ap_name, "Accounts Payable (AP)")
+                if not labels_map.get("asset"):
+                    labels_map["asset"] = ls.get_or_create_exact_label(user_id, "bank", "Bank Account", "Bank Accounts")
+            elif trade_type in ("EXPENSE_PAID", "EXPENSE_INCURRED", "OPEX_EXPENSE"):
+                if not labels_map.get("expense"):
+                    exp_name = desc if desc else "Operating Expenses"
+                    labels_map["expense"] = ls.get_or_create_exact_label(user_id, "expense", exp_name, "Operating Expenses (OPEX)")
+                if not labels_map.get("asset"):
+                    labels_map["asset"] = ls.get_or_create_exact_label(user_id, "bank", "Bank Account", "Bank Accounts")
+        except Exception as prov_err:
+            print(f"[Compiler] Label auto-provisioning warning: {prov_err}")
+
         # ─── Pre-load ALL workbench account types for fallback label resolution ──
         # Priority for each posting: activity.target_id → labels_map[role] → typed_fallback[type]
         # If still unbalanced, the difference goes to Suspense (created on demand).
