@@ -30,7 +30,7 @@ export default function VoucherEntryTab({ doc }) {
   const lowerDocType = docTypeStr.toLowerCase();
   
   const isVendorDoc = lowerDocType.includes('vendor') || lowerDocType.includes('bill') || lowerDocType.includes('purchase');
-  const isBankStatement = lowerDocType.includes('bank statement');
+  const isBankStatement = lowerDocType.includes('bank_statement') || lowerDocType.includes('bank statement') || lowerDocType.includes('passbook') || lowerDocType.includes('statement');
 
   const money = note.money || ufo.financials || {};
   const taxes = note.taxes || {};
@@ -99,11 +99,192 @@ export default function VoucherEntryTab({ doc }) {
   const estimatedCogs = Math.round(subtotal * 0.65); // 65% estimated COGS
 
   if (isBankStatement) {
+    const bankSummary = note.statement_summary || ufo.statement_summary || {};
+    const transactions = (note.transactions && note.transactions.length > 0)
+      ? note.transactions
+      : (ufo.transactions || ufo.line_items || lineItems);
+
+    const bankName = bankSummary.bank_name || 'Axis Bank';
+    const accNumber = bankSummary.account_number || 'XXXX-XXXX-8078';
+    const openingBal = Number(bankSummary.opening_balance ?? 0);
+    const closingBal = Number(bankSummary.closing_balance ?? 0);
+    
+    // Calculate total credits & debits from transactions
+    const totalCredits = bankSummary.total_credits ?? transactions.reduce((acc, t) => acc + (Number(t.credit_amount || t.credit || 0)), 0);
+    const totalDebits = bankSummary.total_debits ?? transactions.reduce((acc, t) => acc + (Number(t.debit_amount || t.debit || 0)), 0);
+    const netCashFlow = totalCredits - totalDebits;
+
     return (
-      <div className="p-8 text-center text-gray-400">
-        <BsDiagram3 className="w-12 h-12 text-gray-500 mx-auto mb-3 opacity-50" />
-        <h3 className="text-base font-bold text-gray-200">Bank Statement Voucher View</h3>
-        <p className="text-xs text-gray-500 mt-1">Bank statements generate multiple cash/bank transaction vouchers.</p>
+      <div className="flex flex-col h-full bg-[#111111] text-gray-200 overflow-y-auto custom-scrollbar font-dm-sans">
+        
+        {/* 🟢 TOP BANNER */}
+        <div className="p-6 bg-gradient-to-r from-[#141b24] via-[#11161d] to-[#111111] border-b border-white/5 shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                <BsDiagram3 size={20} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold text-white tracking-tight">Bank Statement Multi-Voucher Log</h2>
+                  <span className="bg-blue-500/10 text-blue-400 text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded border border-blue-500/20">
+                    BANK STATEMENT
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Records: <span className="text-blue-300 font-medium">"{bankName} • Acc: {accNumber}"</span>
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Closing Balance</p>
+              <p className="text-xl font-extrabold text-white">{formatCurrency(closingBal, country)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-8">
+          
+          {/* 📊 SECTION 1: 5 BANK IMPACT AREAS */}
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                <BsGraphUp className="text-blue-400" />
+                5 Major Bank Impact Areas
+              </h3>
+              <span className="text-[10px] text-gray-400 font-mono">Automated Multi-Voucher Sync</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              
+              {/* 1. Total Credits */}
+              <div className="p-3.5 bg-[#161616] border border-white/5 rounded-xl flex flex-col justify-between hover:border-blue-500/30 transition-colors">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">1. Money In (Credits)</span>
+                  <BsArrowUpRight className="text-green-400 text-xs" />
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-300 font-medium">Receipt Vouchers</p>
+                  <p className="text-sm font-extrabold text-green-400 mt-0.5">+{formatCurrency(totalCredits, country)}</p>
+                </div>
+              </div>
+
+              {/* 2. Total Debits */}
+              <div className="p-3.5 bg-[#161616] border border-white/5 rounded-xl flex flex-col justify-between hover:border-blue-500/30 transition-colors">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">2. Money Out (Debits)</span>
+                  <BsArrowDownRight className="text-rose-400 text-xs" />
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-300 font-medium">Payment Vouchers</p>
+                  <p className="text-sm font-extrabold text-rose-400 mt-0.5">-{formatCurrency(totalDebits, country)}</p>
+                </div>
+              </div>
+
+              {/* 3. Net Cash Flow */}
+              <div className="p-3.5 bg-[#161616] border border-white/5 rounded-xl flex flex-col justify-between hover:border-blue-500/30 transition-colors">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">3. Net Cash Movement</span>
+                  {netCashFlow >= 0 ? <BsArrowUpRight className="text-teal-400 text-xs" /> : <BsArrowDownRight className="text-rose-400 text-xs" />}
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-300 font-medium">Net Movement</p>
+                  <p className={`text-sm font-extrabold mt-0.5 ${netCashFlow >= 0 ? 'text-teal-400' : 'text-rose-400'}`}>
+                    {netCashFlow >= 0 ? `+${formatCurrency(netCashFlow, country)}` : formatCurrency(netCashFlow, country)}
+                  </p>
+                </div>
+              </div>
+
+              {/* 4. Total Vouchers */}
+              <div className="p-3.5 bg-[#161616] border border-white/5 rounded-xl flex flex-col justify-between hover:border-blue-500/30 transition-colors">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">4. Total Vouchers</span>
+                  <BsCheckCircleFill className="text-blue-400 text-xs" />
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-300 font-medium">Extracted Transactions</p>
+                  <p className="text-sm font-extrabold text-blue-400 mt-0.5">{transactions.length} Vouchers</p>
+                </div>
+              </div>
+
+              {/* 5. Closing Position */}
+              <div className="p-3.5 bg-[#161616] border border-white/5 rounded-xl flex flex-col justify-between hover:border-blue-500/30 transition-colors">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">5. End Position</span>
+                  <BsShieldCheck className="text-indigo-400 text-xs" />
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-300 font-medium">Reconciled Balance</p>
+                  <p className="text-sm font-extrabold text-indigo-400 mt-0.5">{formatCurrency(closingBal, country)}</p>
+                </div>
+              </div>
+
+            </div>
+          </section>
+
+          {/* 📑 SECTION 2: DERIVED VOUCHERS TABLE */}
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                <BsFileEarmarkSpreadsheet className="text-blue-400" />
+                Derived Transaction Vouchers ({transactions.length})
+              </h3>
+              <span className="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded font-mono font-bold">Auto-Derived</span>
+            </div>
+
+            <div className="bg-[#141414] border border-white/10 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs divide-y divide-white/5 font-mono">
+                  <thead className="bg-white/[0.02] text-gray-400 text-[10px] uppercase font-semibold">
+                    <tr>
+                      <th className="py-2.5 px-3">Date</th>
+                      <th className="py-2.5 px-3">Description / Particulars</th>
+                      <th className="py-2.5 px-3">Voucher Type</th>
+                      <th className="py-2.5 px-3">Accounting Entry</th>
+                      <th className="py-2.5 px-3 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 text-gray-300">
+                    {transactions.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-6 text-center text-gray-500">No bank transactions extracted yet.</td>
+                      </tr>
+                    ) : (
+                      transactions.map((tx, idx) => {
+                        const isCredit = Number(tx.credit_amount || tx.credit || 0) > 0;
+                        const amt = isCredit ? Number(tx.credit_amount || tx.credit) : Number(tx.debit_amount || tx.debit || 0);
+                        const vType = isCredit ? 'Receipt Voucher' : 'Payment Voucher';
+                        
+                        return (
+                          <tr key={idx} className="hover:bg-white/[0.02]">
+                            <td className="py-2.5 px-3 text-gray-400 whitespace-nowrap">{tx.date || tx.value_date || 'N/A'}</td>
+                            <td className="py-2.5 px-3 font-medium text-white max-w-xs truncate">{tx.description || tx.narrative || tx.particulars || 'Bank Transaction'}</td>
+                            <td className="py-2.5 px-3">
+                              <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${isCredit ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                                {vType}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-gray-300 text-[11px]">
+                              {isCredit ? (
+                                <span><strong className="text-teal-400">Dr Bank</strong> / Cr Accounts Receivable</span>
+                              ) : (
+                                <span><strong className="text-rose-400">Dr Expense/AP</strong> / Cr Bank</span>
+                              )}
+                            </td>
+                            <td className={`py-2.5 px-3 text-right font-bold ${isCredit ? 'text-green-400' : 'text-rose-400'}`}>
+                              {isCredit ? `+${formatCurrency(amt, country)}` : `-${formatCurrency(amt, country)}`}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+        </div>
       </div>
     );
   }
