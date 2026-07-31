@@ -26,8 +26,11 @@ export default function VoucherEntryTab({ doc }) {
   
   // Flattened UFO properties with fallback
   const rawDocType = note.document_type || ufo.document_type || 'sales_invoice';
-  const docTypeStr = typeof rawDocType === 'object' ? rawDocType?.value : rawDocType;
-  const isBankStatement = (docTypeStr || '').toLowerCase().includes('bank statement');
+  const docTypeStr = (typeof rawDocType === 'object' ? rawDocType?.value : rawDocType) || 'sales_invoice';
+  const lowerDocType = docTypeStr.toLowerCase();
+  
+  const isVendorDoc = lowerDocType.includes('vendor') || lowerDocType.includes('bill') || lowerDocType.includes('purchase');
+  const isBankStatement = lowerDocType.includes('bank statement');
 
   const money = note.money || ufo.financials || {};
   const taxes = note.taxes || {};
@@ -54,7 +57,7 @@ export default function VoucherEntryTab({ doc }) {
 
   // Parties
   const seller = parties.issuer || parties.seller || parties.vendor || {
-    name: 'Archzona Partnership',
+    name: 'Wetacre Sustainable Solutions Private Limited',
     gstin: '27AAACA0000A1Z5',
     pan: 'AAACA0000A',
     address: '105, Prism Industrial Estate, Dombivli East, Maharashtra 421201',
@@ -63,7 +66,7 @@ export default function VoucherEntryTab({ doc }) {
   };
 
   const customer = parties.recipient || parties.customer || parties.buyer || {
-    name: 'ABC Pvt Ltd',
+    name: 'Datalis Private Limited',
     customer_code: 'CUST-8841',
     gstin: '27BBBCA1111B1Z2',
     address: 'Plot 42, MIDC Industrial Area, Andheri East, Mumbai 400093',
@@ -108,7 +111,7 @@ export default function VoucherEntryTab({ doc }) {
   return (
     <div className="flex flex-col h-full bg-[#111111] text-gray-200 overflow-y-auto custom-scrollbar font-dm-sans">
       
-      {/* 🟢 TOP BANNER — Sales Voucher Concept */}
+      {/* 🟢 TOP BANNER */}
       <div className="p-6 bg-gradient-to-r from-[#161d1a] via-[#121614] to-[#111111] border-b border-white/5 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -117,13 +120,17 @@ export default function VoucherEntryTab({ doc }) {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-white tracking-tight">Sales Voucher Entry</h2>
+                <h2 className="text-base font-bold text-white tracking-tight">
+                  {isVendorDoc ? 'Purchase / Vendor Voucher Entry' : 'Sales Voucher Entry'}
+                </h2>
                 <span className="bg-teal-500/10 text-teal-400 text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded border border-teal-500/20">
                   {docTypeStr.replace('_', ' ')}
                 </span>
               </div>
               <p className="text-xs text-gray-400 mt-0.5">
-                Records: <span className="text-teal-300 font-medium">"We sold goods/services to a customer."</span>
+                Records: <span className="text-teal-300 font-medium">
+                  {isVendorDoc ? '"We purchased goods/services from a vendor."' : '"We sold goods/services to a customer."'}
+                </span>
               </p>
             </div>
           </div>
@@ -148,38 +155,52 @@ export default function VoucherEntryTab({ doc }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             
-            {/* 1. Revenue */}
+            {/* 1. Revenue / Expense */}
             <div className="p-3.5 bg-[#161616] border border-white/5 rounded-xl flex flex-col justify-between hover:border-teal-500/30 transition-colors group">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">1. Revenue</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  {isVendorDoc ? '1. Expense' : '1. Revenue'}
+                </span>
                 <BsArrowUpRight className="text-green-400 text-xs" />
               </div>
               <div>
-                <p className="text-[11px] text-gray-300 font-medium">Sales Income</p>
+                <p className="text-[11px] text-gray-300 font-medium">
+                  {isVendorDoc ? 'Operating Expense' : 'Sales Income'}
+                </p>
                 <p className="text-sm font-extrabold text-green-400 mt-0.5">+{formatCurrency(subtotal, country)}</p>
               </div>
             </div>
 
-            {/* 2. Accounts Receivable */}
+            {/* 2. Vendor (AP) / Customer (AR) */}
             <div className="p-3.5 bg-[#161616] border border-white/5 rounded-xl flex flex-col justify-between hover:border-teal-500/30 transition-colors group">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">2. Customer (AR)</span>
-                <BsArrowUpRight className="text-teal-400 text-xs" />
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  {isVendorDoc ? '2. Vendor (AP)' : '2. Customer (AR)'}
+                </span>
+                <BsArrowUpRight className={isVendorDoc ? 'text-rose-400 text-xs' : 'text-teal-400 text-xs'} />
               </div>
               <div>
-                <p className="text-[11px] text-gray-300 font-medium">Customer Owes</p>
-                <p className="text-sm font-extrabold text-teal-400 mt-0.5">+{formatCurrency(grandTotal, country)}</p>
+                <p className="text-[11px] text-gray-300 font-medium">
+                  {isVendorDoc ? 'We Owe Vendor' : 'Customer Owes'}
+                </p>
+                <p className={`text-sm font-extrabold mt-0.5 ${isVendorDoc ? 'text-rose-400' : 'text-teal-400'}`}>
+                  +{formatCurrency(grandTotal, country)}
+                </p>
               </div>
             </div>
 
-            {/* 3. Tax Liability */}
+            {/* 3. Tax Liability / Credit */}
             <div className="p-3.5 bg-[#161616] border border-white/5 rounded-xl flex flex-col justify-between hover:border-teal-500/30 transition-colors group">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">3. Output GST</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  {isVendorDoc ? '3. Input GST' : '3. Output GST'}
+                </span>
                 <BsArrowUpRight className="text-amber-400 text-xs" />
               </div>
               <div>
-                <p className="text-[11px] text-gray-300 font-medium">Tax Payable</p>
+                <p className="text-[11px] text-gray-300 font-medium">
+                  {isVendorDoc ? 'Input Tax Credit' : 'Tax Payable'}
+                </p>
                 <p className="text-sm font-extrabold text-amber-400 mt-0.5">+{formatCurrency(totalTax, country)}</p>
               </div>
             </div>
@@ -188,23 +209,33 @@ export default function VoucherEntryTab({ doc }) {
             <div className="p-3.5 bg-[#161616] border border-white/5 rounded-xl flex flex-col justify-between hover:border-teal-500/30 transition-colors group">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">4. Inventory</span>
-                <BsArrowDownRight className="text-rose-400 text-xs" />
+                {isVendorDoc ? <BsArrowUpRight className="text-teal-400 text-xs" /> : <BsArrowDownRight className="text-rose-400 text-xs" />}
               </div>
               <div>
-                <p className="text-[11px] text-gray-300 font-medium">Stock Decreases</p>
-                <p className="text-sm font-extrabold text-rose-400 mt-0.5">-{totalQty} Units</p>
+                <p className="text-[11px] text-gray-300 font-medium">
+                  {isVendorDoc ? 'Stock Increases' : 'Stock Decreases'}
+                </p>
+                <p className={`text-sm font-extrabold mt-0.5 ${isVendorDoc ? 'text-teal-400' : 'text-rose-400'}`}>
+                  {isVendorDoc ? `+${totalQty} Units` : `-${totalQty} Units`}
+                </p>
               </div>
             </div>
 
-            {/* 5. COGS */}
+            {/* 5. COGS / Accrual */}
             <div className="p-3.5 bg-[#161616] border border-white/5 rounded-xl flex flex-col justify-between hover:border-teal-500/30 transition-colors group">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">5. COGS</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  {isVendorDoc ? '5. Payable Liability' : '5. COGS'}
+                </span>
                 <BsArrowUpRight className="text-indigo-400 text-xs" />
               </div>
               <div>
-                <p className="text-[11px] text-gray-300 font-medium">Cost Expense</p>
-                <p className="text-sm font-extrabold text-indigo-400 mt-0.5">+{formatCurrency(estimatedCogs, country)}</p>
+                <p className="text-[11px] text-gray-300 font-medium">
+                  {isVendorDoc ? 'Accrued Payable' : 'Cost Expense'}
+                </p>
+                <p className="text-sm font-extrabold text-indigo-400 mt-0.5">
+                  +{formatCurrency(isVendorDoc ? grandTotal : estimatedCogs, country)}
+                </p>
               </div>
             </div>
 
@@ -223,74 +254,131 @@ export default function VoucherEntryTab({ doc }) {
 
           <div className="space-y-4">
             
-            {/* Revenue Entry Card */}
+            {/* Primary Entry Card */}
             <div className="bg-[#141414] border border-white/10 rounded-xl overflow-hidden">
               <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5 flex items-center justify-between">
                 <span className="text-xs font-bold text-white flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-teal-400"></span>
-                  Entry 1: Revenue & Receivables Entry
+                  {isVendorDoc ? 'Entry 1: Purchase Expense & Vendor Payable Entry' : 'Entry 1: Revenue & Receivables Entry'}
                 </span>
                 <span className="text-[10px] text-gray-400 font-mono">Invoice Date: {invoiceDate}</span>
               </div>
               
               <div className="p-4 space-y-2 text-xs font-mono">
-                {/* Debit Line */}
-                <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                  <div className="flex items-center gap-3">
-                    <span className="px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold text-[10px]">Dr</span>
-                    <span className="text-gray-200 font-bold">Accounts Receivable — {customer.name}</span>
-                  </div>
-                  <span className="text-teal-400 font-bold">{formatCurrency(grandTotal, country)}</span>
-                </div>
+                {isVendorDoc ? (
+                  <>
+                    {/* Debit Expense */}
+                    <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                      <div className="flex items-center gap-3">
+                        <span className="px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold text-[10px]">Dr</span>
+                        <span className="text-gray-200 font-bold">Operating Expense / Purchase Account</span>
+                      </div>
+                      <span className="text-teal-400 font-bold">{formatCurrency(subtotal, country)}</span>
+                    </div>
 
-                {/* Credit Revenue Line */}
-                <div className="flex justify-between items-center py-1.5 border-b border-white/5 pl-6">
-                  <div className="flex items-center gap-3">
-                    <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-bold text-[10px]">Cr</span>
-                    <span className="text-gray-300">Sales Revenue Account</span>
-                  </div>
-                  <span className="text-gray-300">{formatCurrency(subtotal, country)}</span>
-                </div>
+                    {/* Debit Input GST */}
+                    <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                      <div className="flex items-center gap-3">
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px]">Dr</span>
+                        <span className="text-gray-200 font-bold">Input GST Credit Account (18%)</span>
+                      </div>
+                      <span className="text-amber-400 font-bold">{formatCurrency(totalTax, country)}</span>
+                    </div>
 
-                {/* Credit GST Line */}
-                <div className="flex justify-between items-center py-1.5 pl-6">
-                  <div className="flex items-center gap-3">
-                    <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-bold text-[10px]">Cr</span>
-                    <span className="text-gray-300">Output GST Payable (18%)</span>
-                  </div>
-                  <span className="text-gray-300">{formatCurrency(totalTax, country)}</span>
-                </div>
+                    {/* Credit Vendor Payable Line */}
+                    <div className="flex justify-between items-center py-1.5 pl-6">
+                      <div className="flex items-center gap-3">
+                        <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-bold text-[10px]">Cr</span>
+                        <span className="text-gray-300 font-bold">Accounts Payable — {seller.name}</span>
+                      </div>
+                      <span className="text-rose-400 font-bold">{formatCurrency(grandTotal, country)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Debit Line */}
+                    <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                      <div className="flex items-center gap-3">
+                        <span className="px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold text-[10px]">Dr</span>
+                        <span className="text-gray-200 font-bold">Accounts Receivable — {customer.name}</span>
+                      </div>
+                      <span className="text-teal-400 font-bold">{formatCurrency(grandTotal, country)}</span>
+                    </div>
+
+                    {/* Credit Revenue Line */}
+                    <div className="flex justify-between items-center py-1.5 border-b border-white/5 pl-6">
+                      <div className="flex items-center gap-3">
+                        <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-bold text-[10px]">Cr</span>
+                        <span className="text-gray-300">Sales Revenue Account</span>
+                      </div>
+                      <span className="text-gray-300">{formatCurrency(subtotal, country)}</span>
+                    </div>
+
+                    {/* Credit GST Line */}
+                    <div className="flex justify-between items-center py-1.5 pl-6">
+                      <div className="flex items-center gap-3">
+                        <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-bold text-[10px]">Cr</span>
+                        <span className="text-gray-300">Output GST Payable (18%)</span>
+                      </div>
+                      <span className="text-gray-300">{formatCurrency(totalTax, country)}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Inventory & COGS Entry Card */}
+            {/* Inventory Entry Card */}
             <div className="bg-[#141414] border border-white/10 rounded-xl overflow-hidden">
               <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5 flex items-center justify-between">
                 <span className="text-xs font-bold text-white flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
-                  Entry 2: Cost of Goods Sold & Inventory Asset Entry
+                  {isVendorDoc ? 'Entry 2: Stock Receipt & Inventory Asset Entry' : 'Entry 2: Cost of Goods Sold & Inventory Asset Entry'}
                 </span>
                 <span className="text-[10px] text-gray-400 font-mono">Stock Movement</span>
               </div>
               
               <div className="p-4 space-y-2 text-xs font-mono">
-                {/* Debit COGS */}
-                <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                  <div className="flex items-center gap-3">
-                    <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold text-[10px]">Dr</span>
-                    <span className="text-gray-200 font-bold">Cost of Goods Sold (COGS Expense)</span>
-                  </div>
-                  <span className="text-indigo-400 font-bold">{formatCurrency(estimatedCogs, country)}</span>
-                </div>
+                {isVendorDoc ? (
+                  <>
+                    {/* Debit Inventory */}
+                    <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                      <div className="flex items-center gap-3">
+                        <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold text-[10px]">Dr</span>
+                        <span className="text-gray-200 font-bold">Inventory Stock Asset Account</span>
+                      </div>
+                      <span className="text-indigo-400 font-bold">{formatCurrency(subtotal, country)}</span>
+                    </div>
 
-                {/* Credit Inventory */}
-                <div className="flex justify-between items-center py-1.5 pl-6">
-                  <div className="flex items-center gap-3">
-                    <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-bold text-[10px]">Cr</span>
-                    <span className="text-gray-300">Inventory Stock Asset Account</span>
-                  </div>
-                  <span className="text-gray-300">{formatCurrency(estimatedCogs, country)}</span>
-                </div>
+                    {/* Credit Clearing */}
+                    <div className="flex justify-between items-center py-1.5 pl-6">
+                      <div className="flex items-center gap-3">
+                        <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-bold text-[10px]">Cr</span>
+                        <span className="text-gray-300">Unbilled Inventory Clearing / Purchases</span>
+                      </div>
+                      <span className="text-gray-300">{formatCurrency(subtotal, country)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Debit COGS */}
+                    <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                      <div className="flex items-center gap-3">
+                        <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold text-[10px]">Dr</span>
+                        <span className="text-gray-200 font-bold">Cost of Goods Sold (COGS Expense)</span>
+                      </div>
+                      <span className="text-indigo-400 font-bold">{formatCurrency(estimatedCogs, country)}</span>
+                    </div>
+
+                    {/* Credit Inventory */}
+                    <div className="flex justify-between items-center py-1.5 pl-6">
+                      <div className="flex items-center gap-3">
+                        <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-bold text-[10px]">Cr</span>
+                        <span className="text-gray-300">Inventory Stock Asset Account</span>
+                      </div>
+                      <span className="text-gray-300">{formatCurrency(estimatedCogs, country)}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -378,14 +466,14 @@ export default function VoucherEntryTab({ doc }) {
                 </div>
               </div>
 
-              {/* 3. CUSTOMER */}
+              {/* 3. CUSTOMER / RECIPIENT */}
               <div className="bg-[#141414] border border-white/5 rounded-xl p-4 space-y-2 text-xs">
                 <h4 className="text-xs font-bold text-teal-400 flex items-center gap-2 mb-2">
-                  <BsPersonBadge size={14} /> 3. Customer (Accounts Receivable)
+                  <BsPersonBadge size={14} /> {isVendorDoc ? '3. Buyer / Billed-To (Accounts Payable)' : '3. Customer (Accounts Receivable)'}
                 </h4>
                 <div className="flex justify-between">
                   <div>
-                    <p className="text-[10px] text-gray-400">Customer Name</p>
+                    <p className="text-[10px] text-gray-400">{isVendorDoc ? 'Buyer Name' : 'Customer Name'}</p>
                     <p className="font-bold text-white">{customer.name}</p>
                   </div>
                   <span className="text-[10px] font-mono text-gray-400 bg-white/5 px-2 py-0.5 rounded">{customer.customer_code}</span>
@@ -479,7 +567,7 @@ export default function VoucherEntryTab({ doc }) {
               {/* 6. PAYMENT TERMS */}
               <div className="bg-[#141414] border border-white/5 rounded-xl p-4 space-y-3 text-xs">
                 <h4 className="text-xs font-bold text-teal-400 flex items-center gap-2 mb-2">
-                  <BsCalendarCheck size={14} /> 6. Payment Terms & Receivables
+                  <BsCalendarCheck size={14} /> {isVendorDoc ? '6. Payment Terms & Payables' : '6. Payment Terms & Receivables'}
                 </h4>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
