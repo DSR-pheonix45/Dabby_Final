@@ -140,7 +140,7 @@ export function generateStandardCoa({ country } = {}) {
   return accounts.map((acc) => {
     const cls = acc.account_class;
     const grp = acc.group_code;
-    const clsPrefix = cls[0].toUpperCase();
+    const clsPrefix = (cls === "Expenses" || cls === "Expense") ? "X" : cls[0].toUpperCase();
     if (!counters[grp]) counters[grp] = 0;
     counters[grp]++;
     const seq = String(counters[grp]).padStart(2, "0");
@@ -364,7 +364,7 @@ export function generateAiRecommendedCoa({ business_type, industry, sector, coun
   return accounts.map((acc) => {
     const cls = acc.account_class;
     const grp = acc.group_code;
-    const clsPrefix = cls[0].toUpperCase();
+    const clsPrefix = (cls === "Expenses" || cls === "Expense") ? "X" : cls[0].toUpperCase();
     if (!counters[grp]) counters[grp] = 0;
     counters[grp]++;
     const seq = String(counters[grp]).padStart(2, "0");
@@ -470,7 +470,7 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
 
     const cls = newAccClass || "Expenses";
     const grp = newAccGroup || "XAD";
-    const clsPrefix = cls[0].toUpperCase();
+    const clsPrefix = (cls === "Expenses" || cls === "Expense") ? "X" : cls[0].toUpperCase();
 
     const existingInGroup = scannedAccounts.filter(a => a.group_code === grp);
     const nextSeqNum = existingInGroup.length + 1;
@@ -614,7 +614,7 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
     const mapped = raw.map((acc) => {
       const cls = acc.account_class || "Assets";
       const grp = acc.group_code || "ACO";
-      const clsPrefix = cls[0].toUpperCase();
+      const clsPrefix = (cls === "Expenses" || cls === "Expense") ? "X" : cls[0].toUpperCase();
       if (!counters[grp]) counters[grp] = 0;
       counters[grp]++;
       const seq = String(counters[grp]).padStart(2, "0");
