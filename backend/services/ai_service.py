@@ -1640,7 +1640,7 @@ class AIService:
         if text_content and len(text_content.strip()) > 30:
             from services.groq_pool import GroqPool
             try:
-                user_msg = f"Document Filename: {filename}\nContent:\n{text_content[:80000]}"
+                user_msg = f"Document Filename: {filename}\nContent (Respond in JSON format):\n{text_content[:80000]}"
                 completion = GroqPool.execute(
                     lambda client: client.chat.completions.create(
                         model="llama-3.3-70b-versatile",
