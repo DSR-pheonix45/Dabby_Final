@@ -799,18 +799,21 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
       if (error) throw error;
 
       // Auto-assign owner in workbench_members
-      await supabase
-        .from("workbench_members")
-        .insert({
-          workbench_id: data.id,
-          user_id: user.id,
-          role: "owner",
-          status: "active"
-        })
-        .catch(err => console.warn("Member insert warning:", err));
+      try {
+        await supabase
+          .from("workbench_members")
+          .insert({
+            workbench_id: data.id,
+            user_id: user.id,
+            role: "owner",
+            status: "active"
+          });
+      } catch (memberErr) {
+        console.warn("Member insert warning:", memberErr);
+      }
 
       // Auto-insert scanned COA accounts into workbench_accounts (Company Master)
-      if (scannedAccounts.length > 0 && coaConfirmed) {
+      if (scannedAccounts.length > 0 && (coaConfirmed || formData.coa_source === "ai_recommender" || formData.coa_source === "standard")) {
         const coaRows = scannedAccounts.map(acc => ({
           workbench_id: data.id,
           account_class: acc.account_class,
@@ -820,10 +823,13 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
           label: acc.label,
           current_balance: 0
         }));
-        await supabase
-          .from("workbench_accounts")
-          .insert(coaRows)
-          .catch(err => console.warn("COA database seed error:", err));
+        try {
+          await supabase
+            .from("workbench_accounts")
+            .insert(coaRows);
+        } catch (coaErr) {
+          console.warn("COA database seed error:", coaErr);
+        }
       }
 
       toast.success("Workbench created successfully!");
