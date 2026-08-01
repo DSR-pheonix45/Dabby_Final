@@ -14,10 +14,29 @@ class GroqPool:
         try:
             res = supabase.table("groq_api_keys") \
                 .select("*") \
-                .eq("status", "active") \
+                .neq("status", "invalid") \
                 .order("last_used_at", nullsfirst=True) \
                 .execute()
-            return res.data or []
+            raw_keys = res.data or []
+            now = datetime.datetime.now(datetime.timezone.utc)
+            valid_keys = []
+            for k in raw_keys:
+                status = k.get("status")
+                if status == "active":
+                    valid_keys.append(k)
+                elif status == "rate_limited":
+                    last_used_str = k.get("last_used_at")
+                    if last_used_str:
+                        try:
+                            # Replace Z with +00:00 for ISO parsing if needed
+                            dt = datetime.datetime.fromisoformat(last_used_str.replace("Z", "+00:00"))
+                            if (now - dt).total_seconds() > 60:
+                                valid_keys.append(k)
+                        except Exception:
+                            valid_keys.append(k)
+                    else:
+                        valid_keys.append(k)
+            return valid_keys
         except Exception as e:
             # Table might not exist yet if migration wasn't run
             print(f"[GROQ_POOL] Warning: Failed to query groq_api_keys from DB (table may not exist yet): {e}")

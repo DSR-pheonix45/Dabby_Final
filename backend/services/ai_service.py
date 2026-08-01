@@ -1564,7 +1564,7 @@ class AIService:
             "required": ["accounts"]
         }
 
-        # Try to decode as text or extract PDF text to use Groq (avoids Gemini rate limits)
+        # Try to decode as text or extract Excel/PDF text to use Groq or Gemini text mode
         text_content = ""
         mime = (mime_type or "").lower()
         filename_lower = (filename or "").lower()
@@ -1579,25 +1579,56 @@ class AIService:
                 pdf_doc.close()
             except Exception as e:
                 print(f"[WARNING] PDF text extraction failed: {e}")
-        elif filename_lower.endswith((".xlsx", ".xls")):
+        elif filename_lower.endswith((".xlsx", ".xls")) or "excel" in mime or "spreadsheet" in mime:
             try:
                 import pandas as pd
                 import io
-                df = pd.read_excel(io.BytesIO(file_bytes))
-                text_content = df.to_csv(index=False)
+                sheet_dict = pd.read_excel(io.BytesIO(file_bytes), sheet_name=None)
+                sheet_csvs = []
+                for s_name, df in sheet_dict.items():
+                    if not df.empty:
+                        sheet_csvs.append(f"--- Sheet: {s_name} ---\n" + df.to_csv(index=False))
+                text_content = "\n\n".join(sheet_csvs)
             except Exception as xl_err:
-                print(f"[WARNING] Excel parsing failed: {xl_err}")
+                print(f"[WARNING] Excel read_excel parsing failed: {xl_err}")
                 try:
-                    text_content = file_bytes.decode("utf-8", errors="ignore")
-                except Exception:
-                    pass
+                    import pandas as pd
+                    import io
+                    dfs = pd.read_html(io.BytesIO(file_bytes))
+                    sheet_csvs = [df.to_csv(index=False) for df in dfs if not df.empty]
+                    text_content = "\n\n".join(sheet_csvs)
+                except Exception as html_err:
+                    print(f"[WARNING] Excel read_html parsing failed: {html_err}")
+                    try:
+                        decoded = file_bytes.decode("utf-8", errors="ignore")
+                        if "<html" in decoded.lower() or "<table" in decoded.lower() or "," in decoded or "\t" in decoded:
+                            text_content = decoded
+                    except Exception:
+                        pass
         else:
             try:
                 text_content = file_bytes.decode("utf-8", errors="ignore")
             except Exception:
                 pass
+
+        def parse_accounts_json(raw_str: str) -> list:
+            clean = raw_str.strip()
+            if clean.startswith("```json"):
+                clean = clean[7:]
+            if clean.startswith("```"):
+                clean = clean[3:]
+            if clean.endswith("```"):
+                clean = clean[:-3]
+            clean = clean.strip()
+            parsed = json.loads(clean)
+            if isinstance(parsed, list):
+                return parsed
+            elif isinstance(parsed, dict):
+                return parsed.get("accounts", [])
+            return []
         
-        if text_content and len(text_content.strip()) > 50:
+        # 1. Try Groq Pool first if text_content is available
+        if text_content and len(text_content.strip()) > 30:
             from services.groq_pool import GroqPool
             try:
                 user_msg = f"Document Filename: {filename}\nContent:\n{text_content[:80000]}"
@@ -1611,32 +1642,41 @@ class AIService:
                         response_format={"type": "json_object"}
                     )
                 )
-                data = json.loads(completion.choices[0].message.content)
-                return data.get("accounts", [])
+                accounts = parse_accounts_json(completion.choices[0].message.content)
+                if accounts:
+                    return accounts
             except Exception as e:
                 print(f"[WARNING] Groq COA import failed, falling back to Gemini: {e}")
 
-        # Fallback to Gemini
+        # 2. Fallback to Gemini
         if not self.gemini_model:
             raise ValueError("GEMINI_API_KEY not configured")
         
         try:
-            response = self.gemini_model.generate_content(
-                [prompt, {"mime_type": mime_type, "data": file_bytes}],
-                generation_config={
-                    "response_mime_type": "application/json",
-                    "response_schema": schema
-                }
-            )
+            if text_content and len(text_content.strip()) > 30:
+                user_msg = f"Document Filename: {filename}\nContent:\n{text_content[:80000]}"
+                response = self.gemini_model.generate_content(
+                    [prompt, user_msg],
+                    generation_config={
+                        "response_mime_type": "application/json",
+                        "response_schema": schema
+                    }
+                )
+            else:
+                supported_vision_mimes = ("application/pdf", "image/jpeg", "image/png", "image/webp", "image/heic")
+                target_mime = mime_type if mime_type in supported_vision_mimes else "application/pdf"
+                if not (mime.startswith("image/") or mime == "application/pdf" or filename_lower.endswith((".pdf", ".png", ".jpg", ".jpeg"))):
+                    raise ValueError(f"Unable to extract text content from {filename or 'uploaded document'}. Please upload a valid Excel (.xlsx), CSV, or PDF file.")
+
+                response = self.gemini_model.generate_content(
+                    [prompt, {"mime_type": target_mime, "data": file_bytes}],
+                    generation_config={
+                        "response_mime_type": "application/json",
+                        "response_schema": schema
+                    }
+                )
             
-            text = response.text.strip()
-            if text.startswith("```json"):
-                text = text[7:-3].strip()
-            elif text.startswith("```"):
-                text = text[3:-3].strip()
-                
-            data = json.loads(text)
-            return data.get("accounts", [])
+            return parse_accounts_json(response.text)
         except Exception as e:
             print(f"[ERROR] Company Master Import scan failed: {str(e)}")
             raise ValueError(f"Failed to process document: {str(e)}")
