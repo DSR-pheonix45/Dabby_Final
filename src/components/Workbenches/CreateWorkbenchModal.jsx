@@ -24,6 +24,61 @@ import {
   BsPlusLg
 } from "react-icons/bs";
 
+const STEPS = [
+  { id: 1, title: "Basic Details", icon: BsBuilding },
+  { id: 2, title: "Region & Financials", icon: BsGeoAlt },
+  { id: 3, title: "Taxes", icon: BsReceipt },
+  { id: 4, title: "COA Setup", icon: BsJournalText },
+  { id: 5, title: "Users & Roles", icon: BsPeople },
+  { id: 6, title: "Inventory", icon: BsBoxSeam }
+];
+
+const BUSINESS_TYPES = [
+  "Sole Proprietorship",
+  "Partnership",
+  "LLC",
+  "Corporation",
+  "Private Limited",
+  "LLP",
+  "Non-Profit"
+];
+
+const INDUSTRIES = [
+  "Software & Technology",
+  "Retail & E-commerce",
+  "Manufacturing & Production",
+  "Professional & Legal Services",
+  "Healthcare & Life Sciences",
+  "Real Estate & Construction",
+  "Financial Services & Banking",
+  "Food & Beverage",
+  "Others"
+];
+
+const SECTORS = [
+  "Technology",
+  "Retail & E-Commerce",
+  "Financial Services",
+  "Healthcare & Pharma",
+  "Manufacturing & Logistics",
+  "Construction & Real Estate",
+  "Education & Training",
+  "Media & Entertainment",
+  "Energy & Utilities",
+  "Others"
+];
+
+const COUNTRIES = [
+  { name: "India", code: "IN", currency: "INR" },
+  { name: "United States", code: "US", currency: "USD" },
+  { name: "United Kingdom", code: "UK", currency: "GBP" },
+  { name: "United Arab Emirates", code: "AE", currency: "AED" },
+  { name: "Singapore", code: "SG", currency: "SGD" },
+  { name: "Canada", code: "CA", currency: "CAD" },
+  { name: "Australia", code: "AU", currency: "AUD" },
+  { name: "Other", code: "OTHER", currency: "USD" }
+];
+
 /**
  * Generates a standard universal double-entry Chart of Accounts in ALERX format
  */
