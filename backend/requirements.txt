@@ -12,3 +12,6 @@ PyMuPDF
 PyJWT
 python-multipart
 sarvamai
+pandas
+openpyxl
+lxml

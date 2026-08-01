@@ -1594,20 +1594,48 @@ class AIService:
                 text_content = "\n\n".join(sheet_csvs)
             except Exception as xl_err:
                 print(f"[WARNING] Excel read_excel parsing failed: {xl_err}")
+                # Pure Python fallback using built-in zipfile and ElementTree (no pandas/openpyxl needed)
                 try:
-                    import pandas as pd
-                    import io
-                    dfs = pd.read_html(io.BytesIO(file_bytes))
-                    sheet_csvs = [df.to_csv(index=False) for df in dfs if not df.empty]
-                    text_content = "\n\n".join(sheet_csvs)
-                except Exception as html_err:
-                    print(f"[WARNING] Excel read_html parsing failed: {html_err}")
+                    import zipfile, io
+                    import xml.etree.ElementTree as ET
+                    with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
+                        shared_strings = []
+                        if "xl/sharedStrings.xml" in z.namelist():
+                            root = ET.fromstring(z.read("xl/sharedStrings.xml"))
+                            for elem in root.iter():
+                                if elem.tag.endswith("t") and elem.text:
+                                    shared_strings.append(elem.text.strip())
+                        sheet_texts = []
+                        for s_path in z.namelist():
+                            if s_path.startswith("xl/worksheets/sheet") and s_path.endswith(".xml"):
+                                root = ET.fromstring(z.read(s_path))
+                                for elem in root.iter():
+                                    if elem.tag.endswith("v") and elem.text:
+                                        val = elem.text.strip()
+                                        if val.isdigit() and int(val) < len(shared_strings):
+                                            sheet_texts.append(shared_strings[int(val)])
+                                        else:
+                                            sheet_texts.append(val)
+                                    elif elem.tag.endswith("t") and elem.text:
+                                        sheet_texts.append(elem.text.strip())
+                        if shared_strings or sheet_texts:
+                            text_content = "\n".join(list(dict.fromkeys(shared_strings + sheet_texts)))
+                except Exception as zip_err:
+                    print(f"[WARNING] Pure Python zipfile xlsx parsing failed: {zip_err}")
                     try:
-                        decoded = file_bytes.decode("utf-8", errors="ignore")
-                        if "<html" in decoded.lower() or "<table" in decoded.lower() or "," in decoded or "\t" in decoded:
-                            text_content = decoded
-                    except Exception:
-                        pass
+                        import pandas as pd
+                        import io
+                        dfs = pd.read_html(io.BytesIO(file_bytes))
+                        sheet_csvs = [df.to_csv(index=False) for df in dfs if not df.empty]
+                        text_content = "\n\n".join(sheet_csvs)
+                    except Exception as html_err:
+                        print(f"[WARNING] Excel read_html parsing failed: {html_err}")
+                        try:
+                            decoded = file_bytes.decode("utf-8", errors="ignore")
+                            if "<html" in decoded.lower() or "<table" in decoded.lower() or "," in decoded or "\t" in decoded:
+                                text_content = decoded
+                        except Exception:
+                            pass
         else:
             try:
                 text_content = file_bytes.decode("utf-8", errors="ignore")
