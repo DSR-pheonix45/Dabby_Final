@@ -15,7 +15,7 @@ class GroqPool:
             res = supabase.table("groq_api_keys") \
                 .select("*") \
                 .neq("status", "invalid") \
-                .order("last_used_at", nullsfirst=True) \
+                .order("last_used_at") \
                 .execute()
             raw_keys = res.data or []
             now = datetime.datetime.now(datetime.timezone.utc)
