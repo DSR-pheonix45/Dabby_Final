@@ -19,63 +19,309 @@ import {
   BsStars, 
   BsCheckCircleFill,
   BsTrash,
-  BsFileEarmarkSpreadsheet
+  BsFileEarmarkSpreadsheet,
+  BsSearch,
+  BsPlusLg
 } from "react-icons/bs";
 
-const STEPS = [
-  { id: 1, title: "Basic Details", icon: BsBuilding },
-  { id: 2, title: "Region & Financials", icon: BsGeoAlt },
-  { id: 3, title: "Taxes", icon: BsReceipt },
-  { id: 4, title: "COA Setup", icon: BsJournalText },
-  { id: 5, title: "Users & Roles", icon: BsPeople },
-  { id: 6, title: "Inventory", icon: BsBoxSeam }
-];
+/**
+ * Generates a standard universal double-entry Chart of Accounts in ALERX format
+ */
+export function generateStandardCoa({ country } = {}) {
+  const isIndia = country === "India" || country === "IN";
+  const accounts = [
+    // ASSETS (A)
+    { account_class: "Assets", group_code: "ACO", ledger: "HDFC / Primary Operating Bank Account", label: "Bank Account" },
+    { account_class: "Assets", group_code: "ACO", ledger: "Petty Cash Account", label: "Petty Cash" },
+    { account_class: "Assets", group_code: "AAR", ledger: "Accounts Receivable (Trade Debtors)", label: "Accounts Receivable" },
+    { account_class: "Assets", group_code: "AIN", ledger: "Stock & Merchandise Inventory", label: "Stock Inventory" },
+    { account_class: "Assets", group_code: "AFA", ledger: "Office Equipment & Computers", label: "Fixed Assets" },
+    { account_class: "Assets", group_code: "AFA", ledger: "Furniture & Office Fixtures", label: "Furniture" },
+    ...(isIndia ? [
+      { account_class: "Assets", group_code: "AOT", ledger: "Input GST Credit (CGST/SGST/IGST)", label: "Input GST" },
+      { account_class: "Assets", group_code: "AOT", ledger: "TDS Receivable / Tax Credits", label: "TDS Credit" }
+    ] : [
+      { account_class: "Assets", group_code: "AOT", ledger: "Prepaid Expenses & Insurance", label: "Prepaid Expenses" }
+    ]),
+    { account_class: "Assets", group_code: "AOT", ledger: "Security & Rent Deposits", label: "Security Deposits" },
 
-const BUSINESS_TYPES = [
-  "Sole Proprietorship",
-  "Partnership",
-  "LLC",
-  "Corporation",
-  "Private Limited",
-  "LLP",
-  "Non-Profit"
-];
+    // LIABILITIES (L)
+    { account_class: "Liabilities", group_code: "LAP", ledger: "Accounts Payable (Trade Creditors)", label: "Accounts Payable" },
+    ...(isIndia ? [
+      { account_class: "Liabilities", group_code: "LST", ledger: "Output GST Payable (CGST/SGST/IGST)", label: "GST Payable" },
+      { account_class: "Liabilities", group_code: "LST", ledger: "TDS Payable Account", label: "TDS Payable" },
+      { account_class: "Liabilities", group_code: "LST", ledger: "Provident Fund (PF) & ESI Payable", label: "PF / ESI Payable" }
+    ] : [
+      { account_class: "Liabilities", group_code: "LST", ledger: "Sales Tax / VAT Payable", label: "Sales Tax Payable" },
+      { account_class: "Liabilities", group_code: "LST", ledger: "Payroll Tax Payable", label: "Payroll Taxes" }
+    ]),
+    { account_class: "Liabilities", group_code: "LDE", ledger: "Bank Credit Line / Overdraft", label: "Bank Overdraft" },
+    { account_class: "Liabilities", group_code: "LOT", ledger: "Accrued Expenses & Payables", label: "Accrued Expenses" },
 
-const INDUSTRIES = [
-  "Software & Technology",
-  "Retail & E-commerce",
-  "Manufacturing & Production",
-  "Professional & Legal Services",
-  "Healthcare & Life Sciences",
-  "Real Estate & Construction",
-  "Financial Services & Banking",
-  "Food & Beverage",
-  "Others"
-];
+    // EQUITY (E)
+    { account_class: "Equity", group_code: "ESC", ledger: "Paid-up Share / Owner Capital", label: "Owner Capital" },
+    { account_class: "Equity", group_code: "ERE", ledger: "Retained Earnings", label: "Retained Earnings" },
+    { account_class: "Equity", group_code: "EOU", ledger: "Owner / Partner Drawings", label: "Drawings" },
 
-const SECTORS = [
-  "Technology",
-  "Retail & E-Commerce",
-  "Financial Services",
-  "Healthcare & Pharma",
-  "Manufacturing & Logistics",
-  "Construction & Real Estate",
-  "Education & Training",
-  "Media & Entertainment",
-  "Energy & Utilities",
-  "Others"
-];
+    // REVENUE (R)
+    { account_class: "Revenue", group_code: "ROP", ledger: "Sales & Operating Revenue", label: "Sales Revenue" },
+    { account_class: "Revenue", group_code: "ROP", ledger: "Service & Consulting Income", label: "Service Income" },
+    { account_class: "Revenue", group_code: "RCR", ledger: "Other Income & Interest", label: "Other Income" },
 
-const COUNTRIES = [
-  { name: "India", code: "IN", currency: "INR" },
-  { name: "United States", code: "US", currency: "USD" },
-  { name: "United Kingdom", code: "UK", currency: "GBP" },
-  { name: "United Arab Emirates", code: "AE", currency: "AED" },
-  { name: "Singapore", code: "SG", currency: "SGD" },
-  { name: "Canada", code: "CA", currency: "CAD" },
-  { name: "Australia", code: "AU", currency: "AUD" },
-  { name: "Other", code: "OTHER", currency: "USD" }
-];
+    // EXPENSES (X)
+    { account_class: "Expenses", group_code: "XDC", ledger: "Cost of Goods Sold (COGS)", label: "COGS" },
+    { account_class: "Expenses", group_code: "XPE", ledger: "Salaries, Wages & Payroll", label: "Salaries" },
+    { account_class: "Expenses", group_code: "XPE", ledger: "Employee Staff Welfare & Benefits", label: "Staff Welfare" },
+    { account_class: "Expenses", group_code: "XTE", ledger: "Software Subscriptions & Cloud Infra", label: "Tech Subscriptions" },
+    { account_class: "Expenses", group_code: "XAD", ledger: "Office Rent & Lease", label: "Office Rent" },
+    { account_class: "Expenses", group_code: "XAD", ledger: "Electricity & Utilities", label: "Utilities" },
+    { account_class: "Expenses", group_code: "XAD", ledger: "Marketing & Advertising Expenses", label: "Marketing" },
+    { account_class: "Expenses", group_code: "XAD", ledger: "Legal, Audit & Professional Fees", label: "Legal & Audit" },
+    { account_class: "Expenses", group_code: "XAD", ledger: "Bank Charges & Merchant Fees", label: "Bank Charges" },
+    { account_class: "Expenses", group_code: "XAD", ledger: "Depreciation Expense", label: "Depreciation" }
+  ];
+
+  const counters = {};
+  return accounts.map((acc) => {
+    const cls = acc.account_class;
+    const grp = acc.group_code;
+    const clsPrefix = cls[0].toUpperCase();
+    if (!counters[grp]) counters[grp] = 0;
+    counters[grp]++;
+    const seq = String(counters[grp]).padStart(2, "0");
+    return {
+      account_class: cls,
+      group_code: grp,
+      full_code: `${clsPrefix}-${grp}-${seq}`,
+      ledger: acc.ledger,
+      label: acc.label || acc.ledger
+    };
+  });
+}
+
+const GROUP_CODE_OPTIONS = {
+  Assets: [
+    { code: "ACO", label: "ACO — Cash & Bank Accounts" },
+    { code: "AAR", label: "AAR — Accounts Receivable / Debtors" },
+    { code: "AIN", label: "AIN — Stock & Inventory" },
+    { code: "AFA", label: "AFA — Fixed Assets & IT Hardware" },
+    { code: "AOT", label: "AOT — Other Assets / Tax Credits / Deposits" }
+  ],
+  Liabilities: [
+    { code: "LAP", label: "LAP — Accounts Payable / Creditors" },
+    { code: "LST", label: "LST — Statutory Taxes (GST/TDS/PF)" },
+    { code: "LDE", label: "LDE — Debt & Bank Loans" },
+    { code: "LOT", label: "LOT — Other Liabilities & Provisions" }
+  ],
+  Equity: [
+    { code: "ESC", label: "ESC — Share / Partner / Owner Capital" },
+    { code: "ERE", label: "ERE — Retained Earnings" },
+    { code: "EOU", label: "EOU — Reserves & Owner Drawings" }
+  ],
+  Revenue: [
+    { code: "ROP", label: "ROP — Operating Sales & Services Revenue" },
+    { code: "RCR", label: "RCR — Other Income & Gains" }
+  ],
+  Expenses: [
+    { code: "XDC", label: "XDC — Direct Costs / COGS / Raw Materials" },
+    { code: "XPE", label: "XPE — Staff Salaries & Personnel" },
+    { code: "XTE", label: "XTE — Software & Tech Subscriptions" },
+    { code: "XAD", label: "XAD — Admin & Operating Expenses" }
+  ]
+};
+
+/**
+ * Generates an ALERX formatted Chart of Accounts tailored to:
+ * - business_type (Type of firm)
+ * - industry
+ * - sector
+ * - country
+ */
+export function generateAiRecommendedCoa({ business_type, industry, sector, country }) {
+  const bType = (business_type || "Private Limited").toLowerCase();
+  const ind = (industry || "Software & Technology").toLowerCase();
+  const sec = (sector || "Technology").toLowerCase();
+  const isIndia = country === "India" || country === "IN";
+
+  const accounts = [];
+
+  // --- 1. ASSETS (A) ---
+  // ACO: Cash & Cash Equivalents
+  accounts.push({ account_class: "Assets", group_code: "ACO", ledger: "Operating Bank Account", label: "Bank Account" });
+  accounts.push({ account_class: "Assets", group_code: "ACO", ledger: "Petty Cash Account", label: "Petty Cash" });
+  if (ind.includes("tech") || ind.includes("retail") || ind.includes("e-commerce") || sec.includes("retail") || sec.includes("technology")) {
+    accounts.push({ account_class: "Assets", group_code: "ACO", ledger: "Stripe / Razorpay Payment Gateway Receivables", label: "Gateway Receivables" });
+  }
+
+  // AAR: Accounts Receivable (Trade Debtors)
+  if (bType.includes("non-profit")) {
+    accounts.push({ account_class: "Assets", group_code: "AAR", ledger: "Grants & Pledges Receivable", label: "Grants Receivable" });
+  } else if (ind.includes("services") || ind.includes("tech") || sec.includes("technology")) {
+    accounts.push({ account_class: "Assets", group_code: "AAR", ledger: "Accounts Receivable (Client Invoices)", label: "Accounts Receivable" });
+    accounts.push({ account_class: "Assets", group_code: "AAR", ledger: "Unbilled Professional Fees", label: "Unbilled Revenue" });
+  } else if (ind.includes("construction") || sec.includes("construction")) {
+    accounts.push({ account_class: "Assets", group_code: "AAR", ledger: "Contract Progress Billing Receivables", label: "Contract Receivables" });
+  } else {
+    accounts.push({ account_class: "Assets", group_code: "AAR", ledger: "Trade Debtors (Accounts Receivable)", label: "Trade Debtors" });
+  }
+
+  // AIN: Inventory
+  if (ind.includes("manufacturing") || sec.includes("manufacturing")) {
+    accounts.push({ account_class: "Assets", group_code: "AIN", ledger: "Raw Materials Stock Inventory", label: "Raw Materials Stock" });
+    accounts.push({ account_class: "Assets", group_code: "AIN", ledger: "Work-in-Progress (WIP) Stock", label: "WIP Stock" });
+    accounts.push({ account_class: "Assets", group_code: "AIN", ledger: "Finished Goods Inventory", label: "Finished Goods Stock" });
+  } else if (ind.includes("retail") || ind.includes("e-commerce") || ind.includes("food") || sec.includes("retail")) {
+    accounts.push({ account_class: "Assets", group_code: "AIN", ledger: "Merchandise & Stock Inventory", label: "Stock Inventory" });
+  } else if (ind.includes("construction") || sec.includes("construction")) {
+    accounts.push({ account_class: "Assets", group_code: "AIN", ledger: "Construction Work-in-Progress (CWIP)", label: "Construction WIP" });
+  }
+
+  // AFA: Fixed Assets
+  accounts.push({ account_class: "Assets", group_code: "AFA", ledger: "Computers & IT Hardware Assets", label: "IT Hardware Assets" });
+  if (ind.includes("manufacturing") || ind.includes("construction")) {
+    accounts.push({ account_class: "Assets", group_code: "AFA", ledger: "Plant, Heavy Machinery & Equipment", label: "Plant & Machinery" });
+  } else if (ind.includes("food") || ind.includes("healthcare")) {
+    accounts.push({ account_class: "Assets", group_code: "AFA", ledger: "Specialized Kitchen / Medical Equipment", label: "Specialized Equipment" });
+  } else {
+    accounts.push({ account_class: "Assets", group_code: "AFA", ledger: "Office Furniture & Fixtures", label: "Office Assets" });
+  }
+
+  // AOT: Other Assets & Intangibles / Tax Credits
+  if (isIndia) {
+    accounts.push({ account_class: "Assets", group_code: "AOT", ledger: "Input GST Credit (CGST/SGST/IGST)", label: "GST Input Credit" });
+    accounts.push({ account_class: "Assets", group_code: "AOT", ledger: "TDS Receivable / Tax Credits", label: "TDS Credit" });
+  } else {
+    accounts.push({ account_class: "Assets", group_code: "AOT", ledger: "Prepaid Expenses & Insurance", label: "Prepaid Expenses" });
+  }
+  if (ind.includes("tech") || sec.includes("technology")) {
+    accounts.push({ account_class: "Assets", group_code: "AOT", ledger: "Capitalized R&D & Software IP", label: "Software IP Assets" });
+  }
+  accounts.push({ account_class: "Assets", group_code: "AOT", ledger: "Security Deposits (Office Rent & Utilities)", label: "Security Deposits" });
+
+  // --- 2. LIABILITIES (L) ---
+  // LAP: Accounts Payable (Trade Creditors)
+  accounts.push({ account_class: "Liabilities", group_code: "LAP", ledger: "Accounts Payable (Trade Creditors)", label: "Accounts Payable" });
+  if (ind.includes("services") || ind.includes("tech") || ind.includes("construction")) {
+    accounts.push({ account_class: "Liabilities", group_code: "LAP", ledger: "Subcontractor & Vendor Payables", label: "Vendor Payables" });
+  }
+
+  // LST: Statutory Tax Payables
+  if (isIndia) {
+    accounts.push({ account_class: "Liabilities", group_code: "LST", ledger: "Output GST Payable (CGST/SGST/IGST)", label: "GST Payable" });
+    accounts.push({ account_class: "Liabilities", group_code: "LST", ledger: "TDS Payable (Section 194C/194J/194I)", label: "TDS Payable" });
+    accounts.push({ account_class: "Liabilities", group_code: "LST", ledger: "Provident Fund (PF) & ESI Payable", label: "PF / ESI Payable" });
+  } else {
+    accounts.push({ account_class: "Liabilities", group_code: "LST", ledger: "Sales Tax / VAT Payable", label: "Sales Tax Payable" });
+    accounts.push({ account_class: "Liabilities", group_code: "LST", ledger: "Payroll Tax Withholdings", label: "Payroll Taxes" });
+  }
+
+  // LDE: Debt & Loans
+  if (bType.includes("sole") || bType.includes("partnership")) {
+    accounts.push({ account_class: "Liabilities", group_code: "LDE", ledger: "Bank Overdraft & Working Capital Line", label: "Bank Overdraft" });
+  } else {
+    accounts.push({ account_class: "Liabilities", group_code: "LDE", ledger: "Short-term Credit Line & Debt", label: "Short-term Debt" });
+    accounts.push({ account_class: "Liabilities", group_code: "LDE", ledger: "Directors' & Promoters' Loan Account", label: "Director Loans" });
+  }
+
+  // LOT: Other Liabilities & Provisions
+  accounts.push({ account_class: "Liabilities", group_code: "LOT", ledger: "Accrued Operating Expenses", label: "Accrued Expenses" });
+  if (ind.includes("tech") || ind.includes("services") || ind.includes("education")) {
+    accounts.push({ account_class: "Liabilities", group_code: "LOT", ledger: "Deferred Revenue & Unearned Retainers", label: "Deferred Revenue" });
+  }
+
+  // --- 3. EQUITY (E) ---
+  if (bType.includes("sole")) {
+    accounts.push({ account_class: "Equity", group_code: "ESC", ledger: "Proprietor's Capital Account", label: "Owner Capital" });
+    accounts.push({ account_class: "Equity", group_code: "EOU", ledger: "Proprietor's Personal Drawings", label: "Owner Drawings" });
+  } else if (bType.includes("partnership") || bType.includes("llp")) {
+    accounts.push({ account_class: "Equity", group_code: "ESC", ledger: "Partners' Capital Accounts", label: "Partner Capital" });
+    accounts.push({ account_class: "Equity", group_code: "EOU", ledger: "Partners' Current & Drawings Accounts", label: "Partner Drawings" });
+  } else if (bType.includes("non-profit")) {
+    accounts.push({ account_class: "Equity", group_code: "ESC", ledger: "Corpus Fund & Capital Endowment", label: "Corpus Fund" });
+  } else {
+    accounts.push({ account_class: "Equity", group_code: "ESC", ledger: "Paid-up Equity Share Capital", label: "Share Capital" });
+    accounts.push({ account_class: "Equity", group_code: "EOU", ledger: "Securities Premium / Additional Paid-in Capital", label: "Share Premium" });
+  }
+  accounts.push({ account_class: "Equity", group_code: "ERE", ledger: "Retained Earnings & Reserves", label: "Retained Earnings" });
+
+  // --- 4. REVENUE (R) ---
+  if (ind.includes("tech") || sec.includes("technology")) {
+    accounts.push({ account_class: "Revenue", group_code: "ROP", ledger: "SaaS Subscriptions & Recurring Revenue", label: "SaaS Revenue" });
+    accounts.push({ account_class: "Revenue", group_code: "ROP", ledger: "Software Licensing & API Consumption Fees", label: "Licensing Revenue" });
+    accounts.push({ account_class: "Revenue", group_code: "ROP", ledger: "Implementation & Technical Support Revenue", label: "Tech Services" });
+  } else if (ind.includes("retail") || ind.includes("e-commerce") || sec.includes("retail")) {
+    accounts.push({ account_class: "Revenue", group_code: "ROP", ledger: "E-Commerce Online Store Sales", label: "Online Sales" });
+    accounts.push({ account_class: "Revenue", group_code: "ROP", ledger: "Retail Storefront Sales", label: "Retail Sales" });
+  } else if (ind.includes("manufacturing") || sec.includes("manufacturing")) {
+    accounts.push({ account_class: "Revenue", group_code: "ROP", ledger: "Domestic Goods Sales Revenue", label: "Domestic Sales" });
+    accounts.push({ account_class: "Revenue", group_code: "ROP", ledger: "Export Sales Revenue", label: "Export Sales" });
+  } else if (ind.includes("construction") || sec.includes("construction")) {
+    accounts.push({ account_class: "Revenue", group_code: "ROP", ledger: "Milestone Construction Contract Revenue", label: "Contract Revenue" });
+  } else if (ind.includes("food") || ind.includes("beverage")) {
+    accounts.push({ account_class: "Revenue", group_code: "ROP", ledger: "Restaurant Dine-in & Takeaway Sales", label: "F&B Sales" });
+    accounts.push({ account_class: "Revenue", group_code: "ROP", ledger: "Delivery Partner Platform Sales", label: "Delivery Sales" });
+  } else if (ind.includes("healthcare")) {
+    accounts.push({ account_class: "Revenue", group_code: "ROP", ledger: "Patient Care & Clinical Consultation Revenue", label: "Patient Care Revenue" });
+  } else {
+    accounts.push({ account_class: "Revenue", group_code: "ROP", ledger: "Core Operating Sales Revenue", label: "Operating Sales" });
+  }
+  accounts.push({ account_class: "Revenue", group_code: "RCR", ledger: "Other Income (Interest, Forex & Asset Gains)", label: "Other Income" });
+
+  // --- 5. EXPENSES (X) ---
+  // XDC: Direct Costs / COGS
+  if (ind.includes("tech") || sec.includes("technology")) {
+    accounts.push({ account_class: "Expenses", group_code: "XDC", ledger: "Cloud Infrastructure (AWS/GCP/Azure)", label: "Cloud Infrastructure" });
+    accounts.push({ account_class: "Expenses", group_code: "XDC", ledger: "Third-party APIs & Server Tooling", label: "API Costs" });
+  } else if (ind.includes("manufacturing") || sec.includes("manufacturing")) {
+    accounts.push({ account_class: "Expenses", group_code: "XDC", ledger: "Raw Materials Consumed (COGS)", label: "Raw Materials Consumed" });
+    accounts.push({ account_class: "Expenses", group_code: "XDC", ledger: "Direct Factory Power & Fuel", label: "Factory Power" });
+    accounts.push({ account_class: "Expenses", group_code: "XDC", ledger: "Inward Freight & Logistics", label: "Inward Freight" });
+  } else if (ind.includes("retail") || ind.includes("e-commerce")) {
+    accounts.push({ account_class: "Expenses", group_code: "XDC", ledger: "Cost of Merchandise Goods Sold (COGS)", label: "Merchandise COGS" });
+    accounts.push({ account_class: "Expenses", group_code: "XDC", ledger: "Shipping, Freight & Fulfillment Costs", label: "Shipping Costs" });
+  } else if (ind.includes("services")) {
+    accounts.push({ account_class: "Expenses", group_code: "XDC", ledger: "Subcontractor & Direct Freelancer Fees", label: "Direct Contractor Costs" });
+  } else {
+    accounts.push({ account_class: "Expenses", group_code: "XDC", ledger: "Direct Costs & Cost of Sales", label: "Direct Costs" });
+  }
+
+  // XPE: Personnel Expenses
+  accounts.push({ account_class: "Expenses", group_code: "XPE", ledger: "Staff Salaries & Employee Wages", label: "Salaries & Wages" });
+  accounts.push({ account_class: "Expenses", group_code: "XPE", ledger: "Employee Benefits & Health Insurance", label: "Employee Benefits" });
+  if (!bType.includes("sole")) {
+    accounts.push({ account_class: "Expenses", group_code: "XPE", ledger: "Directors' / Partners' Remuneration", label: "Director Remuneration" });
+  }
+
+  // XTE: Tech & Software Subscriptions
+  accounts.push({ account_class: "Expenses", group_code: "XTE", ledger: "SaaS Software Subscriptions & Tools", label: "Software Tools" });
+  accounts.push({ account_class: "Expenses", group_code: "XTE", ledger: "IT Security, Domains & Network Infra", label: "IT Expenses" });
+
+  // XAD: Admin & General Expenses
+  accounts.push({ account_class: "Expenses", group_code: "XAD", ledger: "Office Rent & Facility Lease", label: "Office Rent" });
+  accounts.push({ account_class: "Expenses", group_code: "XAD", ledger: "Electricity, Water & Utilities", label: "Utilities" });
+  accounts.push({ account_class: "Expenses", group_code: "XAD", ledger: "Marketing, Branding & Ad Spends", label: "Marketing Expenses" });
+  accounts.push({ account_class: "Expenses", group_code: "XAD", ledger: "Legal, Audit & Professional Retainers", label: "Legal & Audit" });
+  accounts.push({ account_class: "Expenses", group_code: "XAD", ledger: "Bank Processing Charges & Merchant Fees", label: "Bank Charges" });
+  accounts.push({ account_class: "Expenses", group_code: "XAD", ledger: "Depreciation & Amortization Expense", label: "Depreciation" });
+
+  // Format full codes sequentially for each group (A-ACO-01, L-LAP-01, E-ESC-01, R-ROP-01, X-XDC-01, etc.)
+  const counters = {};
+  return accounts.map((acc) => {
+    const cls = acc.account_class;
+    const grp = acc.group_code;
+    const clsPrefix = cls[0].toUpperCase();
+    if (!counters[grp]) counters[grp] = 0;
+    counters[grp]++;
+    const seq = String(counters[grp]).padStart(2, "0");
+    return {
+      account_class: cls,
+      group_code: grp,
+      full_code: `${clsPrefix}-${grp}-${seq}`,
+      ledger: acc.ledger,
+      label: acc.label || acc.ledger
+    };
+  });
+}
 
 export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
   const { user } = useAuth();
@@ -86,6 +332,7 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
   const [isScanningCoa, setIsScanningCoa] = useState(false);
   const [scannedAccounts, setScannedAccounts] = useState([]);
   const [coaConfirmed, setCoaConfirmed] = useState(false);
+  const [coaSearchQuery, setCoaSearchQuery] = useState("");
 
   // Form state across 6 steps
   const [formData, setFormData] = useState({
@@ -126,6 +373,74 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("Accountant");
   const [isLinkCopied, setIsLinkCopied] = useState(false);
+
+  // Add COA Account Form State
+  const [isAddingAccount, setIsAddingAccount] = useState(false);
+  const [newAccClass, setNewAccClass] = useState("Expenses");
+  const [newAccGroup, setNewAccGroup] = useState("XAD");
+  const [newAccLedger, setNewAccLedger] = useState("");
+  const [newAccLabel, setNewAccLabel] = useState("");
+
+  const handleGenerateAiCoa = (overrideForm) => {
+    const currentForm = overrideForm || formData;
+    setIsScanningCoa(true);
+    setCoaConfirmed(false);
+
+    setTimeout(() => {
+      const recommended = generateAiRecommendedCoa(currentForm);
+      setScannedAccounts(recommended);
+      setIsScanningCoa(false);
+      toast.success(`Dabby AI generated ${recommended.length} COA ledgers (ALERX) tailored for ${currentForm.business_type} • ${currentForm.industry}!`);
+    }, 350);
+  };
+
+  const handleGenerateStandardCoa = () => {
+    setIsScanningCoa(true);
+    setCoaConfirmed(false);
+
+    setTimeout(() => {
+      const std = generateStandardCoa(formData);
+      setScannedAccounts(std);
+      setIsScanningCoa(false);
+      toast.success(`Loaded Standard Accounting Template (${std.length} ALERX Ledgers)!`);
+    }, 300);
+  };
+
+  const handleAddAccount = (e) => {
+    e.preventDefault();
+    if (!newAccLedger.trim()) {
+      toast.error("Please enter a Ledger Name");
+      return;
+    }
+
+    const cls = newAccClass || "Expenses";
+    const grp = newAccGroup || "XAD";
+    const clsPrefix = cls[0].toUpperCase();
+
+    const existingInGroup = scannedAccounts.filter(a => a.group_code === grp);
+    const nextSeqNum = existingInGroup.length + 1;
+    const seq = String(nextSeqNum).padStart(2, "0");
+    const fullCode = `${clsPrefix}-${grp}-${seq}`;
+
+    const newAcc = {
+      account_class: cls,
+      group_code: grp,
+      full_code: fullCode,
+      ledger: newAccLedger.trim(),
+      label: newAccLabel.trim() || newAccLedger.trim()
+    };
+
+    setScannedAccounts(prev => [...prev, newAcc]);
+    setNewAccLedger("");
+    setNewAccLabel("");
+    setIsAddingAccount(false);
+    toast.success(`Added ${fullCode}: ${newAcc.ledger}`);
+  };
+
+  const handleDeleteAccount = (fullCodeToDelete, ledgerName) => {
+    setScannedAccounts(prev => prev.filter(a => a.full_code !== fullCodeToDelete));
+    toast.success(`Deleted ${fullCodeToDelete} (${ledgerName})`);
+  };
 
   const isBinaryGarbage = (str) => {
     if (!str || typeof str !== "string") return true;
@@ -275,6 +590,17 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
       handleCoaFileSelect(formData.coa_file);
     }
   }, [formData.coa_file]);
+
+  // Auto-generate AI or Standard COA whenever Step 4 is active & no accounts are loaded yet
+  useEffect(() => {
+    if (currentStep === 4 && scannedAccounts.length === 0 && !isScanningCoa && !coaConfirmed) {
+      if (formData.coa_source === "ai_recommender") {
+        handleGenerateAiCoa();
+      } else if (formData.coa_source === "standard") {
+        handleGenerateStandardCoa();
+      }
+    }
+  }, [currentStep, formData.coa_source]);
 
   if (!isOpen) return null;
 
@@ -791,7 +1117,11 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
               <div>
                 <h4 className="text-sm font-semibold text-white">Chart of Accounts (COA) Setup</h4>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {formData.coa_file || scannedAccounts.length > 0
+                  {formData.coa_source === "ai_recommender"
+                    ? `Dabby AI Recommender — Auto-tailored ALERX taxonomy for ${formData.business_type} • ${formData.industry} • ${formData.sector}.`
+                    : formData.coa_source === "standard"
+                    ? "Standard Template — Double-entry accounting COA taxonomy with full customization."
+                    : formData.coa_file || scannedAccounts.length > 0
                     ? `Uploaded ${formData.coa_file ? formData.coa_file.name : "COA File"} — Mapped to Dabby A, L, E, R, X structure.`
                     : "Choose how to initialize ledger accounts for this workbench."}
                 </p>
@@ -838,7 +1168,17 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
                     return (
                       <div
                         key={option.id}
-                        onClick={() => setFormData(prev => ({ ...prev, coa_source: option.id }))}
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, coa_source: option.id }));
+                          if (option.id === "ai_recommender") {
+                            handleGenerateAiCoa();
+                          } else if (option.id === "standard") {
+                            handleGenerateStandardCoa();
+                          } else {
+                            setScannedAccounts([]);
+                            setCoaConfirmed(false);
+                          }
+                        }}
                         className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
                           selected
                             ? "bg-teal-500/10 border-teal-500 text-white shadow-lg shadow-teal-500/10"
@@ -891,8 +1231,98 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
                 </div>
               )}
 
+              {/* Dabby AI Active Header Banner when AI Recommender is active */}
+              {formData.coa_source === "ai_recommender" && (scannedAccounts.length > 0 || coaConfirmed) && (
+                <div className="p-3.5 bg-gradient-to-r from-teal-950/40 via-cyan-950/40 to-blue-950/40 border border-teal-500/30 rounded-xl flex items-center justify-between shadow-lg shadow-teal-500/5">
+                  <div className="flex items-center space-x-3 truncate">
+                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-teal-500 to-cyan-500 text-white flex items-center justify-center font-bold shadow-md flex-shrink-0">
+                      <BsStars className="w-5 h-5" />
+                    </div>
+                    <div className="truncate">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold text-white truncate">
+                          Dabby AI Tailored Chart of Accounts
+                        </p>
+                        <span className="text-[10px] bg-teal-500/20 text-teal-300 border border-teal-500/30 px-2 py-0.5 rounded-full font-mono font-semibold">
+                          ALERX Format
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-300 truncate mt-0.5">
+                        Customized for <span className="text-teal-400 font-semibold">{formData.business_type}</span> • <span className="text-cyan-400 font-semibold">{formData.industry}</span> • <span className="text-blue-400 font-semibold">{formData.sector}</span> ({formData.country})
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateAiCoa()}
+                      className="px-3 py-1.5 bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 text-teal-300 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"
+                      title="Regenerate list based on latest firm details"
+                    >
+                      <BsStars className="w-3.5 h-3.5" /> Re-generate
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setScannedAccounts([]);
+                        setCoaConfirmed(false);
+                      }}
+                      className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white rounded-lg text-xs font-medium transition-colors"
+                    >
+                      Change Source
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Standard Template Active Header Banner when Standard is active */}
+              {formData.coa_source === "standard" && (scannedAccounts.length > 0 || coaConfirmed) && (
+                <div className="p-3.5 bg-gradient-to-r from-blue-950/40 via-indigo-950/40 to-purple-950/40 border border-blue-500/30 rounded-xl flex items-center justify-between shadow-lg shadow-blue-500/5">
+                  <div className="flex items-center space-x-3 truncate">
+                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center font-bold shadow-md flex-shrink-0">
+                      <BsJournalText className="w-5 h-5" />
+                    </div>
+                    <div className="truncate">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold text-white truncate">
+                          Standard Accounting Chart of Accounts
+                        </p>
+                        <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full font-mono font-semibold">
+                          Standard ALERX
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-300 truncate mt-0.5">
+                        Universal double-entry template • Add or delete custom COA ledgers below
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateStandardCoa()}
+                      className="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-300 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"
+                      title="Reload standard template"
+                    >
+                      Reload Standard
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setScannedAccounts([]);
+                        setCoaConfirmed(false);
+                      }}
+                      className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white rounded-lg text-xs font-medium transition-colors"
+                    >
+                      Change Source
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Active File Header Banner when a file is selected */}
-              {(formData.coa_file || scannedAccounts.length > 0) && (
+              {!["ai_recommender", "standard"].includes(formData.coa_source) && (formData.coa_file || scannedAccounts.length > 0) && (
                 <div className="p-3.5 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between">
                   <div className="flex items-center space-x-3 truncate">
                     <div className="w-9 h-9 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center border border-teal-500/30 flex-shrink-0">
@@ -926,8 +1356,18 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
               {isScanningCoa && (
                 <div className="border border-teal-500/30 bg-teal-500/10 rounded-xl p-6 text-center space-y-3 animate-pulse">
                   <div className="animate-spin w-8 h-8 border-3 border-teal-400 border-t-transparent rounded-full mx-auto" />
-                  <p className="text-sm font-semibold text-white">Scanning Chart of Accounts with Dabby AI...</p>
-                  <p className="text-xs text-gray-400">Extracting ledgers and mapping to Dabby A, L, E, R, X account codes...</p>
+                  <p className="text-sm font-semibold text-white">
+                    {formData.coa_source === "ai_recommender"
+                      ? "Generating AI Chart of Accounts in ALERX format..."
+                      : formData.coa_source === "standard"
+                      ? "Loading Standard Accounting COA Template..."
+                      : "Scanning Chart of Accounts with Dabby AI..."}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {formData.coa_source === "ai_recommender"
+                      ? `Tailoring accounts for ${formData.business_type} • ${formData.industry} • ${formData.sector}...`
+                      : "Extracting ledgers and mapping to Dabby A, L, E, R, X account codes..."}
+                  </p>
                 </div>
               )}
 
@@ -936,13 +1376,115 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
                 <div className="border border-teal-500/40 bg-black/40 rounded-xl p-4 space-y-4 shadow-xl">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h5 className="text-sm font-bold text-teal-300">Scanned Chart of Accounts ({scannedAccounts.length} Ledgers Mapped)</h5>
-                      <p className="text-xs text-gray-400 mt-0.5">Please review the mapped account classes and codes below.</p>
+                      <h5 className="text-sm font-bold text-teal-300">
+                        {formData.coa_source === "ai_recommender"
+                          ? "Dabby AI Recommended Accounts"
+                          : formData.coa_source === "standard"
+                          ? "Standard Chart of Accounts Template"
+                          : "Scanned Chart of Accounts"} ({scannedAccounts.length} Ledgers Mapped)
+                      </h5>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {formData.coa_source === "ai_recommender"
+                          ? `Generated using ALERX taxonomy based on ${formData.business_type}, ${formData.industry}, and ${formData.sector}.`
+                          : formData.coa_source === "standard"
+                          ? "Review, add, or delete COA ledgers before mapping."
+                          : "Please review the mapped account classes and codes below."}
+                      </p>
                     </div>
-                    <span className="text-[11px] px-2.5 py-1 bg-amber-500/20 text-amber-300 rounded-lg border border-amber-500/30 font-medium">
-                      Confirmation Required
-                    </span>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingAccount(!isAddingAccount)}
+                      className="px-3 py-1.5 bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 text-teal-300 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm"
+                    >
+                      <BsPlusLg className="w-3 h-3" /> {isAddingAccount ? "Cancel Add" : "Add COA Ledger"}
+                    </button>
                   </div>
+
+                  {/* Inline Add COA Account Form */}
+                  {isAddingAccount && (
+                    <form onSubmit={handleAddAccount} className="p-3.5 bg-white/5 border border-teal-500/30 rounded-xl space-y-3 animate-fadeIn">
+                      <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                        <h6 className="text-xs font-bold text-teal-300 uppercase tracking-wider flex items-center gap-1.5">
+                          <BsPlusLg className="w-3 h-3" /> Add New Custom COA Ledger
+                        </h6>
+                        <span className="text-[10px] text-gray-400 font-mono">ALERX Auto-sequenced</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] text-gray-300 font-medium mb-1">Account Class</label>
+                          <select
+                            value={newAccClass}
+                            onChange={(e) => {
+                              const cls = e.target.value;
+                              setNewAccClass(cls);
+                              setNewAccGroup(GROUP_CODE_OPTIONS[cls][0].code);
+                            }}
+                            className="w-full bg-[#1A1D24] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-teal-500"
+                          >
+                            <option value="Assets">Assets (A)</option>
+                            <option value="Liabilities">Liabilities (L)</option>
+                            <option value="Equity">Equity (E)</option>
+                            <option value="Revenue">Revenue (R)</option>
+                            <option value="Expenses">Expenses (X)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] text-gray-300 font-medium mb-1">ALERX Group Code</label>
+                          <select
+                            value={newAccGroup}
+                            onChange={(e) => setNewAccGroup(e.target.value)}
+                            className="w-full bg-[#1A1D24] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-teal-500"
+                          >
+                            {(GROUP_CODE_OPTIONS[newAccClass] || []).map(opt => (
+                              <option key={opt.code} value={opt.code}>{opt.label}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] text-gray-300 font-medium mb-1">Ledger Name *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Office Pantry & Snacks"
+                            value={newAccLedger}
+                            onChange={(e) => setNewAccLedger(e.target.value)}
+                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-teal-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] text-gray-300 font-medium mb-1">Friendly Label (Optional)</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Pantry Expenses"
+                            value={newAccLabel}
+                            onChange={(e) => setNewAccLabel(e.target.value)}
+                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-teal-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingAccount(false)}
+                          className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg text-xs transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-4 py-1.5 bg-teal-500 hover:bg-teal-400 text-white rounded-lg text-xs font-semibold shadow-md shadow-teal-500/20 transition-all flex items-center gap-1"
+                        >
+                          <BsPlusLg className="w-3 h-3" /> Save Ledger
+                        </button>
+                      </div>
+                    </form>
+                  )}
 
                   {/* Class Distribution Summary Badges */}
                   <div className="flex flex-wrap gap-2 text-xs">
@@ -963,6 +1505,18 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
                     </span>
                   </div>
 
+                  {/* Search Filter Input */}
+                  <div className="relative">
+                    <BsSearch className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Filter accounts by ledger name, class, or ALERX code..."
+                      value={coaSearchQuery}
+                      onChange={(e) => setCoaSearchQuery(e.target.value)}
+                      className="w-full bg-black/40 border border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-teal-500"
+                    />
+                  </div>
+
                   {/* Scrollable Accounts Table */}
                   <div className="max-h-56 overflow-y-auto border border-white/10 rounded-lg bg-black/40">
                     <table className="w-full text-xs text-left text-gray-300">
@@ -972,27 +1526,49 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
                           <th className="px-3 py-2">Class</th>
                           <th className="px-3 py-2">Group</th>
                           <th className="px-3 py-2">Ledger Name</th>
+                          <th className="px-3 py-2 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
-                        {scannedAccounts.map((acc, idx) => (
-                          <tr key={idx} className="hover:bg-white/5">
-                            <td className="px-3 py-1.5 font-mono text-teal-400 font-semibold">{acc.full_code}</td>
-                            <td className="px-3 py-1.5">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                                acc.account_class === 'Assets' ? 'bg-teal-500/20 text-teal-300' :
-                                acc.account_class === 'Liabilities' ? 'bg-amber-500/20 text-amber-300' :
-                                acc.account_class === 'Equity' ? 'bg-purple-500/20 text-purple-300' :
-                                acc.account_class === 'Revenue' ? 'bg-emerald-500/20 text-emerald-300' :
-                                'bg-rose-500/20 text-rose-300'
-                              }`}>
-                                {acc.account_class}
-                              </span>
-                            </td>
-                            <td className="px-3 py-1.5 font-mono text-gray-300">{acc.group_code}</td>
-                            <td className="px-3 py-1.5 font-medium text-white">{acc.ledger}</td>
-                          </tr>
-                        ))}
+                        {scannedAccounts
+                          .filter((acc) => {
+                            if (!coaSearchQuery.trim()) return true;
+                            const q = coaSearchQuery.toLowerCase();
+                            return (
+                              acc.full_code.toLowerCase().includes(q) ||
+                              acc.account_class.toLowerCase().includes(q) ||
+                              acc.group_code.toLowerCase().includes(q) ||
+                              acc.ledger.toLowerCase().includes(q)
+                            );
+                          })
+                          .map((acc, idx) => (
+                            <tr key={idx} className="hover:bg-white/5 group">
+                              <td className="px-3 py-1.5 font-mono text-teal-400 font-semibold">{acc.full_code}</td>
+                              <td className="px-3 py-1.5">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                                  acc.account_class === 'Assets' ? 'bg-teal-500/20 text-teal-300' :
+                                  acc.account_class === 'Liabilities' ? 'bg-amber-500/20 text-amber-300' :
+                                  acc.account_class === 'Equity' ? 'bg-purple-500/20 text-purple-300' :
+                                  acc.account_class === 'Revenue' ? 'bg-emerald-500/20 text-emerald-300' :
+                                  'bg-rose-500/20 text-rose-300'
+                                }`}>
+                                  {acc.account_class}
+                                </span>
+                              </td>
+                              <td className="px-3 py-1.5 font-mono text-gray-300">{acc.group_code}</td>
+                              <td className="px-3 py-1.5 font-medium text-white">{acc.ledger}</td>
+                              <td className="px-3 py-1.5 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteAccount(acc.full_code, acc.ledger)}
+                                  className="p-1 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                  title={`Delete ${acc.full_code}`}
+                                >
+                                  <BsTrash className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
                       </tbody>
                     </table>
                   </div>
@@ -1004,13 +1580,23 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
                       <button
                         type="button"
                         onClick={() => {
-                          setScannedAccounts([]);
-                          setCoaConfirmed(false);
-                          setFormData(prev => ({ ...prev, coa_file: null }));
+                          if (formData.coa_source === "ai_recommender") {
+                            handleGenerateAiCoa();
+                          } else if (formData.coa_source === "standard") {
+                            handleGenerateStandardCoa();
+                          } else {
+                            setScannedAccounts([]);
+                            setCoaConfirmed(false);
+                            setFormData(prev => ({ ...prev, coa_file: null }));
+                          }
                         }}
                         className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg text-xs transition-colors"
                       >
-                        Re-upload File
+                        {formData.coa_source === "ai_recommender"
+                          ? "Re-generate"
+                          : formData.coa_source === "standard"
+                          ? "Reload Standard"
+                          : "Re-upload File"}
                       </button>
                       <button
                         type="button"
