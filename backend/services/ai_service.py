@@ -1718,6 +1718,83 @@ class AIService:
             print(f"[ERROR] Company Master Import scan failed: {str(e)}")
             raise ValueError(f"Failed to process document: {str(e)}")
 
+    async def scan_trial_balance_import(self, file_bytes: bytes, mime_type: str, filename: str) -> list:
+        """
+        Parses an exported Trial Balance spreadsheet (from Tally, Zoho Books, etc.)
+        and extracts trial balance line items: ledger_name, account_class, group_code, debit_amount, credit_amount, net_balance.
+        """
+        prompt = """
+        You are an expert accountant and AI assistant. Your task is to analyze the provided Trial Balance spreadsheet or report (exported from systems like Tally, Zoho Books, QuickBooks, etc.) and extract all trial balance account line items.
+
+        For each account found in the Trial Balance:
+        1. 'ledger_name': Clean account name.
+        2. 'account_class': One of ["Assets", "Liabilities", "Equity", "Revenue", "Expenses"]
+        3. 'group_code': 3-letter prefix (ACO, AAR, AIN, ATX, AFA, LAP, LDE, LST, LPR, ESC, ERE, ROP, RCR, XDC, XPE, XMK, XTE, XAD)
+        4. 'debit_amount': Total debit amount (numeric float, 0.0 if none)
+        5. 'credit_amount': Total credit amount (numeric float, 0.0 if none)
+        6. 'net_balance': Net balance (numeric float)
+
+        Return ONLY a JSON object containing an array called "items" with the extracted trial balance rows.
+        """
+
+        # Extract text content
+        text_content = ""
+        filename_lower = (filename or "").lower()
+        
+        if filename_lower.endswith((".xlsx", ".xls")):
+            try:
+                import pandas as pd, io
+                sheet_dict = pd.read_excel(io.BytesIO(file_bytes), sheet_name=None)
+                sheet_csvs = [f"--- Sheet: {s} ---\n" + df.to_csv(index=False) for s, df in sheet_dict.items() if not df.empty]
+                text_content = "\n\n".join(sheet_csvs)
+            except Exception:
+                try:
+                    import zipfile, io
+                    import xml.etree.ElementTree as ET
+                    with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
+                        strings = []
+                        if "xl/sharedStrings.xml" in z.namelist():
+                            root = ET.fromstring(z.read("xl/sharedStrings.xml"))
+                            for elem in root.iter():
+                                if elem.tag.endswith("t") and elem.text:
+                                    strings.append(elem.text.strip())
+                        text_content = "\n".join(strings)
+                except Exception:
+                    pass
+        else:
+            try:
+                text_content = file_bytes.decode("utf-8", errors="ignore")
+            except Exception:
+                pass
+
+        if not text_content or len(text_content.strip()) < 10:
+            text_content = f"Filename: {filename}"
+
+        from services.groq_pool import GroqPool
+        try:
+            user_msg = f"Trial Balance Document: {filename}\nContent (Respond in JSON format):\n{text_content[:80000]}"
+            completion = GroqPool.execute(
+                lambda client: client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[
+                        {"role": "system", "content": prompt},
+                        {"role": "user", "content": user_msg}
+                    ],
+                    response_format={"type": "json_object"}
+                )
+            )
+            raw = completion.choices[0].message.content.strip()
+            if raw.startswith("```json"): raw = raw[7:]
+            if raw.startswith("```"): raw = raw[3:]
+            if raw.endswith("```"): raw = raw[:-3]
+            parsed = json.loads(raw.strip())
+            items = parsed.get("items") or parsed.get("accounts") or (parsed if isinstance(parsed, list) else [])
+            return items
+        except Exception as e:
+            print(f"[WARNING] Groq TB import failed: {e}")
+            return []
+
 
 ai_service = AIService()
+
 

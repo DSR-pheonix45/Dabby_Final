@@ -132,3 +132,112 @@ async def delete_account(account_id: str, user = Depends(get_current_user)):
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class VoucherEntryItem(BaseModel):
+    account_id: Optional[str] = None
+    full_code: Optional[str] = None
+    ledger: Optional[str] = None
+    direction: str  # 'debit' or 'credit'
+    amount: float
+
+class VoucherPostPayload(BaseModel):
+    workbench_id: str
+    voucher_type: Optional[str] = "journal"
+    voucher_number: Optional[str] = None
+    description: Optional[str] = None
+    entries: List[VoucherEntryItem]
+
+@router.post("/post-voucher")
+async def post_voucher(payload: VoucherPostPayload, user = Depends(get_current_user)):
+    try:
+        if not payload.entries:
+            raise HTTPException(status_code=400, detail="Voucher entries cannot be empty")
+        
+        # 1. Verify Double-Entry Balance: sum(debit) == sum(credit)
+        total_debit = sum(e.amount for e in payload.entries if e.direction.lower() == "debit")
+        total_credit = sum(e.amount for e in payload.entries if e.direction.lower() == "credit")
+
+        if round(total_debit, 2) != round(total_credit, 2):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unbalanced voucher: Total Debits (₹{total_debit:.2f}) must equal Total Credits (₹{total_credit:.2f})"
+            )
+
+        # 2. Fetch all workbench accounts for mapping
+        acc_res = supabase.table("workbench_accounts").select("*").eq("workbench_id", payload.workbench_id).execute()
+        accounts = acc_res.data or []
+        acc_by_id = {a["id"]: a for a in accounts}
+        acc_by_code = {a["full_code"]: a for a in accounts}
+        acc_by_ledger = {a["ledger"].strip().lower(): a for a in accounts}
+
+        updated_accounts = []
+        for entry in payload.entries:
+            target_acc = None
+            if entry.account_id and entry.account_id in acc_by_id:
+                target_acc = acc_by_id[entry.account_id]
+            elif entry.full_code and entry.full_code in acc_by_code:
+                target_acc = acc_by_code[entry.full_code]
+            elif entry.ledger and entry.ledger.strip().lower() in acc_by_ledger:
+                target_acc = acc_by_ledger[entry.ledger.strip().lower()]
+            
+            if target_acc:
+                curr_bal = float(target_acc.get("current_balance") or 0.0)
+                ac_class = (target_acc.get("account_class") or "Expenses").capitalize()
+                
+                # Normal Balances:
+                # Debit Normal: Assets, Expenses
+                # Credit Normal: Liabilities, Equity, Revenue
+                if ac_class in ["Assets", "Expenses"]:
+                    new_bal = curr_bal + entry.amount if entry.direction.lower() == "debit" else curr_bal - entry.amount
+                else:
+                    new_bal = curr_bal + entry.amount if entry.direction.lower() == "credit" else curr_bal - entry.amount
+
+                upd = supabase.table("workbench_accounts").update({"current_balance": new_bal}).eq("id", target_acc["id"]).execute()
+                if upd.data:
+                    updated_accounts.append(upd.data[0])
+
+        return {
+            "status": "success",
+            "total_debit": total_debit,
+            "total_credit": total_credit,
+            "updated_accounts_count": len(updated_accounts)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/kpi-summary/{workbench_id}")
+async def get_kpi_summary(workbench_id: str, user = Depends(get_current_user)):
+    try:
+        acc_res = supabase.table("workbench_accounts").select("*").eq("workbench_id", workbench_id).execute()
+        accounts = acc_res.data or []
+
+        kpis = {
+            "Asset": {"net": 0.0, "gross": 0.0, "count": 0},
+            "Liability": {"net": 0.0, "gross": 0.0, "count": 0},
+            "Equity": {"net": 0.0, "gross": 0.0, "count": 0},
+            "Revenue": {"net": 0.0, "gross": 0.0, "count": 0},
+            "Expense": {"net": 0.0, "gross": 0.0, "count": 0},
+        }
+
+        for acc in accounts:
+            raw_cls = (acc.get("account_class") or "Expense").strip().capitalize()
+            # Singularize
+            if raw_cls.endswith("s"):
+                cls_key = raw_cls[:-1]
+            else:
+                cls_key = raw_cls
+
+            if cls_key not in kpis:
+                cls_key = "Expense"
+
+            bal = float(acc.get("current_balance") or 0.0)
+            kpis[cls_key]["net"] += bal
+            kpis[cls_key]["gross"] += abs(bal)
+            kpis[cls_key]["count"] += 1
+
+        return kpis
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
