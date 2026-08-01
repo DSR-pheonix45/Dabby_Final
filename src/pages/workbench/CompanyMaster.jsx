@@ -159,13 +159,28 @@ export default function CompanyMaster() {
     }
   };
 
+  const updateImportedAccount = (idx, field, value) => {
+    setImportedAccounts(prev => prev.map((acc, i) => {
+      if (i !== idx) return acc;
+      const updated = { ...acc, [field]: value };
+      if (field === 'account_class') {
+        updated.group_code = ''; // reset group prefix if class changes
+      }
+      return updated;
+    }));
+  };
+
+  const removeImportedAccount = (idx) => {
+    setImportedAccounts(prev => prev.filter((_, i) => i !== idx));
+  };
+
   const confirmImport = () => {
     const newRows = importedAccounts.map((acc, index) => ({
       id: `imported-${Date.now()}-${index}`,
       accountClass: acc.account_class || '',
       groupCode: acc.group_code || '',
-      ledger: acc.ledger || '',
-      label: acc.label || '',
+      ledger: acc.ledger || acc.source_account || '',
+      label: acc.label || acc.source_account || acc.ledger || '',
       fullCode: '', // will be reindexed
       isNew: true
     }));
@@ -420,59 +435,153 @@ export default function CompanyMaster() {
         </div>
       )}
 
-      {/* Confirmation Modal */}
+      {/* Confirmation Modal - Side-by-Side Extracted Label vs Dabby Ledger Comparison */}
       {isConfirmModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-3xl bg-[#18181A] border border-white/10 rounded-2xl shadow-2xl p-6 relative max-h-[80vh] flex flex-col">
-            <button onClick={() => setConfirmModalOpen(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white">
-              <BsXLg />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+          <div className="w-full max-w-5xl bg-[#18181A] border border-white/10 rounded-2xl shadow-2xl p-6 relative max-h-[85vh] flex flex-col">
+            <button onClick={() => setConfirmModalOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors">
+              <BsXLg size={18} />
             </button>
-            <h3 className="text-xl font-bold text-white mb-2">Review Extracted Accounts</h3>
-            <p className="text-sm text-gray-400 mb-4">Please review the AI mapping before adding these ledgers to your Company Master.</p>
+
+            <div className="flex items-center justify-between mb-4 pr-8">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <span>Review Extracted Accounts & Dabby Mapping</span>
+                  <span className="text-xs bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2.5 py-0.5 rounded-full font-normal">
+                    {importedAccounts.length} Extracted
+                  </span>
+                </h3>
+                <p className="text-sm text-gray-400 mt-1">
+                  Side-by-side comparison of raw labels extracted from your document mapped to Dabby's ledger structure.
+                </p>
+              </div>
+            </div>
             
-            <div className="flex-1 overflow-y-auto custom-scrollbar border border-white/10 rounded-xl mb-6">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-[#111] text-gray-400 sticky top-0">
+            <div className="flex-1 overflow-y-auto custom-scrollbar border border-white/10 rounded-xl mb-6 bg-[#111]">
+              <table className="w-full text-sm text-left border-collapse">
+                <thead className="bg-[#181818] text-gray-400 sticky top-0 border-b border-white/10 z-10">
                   <tr>
-                    <th className="p-3 border-b border-white/10 font-semibold">Ledger</th>
-                    <th className="p-3 border-b border-white/10 font-semibold">Account Class</th>
-                    <th className="p-3 border-b border-white/10 font-semibold">Group Code</th>
-                    <th className="p-3 border-b border-white/10 font-semibold">Label</th>
+                    <th className="p-3 font-semibold text-gray-300 min-w-[200px]">Extracted Account Label</th>
+                    <th className="p-3 text-center font-semibold text-gray-400 w-16">Link</th>
+                    <th className="p-3 font-semibold text-gray-300 min-w-[200px]">Mapped Dabby Ledger</th>
+                    <th className="p-3 font-semibold text-gray-300 min-w-[150px]">Account Class</th>
+                    <th className="p-3 font-semibold text-gray-300 min-w-[170px]">Sub-Account Group</th>
+                    <th className="p-3 font-semibold text-gray-300 min-w-[150px]">User Label</th>
+                    <th className="p-3 text-center font-semibold text-gray-400 w-16">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {importedAccounts.map((acc, idx) => (
-                    <tr key={idx} className="border-b border-white/5 text-gray-200 hover:bg-white/5">
-                      <td className="p-3 font-medium">{acc.ledger}</td>
-                      <td className="p-3">{acc.account_class}</td>
-                      <td className="p-3 font-mono text-teal-400">{acc.group_code}</td>
-                      <td className="p-3">{acc.label}</td>
+                    <tr key={idx} className="border-b border-white/5 text-gray-200 hover:bg-white/[0.03] transition-colors">
+                      {/* 1. Extracted Source Account Label */}
+                      <td className="p-3">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-white bg-white/5 border border-white/10 px-2.5 py-1 rounded-md text-sm">
+                            {acc.source_account || acc.ledger || acc.label}
+                          </span>
+                          <span className="text-[10px] text-gray-500 mt-0.5 tracking-wider uppercase">From Upload</span>
+                        </div>
+                      </td>
+
+                      {/* 2. Link Arrow */}
+                      <td className="p-3 text-center text-teal-400 font-bold">
+                        ➔
+                      </td>
+
+                      {/* 3. Mapped Dabby Ledger Name */}
+                      <td className="p-3">
+                        <input 
+                          type="text" 
+                          value={acc.ledger || ''} 
+                          onChange={(e) => updateImportedAccount(idx, 'ledger', e.target.value)}
+                          placeholder="e.g. Repairs & Maintenance" 
+                          className="w-full bg-[#1A1A1A] border border-white/10 rounded px-2.5 py-1.5 text-white placeholder-gray-600 focus:outline-none focus:border-teal-500 text-sm font-medium"
+                        />
+                      </td>
+
+                      {/* 4. Account Class Selection */}
+                      <td className="p-3">
+                        <select 
+                          value={acc.account_class || ''}
+                          onChange={(e) => updateImportedAccount(idx, 'account_class', e.target.value)}
+                          className="w-full bg-[#1A1A1A] border border-white/10 rounded px-2 py-1.5 text-gray-200 focus:outline-none focus:border-teal-500 text-xs"
+                        >
+                          <option value="" disabled>Select Class</option>
+                          {Object.values(ACCOUNT_CLASSES).map(cls => (
+                            <option key={cls} value={cls}>{cls}</option>
+                          ))}
+                        </select>
+                      </td>
+
+                      {/* 5. Sub-Account Group Code */}
+                      <td className="p-3">
+                        <select 
+                          value={acc.group_code || ''}
+                          disabled={!acc.account_class}
+                          onChange={(e) => updateImportedAccount(idx, 'group_code', e.target.value)}
+                          className="w-full bg-[#1A1A1A] border border-white/10 rounded px-2 py-1.5 text-gray-200 focus:outline-none focus:border-teal-500 disabled:opacity-50 text-xs font-mono"
+                        >
+                          <option value="" disabled>Select Group</option>
+                          {acc.account_class && SUB_ACCOUNT_GROUPS[acc.account_class]?.map(group => (
+                            <option key={group.prefix} value={group.prefix}>
+                              {group.prefix} - {group.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+
+                      {/* 6. User Label */}
+                      <td className="p-3">
+                        <input 
+                          type="text" 
+                          value={acc.label || ''} 
+                          onChange={(e) => updateImportedAccount(idx, 'label', e.target.value)}
+                          placeholder="User Label" 
+                          className="w-full bg-[#1A1A1A] border border-white/10 rounded px-2.5 py-1.5 text-gray-300 placeholder-gray-600 focus:outline-none focus:border-teal-500 text-xs"
+                        />
+                      </td>
+
+                      {/* 7. Action Remove */}
+                      <td className="p-4 text-center">
+                        <button 
+                          onClick={() => removeImportedAccount(idx)} 
+                          className="text-gray-500 hover:text-red-400 transition-colors p-1"
+                          title="Remove item from import"
+                        >
+                          <BsTrash size={16} />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                   {importedAccounts.length === 0 && (
                     <tr>
-                      <td colSpan="4" className="p-8 text-center text-gray-500">No accounts could be extracted.</td>
+                      <td colSpan="7" className="p-8 text-center text-gray-500">No accounts selected for import.</td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
             
-            <div className="flex justify-end gap-3 shrink-0">
-              <button 
-                onClick={() => setConfirmModalOpen(false)}
-                className="px-5 py-2.5 rounded-xl border border-white/10 text-gray-300 hover:bg-white/5 transition-colors font-medium text-sm"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={confirmImport}
-                disabled={importedAccounts.length === 0}
-                className="px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-black font-bold transition-colors disabled:opacity-50 flex items-center gap-2 text-sm"
-              >
-                <BsCheck size={20} />
-                Confirm & Append
-              </button>
+            <div className="flex justify-between items-center shrink-0">
+              <span className="text-xs text-gray-500">
+                You can edit ledgers, classes, and groups before appending to Company Master.
+              </span>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setConfirmModalOpen(false)}
+                  className="px-5 py-2.5 rounded-xl border border-white/10 text-gray-300 hover:bg-white/5 transition-colors font-medium text-sm"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmImport}
+                  disabled={importedAccounts.length === 0}
+                  className="px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-black font-bold transition-colors disabled:opacity-50 flex items-center gap-2 text-sm"
+                >
+                  <BsCheck size={20} />
+                  Confirm & Append
+                </button>
+              </div>
             </div>
           </div>
         </div>

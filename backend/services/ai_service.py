@@ -1530,16 +1530,17 @@ class AIService:
         prompt = """
         You are an expert accountant and AI assistant. Your task is to analyze the provided financial document (which could be a Trial Balance, P&L, Balance Sheet, or Chart of Accounts export from systems like Tally, Zoho, etc.) and extract all the ledger accounts mentioned in it.
         
-        For each ledger account you find, map it to Dabby's internal account structure which consists of:
-        1. 'account_class': Must be exactly one of ["Assets", "Liabilities", "Equity", "Revenue", "Expenses"]
-        2. 'group_code': A 3-letter prefix based on the following mapping:
+        For each ledger account you find, extract its raw name and map it to Dabby's internal account structure:
+        1. 'source_account': The exact account name or label extracted directly from the uploaded document (e.g., 'Repairs and Maintenance', 'Cost of Goods Sold', 'Employee Advance', 'Shipping Charge', 'Undeposited Funds', etc.).
+        2. 'ledger': Dabby's mapped ledger name (clean, standard name).
+        3. 'account_class': Must be exactly one of ["Assets", "Liabilities", "Equity", "Revenue", "Expenses"]
+        4. 'group_code': A 3-letter prefix based on the following mapping:
            - Assets: ACO (Cash & Cash Equivalents), AAR (Accounts Receivable), AIN (Inventory), ATX (Tax & Operational Advances), AFA (Fixed & Intangible Assets)
            - Liabilities: LAP (Accounts Payable), LDE (Debt & Credit Lines), LST (Statutory & Tax Liabilities), LPR (Payroll Liabilities)
            - Equity: ESC (Share Capital), ERE (Retained Earnings & Option Pools)
            - Revenue: ROP (Operating Revenue), RCR (Contra-Revenue & Other Income)
            - Expenses: XDC (Direct Costs/COGS), XPE (Personnel Costs/OPEX), XMK (Marketing & Growth/OPEX), XTE (Technology & Internal Tools/OPEX), XAD (Administrative & Statutory Expenses)
-        3. 'ledger': The exact name of the ledger as found in the document.
-        4. 'label': A short, user-friendly label (can be same as ledger or slightly simplified).
+        5. 'label': User-friendly label (can be same as source_account or ledger).
         
         Return ONLY a JSON object containing an array called "accounts" with the extracted and mapped data.
         """
@@ -1552,12 +1553,13 @@ class AIService:
                     "items": {
                         "type": "OBJECT",
                         "properties": {
+                            "source_account": {"type": "STRING"},
+                            "ledger": {"type": "STRING"},
                             "account_class": {"type": "STRING"},
                             "group_code": {"type": "STRING"},
-                            "ledger": {"type": "STRING"},
                             "label": {"type": "STRING"}
                         },
-                        "required": ["account_class", "group_code", "ledger", "label"]
+                        "required": ["source_account", "ledger", "account_class", "group_code", "label"]
                     }
                 }
             },
@@ -1621,11 +1623,17 @@ class AIService:
                 clean = clean[:-3]
             clean = clean.strip()
             parsed = json.loads(clean)
+            accounts_list = []
             if isinstance(parsed, list):
-                return parsed
+                accounts_list = parsed
             elif isinstance(parsed, dict):
-                return parsed.get("accounts", [])
-            return []
+                accounts_list = parsed.get("accounts", [])
+            
+            for acc in accounts_list:
+                if isinstance(acc, dict):
+                    if not acc.get("source_account"):
+                        acc["source_account"] = acc.get("ledger") or acc.get("label") or "Extracted Account"
+            return accounts_list
         
         # 1. Try Groq Pool first if text_content is available
         if text_content and len(text_content.strip()) > 30:
