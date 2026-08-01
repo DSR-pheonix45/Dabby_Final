@@ -33,6 +33,27 @@ export const accountService = {
     return res.json();
   },
 
+  async clearAllAccounts(workbenchId) {
+    const res = await apiFetch(`/api/workbench-accounts/workbench/${workbenchId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error("Failed to clear accounts");
+    return res.json();
+  },
+
+  async syncAccounts(workbenchId, accounts, deletedIds = []) {
+    const res = await apiFetch(`/api/workbench-accounts/sync`, {
+      method: "POST",
+      body: JSON.stringify({
+        workbench_id: workbenchId,
+        accounts,
+        deleted_ids: deletedIds,
+      }),
+    });
+    if (!res.ok) throw new Error("Failed to sync accounts");
+    return res.json();
+  },
+
   async importAccounts(workbenchId, file) {
     const formData = new FormData();
     formData.append("workbench_id", workbenchId);

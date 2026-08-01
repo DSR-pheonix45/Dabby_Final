@@ -176,47 +176,51 @@ export default function CompanyMaster() {
 
   const [isSaving, setIsSaving] = useState(false);
 
+  const handleClearAll = async () => {
+    if (!window.confirm("Are you sure you want to clear all accounts in this Chart of Accounts? This will permanently delete all saved ledgers.")) {
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await accountService.clearAllAccounts(activeWorkbench.id);
+      setInitialAccounts([]);
+      setTableRows([]);
+      toast.success("Chart of Accounts cleared successfully!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to clear accounts: " + (err.message || err));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
       // 1. Find deleted rows
       const currentIds = new Set(tableRows.map(r => r.id));
-      const deletedAccounts = initialAccounts.filter(acc => !currentIds.has(acc.id));
+      const deletedAccountIds = initialAccounts.filter(acc => !currentIds.has(acc.id)).map(acc => acc.id);
       
-      const promises = [];
-      
-      // Delete
-      for (const acc of deletedAccounts) {
-        promises.push(accountService.deleteAccount(acc.id));
-      }
-      
-      // Update or Create
-      for (const row of tableRows) {
-        if (!row.fullCode || !row.ledger) continue; // skip incomplete rows
-        
-        const payload = {
-          workbench_id: activeWorkbench.id,
+      // 2. Prepare formatted accounts payload
+      const validAccounts = tableRows
+        .filter(row => row.fullCode && row.ledger)
+        .map(row => ({
+          id: row.id,
           account_class: row.accountClass,
           group_code: row.groupCode,
           full_code: row.fullCode,
           ledger: row.ledger,
-          label: row.label
-        };
+          label: row.label,
+          is_new: !!row.isNew
+        }));
 
-        if (row.isNew) {
-          promises.push(accountService.createAccount(payload));
-        } else {
-          promises.push(accountService.updateAccount(row.id, payload));
-        }
-      }
-
-      await Promise.all(promises);
+      await accountService.syncAccounts(activeWorkbench.id, validAccounts, deletedAccountIds);
       
       toast.success("Company Master synchronized successfully!");
-      loadAccounts(); // Reload to get actual UUIDs from DB
+      await loadAccounts(); // Reload to get actual UUIDs from DB
     } catch (err) {
       console.error(err);
-      toast.error("Failed to sync Company Master with database.");
+      toast.error("Failed to sync Company Master: " + (err.message || err));
     } finally {
       setIsSaving(false);
     }
@@ -235,13 +239,24 @@ export default function CompanyMaster() {
               <h3 className="text-lg font-medium text-white">Company Master Chart</h3>
               <p className="text-sm text-gray-500 mt-1">Manage accounts, sub-accounts, and ledgers for your company structure.</p>
             </div>
-            <button 
-              onClick={handleSave}
-              disabled={isSaving}
-              className="px-4 py-2 bg-teal-500 hover:bg-teal-400 text-black font-medium rounded-md transition-colors text-sm disabled:opacity-50"
-            >
-              {isSaving ? "Saving..." : "Save Master Data"}
-            </button>
+            <div className="flex gap-2">
+              <button 
+                onClick={handleClearAll}
+                disabled={isSaving}
+                className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-medium rounded-md transition-colors text-sm disabled:opacity-50 flex items-center gap-1.5"
+                title="Delete all ledgers in this Chart of Accounts"
+              >
+                <BsTrash size={15} />
+                <span>Clear All</span>
+              </button>
+              <button 
+                onClick={handleSave}
+                disabled={isSaving}
+                className="px-4 py-2 bg-teal-500 hover:bg-teal-400 text-black font-medium rounded-md transition-colors text-sm disabled:opacity-50"
+              >
+                {isSaving ? "Saving..." : "Save Master Data"}
+              </button>
+            </div>
           </div>
 
           {/* Top Action Bar Layer */}
