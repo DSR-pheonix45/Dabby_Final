@@ -1,6 +1,6 @@
 import json
 from typing import Dict, Any, Optional, Tuple
-from services.groq_pool import groq_pool
+from services.groq_pool import GroqPool
 
 class LLMResolver:
     """
@@ -46,7 +46,15 @@ class LLMResolver:
         """
 
         try:
-            raw_response = await groq_pool.execute_prompt(prompt, temperature=0.1, max_tokens=150)
+            completion = GroqPool.execute(
+                lambda client: client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.1,
+                    max_tokens=150
+                )
+            )
+            raw_response = completion.choices[0].message.content or ""
             cleaned = raw_response.strip().replace("```json", "").replace("```", "").strip()
             parsed = json.loads(cleaned)
 
