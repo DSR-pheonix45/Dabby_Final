@@ -30,7 +30,7 @@ export default function QuotationModal({ isOpen, onClose }) {
   const [showColConfig, setShowColConfig] = useState(false);
 
   const [items, setItems] = useState([
-    { description: "100 MM x 50 MM UPVC louver Profile", subDetails: "100 – 75 – 100 – 75 – 100", hsn: "39162019", qty: 6900, unit: "RFT", rate: 115 },
+    { description: "100 MM x 50 MM UPVC louver Profile", subDetails: "", hsn: "39162019", qty: 6900, unit: "RFT", rate: 115 },
     { description: "MS FABRICATION WORK 115'X30'", subDetails: "", hsn: "7308", qty: 1, unit: "pcs", rate: 240000 },
   ]);
 
@@ -43,6 +43,9 @@ export default function QuotationModal({ isOpen, onClose }) {
   const updateItem = (idx, field, val) => {
     const updated = [...items];
     updated[idx][field] = field === "qty" || field === "rate" ? Number(val) || 0 : val;
+    if (field === "description" && !columns.some(c => c.id === "subDetails")) {
+      updated[idx].subDetails = "";
+    }
     setItems(updated);
   };
   const removeItem = (idx) => setItems(items.filter((_, i) => i !== idx));

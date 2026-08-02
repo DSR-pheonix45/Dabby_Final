@@ -35,7 +35,7 @@ export default function QuotationGenerator() {
     items: [
       {
         description: "100 MM x 50 MM UPVC louver Profile",
-        subDetails: "100 – 75 – 100 – 75 – 100",
+        subDetails: "",
         hsn: "39162019",
         qty: 6900,
         unit: "RFT",
