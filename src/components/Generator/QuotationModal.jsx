@@ -56,6 +56,14 @@ export default function QuotationModal({ isOpen, onClose }) {
 
   const totalAmount = items.reduce((acc, it) => acc + ((Number(it.qty) || 0) * (Number(it.rate) || 0)), 0);
 
+  const sanitizeItems = (rawItems) => {
+    const hasSubCol = columns.some(c => c.id === "subDetails");
+    return rawItems.map(it => ({
+      ...it,
+      subDetails: hasSubCol ? (it.subDetails || "") : ""
+    }));
+  };
+
   const generatePDFDoc = () => {
     return generateStandardDocumentPDF({
       documentType: "QUOTATION",
@@ -72,7 +80,7 @@ export default function QuotationModal({ isOpen, onClose }) {
       placeOfSupply: placeOfSupply,
       shipToName: shipToSameAsBilling ? partyName : shipToName,
       shipToAddress: shipToSameAsBilling ? clientAddress : shipToAddress,
-      items,
+      items: sanitizeItems(items),
       columns,
       taxRate: 0,
       notes: notes,
@@ -111,7 +119,7 @@ export default function QuotationModal({ isOpen, onClose }) {
           shipToAddress: shipToSameAsBilling ? clientAddress : shipToAddress,
           notes,
           terms,
-          items,
+          items: sanitizeItems(items),
           columns
         }
       };

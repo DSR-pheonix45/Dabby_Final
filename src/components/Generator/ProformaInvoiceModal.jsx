@@ -55,6 +55,14 @@ export default function ProformaInvoiceModal({ isOpen, onClose }) {
   const totalEstimate = items.reduce((acc, it) => acc + ((Number(it.qty) || 0) * (Number(it.rate) || 0)), 0);
   const requiredAdvance = (totalEstimate * advancePercent) / 100;
 
+  const sanitizeItems = (rawItems) => {
+    const hasSubCol = columns.some(c => c.id === "subDetails");
+    return rawItems.map(it => ({
+      ...it,
+      subDetails: hasSubCol ? (it.subDetails || "") : ""
+    }));
+  };
+
   const generatePDFDoc = () => {
     return generateStandardDocumentPDF({
       documentType: "PROFORMA INVOICE",
@@ -70,7 +78,7 @@ export default function ProformaInvoiceModal({ isOpen, onClose }) {
       placeOfSupply: placeOfSupply,
       shipToName: shipToSameAsBilling ? partyName : shipToName,
       shipToAddress: shipToSameAsBilling ? clientAddress : shipToAddress,
-      items,
+      items: sanitizeItems(items),
       columns,
       taxRate: 18,
       notes: `Project/Contract: ${projectEstimateName}\n${notes}`,

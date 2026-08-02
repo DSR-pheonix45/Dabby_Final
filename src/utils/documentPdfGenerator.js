@@ -228,12 +228,13 @@ export function generateStandardDocumentPDF(docData) {
     const amtNum = qtyNum * rateNum;
     subtotal += amtNum;
     totalQty += qtyNum;
-
     const row = [idx + 1];
 
     activeCols.forEach(col => {
       if (col.id === "description") {
-        row.push(it.subDetails ? `${it.description || ""}\n${it.subDetails}` : (it.description || ""));
+        const hasSubCol = activeCols.some(c => c.id === "subDetails");
+        const showSubInDesc = hasSubCol && Boolean(it.subDetails && String(it.subDetails).trim());
+        row.push(showSubInDesc ? `${it.description || ""}\n${it.subDetails}` : (it.description || ""));
       } else if (col.id === "subDetails") {
         row.push(it.subDetails || "-");
       } else if (col.id === "hsn") {
