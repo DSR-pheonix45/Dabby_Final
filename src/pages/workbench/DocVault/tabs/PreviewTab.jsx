@@ -69,37 +69,29 @@ export default function PreviewTab({ doc, onDelete, onScan }) {
             onClick={() => {
               window.dispatchEvent(new CustomEvent('trade:create_from_doc', { detail: doc }));
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-gradient-to-r from-teal-400 to-emerald-400 text-black text-xs font-extrabold transition-all shadow-md hover:opacity-95"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-400 to-emerald-400 text-black text-xs font-extrabold transition-all shadow-md hover:opacity-95"
             title="Create a Trade Transaction in Business Engine using this voucher"
           >
             🚀 Send to Business Engine
           </button>
-          {onScan && (
-            <button
-              onClick={handleScan}
-              disabled={scanning}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-teal-500 hover:bg-teal-400 text-black text-xs font-bold transition-all shadow-md disabled:opacity-50"
-              title="Scan document with Gemini Vision OCR"
-            >
-              <BsLightningChargeFill className={scanning ? 'animate-spin' : ''} />
-              {scanning ? 'Scanning...' : 'Scan & Extract (AI OCR)'}
-            </button>
-          )}
+
           <a 
             href={url} 
             target="_blank" 
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 text-xs font-semibold text-gray-300 transition-colors"
+            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 transition-colors flex items-center justify-center"
+            title="Download Original Document"
           >
-            <BsDownload /> Download Original
+            <BsDownload size={14} />
           </a>
+
           {onDelete && (
             <button
               onClick={() => onDelete(doc.id)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-red-500/10 hover:bg-red-500/20 text-xs font-semibold text-red-400 border border-red-500/30 transition-colors"
-              title="Delete document from Doc Vault"
+              className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-colors flex items-center justify-center"
+              title="Delete Document from Doc Vault"
             >
-              <BsTrash /> Delete Document
+              <BsTrash size={14} />
             </button>
           )}
         </div>
