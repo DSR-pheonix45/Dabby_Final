@@ -9,7 +9,22 @@ export function WorkbenchProvider({ children }) {
   const { user } = useAuth();
   const [workbenches, setWorkbenches] = useState([]);
   const [activeWorkbench, setActiveWorkbench] = useState(null);
+  const [isWorkbenchContextEnabled, setIsWorkbenchContextEnabled] = useState(() => {
+    return localStorage.getItem("dabby_workbench_context_enabled") !== "false";
+  });
   const [loading, setLoading] = useState(true);
+
+  const toggleWorkbenchContext = (forcedVal) => {
+    setIsWorkbenchContextEnabled((prev) => {
+      const nextVal = typeof forcedVal === 'boolean' ? forcedVal : !prev;
+      localStorage.setItem("dabby_workbench_context_enabled", String(nextVal));
+      toast(nextVal ? "Workbench Context Enabled" : "Workbench Context Disabled", {
+        icon: nextVal ? "⚡" : "⏸️"
+      });
+      window.dispatchEvent(new Event("workbenchContextToggled"));
+      return nextVal;
+    });
+  };
 
   useEffect(() => {
     if (user) {
@@ -68,6 +83,8 @@ export function WorkbenchProvider({ children }) {
       value={{
         workbenches,
         activeWorkbench,
+        isWorkbenchContextEnabled,
+        toggleWorkbenchContext,
         loading,
         fetchWorkbenches,
         changeActiveWorkbench,

@@ -20,7 +20,6 @@ export type DocumentType =
   | 'vendor_payment_receipt'
   | 'expense_receipt'
   | 'bank_statement'
-  | 'payroll_register'
   | 'credit_note'
   | 'debit_note'
   | 'purchase_order'

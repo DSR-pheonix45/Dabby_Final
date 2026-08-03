@@ -36,7 +36,6 @@ INTENT_MAP: Dict[str, str] = {
     "vendor_payment_receipt":    "PAYMENT_SNIPPET",
     "expense_receipt":           "PAYMENT_SNIPPET",
     "receipt":                   "PAYMENT_SNIPPET",
-    "payroll_register":          "PAYROLL_INCURRED",
 
     "credit_note":               "REVENUE_REVERSED",
     "debit_note":                "VENDOR_ADJUSTMENT_ISSUED",
@@ -55,7 +54,6 @@ CASH_DIRECTION_MAP: Dict[str, str] = {
     "vendor_invoice":            "OUTBOUND",  # money expected to go out
     "vendor_payment_receipt":    "OUTBOUND",
     "expense_receipt":           "OUTBOUND",
-    "payroll_register":          "OUTBOUND",
     "credit_note":               "INBOUND",   # reversal reduces AR
     "debit_note":                "OUTBOUND",
     "bank_statement":            "MIXED",

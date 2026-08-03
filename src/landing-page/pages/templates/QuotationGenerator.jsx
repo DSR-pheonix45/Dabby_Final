@@ -5,65 +5,62 @@ import { ArrowLeft, Download, Plus, Trash2, Printer } from "lucide-react";
 import { generateStandardDocumentPDF } from "../../../utils/documentPdfGenerator";
 import PrintableDocumentTemplate from "../../../components/Generator/PrintableDocumentTemplate";
 import DynamicColumnConfigurator, { DEFAULT_COLUMNS } from "../../../components/Generator/DynamicColumnConfigurator";
+import { useWorkbench } from "../../../context/WorkbenchContext";
+import { getWorkbenchCompanyDetails } from "../../../utils/workbenchCompanyHelper";
 
 export default function QuotationGenerator() {
   const { theme } = useTheme();
+  const { activeWorkbench } = useWorkbench();
+  const company = getWorkbenchCompanyDetails(activeWorkbench);
+
   const [quotationData, setQuotationData] = useState({
     documentType: "QUOTATION",
-    quotationNumber: "QT-10",
+    quotationNumber: `QT-${Math.floor(1000 + Math.random() * 9000)}`,
     date: new Date().toISOString().split('T')[0],
     expiryDate: "",
 
-    // Sender / Business
-    senderName: "Archzona",
-    senderAddress: "105, PRISM INDUSTRIAL ESTATE, BEHIND PENDARKAR COLLEGE, DOMBIVLI(EAST)421201",
-    senderGstin: "7ACDFA4175F1ZJ",
-    senderMobile: "9870048082",
-    senderEmail: "info.archzona@gmail.com",
-    logo: null,
+    // Sender / Business auto-fitted from Settings
+    senderName: company.legalName || company.name,
+    senderAddress: company.address,
+    senderGstin: company.gstin,
+    senderMobile: "",
+    senderEmail: company.email,
+    logo: company.logo,
 
     // Client / Bill To & Ship To
-    clientName: "RATNA DEEP CHS",
-    clientAddress: "Mulund",
-    placeOfSupply: "Maharashtra",
+    clientName: "",
+    clientAddress: "",
+    placeOfSupply: "",
     clientGstin: "",
 
-    shipToName: "RATNA DEEP CHS",
-    shipToAddress: "Mulund",
+    shipToName: "",
+    shipToAddress: "",
 
     // Items
     items: [
       {
-        description: "100 MM x 50 MM UPVC louver Profile",
+        description: "",
         subDetails: "",
-        hsn: "39162019",
-        qty: 6900,
-        unit: "RFT",
-        rate: 115
-      },
-      {
-        description: "MS FABRICATION WORK 115'X30'",
-        subDetails: "",
-        hsn: "7308",
+        hsn: "",
         qty: 1,
         unit: "pcs",
-        rate: 240000
+        rate: 0
       }
     ],
 
     taxRate: 0,
     isIgst: false,
 
-    notes: "T-Patti for top,bottom & center support\n2\"X 2\" Pipe Ms Fabrication For Fins Support With Material And installation",
-    terms: "50% Advance\n30% ongoing work\n20% after completion",
+    notes: "",
+    terms: "",
 
     bankDetails: {
-      name: "Archzona",
-      ifsc: "UTIB000125",
-      accountNo: "923020053039794",
-      bankName: "AXIS BANK, Dombivli"
+      name: company.bankDetails.accountName || company.legalName,
+      ifsc: company.bankDetails.ifsc,
+      accountNo: company.bankDetails.accountNumber,
+      bankName: company.bankDetails.bankName
     },
-    authorisedSignatory: "Archzona"
+    authorisedSignatory: company.legalName || company.name
   });
 
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
@@ -326,14 +323,6 @@ export default function QuotationGenerator() {
                     name="clientAddress"
                     placeholder="Billing Address"
                     value={quotationData.clientAddress}
-                    onChange={handleInputChange}
-                    className={`w-full p-2.5 rounded-lg border text-sm ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
-                  />
-                  <input
-                    type="text"
-                    name="placeOfSupply"
-                    placeholder="Place of Supply (e.g. Maharashtra)"
-                    value={quotationData.placeOfSupply}
                     onChange={handleInputChange}
                     className={`w-full p-2.5 rounded-lg border text-sm ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
                   />

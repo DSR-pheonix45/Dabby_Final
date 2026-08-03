@@ -60,10 +60,64 @@ export const collaborationService = {
 
   async updateSettings(workbenchId, settingsData) {
     const res = await apiFetch(`/api/collaboration/${workbenchId}/settings`, {
-      method: "PUT",
+      method: "PATCH",
       body: JSON.stringify(settingsData),
     });
     if (!res.ok) throw new Error("Failed to update settings");
     return res.json();
   },
+
+  async getDepartments(workbenchId) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/departments`);
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async createDepartment(workbenchId, deptData) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/departments`, {
+      method: "POST",
+      body: JSON.stringify(deptData),
+    });
+    if (!res.ok) throw new Error("Failed to create department");
+    return res.json();
+  },
+
+  async getEmployees(workbenchId) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/employees`);
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async createEmployee(workbenchId, empData) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/employees`, {
+      method: "POST",
+      body: JSON.stringify(empData),
+    });
+    if (!res.ok) throw new Error("Failed to create employee");
+    return res.json();
+  },
+
+  async submitClaim(workbenchId, claimData) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/claims`, {
+      method: "POST",
+      body: JSON.stringify(claimData),
+    });
+    if (!res.ok) throw new Error("Failed to submit claim");
+    return res.json();
+  },
+
+  async getClaims(workbenchId) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/claims`);
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async updateClaimStatus(workbenchId, claimId, status) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/claims/${claimId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) throw new Error("Failed to update claim status");
+    return res.json();
+  }
 };

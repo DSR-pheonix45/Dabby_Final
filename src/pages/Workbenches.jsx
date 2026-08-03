@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useWorkbench } from "../context/WorkbenchContext";
 import { useAuth } from "../hooks/useAuth";
-import { BsSearch, BsGrid, BsListUl, BsThreeDots, BsPencil, BsTrash } from "react-icons/bs";
+import { BsSearch, BsGrid, BsListUl, BsThreeDots, BsPencil, BsTrash, BsX } from "react-icons/bs";
 import { HiChevronDown } from "react-icons/hi";
 import CreateWorkbenchModal from "../components/Workbenches/CreateWorkbenchModal";
 import { supabase } from "../lib/supabase";
@@ -56,19 +56,32 @@ export default function Workbenches() {
     }
   };
 
-  let finalWorkbenches = workbenches.filter((wb) =>
-    wb.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  let finalWorkbenches = workbenches.filter((wb) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.trim().toLowerCase();
+    const name = (wb.name || "").toLowerCase();
+    const legalName = (wb.legal_name || "").toLowerCase();
+    const industry = (wb.industry || "").toLowerCase();
+    const country = (wb.country || "").toLowerCase();
+    const bType = (wb.business_type || "").toLowerCase();
+    return (
+      name.includes(query) || 
+      legalName.includes(query) || 
+      industry.includes(query) || 
+      country.includes(query) ||
+      bType.includes(query)
+    );
+  });
 
   if (statusFilter === "Active") {
     finalWorkbenches = finalWorkbenches.filter(wb => activeWorkbench?.id === wb.id);
   }
 
   finalWorkbenches.sort((a, b) => {
-    if (sortBy === "Name (A-Z)") return a.name.localeCompare(b.name);
-    if (sortBy === "Name (Z-A)") return b.name.localeCompare(a.name);
-    if (sortBy === "Newest") return new Date(b.created_at) - new Date(a.created_at);
-    if (sortBy === "Oldest") return new Date(a.created_at) - new Date(b.created_at);
+    if (sortBy === "Name (A-Z)") return (a.name || "").localeCompare(b.name || "");
+    if (sortBy === "Name (Z-A)") return (b.name || "").localeCompare(a.name || "");
+    if (sortBy === "Newest") return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+    if (sortBy === "Oldest") return new Date(a.created_at || 0) - new Date(b.created_at || 0);
     return 0;
   });
 
@@ -87,11 +100,20 @@ export default function Workbenches() {
               <BsSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
               <input
                 type="text"
-                placeholder="Search for a workbench"
+                placeholder="Search for a workbench..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#1A1A1A] border border-white/10 rounded-md py-1.5 pl-9 pr-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20 transition-colors"
+                className="w-full bg-[#1A1A1A] border border-white/10 rounded-md py-1.5 pl-9 pr-8 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20 transition-colors"
               />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                  title="Clear search"
+                >
+                  <BsX size={16} />
+                </button>
+              )}
             </div>
 
             <div className="relative hidden sm:block z-30">

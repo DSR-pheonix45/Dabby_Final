@@ -43,6 +43,14 @@ export const diService = {
     return res.json();
   },
 
+  async deleteDocument(documentId) {
+    const res = await apiFetch(`/api/di/documents/${documentId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete document');
+    return res.json();
+  },
+
   async processDocument(documentId, hint = null, password = null) {
     const params = new URLSearchParams();
     if (hint) params.append('hint', hint);

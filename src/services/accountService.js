@@ -66,25 +66,4 @@ export const accountService = {
     if (!res.ok) throw new Error("Failed to process document");
     return res.json();
   },
-
-  async postVoucher(workbenchId, voucherData) {
-    const res = await apiFetch(`/api/workbench-accounts/post-voucher`, {
-      method: "POST",
-      body: JSON.stringify({
-        workbench_id: workbenchId,
-        ...voucherData
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || "Failed to post voucher");
-    }
-    return res.json();
-  },
-
-  async getKpiSummary(workbenchId) {
-    const res = await apiFetch(`/api/workbench-accounts/kpi-summary/${workbenchId}`);
-    if (!res.ok) throw new Error("Failed to fetch KPI summary");
-    return res.json();
-  }
 };

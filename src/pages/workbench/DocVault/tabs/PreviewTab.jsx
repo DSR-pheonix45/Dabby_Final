@@ -1,9 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../../lib/supabase';
-import { BsFileEarmarkPdf, BsImage, BsFileEarmarkText, BsDownload } from 'react-icons/bs';
+import { BsFileEarmarkPdf, BsImage, BsFileEarmarkText, BsDownload, BsTrash, BsLightningChargeFill } from 'react-icons/bs';
 
-export default function PreviewTab({ doc }) {
+export default function PreviewTab({ doc, onDelete, onScan }) {
   const [url, setUrl] = useState(null);
+  const [scanning, setScanning] = useState(false);
+
+  const handleScan = async () => {
+    if (!onScan || !doc) return;
+    setScanning(true);
+    try {
+      await onScan(doc.id);
+    } finally {
+      setScanning(false);
+    }
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -53,14 +64,36 @@ export default function PreviewTab({ doc }) {
           {isPdf ? <BsFileEarmarkPdf /> : isImage ? <BsImage /> : <BsFileEarmarkText />}
           {doc.original_filename}
         </div>
-        <a 
-          href={url} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 text-xs font-semibold text-gray-300 transition-colors"
-        >
-          <BsDownload /> Download Original
-        </a>
+        <div className="flex items-center gap-2">
+          {onScan && (
+            <button
+              onClick={handleScan}
+              disabled={scanning}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-teal-500 hover:bg-teal-400 text-black text-xs font-bold transition-all shadow-md disabled:opacity-50"
+              title="Scan document with Gemini Vision OCR"
+            >
+              <BsLightningChargeFill className={scanning ? 'animate-spin' : ''} />
+              {scanning ? 'Scanning...' : 'Scan & Extract (AI OCR)'}
+            </button>
+          )}
+          <a 
+            href={url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 text-xs font-semibold text-gray-300 transition-colors"
+          >
+            <BsDownload /> Download Original
+          </a>
+          {onDelete && (
+            <button
+              onClick={() => onDelete(doc.id)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-red-500/10 hover:bg-red-500/20 text-xs font-semibold text-red-400 border border-red-500/30 transition-colors"
+              title="Delete document from Doc Vault"
+            >
+              <BsTrash /> Delete Document
+            </button>
+          )}
+        </div>
       </div>
       
       <div className="flex-1 overflow-auto flex items-center justify-center p-4">

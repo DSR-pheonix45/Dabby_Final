@@ -4,36 +4,41 @@ import { toast } from "react-hot-toast";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { formatCurrency } from "../../utils/currency";
 import { generateStandardDocumentPDF } from "../../utils/documentPdfGenerator";
+import { getWorkbenchCompanyDetails } from "../../utils/workbenchCompanyHelper";
+import { saveDocumentToDocVaultAndEngine } from "../../utils/docVaultExporter";
 import DynamicColumnConfigurator, { DEFAULT_COLUMNS } from "./DynamicColumnConfigurator";
+import PartySelector from "./PartySelector";
 
 export default function ProformaInvoiceModal({ isOpen, onClose }) {
   const { activeWorkbench } = useWorkbench();
+  const company = getWorkbenchCompanyDetails(activeWorkbench);
+  const [isSavingDoc, setIsSavingDoc] = useState(false);
+
   const [proformaNumber, setProformaNumber] = useState(`PI-${Math.floor(1000 + Math.random() * 9000)}`);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   
   // Billing Details
-  const [partyName, setPartyName] = useState("RATNA DEEP CHS");
-  const [clientAddress, setClientAddress] = useState("Mulund");
-  const [placeOfSupply, setPlaceOfSupply] = useState("Maharashtra");
+  const [partyName, setPartyName] = useState("");
+  const [clientAddress, setClientAddress] = useState("");
+  const [placeOfSupply, setPlaceOfSupply] = useState("");
 
   // Shipping Details
   const [shipToSameAsBilling, setShipToSameAsBilling] = useState(true);
-  const [shipToName, setShipToName] = useState("RATNA DEEP CHS");
-  const [shipToAddress, setShipToAddress] = useState("Mulund");
+  const [shipToName, setShipToName] = useState("");
+  const [shipToAddress, setShipToAddress] = useState("");
 
-  const [projectEstimateName, setProjectEstimateName] = useState("Site Excavation & Foundation Phase 1");
-  const [advancePercent, setAdvancePercent] = useState(20);
+  const [projectEstimateName, setProjectEstimateName] = useState("");
+  const [advancePercent, setAdvancePercent] = useState(0);
 
   const [columns, setColumns] = useState(DEFAULT_COLUMNS);
   const [showColConfig, setShowColConfig] = useState(false);
 
   const [items, setItems] = useState([
-    { description: "100 MM x 50 MM UPVC louver Profile", subDetails: "", hsn: "39162019", qty: 6900, unit: "RFT", rate: 115 },
-    { description: "MS FABRICATION WORK 115'X30'", subDetails: "", hsn: "7308", qty: 1, unit: "pcs", rate: 240000 },
+    { description: "", subDetails: "", hsn: "", qty: 1, unit: "pcs", rate: 0 }
   ]);
 
-  const [notes, setNotes] = useState("T-Patti for top,bottom & center support\n2\"X 2\" Pipe Ms Fabrication For Fins Support With Material And installation");
-  const [terms, setTerms] = useState("50% Advance\n30% ongoing work\n20% after completion");
+  const [notes, setNotes] = useState("");
+  const [terms, setTerms] = useState("");
 
   if (!isOpen) return null;
 
@@ -68,11 +73,12 @@ export default function ProformaInvoiceModal({ isOpen, onClose }) {
       documentType: "PROFORMA INVOICE",
       docNumber: proformaNumber,
       docDate: date,
-      senderName: activeWorkbench?.name || "Archzona",
-      senderAddress: activeWorkbench?.metadata?.address || "105, PRISM INDUSTRIAL ESTATE, BEHIND PENDARKAR COLLEGE, DOMBIVLI(EAST)421201",
-      senderGstin: activeWorkbench?.gstin || "7ACDFA4175F1ZJ",
-      senderMobile: activeWorkbench?.metadata?.mobile || "9870048082",
-      senderEmail: activeWorkbench?.metadata?.email || "info.archzona@gmail.com",
+      senderName: company.legalName || company.name,
+      senderAddress: company.address,
+      senderGstin: company.gstin,
+      senderPan: company.pan,
+      senderCin: company.cin,
+      senderEmail: company.email,
       clientName: partyName,
       clientAddress: clientAddress,
       placeOfSupply: placeOfSupply,
@@ -84,12 +90,12 @@ export default function ProformaInvoiceModal({ isOpen, onClose }) {
       notes: `Project/Contract: ${projectEstimateName}\n${notes}`,
       terms: `${advancePercent}% Advance\n${terms}`,
       bankDetails: {
-        name: activeWorkbench?.name || "Archzona",
-        ifsc: "UTIB000125",
-        accountNo: "923020053039794",
-        bankName: "AXIS BANK, Dombivli"
+        name: company.bankDetails.accountName || company.legalName,
+        ifsc: company.bankDetails.ifsc,
+        accountNo: company.bankDetails.accountNumber,
+        bankName: company.bankDetails.bankName
       },
-      authorisedSignatory: activeWorkbench?.name || "Archzona"
+      authorisedSignatory: company.legalName || company.name
     });
   };
 
@@ -100,40 +106,30 @@ export default function ProformaInvoiceModal({ isOpen, onClose }) {
   };
 
   const handleSendToTrade = async () => {
+    setIsSavingDoc(true);
     try {
-      const payload = {
-        document_type: "proforma_invoice",
-        party: partyName,
-        total_amount: totalEstimate,
-        date: date,
-        currency: activeWorkbench?.country === "IN" ? "INR" : "USD",
-        metadata: {
-          proformaNumber,
-          projectEstimateName,
-          advancePercent,
-          requiredAdvance,
-          clientAddress,
-          placeOfSupply,
-          shipToName: shipToSameAsBilling ? partyName : shipToName,
-          shipToAddress: shipToSameAsBilling ? clientAddress : shipToAddress,
-          notes,
-          terms,
-          items,
-          columns
-        }
-      };
-
-      await fetch("/api/events/from-document/draft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+      const pdfDoc = generatePDFDoc();
+      await saveDocumentToDocVaultAndEngine({
+        activeWorkbench,
+        docNumber: proformaNumber,
+        documentType: "proforma",
+        pdfDoc,
+        partyName,
+        partyAddress: clientAddress,
+        totalAmount: totalEstimate,
+        docDate: date,
+        lineItems: sanitizeItems(items),
+        notes,
+        terms
       });
 
-      toast.success(`Proforma ${proformaNumber} dispatched to Business Engine!`);
+      toast.success(`Proforma ${proformaNumber} saved to Doc Vault!`);
       onClose();
     } catch (e) {
-      toast.success(`Proforma ${proformaNumber} saved as draft proof!`);
-      onClose();
+      console.error("Save to Doc Vault error:", e);
+      toast.error("Failed to save document to Doc Vault: " + (e.message || e));
+    } finally {
+      setIsSavingDoc(false);
     }
   };
 
@@ -186,12 +182,15 @@ export default function ProformaInvoiceModal({ isOpen, onClose }) {
               <div className="space-y-2">
                 <span className="text-[11px] font-bold text-gray-300 block uppercase">Bill To</span>
                 <div>
-                  <label className="text-[10px] text-gray-400 block mb-0.5">Party / Client Name</label>
-                  <input
+                  <label className="text-[10px] text-gray-400 block mb-0.5">Select Party / Client</label>
+                  <PartySelector
                     value={partyName}
-                    onChange={e => setPartyName(e.target.value)}
-                    placeholder="e.g. RATNA DEEP CHS"
-                    className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-xs text-white"
+                    placeholder="Select or Create Client..."
+                    filterType="customer"
+                    onSelectParty={(party) => {
+                      setPartyName(party.name);
+                      if (party.address) setClientAddress(party.address);
+                    }}
                   />
                 </div>
                 <div>
@@ -201,15 +200,6 @@ export default function ProformaInvoiceModal({ isOpen, onClose }) {
                     value={clientAddress}
                     onChange={e => setClientAddress(e.target.value)}
                     placeholder="Full billing address..."
-                    className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-xs text-white"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-gray-400 block mb-0.5">Place of Supply</label>
-                  <input
-                    value={placeOfSupply}
-                    onChange={e => setPlaceOfSupply(e.target.value)}
-                    placeholder="e.g. Maharashtra"
                     className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-xs text-white"
                   />
                 </div>
@@ -384,7 +374,7 @@ export default function ProformaInvoiceModal({ isOpen, onClose }) {
             <BsFileEarmarkPdf className="mr-2 text-red-400" /> Export PDF Proof
           </button>
           <button onClick={handleSendToTrade} className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg text-xs flex items-center">
-            <BsSend className="mr-2" /> Save to Doc Vault & Send to Business Engine
+            <BsSend className="mr-2" /> Save to Doc Vault
           </button>
         </div>
       </div>

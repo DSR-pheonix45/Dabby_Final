@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BsSearch, BsFileEarmarkText, BsExclamationCircle } from 'react-icons/bs';
+import { BsSearch, BsFileEarmarkText, BsExclamationCircle, BsTrash } from 'react-icons/bs';
 import { useWorkbench } from '../../../context/WorkbenchContext';
 import { formatCurrency } from '../../../utils/currency';
 
@@ -22,7 +22,7 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-export default function DocumentList({ documents, loading, selectedDoc, onSelect, uploading }) {
+export default function DocumentList({ documents, loading, selectedDoc, onSelect, onDelete, uploading }) {
   const [search, setSearch] = useState("");
   const { activeWorkbench } = useWorkbench();
 
@@ -117,17 +117,28 @@ export default function DocumentList({ documents, loading, selectedDoc, onSelect
                     </div>
                   </div>
 
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center group/row">
                     <StatusBadge status={doc.derivedStatus} />
-                    {doc.derivedStatus === 'Uploaded' || doc.derivedStatus === 'Processing' ? (
-                       <div className="text-[10px] text-gray-600 truncate max-w-[150px]">{doc.original_filename}</div>
-                    ) : (
-                      note?.confidence !== undefined && (
-                        <div className={`text-[10px] font-bold ${note.confidence >= 0.90 ? 'text-green-500/70' : 'text-amber-500/70'}`}>
-                          {Math.round(note.confidence * 100)}% Match
-                        </div>
-                      )
-                    )}
+                    <div className="flex items-center gap-2">
+                      {onDelete && (
+                        <button
+                          onClick={(e) => onDelete(doc.id, e)}
+                          className="opacity-0 group-hover/row:opacity-100 p-1 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-all"
+                          title="Delete Document"
+                        >
+                          <BsTrash size={13} />
+                        </button>
+                      )}
+                      {doc.derivedStatus === 'Uploaded' || doc.derivedStatus === 'Processing' ? (
+                         <div className="text-[10px] text-gray-600 truncate max-w-[120px]">{doc.original_filename}</div>
+                      ) : (
+                        note?.confidence !== undefined && (
+                          <div className={`text-[10px] font-bold ${note.confidence >= 0.90 ? 'text-green-500/70' : 'text-amber-500/70'}`}>
+                            {Math.round(note.confidence * 100)}% Match
+                          </div>
+                        )
+                      )}
+                    </div>
                   </div>
                 </div>
               );

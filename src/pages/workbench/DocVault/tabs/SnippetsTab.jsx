@@ -1,6 +1,6 @@
 import React from 'react';
 import { BsDiagram3 } from 'react-icons/bs';
-import SnippetCard from '../../business-engine/components/SnippetCard';
+import SnippetCard from './SnippetCard';
 
 export default function SnippetsTab({ doc }) {
   const note = doc.di_analysis_notes?.[0] || {};

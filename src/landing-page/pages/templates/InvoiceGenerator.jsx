@@ -341,14 +341,6 @@ export default function InvoiceGenerator() {
                     onChange={handleInputChange}
                     className={`w-full p-2.5 rounded-lg border text-sm ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
                   />
-                  <input
-                    type="text"
-                    name="placeOfSupply"
-                    placeholder="Place of Supply (e.g. Maharashtra)"
-                    value={invoiceData.placeOfSupply}
-                    onChange={handleInputChange}
-                    className={`w-full p-2.5 rounded-lg border text-sm ${theme === "dark" ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-300"}`}
-                  />
                 </div>
 
                 <div className="space-y-3 pt-2">

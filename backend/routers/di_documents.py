@@ -70,6 +70,10 @@ async def upload_document(
             "status": "success"
         }).execute()
 
+        # Automatically trigger background AI extraction
+        import asyncio
+        asyncio.create_task(process_document(document_id))
+
         return {"status": "success", "document_id": document_id}
     except Exception as e:
         import traceback
@@ -520,3 +524,34 @@ async def update_ufo(document_id: str, payload: dict):
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{document_id}")
+async def delete_document(document_id: str):
+    try:
+        # Fetch document to get storage path
+        doc_res = supabase.table("di_documents").select("*").eq("id", document_id).execute()
+        if doc_res.data and len(doc_res.data) > 0:
+            doc = doc_res.data[0]
+            storage_path = doc.get("storage_path")
+            if storage_path:
+                try:
+                    from supabase_client import url, key
+                    import httpx
+                    headers = {"Authorization": f"Bearer {key}", "apikey": key}
+                    async with httpx.AsyncClient() as client:
+                        await client.delete(f"{url}/storage/v1/object/Doc_vault_Raw/{storage_path}", headers=headers)
+                except Exception as s_err:
+                    print("[WARNING] Could not delete from storage bucket:", s_err)
+
+        # Delete dependent notes, logs, and document
+        try:
+            supabase.table("di_analysis_notes").delete().eq("document_id", document_id).execute()
+            supabase.table("di_document_processing_logs").delete().eq("document_id", document_id).execute()
+        except Exception:
+            pass
+
+        supabase.table("di_documents").delete().eq("id", document_id).execute()
+        return {"status": "success", "deleted_id": document_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

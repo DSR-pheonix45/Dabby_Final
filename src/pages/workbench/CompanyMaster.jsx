@@ -130,10 +130,17 @@ export default function CompanyMaster() {
   };
 
   const addNewBlankRow = () => {
-    setTableRows(prev => [
-      ...prev, 
-      { id: `row-${Date.now()}`, accountClass: '', groupCode: '', ledger: '', label: '', fullCode: '', isNew: true }
-    ]);
+    const newRow = { 
+      id: `row-${Date.now()}`, 
+      accountClass: 'Assets', 
+      groupCode: 'ACO', 
+      ledger: '', 
+      label: '', 
+      fullCode: '', 
+      isNew: true 
+    };
+    setTableRows(prev => reindexRows([newRow, ...prev]));
+    toast.success("New ledger row added at top of chart!");
   };
 
   const deleteRow = (rowId) => {
@@ -233,6 +240,7 @@ export default function CompanyMaster() {
       
       toast.success("Company Master synchronized successfully!");
       await loadAccounts(); // Reload to get actual UUIDs from DB
+      window.dispatchEvent(new Event("coaUpdated"));
     } catch (err) {
       console.error(err);
       toast.error("Failed to sync Company Master: " + (err.message || err));
@@ -276,7 +284,7 @@ export default function CompanyMaster() {
 
           {/* Top Action Bar Layer */}
           <div className="flex justify-between items-center mb-6 gap-2 border-b border-white/10 pb-4">
-            <div className="flex gap-4">
+            <div className="flex items-center gap-3">
               <button 
                 onClick={() => toast("✨ AI Assistant - Coming Soon")} 
                 className="flex items-center space-x-2 px-3 py-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20 rounded-md text-sm font-medium transition-colors"
@@ -299,6 +307,14 @@ export default function CompanyMaster() {
                 <option value="pl">P&L / Balance Sheet</option>
                 <option value="trial">Trial Balance</option>
               </select>
+
+              <button 
+                onClick={addNewBlankRow}
+                className="flex items-center space-x-2 px-3.5 py-1.5 bg-teal-500 hover:bg-teal-400 text-black font-bold text-sm rounded-md transition-colors shadow-sm"
+              >
+                <span className="text-base leading-none mb-0.5">+</span>
+                <span>Add Single Ledger</span>
+              </button>
             </div>
           </div>
 
@@ -320,7 +336,16 @@ export default function CompanyMaster() {
                   <tr key={row.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
                     {/* Code Field */}
                     <td className="p-4 font-mono text-teal-400 font-bold tracking-wider whitespace-nowrap">
-                      {row.fullCode || '—'}
+                      <div className="flex items-center space-x-2">
+                        <span>{row.fullCode || '—'}</span>
+                        {activeWorkbench?.bank_accounts?.some(
+                          (b) => b.coa_ledger_id === row.id || b.coa_ledger_code === row.fullCode || b.coa_ledger_code === row.ledger
+                        ) && (
+                          <span className="text-[9px] bg-teal-500/20 text-teal-300 border border-teal-500/30 px-1.5 py-0.5 rounded-full font-sans uppercase font-bold tracking-wider">
+                            Linked Bank
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Account Selection */}

@@ -47,7 +47,7 @@ const ChatInput = forwardRef(function ChatInput(
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const { workbenches, activeWorkbench, changeActiveWorkbench } = useWorkbench();
+  const { workbenches, activeWorkbench, changeActiveWorkbench, isWorkbenchContextEnabled, toggleWorkbenchContext } = useWorkbench();
   const [isWorkbenchDropdownOpen, setIsWorkbenchDropdownOpen] = useState(false);
 
   // Rotating Placeholder Logic
@@ -265,46 +265,28 @@ const ChatInput = forwardRef(function ChatInput(
               </button>
             </div>
 
-            {/* Workbench Selector */}
-            <div className="flex items-center gap-1 px-1 relative">
+            {/* Workbench Context Toggle */}
+            <div className="flex items-center gap-1 px-1">
               <button
                 type="button"
-                onClick={() => setIsWorkbenchDropdownOpen(!isWorkbenchDropdownOpen)}
+                onClick={() => toggleWorkbenchContext()}
                 disabled={disabled || isLoading}
-                title={activeWorkbench ? `Workbench: ${activeWorkbench.name}` : "Select Workbench"}
-                className={`group/btn relative p-2 sm:p-2.5 rounded-lg sm:rounded-xl transition-all duration-200 ${
-                  activeWorkbench 
-                    ? "text-teal-400 bg-teal-500/10 shadow-[0_0_10px_rgba(20,184,166,0.1)]"
-                    : "text-gray-400 hover:text-teal-400 hover:bg-teal-500/10"
+                title={
+                  isWorkbenchContextEnabled && activeWorkbench 
+                    ? `Workbench Context: ON (${activeWorkbench.name}) — Click to turn OFF` 
+                    : "Workbench Context: OFF — Click to turn ON"
+                }
+                className={`group/btn relative p-2 sm:p-2.5 rounded-lg sm:rounded-xl transition-all duration-200 border ${
+                  isWorkbenchContextEnabled && activeWorkbench
+                    ? "text-teal-400 bg-teal-500/10 border-teal-500/30 shadow-[0_0_10px_rgba(20,184,166,0.15)]"
+                    : "text-gray-500 bg-white/5 border-white/5 opacity-60 hover:opacity-100 hover:text-teal-400"
                 }`}
               >
                 <BsBuilding className="text-base sm:text-lg" />
+                {isWorkbenchContextEnabled && activeWorkbench && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-teal-400 rounded-full border-2 border-[#161B22] animate-pulse" />
+                )}
               </button>
-
-              {isWorkbenchDropdownOpen && (
-                <div className="absolute bottom-full mb-2 left-0 w-56 bg-[#161B22]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/10 z-50 p-1">
-                  {workbenches.map((wb) => (
-                    <button
-                      key={wb.id}
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        changeActiveWorkbench(wb);
-                        setIsWorkbenchDropdownOpen(false);
-                      }}
-                      className="w-full flex items-center px-3 py-2 hover:bg-white/10 rounded-lg transition-colors text-left"
-                    >
-                      <span className={`text-sm truncate ${activeWorkbench?.id === wb.id ? 'text-teal-400 font-medium' : 'text-white'}`}>
-                        {wb.name}
-                      </span>
-                    </button>
-                  ))}
-                  
-                  {workbenches.length === 0 && (
-                    <div className="px-3 py-2 text-sm text-gray-500">No workbenches</div>
-                  )}
-                </div>
-              )}
             </div>
 
             {/* Web Search Toggle */}
@@ -352,19 +334,8 @@ const ChatInput = forwardRef(function ChatInput(
               />
             </div>
 
-            {/* Right Actions (Voice & Send) */}
+            {/* Right Actions (Send) */}
             <div className="flex items-center gap-1 sm:gap-2 pr-2 sm:pr-3 pl-1 sm:pl-2 border-l border-white/5">
-              <div className="hidden sm:block">
-                <VoiceInput
-                  disabled={disabled || isLoading}
-                  onTranscript={setMessage}
-                  onFinalTranscript={(text) => {
-                    setMessage(text);
-                    if (textareaRef.current) textareaRef.current.focus();
-                  }}
-                />
-              </div>
-
               <button
                 type="submit"
                 disabled={(!message.trim() && attachedFiles.length === 0) || disabled || isLoading}

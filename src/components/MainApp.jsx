@@ -34,7 +34,7 @@ import { useWorkbench } from "../context/WorkbenchContext";
 export default function MainApp() {
   useTheme(); // Theme context is used for side effects
   const location = useLocation();
-  const { activeWorkbench } = useWorkbench();
+  const { activeWorkbench, isWorkbenchContextEnabled } = useWorkbench();
   const { user, profile, loading: authLoading } = useAuth();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -522,13 +522,18 @@ Based on the Profit & Loss statement provided, the business shows stable operati
 
       // Build real-time business context for user
       let userContextStr = "";
-      try {
-        console.log(`[DEBUG] Building real-time intelligence for user`);
-        const intel = await contextService.getUserIntelligence();
-        userContextStr = contextService.formatForLLM(intel);
-      } catch (ctxError) {
-        console.error("[DEBUG] Error building user intelligence:", ctxError);
-        userContextStr = "Error: Failed to fetch real-time data.";
+      if (isWorkbenchContextEnabled === false) {
+        console.log(`[DEBUG] Workbench Context is OFF by user setting. Skipping workbench intelligence.`);
+        userContextStr = "Workbench context is OFF. Respond using general domain knowledge or uploaded files.";
+      } else {
+        try {
+          console.log(`[DEBUG] Building real-time intelligence for user`);
+          const intel = await contextService.getUserIntelligence();
+          userContextStr = contextService.formatForLLM(intel);
+        } catch (ctxError) {
+          console.error("[DEBUG] Error building user intelligence:", ctxError);
+          userContextStr = "Error: Failed to fetch real-time data.";
+        }
       }
 
       const llmResponse = await callLLMWithFallback({

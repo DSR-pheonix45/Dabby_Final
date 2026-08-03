@@ -4,6 +4,11 @@ import { toast } from "react-hot-toast";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { savePO } from "./generatorStore";
+import { useWorkbench } from "../../context/WorkbenchContext";
+import { useAuth } from "../../hooks/useAuth";
+import { getWorkbenchCompanyDetails } from "../../utils/workbenchCompanyHelper";
+import { saveDocumentToDocVaultAndEngine } from "../../utils/docVaultExporter";
+import PartySelector from "./PartySelector";
 
 const PRESET_VENDORS = [
   { name: "RawMat India Supplies", gstin: "27AABCR9911P1ZK", address: "GIDC Industrial Estate, Vadodara, GJ - 390010", email: "orders@rawmat.in" },
@@ -12,22 +17,26 @@ const PRESET_VENDORS = [
 ];
 
 export default function PurchaseOrderModal({ isOpen, onClose }) {
+  const { activeWorkbench } = useWorkbench();
+  const { user } = useAuth();
+  const company = getWorkbenchCompanyDetails(activeWorkbench, user);
+
   const [poNumber, setPoNumber] = useState(`PO-${Math.floor(1000 + Math.random() * 9000)}`);
   const [poDate, setPoDate] = useState(new Date().toISOString().split("T")[0]);
   const [deliveryDate, setDeliveryDate] = useState("");
 
   const [vendor, setVendor] = useState({
-    name: "RawMat India Supplies",
-    gstin: "27AABCR9911P1ZK",
-    address: "GIDC Industrial Estate, Vadodara, GJ - 390010",
-    email: "orders@rawmat.in"
+    name: "",
+    gstin: "",
+    address: "",
+    email: ""
   });
 
   const [items, setItems] = useState([
-    { id: 1, sku: "SKU-RAW-101", description: "Stainless Steel Sheet Grade 304 (2mm)", qty: 50, expectedRate: 1800, targetDate: "2026-08-10" }
+    { id: 1, sku: "", description: "", qty: 1, expectedRate: 0, targetDate: "" }
   ]);
 
-  const [instructions, setInstructions] = useState("Please confirm delivery timeline within 48 hours. Include test certificate on dispatch.");
+  const [instructions, setInstructions] = useState("");
 
   const handleVendorPreset = (e) => {
     const matched = PRESET_VENDORS.find(v => v.name === e.target.value);
@@ -55,18 +64,23 @@ export default function PurchaseOrderModal({ isOpen, onClose }) {
   const handleExportPDF = () => {
     try {
       const doc = new jsPDF();
-      doc.setFontSize(20);
+      doc.setFontSize(18);
       doc.setTextColor(20, 184, 166);
-      doc.text("DABBY ENTERPRISE PVT LTD", 14, 20);
-
-      doc.setFontSize(14);
-      doc.setTextColor(40, 40, 40);
-      doc.text("PURCHASE ORDER (PO)", 14, 28);
+      doc.text((company.legalName || company.name).toUpperCase(), 14, 20);
 
       doc.setFontSize(10);
+      doc.setTextColor(80, 80, 80);
+      doc.text(company.address, 14, 26);
+      doc.text(`GSTIN: ${company.gstin} | PAN: ${company.pan} ${company.cin ? '| CIN: ' + company.cin : ''}`, 14, 31);
+
+      doc.setFontSize(13);
+      doc.setTextColor(40, 40, 40);
+      doc.text("PURCHASE ORDER (PO)", 14, 39);
+
+      doc.setFontSize(9);
       doc.setTextColor(100, 100, 100);
-      doc.text(`PO #: ${poNumber}`, 14, 35);
-      doc.text(`PO Date: ${poDate}`, 14, 40);
+      doc.text(`PO #: ${poNumber}`, 14, 45);
+      doc.text(`PO Date: ${poDate}`, 14, 50);
 
       // Vendor block
       doc.setFontSize(11);
@@ -116,21 +130,94 @@ export default function PurchaseOrderModal({ isOpen, onClose }) {
     }
   };
 
-  const handleSavePO = () => {
-    const poObj = {
-      id: poNumber,
-      poNumber,
-      poDate,
-      deliveryDate,
-      vendor,
-      items,
-      instructions,
-      totalAmount,
-      status: "Sent to Vendor"
-    };
-    savePO(poObj);
-    toast.success(`Purchase Order ${poNumber} created successfully!`);
-    onClose();
+  const [isSavingDoc, setIsSavingDoc] = useState(false);
+
+  const handleSavePO = async () => {
+    setIsSavingDoc(true);
+    try {
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.setTextColor(20, 184, 166);
+      doc.text((company.legalName || company.name).toUpperCase(), 14, 20);
+
+      doc.setFontSize(10);
+      doc.setTextColor(80, 80, 80);
+      doc.text(company.address, 14, 26);
+      doc.text(`GSTIN: ${company.gstin} | PAN: ${company.pan} ${company.cin ? '| CIN: ' + company.cin : ''}`, 14, 31);
+
+      doc.setFontSize(13);
+      doc.setTextColor(40, 40, 40);
+      doc.text("PURCHASE ORDER (PO)", 14, 39);
+
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`PO #: ${poNumber}`, 14, 45);
+      doc.text(`PO Date: ${poDate}`, 14, 50);
+
+      // Vendor block
+      doc.setFontSize(11);
+      doc.setTextColor(0, 0, 0);
+      doc.text("VENDOR DETAILS:", 120, 28);
+      doc.setFontSize(10);
+      doc.setTextColor(60, 60, 60);
+      doc.text(vendor.name || "Vendor", 120, 34);
+      doc.text(`GSTIN: ${vendor.gstin || "N/A"}`, 120, 39);
+      doc.text(`Email: ${vendor.email || "N/A"}`, 120, 44);
+
+      const tableData = items.map((item, idx) => [
+        idx + 1,
+        item.sku || "N/A",
+        item.description || "Item",
+        item.qty,
+        `Rs. ${Number(item.expectedRate || 0).toLocaleString('en-IN')}`,
+        item.targetDate || deliveryDate || "ASAP",
+        `Rs. ${(Number(item.qty || 0) * Number(item.expectedRate || 0)).toLocaleString('en-IN')}`
+      ]);
+
+      autoTable(doc, {
+        startY: 50,
+        head: [['#', 'SKU', 'Required Material Description', 'Qty', 'Expected Rate', 'Target Date', 'Total (Rs.)']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [20, 184, 166] }
+      });
+
+      await saveDocumentToDocVaultAndEngine({
+        activeWorkbench,
+        docNumber: poNumber,
+        documentType: "purchase_order",
+        pdfDoc: doc,
+        partyName: vendor.name,
+        partyAddress: vendor.address,
+        partyGstin: vendor.gstin,
+        totalAmount,
+        docDate: poDate,
+        dueDate: deliveryDate,
+        lineItems: items,
+        notes: instructions
+      });
+
+      const poObj = {
+        id: poNumber,
+        poNumber,
+        poDate,
+        deliveryDate,
+        vendor,
+        items,
+        instructions,
+        totalAmount,
+        status: "Sent to Vendor"
+      };
+      savePO(poObj);
+
+      toast.success(`Purchase Order ${poNumber} saved to Doc Vault!`);
+      onClose();
+    } catch (e) {
+      console.error("Save to Doc Vault error:", e);
+      toast.error("Failed to save Purchase Order to Doc Vault: " + (e.message || e));
+    } finally {
+      setIsSavingDoc(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -209,12 +296,20 @@ export default function PurchaseOrderModal({ isOpen, onClose }) {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <label className="block text-gray-400 mb-1">Vendor Name</label>
-                <input
-                  type="text"
+                <label className="block text-gray-400 mb-1">Select Vendor / Supplier</label>
+                <PartySelector
                   value={vendor.name}
-                  onChange={(e) => setVendor({ ...vendor, name: e.target.value })}
-                  className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none"
+                  placeholder="Select or Create Vendor..."
+                  filterType="vendor"
+                  onSelectParty={(party) => {
+                    setVendor(prev => ({
+                      ...prev,
+                      name: party.name,
+                      address: party.address || prev.address,
+                      gstin: party.gstin || prev.gstin,
+                      email: party.email || prev.email
+                    }));
+                  }}
                 />
               </div>
               <div>

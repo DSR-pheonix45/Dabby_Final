@@ -63,12 +63,34 @@ export default function VoucherEntryTab({ doc }) {
   const ufo = note.extracted_data || {};
   
   // Flattened UFO properties with fallback
-  const rawDocType = note.document_type || ufo.document_type || 'sales_invoice';
-  const docTypeStr = (typeof rawDocType === 'object' ? rawDocType?.value : rawDocType) || 'sales_invoice';
+  const rawDocType = note.document_type || ufo.document_type || 'expense_receipt';
+  const docTypeStr = (typeof rawDocType === 'object' ? rawDocType?.value : rawDocType) || 'expense_receipt';
   const lowerDocType = docTypeStr.toLowerCase();
+  const filename = (doc?.original_filename || '').toLowerCase();
   
-  const isVendorDoc = lowerDocType.includes('vendor') || lowerDocType.includes('bill') || lowerDocType.includes('purchase');
-  const isBankStatement = lowerDocType.includes('bank_statement') || lowerDocType.includes('bank statement') || lowerDocType.includes('passbook') || lowerDocType.includes('statement');
+  const isExpenseDoc = lowerDocType.includes('expense') || 
+                       lowerDocType.includes('receipt') || 
+                       lowerDocType.includes('claim') || 
+                       lowerDocType.includes('opex') || 
+                       lowerDocType.includes('petrol') || 
+                       lowerDocType.includes('fuel') || 
+                       lowerDocType.includes('allowance') || 
+                       filename.includes('receipt') || 
+                       filename.includes('clm-') || 
+                       filename.includes('expense');
+
+  const isVendorDoc = !isExpenseDoc && (
+    lowerDocType.includes('vendor') || 
+    lowerDocType.includes('bill') || 
+    lowerDocType.includes('purchase') || 
+    lowerDocType.includes('po') || 
+    lowerDocType.includes('purchase_order')
+  );
+
+  const isBankStatement = lowerDocType.includes('bank_statement') || 
+                         lowerDocType.includes('bank statement') || 
+                         lowerDocType.includes('passbook') || 
+                         lowerDocType.includes('statement');
 
   const money = note.money || ufo.financials || {};
   const taxes = note.taxes || {};
@@ -76,65 +98,70 @@ export default function VoucherEntryTab({ doc }) {
   const parties = note.parties || ufo.parties || {};
   const lineItems = (note.line_items && note.line_items.length > 0) ? note.line_items : (ufo.line_items || []);
 
-  // Currency & Values
+  // Currency & Real Values (No fake 59000 fallback)
   const country = activeWorkbench?.country || 'India';
-  const grandTotal = Number(money.total_amount ?? money.grand_total ?? money.subtotal ?? 59000);
-  const totalTax = Number(taxes.total_tax ?? money.tax_amount ?? (grandTotal * 0.18 / 1.18));
+  const rawTotal = money.total_amount ?? money.grand_total ?? money.subtotal ?? ufo.financials?.total_amount?.value ?? ufo.total_amount;
+  const grandTotal = (rawTotal !== undefined && rawTotal !== null) ? Number(rawTotal) : (lineItems.reduce((acc, i) => acc + (Number(i.amount || i.total) || 0), 0) || 0);
+
+  const totalTax = Number(taxes.total_tax ?? money.tax_amount ?? (grandTotal > 0 ? (grandTotal * 0.18 / 1.18) : 0));
   const subtotal = Number(money.subtotal ?? money.taxable_amount ?? (grandTotal - totalTax));
   const cgst = Number(taxes.cgst ?? (totalTax / 2));
   const sgst = Number(taxes.sgst ?? (totalTax / 2));
   const igst = Number(taxes.igst ?? 0);
 
   // Header Details
-  const invoiceNo = dates.invoice_number || dates.invoice_no || ufo.invoice_number || 'INV-1024';
-  const invoiceDate = dates.document_date || dates.invoice_date || dates.date || '2026-07-26';
-  const dueDate = dates.due_date || '2026-08-25';
+  const invoiceNo = dates.invoice_number || dates.invoice_no || ufo.invoice_number || (isExpenseDoc ? 'EXP-REC' : 'INV-1024');
+  const invoiceDate = dates.document_date || dates.invoice_date || dates.date || new Date().toISOString().split('T')[0];
+  const dueDate = dates.due_date || invoiceDate;
   const placeOfSupply = dates.place_of_supply || 'Maharashtra (27)';
   const reverseCharge = dates.reverse_charge ? 'Yes' : 'No';
-  const natureOfSupply = dates.nature_of_supply || 'B2B Taxable Supply';
+  const natureOfSupply = dates.nature_of_supply || (isExpenseDoc ? 'Direct OPEX Expense' : 'B2B Taxable Supply');
 
   // Parties
+  const issuerPartyName = parties.issuer?.name || parties.seller?.name || parties.vendor?.name || 'Venkatesh Automobiles';
+  const recipientPartyName = parties.recipient?.name || parties.customer?.name || activeWorkbench?.name || 'Datalis Private Limited';
+
   const seller = parties.issuer || parties.seller || parties.vendor || {
-    name: 'Wetacre Sustainable Solutions Private Limited',
+    name: issuerPartyName,
     gstin: '27AAACA0000A1Z5',
     pan: 'AAACA0000A',
-    address: '105, Prism Industrial Estate, Dombivli East, Maharashtra 421201',
+    address: 'Fuel Station & Retail Premises',
     state_code: '27',
-    bank_details: 'Axis Bank • A/C 920010050010754'
+    bank_details: 'UPI / Direct Petty Cash'
   };
 
   const customer = parties.recipient || parties.customer || parties.buyer || {
-    name: 'Datalis Private Limited',
+    name: recipientPartyName,
     customer_code: 'CUST-8841',
     gstin: '27BBBCA1111B1Z2',
-    address: 'Plot 42, MIDC Industrial Area, Andheri East, Mumbai 400093',
+    address: activeWorkbench?.address?.street || 'Company Office',
     state: 'Maharashtra',
     country: 'India',
     pan: 'BBBCA1111B'
   };
 
-  // Default demonstration line items if none extracted
+  // Line Items
   const items = lineItems.length > 0 ? lineItems : [
     {
-      description: 'Cloud Subscription & License',
-      sku: 'SKU-CS-10',
+      description: isExpenseDoc ? 'Fuel / Travel Allowance Reimbursement' : 'Cloud Subscription & License',
+      sku: isExpenseDoc ? 'SKU-OPEX' : 'SKU-CS-10',
       hsn_sac: '998313',
-      quantity: 10,
+      quantity: 1,
       unit: 'NOS',
-      rate: 5000,
+      rate: grandTotal,
       discount: 0,
-      taxable_value: 50000,
+      taxable_value: subtotal,
       gst_rate: 18,
-      cgst: 4500,
-      sgst: 4500,
-      igst: 0,
-      total: 59000
+      cgst: cgst,
+      sgst: sgst,
+      igst: igst,
+      total: grandTotal
     }
   ];
 
   // Calculated inventory & COGS estimates
-  const totalQty = items.reduce((acc, item) => acc + (Number(item.quantity) || 1), 0);
-  const estimatedCogs = Math.round(subtotal * 0.65); // 65% estimated COGS
+  const totalQty = isExpenseDoc ? 0 : items.reduce((acc, item) => acc + (Number(item.quantity) || 1), 0);
+  const estimatedCogs = isExpenseDoc ? 0 : Math.round(subtotal * 0.65);
 
   if (isBankStatement) {
     const bankSummary = note.statement_summary || ufo.statement_summary || {};
@@ -390,7 +417,7 @@ export default function VoucherEntryTab({ doc }) {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-white tracking-tight">
-                  {isVendorDoc ? 'Purchase / Vendor Voucher Entry' : 'Sales Voucher Entry'}
+                  {isExpenseDoc ? 'Direct OPEX Expense Voucher Entry' : isVendorDoc ? 'Purchase / Vendor Voucher Entry' : 'Sales Voucher Entry'}
                 </h2>
                 <span className="bg-teal-500/10 text-teal-400 text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded border border-teal-500/20">
                   {docTypeStr.replace('_', ' ')}
@@ -398,7 +425,7 @@ export default function VoucherEntryTab({ doc }) {
               </div>
               <p className="text-xs text-gray-400 mt-0.5">
                 Records: <span className="text-teal-300 font-medium">
-                  {isVendorDoc ? '"We purchased goods/services from a vendor."' : '"We sold goods/services to a customer."'}
+                  {isExpenseDoc ? '"Direct Operational Expense / Employee Out-of-Pocket Reimbursement."' : isVendorDoc ? '"We purchased goods/services from a vendor."' : '"We sold goods/services to a customer."'}
                 </span>
               </p>
             </div>
@@ -428,31 +455,31 @@ export default function VoucherEntryTab({ doc }) {
             <div className="p-3.5 bg-[#161616] border border-white/5 rounded-xl flex flex-col justify-between hover:border-teal-500/30 transition-colors group">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  {isVendorDoc ? '1. Expense' : '1. Revenue'}
+                  {isExpenseDoc || isVendorDoc ? '1. Expense' : '1. Revenue'}
                 </span>
                 <BsArrowUpRight className="text-green-400 text-xs" />
               </div>
               <div>
                 <p className="text-[11px] text-gray-300 font-medium">
-                  {isVendorDoc ? 'Operating Expense' : 'Sales Income'}
+                  {isExpenseDoc || isVendorDoc ? 'Operating Expense' : 'Sales Income'}
                 </p>
                 <p className="text-sm font-extrabold text-green-400 mt-0.5">+{formatCurrency(subtotal, country)}</p>
               </div>
             </div>
 
-            {/* 2. Vendor (AP) / Customer (AR) */}
+            {/* 2. Vendor / Employee Payables / Customer AR */}
             <div className="p-3.5 bg-[#161616] border border-white/5 rounded-xl flex flex-col justify-between hover:border-teal-500/30 transition-colors group">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  {isVendorDoc ? '2. Vendor (AP)' : '2. Customer (AR)'}
+                  {isExpenseDoc ? '2. Reimbursement (AP)' : isVendorDoc ? '2. Vendor (AP)' : '2. Customer (AR)'}
                 </span>
-                <BsArrowUpRight className={isVendorDoc ? 'text-rose-400 text-xs' : 'text-teal-400 text-xs'} />
+                <BsArrowUpRight className={isExpenseDoc || isVendorDoc ? 'text-rose-400 text-xs' : 'text-teal-400 text-xs'} />
               </div>
               <div>
                 <p className="text-[11px] text-gray-300 font-medium">
-                  {isVendorDoc ? 'We Owe Vendor' : 'Customer Owes'}
+                  {isExpenseDoc ? 'Employee Dues' : isVendorDoc ? 'We Owe Vendor' : 'Customer Owes'}
                 </p>
-                <p className={`text-sm font-extrabold mt-0.5 ${isVendorDoc ? 'text-rose-400' : 'text-teal-400'}`}>
+                <p className={`text-sm font-extrabold mt-0.5 ${isExpenseDoc || isVendorDoc ? 'text-rose-400' : 'text-teal-400'}`}>
                   +{formatCurrency(grandTotal, country)}
                 </p>
               </div>
@@ -462,13 +489,13 @@ export default function VoucherEntryTab({ doc }) {
             <div className="p-3.5 bg-[#161616] border border-white/5 rounded-xl flex flex-col justify-between hover:border-teal-500/30 transition-colors group">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  {isVendorDoc ? '3. Input GST' : '3. Output GST'}
+                  {isExpenseDoc || isVendorDoc ? '3. Input GST' : '3. Output GST'}
                 </span>
                 <BsArrowUpRight className="text-amber-400 text-xs" />
               </div>
               <div>
                 <p className="text-[11px] text-gray-300 font-medium">
-                  {isVendorDoc ? 'Input Tax Credit' : 'Tax Payable'}
+                  {isExpenseDoc || isVendorDoc ? 'Input Tax Credit' : 'Tax Payable'}
                 </p>
                 <p className="text-sm font-extrabold text-amber-400 mt-0.5">+{formatCurrency(totalTax, country)}</p>
               </div>
@@ -482,28 +509,28 @@ export default function VoucherEntryTab({ doc }) {
               </div>
               <div>
                 <p className="text-[11px] text-gray-300 font-medium">
-                  {isVendorDoc ? 'Stock Increases' : 'Stock Decreases'}
+                  {isExpenseDoc ? 'No Inventory Impact' : isVendorDoc ? 'Stock Increases' : 'Stock Decreases'}
                 </p>
-                <p className={`text-sm font-extrabold mt-0.5 ${isVendorDoc ? 'text-teal-400' : 'text-rose-400'}`}>
-                  {isVendorDoc ? `+${totalQty} Units` : `-${totalQty} Units`}
+                <p className={`text-sm font-extrabold mt-0.5 ${isExpenseDoc ? 'text-gray-400' : isVendorDoc ? 'text-teal-400' : 'text-rose-400'}`}>
+                  {isExpenseDoc ? '0 Units' : isVendorDoc ? `+${totalQty} Units` : `-${totalQty} Units`}
                 </p>
               </div>
             </div>
 
-            {/* 5. COGS / Accrual */}
+            {/* 5. COGS / Accrual / Net PnL Impact */}
             <div className="p-3.5 bg-[#161616] border border-white/5 rounded-xl flex flex-col justify-between hover:border-teal-500/30 transition-colors group">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  {isVendorDoc ? '5. Payable Liability' : '5. COGS'}
+                  {isExpenseDoc ? '5. Net P&L Impact' : isVendorDoc ? '5. Payable Liability' : '5. COGS'}
                 </span>
                 <BsArrowUpRight className="text-indigo-400 text-xs" />
               </div>
               <div>
                 <p className="text-[11px] text-gray-300 font-medium">
-                  {isVendorDoc ? 'Accrued Payable' : 'Cost Expense'}
+                  {isExpenseDoc ? 'Net Profit Impact' : isVendorDoc ? 'Accrued Payable' : 'Cost Expense'}
                 </p>
                 <p className="text-sm font-extrabold text-indigo-400 mt-0.5">
-                  +{formatCurrency(isVendorDoc ? grandTotal : estimatedCogs, country)}
+                  {isExpenseDoc ? `-${formatCurrency(grandTotal, country)}` : `+${formatCurrency(isVendorDoc ? grandTotal : estimatedCogs, country)}`}
                 </p>
               </div>
             </div>
@@ -528,13 +555,48 @@ export default function VoucherEntryTab({ doc }) {
               <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5 flex items-center justify-between">
                 <span className="text-xs font-bold text-white flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-teal-400"></span>
-                  {isVendorDoc ? 'Entry 1: Purchase Expense & Vendor Payable Entry' : 'Entry 1: Revenue & Receivables Entry'}
+                  {isExpenseDoc 
+                    ? 'Entry 1: OPEX Expense & Employee Reimbursement Entry' 
+                    : isVendorDoc 
+                      ? 'Entry 1: Purchase Expense & Vendor Payable Entry' 
+                      : 'Entry 1: Revenue & Receivables Entry'}
                 </span>
                 <span className="text-[10px] text-gray-400 font-mono">Invoice Date: {invoiceDate}</span>
               </div>
               
               <div className="p-4 space-y-2 text-xs font-mono">
-                {isVendorDoc ? (
+                {isExpenseDoc ? (
+                  <>
+                    {/* Debit Expense */}
+                    <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                      <div className="flex items-center gap-3">
+                        <span className="px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold text-[10px]">Dr</span>
+                        <span className="text-gray-200 font-bold">Operating Expense Account (Travel & Fuel / Site Operations)</span>
+                      </div>
+                      <span className="text-teal-400 font-bold">{formatCurrency(subtotal, country)}</span>
+                    </div>
+
+                    {/* Debit Input GST if tax present */}
+                    {totalTax > 0 && (
+                      <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                          <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px]">Dr</span>
+                          <span className="text-gray-200 font-bold">Input GST Credit Account (18%)</span>
+                        </div>
+                        <span className="text-amber-400 font-bold">{formatCurrency(totalTax, country)}</span>
+                      </div>
+                    )}
+
+                    {/* Credit Employee Reimbursement Line */}
+                    <div className="flex justify-between items-center py-1.5 pl-6">
+                      <div className="flex items-center gap-3">
+                        <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-bold text-[10px]">Cr</span>
+                        <span className="text-gray-300 font-bold">Employee Reimbursement Payable — {seller.name}</span>
+                      </div>
+                      <span className="text-rose-400 font-bold">{formatCurrency(grandTotal, country)}</span>
+                    </div>
+                  </>
+                ) : isVendorDoc ? (
                   <>
                     {/* Debit Expense */}
                     <div className="flex justify-between items-center py-1.5 border-b border-white/5">

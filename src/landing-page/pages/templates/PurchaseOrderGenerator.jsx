@@ -8,17 +8,23 @@ import autoTable from "jspdf-autotable";
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle, ImageRun } from "docx";
 import { saveAs } from "file-saver";
 
+import { useWorkbench } from "../../../context/WorkbenchContext";
+import { getWorkbenchCompanyDetails } from "../../../utils/workbenchCompanyHelper";
+
 export default function PurchaseOrderGenerator() {
   const { theme } = useTheme();
+  const { activeWorkbench } = useWorkbench();
+  const company = getWorkbenchCompanyDetails(activeWorkbench);
+
   const [poData, setPoData] = useState({
-    poNumber: "PO-001",
+    poNumber: `PO-${Math.floor(1000 + Math.random() * 9000)}`,
     date: new Date().toISOString().split('T')[0],
     deliveryDate: "",
-    senderName: "",
-    senderEmail: "",
-    senderAddress: "",
-    senderGstin: "",
-    senderCin: "",
+    senderName: company.legalName || company.name,
+    senderEmail: company.email,
+    senderAddress: company.address,
+    senderGstin: company.gstin,
+    senderCin: company.cin,
     vendorName: "",
     vendorEmail: "",
     vendorAddress: "",
@@ -26,7 +32,7 @@ export default function PurchaseOrderGenerator() {
     items: [{ description: "", quantity: 1, price: 0 }],
     notes: "",
     taxRate: 18,
-    logo: null,
+    logo: company.logo,
     letterhead: null,
     footer: null,
   });

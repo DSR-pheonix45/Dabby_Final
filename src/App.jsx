@@ -57,6 +57,7 @@ const MainApp = lazy(() => import("./components/MainApp"));
 const Settings = lazy(() => import("./components/Settings/Settings"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const DataIngestionPage = lazy(() => import("./pages/DataIngestion"));
+const EmployeeExpensePortal = lazy(() => import("./pages/EmployeeExpensePortal"));
 const RulesetEditor = lazy(() => import("./pages/RulesetEditor"));
 
 
@@ -172,6 +173,8 @@ function App() {
                   <Route path="/data-retention" element={<DataRetentionPolicy />} />
                   <Route path="/security" element={<SecurityPage />} />
                   <Route path="/waitlist" element={<Waitlist />} />
+                  <Route path="/expense-claim" element={<EmployeeExpensePortal />} />
+                  <Route path="/expense-claim/:workbenchId" element={<EmployeeExpensePortal />} />
                   <Route path="/ingest" element={
                     <ProtectedRoute>
                       <DataIngestionPage />

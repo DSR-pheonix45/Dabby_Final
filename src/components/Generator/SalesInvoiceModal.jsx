@@ -8,6 +8,11 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { saveInvoice, getStoredDiscountTags } from "./generatorStore";
 import { generateStandardDocumentPDF } from "../../utils/documentPdfGenerator";
+import { useWorkbench } from "../../context/WorkbenchContext";
+import { useAuth } from "../../hooks/useAuth";
+import { getWorkbenchCompanyDetails } from "../../utils/workbenchCompanyHelper";
+import { saveDocumentToDocVaultAndEngine } from "../../utils/docVaultExporter";
+import PartySelector from "./PartySelector";
 
 const STAGES = [
   {
@@ -50,6 +55,10 @@ const PRESET_SKUS = [
 ];
 
 export default function SalesInvoiceModal({ isOpen, onClose }) {
+  const { activeWorkbench } = useWorkbench();
+  const { user } = useAuth();
+  const company = getWorkbenchCompanyDetails(activeWorkbench, user);
+
   const [stage, setStage] = useState("QUOTATION");
   const [docNumber, setDocNumber] = useState(`QT-${Math.floor(1000 + Math.random() * 9000)}`);
   const [docDate, setDocDate] = useState(new Date().toISOString().split("T")[0]);
@@ -57,23 +66,35 @@ export default function SalesInvoiceModal({ isOpen, onClose }) {
 
   // Linked Beneficiary / Party
   const [party, setParty] = useState({
-    name: "Apex Logistics Ltd",
-    gstin: "27AABCU9603R1ZM",
-    pan: "AABCU9603R",
-    address: "Plot 42, MIDC Industrial Area, Mumbai, MH - 400093",
-    email: "accounts@apexlogistics.in",
-    placeOfSupply: "27 - Maharashtra"
+    name: "",
+    gstin: "",
+    pan: "",
+    address: "",
+    email: "",
+    placeOfSupply: ""
   });
 
-  // Payment Snippet Details
+  // Payment Snippet Details auto-fitted from Workbench Settings
   const [paymentSnippet, setPaymentSnippet] = useState({
-    bankName: "HDFC Bank Ltd",
-    accountName: "Dabby Enterprise Pvt Ltd",
-    accountNumber: "50200049281734",
-    ifsc: "HDFC0001234",
-    upiId: "dabbyenterprise@hdfcbank",
+    bankName: company.bankDetails.bankName || "",
+    accountName: company.bankDetails.accountName || company.legalName || "",
+    accountNumber: company.bankDetails.accountNumber || "",
+    ifsc: company.bankDetails.ifsc || "",
+    upiId: "",
     paymentTerms: "Net 30 Days"
   });
+
+  useEffect(() => {
+    if (activeWorkbench) {
+      setPaymentSnippet((prev) => ({
+        ...prev,
+        bankName: company.bankDetails.bankName || prev.bankName,
+        accountName: company.bankDetails.accountName || company.legalName || prev.accountName,
+        accountNumber: company.bankDetails.accountNumber || prev.accountNumber,
+        ifsc: company.bankDetails.ifsc || prev.ifsc
+      }));
+    }
+  }, [activeWorkbench]);
 
   // GST Related Record Details
   const [gstDetails, setGstDetails] = useState({
@@ -87,10 +108,10 @@ export default function SalesInvoiceModal({ isOpen, onClose }) {
   const [includeShipping, setIncludeShipping] = useState(false);
   const [deliveryChallan, setDeliveryChallan] = useState({
     challanNo: `DC-${Math.floor(1000 + Math.random() * 9000)}`,
-    vehicleNo: "MH-04-AB-9821",
+    vehicleNo: "",
     dispatchDate: new Date().toISOString().split("T")[0],
-    biltyLrNo: "LR-882391",
-    shippingAddress: "Plot 42, MIDC Industrial Area, Mumbai, MH - 400093"
+    biltyLrNo: "",
+    shippingAddress: ""
   });
 
   // Discount Coupons
@@ -110,14 +131,14 @@ export default function SalesInvoiceModal({ isOpen, onClose }) {
   const [showColConfig, setShowColConfig] = useState(false);
   const [showSeparateUnitCol, setShowSeparateUnitCol] = useState(false);
 
-  // Line Items
+  // Line items
   const [lineItems, setLineItems] = useState([
-    { id: 1, sku: "SKU-CONV-88", description: "Industrial Conveyor Belt (Heavy Duty)", hsnSac: "8428", qty: 2, unit: "pcs", rate: 45000, taxRate: 18 }
+    { id: 1, sku: "CUSTOM", description: "", hsnSac: "", qty: 1, rate: 0 }
   ]);
 
   useEffect(() => {
     setDiscountTags(getStoredDiscountTags());
-  }, [isOpen]);
+  }, []);
 
   // Update Document Prefix based on stage
   const handleStageChange = (newStage) => {
@@ -128,80 +149,65 @@ export default function SalesInvoiceModal({ isOpen, onClose }) {
     else setDocNumber(`INV-${rand}`);
   };
 
-  const handleSelectPresetParty = (e) => {
-    const selected = PRESET_PARTIES.find(p => p.name === e.target.value);
-    if (selected) {
-      setParty(prev => ({ ...prev, ...selected }));
-    }
-  };
-
   const addLineItem = () => {
     setLineItems([
       ...lineItems,
-      { id: Date.now(), sku: "", description: "", hsnSac: "8471", qty: 1, rate: 0, taxRate: 18 }
+      { id: Date.now(), sku: "CUSTOM", description: "", hsnSac: "9983", qty: 1, rate: 0 }
     ]);
+  };
+
+  const removeLineItem = (id) => {
+    if (lineItems.length === 1) return toast.error("Invoice must have at least one line item.");
+    setLineItems(lineItems.filter(item => item.id !== id));
   };
 
   const updateLineItem = (id, field, value) => {
     setLineItems(lineItems.map(item => {
       if (item.id === id) {
-        const updated = { ...item, [field]: value };
         if (field === "sku") {
-          const matchedSKU = PRESET_SKUS.find(s => s.sku === value);
-          if (matchedSKU) {
-            updated.description = matchedSKU.name;
-            updated.hsnSac = matchedSKU.hsn;
-            updated.rate = matchedSKU.rate;
+          const matchedPreset = PRESET_SKUS.find(s => s.sku === value);
+          if (matchedPreset) {
+            return {
+              ...item,
+              sku: value,
+              description: matchedPreset.name,
+              hsnSac: matchedPreset.hsn,
+              rate: matchedPreset.rate
+            };
           }
         }
-        return updated;
+        return { ...item, [field]: value };
       }
       return item;
     }));
   };
 
-  const removeLineItem = (id) => {
-    if (lineItems.length === 1) return toast.error("At least one line item is required.");
-    setLineItems(lineItems.filter(item => item.id !== id));
+  const handlePartyPreset = (e) => {
+    const matched = PRESET_PARTIES.find(p => p.name === e.target.value);
+    if (matched) setParty(matched);
   };
 
-  // Calculation helpers
-  const subtotal = lineItems.reduce((sum, item) => sum + (Number(item.qty || 0) * Number(item.rate || 0)), 0);
+  const subtotal = lineItems.reduce((acc, item) => acc + (Number(item.qty || 0) * Number(item.rate || 0)), 0);
 
-  const selectedDiscountTag = discountTags.find(t => t.id === selectedTagId);
+  // Calculate Tag Discount
+  const activeDiscountTag = discountTags.find(t => t.id === selectedTagId);
   let discountAmount = 0;
-  if (selectedDiscountTag) {
-    if (selectedDiscountTag.type === "percentage") {
-      discountAmount = (subtotal * selectedDiscountTag.value) / 100;
+  if (activeDiscountTag) {
+    if (activeDiscountTag.type === "PERCENT") {
+      discountAmount = (subtotal * activeDiscountTag.value) / 100;
     } else {
-      discountAmount = selectedDiscountTag.value;
+      discountAmount = activeDiscountTag.value;
     }
   }
 
   const taxableAmount = Math.max(0, subtotal - discountAmount);
-
-  // Calculate GST
-  let cgstTotal = 0;
-  let sgstTotal = 0;
-  let igstTotal = 0;
-
-  lineItems.forEach(item => {
-    const itemSubtotal = Number(item.qty || 0) * Number(item.rate || 0);
-    const itemTax = (itemSubtotal * (Number(item.taxRate) || 0)) / 100;
-    if (gstDetails.taxType === "CGST_SGST") {
-      cgstTotal += itemTax / 2;
-      sgstTotal += itemTax / 2;
-    } else {
-      igstTotal += itemTax;
-    }
-  });
-
-  const totalTax = cgstTotal + sgstTotal + igstTotal;
+  const taxRate = 0.18; // 18% GST
+  const totalTax = taxableAmount * taxRate;
   const grandTotal = taxableAmount + totalTax;
 
   const currentStageObj = STAGES.find(s => s.key === stage);
 
-  // PDF Exporter
+  // PDF Exporter with auto-fitted Workbench company settings
   const handleExportPDF = () => {
     try {
       const docType = stage === "QUOTATION" ? "QUOTATION" : (stage === "PROFORMA" ? "PROFORMA INVOICE" : "TAX INVOICE");
@@ -210,11 +216,12 @@ export default function SalesInvoiceModal({ isOpen, onClose }) {
         docNumber: docNumber,
         docDate: docDate,
         dueDate: dueDate,
-        senderName: "Archzona",
-        senderAddress: "105, PRISM INDUSTRIAL ESTATE, BEHIND PENDARKAR COLLEGE, DOMBIVLI(EAST)421201",
-        senderGstin: "7ACDFA4175F1ZJ",
-        senderMobile: "9870048082",
-        senderEmail: "info.archzona@gmail.com",
+        senderName: company.legalName || company.name,
+        senderAddress: company.address,
+        senderGstin: company.gstin,
+        senderPan: company.pan,
+        senderCin: company.cin,
+        senderEmail: company.email,
         clientName: party.name || "RATNA DEEP CHS",
         clientAddress: party.address || "Mulund",
         placeOfSupply: party.placeOfSupply || "Maharashtra",
@@ -237,12 +244,12 @@ export default function SalesInvoiceModal({ isOpen, onClose }) {
         notes: "T-Patti for top,bottom & center support\n2\"X 2\" Pipe Ms Fabrication For Fins Support With Material And installation",
         terms: paymentSnippet.paymentTerms || "50% Advance\n30% ongoing work\n20% after completion",
         bankDetails: {
-          name: paymentSnippet.accountName || "Archzona",
-          ifsc: paymentSnippet.ifsc || "UTIB000125",
-          accountNo: paymentSnippet.accountNumber || "923020053039794",
-          bankName: paymentSnippet.bankName || "AXIS BANK, Dombivli"
+          name: paymentSnippet.accountName || company.legalName,
+          ifsc: paymentSnippet.ifsc || company.bankDetails.ifsc,
+          accountNo: paymentSnippet.accountNumber || company.bankDetails.accountNumber,
+          bankName: paymentSnippet.bankName || company.bankDetails.bankName
         },
-        authorisedSignatory: "Archzona"
+        authorisedSignatory: company.legalName || company.name
       });
 
       doc.save(`${docNumber}_${stage}.pdf`);
@@ -253,26 +260,95 @@ export default function SalesInvoiceModal({ isOpen, onClose }) {
     }
   };
 
-  const handleSaveDocument = () => {
-    const savedObj = {
-      id: docNumber,
-      invoiceNumber: docNumber,
-      stage: stage,
-      stageLabel: currentStageObj.badge,
-      date: docDate,
-      partyName: party.name,
-      partyGstin: party.gstin,
-      amount: grandTotal,
-      status: stage === "SALES_INVOICE" ? "Issued & Locked" : stage === "PROFORMA" ? "Under Negotiation" : "Draft Quotation",
-      paymentSnippet,
-      gstDetails,
-      includeShipping,
-      deliveryChallan,
-      lineItems
-    };
-    saveInvoice(savedObj);
-    toast.success(`${currentStageObj.title} saved to system!`);
-    onClose();
+  const [isSavingDoc, setIsSavingDoc] = useState(false);
+
+  const handleSaveDocument = async () => {
+    setIsSavingDoc(true);
+    try {
+      const docType = stage === "QUOTATION" ? "quotation" : (stage === "PROFORMA" ? "proforma" : "sales_invoice");
+      const pdfDoc = generateStandardDocumentPDF({
+        documentType: stage === "QUOTATION" ? "QUOTATION" : (stage === "PROFORMA" ? "PROFORMA INVOICE" : "TAX INVOICE"),
+        docNumber: docNumber,
+        docDate: docDate,
+        dueDate: dueDate,
+        senderName: company.legalName || company.name,
+        senderAddress: company.address,
+        senderGstin: company.gstin,
+        senderPan: company.pan,
+        senderCin: company.cin,
+        senderEmail: company.email,
+        clientName: party.name || "Client",
+        clientAddress: party.address || "",
+        placeOfSupply: party.placeOfSupply || "",
+        clientGstin: party.gstin,
+        shipToName: includeShipping && deliveryChallan.shippingAddress ? party.name : (party.name || ""),
+        shipToAddress: includeShipping && deliveryChallan.shippingAddress ? deliveryChallan.shippingAddress : (party.address || ""),
+        items: lineItems.map((item, idx) => ({
+          sno: idx + 1,
+          description: item.description || item.sku,
+          subDetails: "",
+          hsn: item.hsnSac || "",
+          qty: Number(item.qty) || 1,
+          unit: "pcs",
+          rate: Number(item.rate) || 0
+        })),
+        taxRate: 18,
+        isIgst: gstDetails.taxType === "IGST",
+        columnLabels,
+        showSeparateUnitCol,
+        notes: "",
+        terms: paymentSnippet.paymentTerms || "Net 30 Days",
+        bankDetails: {
+          name: paymentSnippet.accountName || company.legalName,
+          ifsc: paymentSnippet.ifsc || company.bankDetails.ifsc,
+          accountNo: paymentSnippet.accountNumber || company.bankDetails.accountNumber,
+          bankName: paymentSnippet.bankName || company.bankDetails.bankName
+        },
+        authorisedSignatory: company.legalName || company.name
+      });
+
+      await saveDocumentToDocVaultAndEngine({
+        activeWorkbench,
+        docNumber,
+        documentType: docType,
+        pdfDoc,
+        partyName: party.name,
+        partyAddress: party.address,
+        partyGstin: party.gstin,
+        totalAmount: grandTotal,
+        docDate,
+        dueDate,
+        lineItems,
+        notes: "",
+        terms: paymentSnippet.paymentTerms || ""
+      });
+
+      const savedObj = {
+        id: docNumber,
+        invoiceNumber: docNumber,
+        stage: stage,
+        stageLabel: currentStageObj.badge,
+        date: docDate,
+        partyName: party.name,
+        partyGstin: party.gstin,
+        amount: grandTotal,
+        status: stage === "SALES_INVOICE" ? "Issued & Locked" : stage === "PROFORMA" ? "Under Negotiation" : "Draft Quotation",
+        paymentSnippet,
+        gstDetails,
+        includeShipping,
+        deliveryChallan,
+        lineItems
+      };
+      saveInvoice(savedObj);
+
+      toast.success(`${currentStageObj.title} saved to Doc Vault!`);
+      onClose();
+    } catch (e) {
+      console.error("Save to Doc Vault error:", e);
+      toast.error("Failed to save document to Doc Vault: " + (e.message || e));
+    } finally {
+      setIsSavingDoc(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -392,13 +468,21 @@ export default function SalesInvoiceModal({ isOpen, onClose }) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               <div>
-                <label className="block font-medium text-gray-400 mb-1">Party / Customer Name</label>
-                <input
-                  type="text"
+                <label className="block font-medium text-gray-400 mb-1">Select Party / Customer</label>
+                <PartySelector
                   value={party.name}
-                  onChange={(e) => setParty({ ...party, name: e.target.value })}
-                  placeholder="e.g. Apex Logistics Ltd"
-                  className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-teal-500"
+                  placeholder="Select or Create Party..."
+                  filterType="customer"
+                  onSelectParty={(selected) => {
+                    setParty(prev => ({
+                      ...prev,
+                      name: selected.name,
+                      address: selected.address || prev.address,
+                      gstin: selected.gstin || prev.gstin,
+                      pan: selected.pan || prev.pan,
+                      email: selected.email || prev.email
+                    }));
+                  }}
                 />
               </div>
               <div>

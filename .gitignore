@@ -1,6 +1,8 @@
 # Python virtualenvs & caches
 venv/
+venv2/
 venv3/
+scratch/
 .venv/
 env/
 ENV/

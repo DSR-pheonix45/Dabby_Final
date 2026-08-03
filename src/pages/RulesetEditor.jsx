@@ -25,7 +25,6 @@ const DOCUMENT_TYPES = [
   { id: "vendor_payment_receipt", label: "Vendor Payment Receipt" },
   { id: "bank_statement", label: "Bank Statement" },
   { id: "expense_receipt", label: "Expense Receipt" },
-  { id: "payroll_register", label: "Payroll Register" },
   { id: "credit_note", label: "Credit Note" },
   { id: "debit_note", label: "Debit Note" },
   { id: "loan_agreement", label: "Loan Agreement" },

@@ -40,8 +40,6 @@ DOC_TYPE_MAP: Dict[str, Tuple[str, str]] = {
     "vendor_payment_receipt":("PAYMENT_SNIPPET", "recipient"),
     "payment_advice":        ("PAYMENT_SNIPPET", "recipient"),
     "bank_statement":        ("BANK_ACTIVITY_RECORDED", "either"),
-    "payroll_register":      ("PAYROLL_INCURRED", "either"),
-    "payroll":               ("PAYROLL_INCURRED", "either"),
     "credit_note":           ("CREDIT_NOTE_ISSUED", "recipient"),
     "debit_note":            ("DEBIT_NOTE_ISSUED", "issuer"),
     "purchase_order":        ("PURCHASE_ORDER_CREATED", "issuer"),

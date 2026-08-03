@@ -141,7 +141,7 @@ export default function Sidebar({
   onNavigate,
 }) {
   const { user } = useAuth();
-  const { activeWorkbench } = useWorkbench();
+  const { activeWorkbench, workbenches, changeActiveWorkbench } = useWorkbench();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -151,7 +151,7 @@ export default function Sidebar({
   });
 
   const toggleSection = (section) => {
-    if (isCollapsed) return; // Don't toggle in collapsed mode, or maybe expand it?
+    if (isCollapsed) return; // Don't toggle in collapsed mode
     setExpandedSections((prev) => ({
       ...prev,
       [section]: !prev[section],
@@ -268,12 +268,72 @@ export default function Sidebar({
             isCollapsed={isCollapsed}
           >
             <div className="py-1 space-y-2">
+              {/* Recently Active Workbenches Quick Access Buttons */}
+              {workbenches && workbenches.length > 0 ? (
+                <div className="space-y-1.5 mb-2">
+                  {workbenches.slice(0, 3).map((wb) => {
+                    const isActive = activeWorkbench?.id === wb.id;
+                    return (
+                      <button
+                        key={wb.id}
+                        onClick={() => {
+                          changeActiveWorkbench(wb);
+                          navigate("/dashboard/workbench/business-engine");
+                          onNavigate?.();
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 group/wb ${
+                          isActive
+                            ? "bg-teal-500/15 text-teal-300 border border-teal-500/30 shadow-md shadow-teal-500/5"
+                            : "text-gray-400 hover:text-white hover:bg-white/5 border border-transparent"
+                        }`}
+                        title={`Switch to ${wb.name}`}
+                      >
+                        <div className="flex items-center space-x-2.5 truncate">
+                          <span
+                            className={`w-2 h-2 rounded-full flex-shrink-0 transition-all ${
+                              isActive
+                                ? "bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.8)] animate-pulse"
+                                : "bg-gray-600 group-hover/wb:bg-gray-400"
+                            }`}
+                          />
+                          <span className="truncate font-dm-sans">{wb.name}</span>
+                        </div>
+
+                        {isActive && (
+                          <span className="text-[9px] bg-teal-400/20 text-teal-300 px-1.5 py-0.5 rounded-full font-mono uppercase tracking-wider font-bold border border-teal-400/30">
+                            Active
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : activeWorkbench ? (
+                <div className="mb-2">
+                  <button
+                    onClick={() => {
+                      navigate("/dashboard/workbench/business-engine");
+                      onNavigate?.();
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30 shadow-md"
+                  >
+                    <div className="flex items-center space-x-2.5 truncate">
+                      <span className="w-2 h-2 rounded-full bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.8)] animate-pulse flex-shrink-0" />
+                      <span className="truncate">{activeWorkbench.name}</span>
+                    </div>
+                    <span className="text-[9px] bg-teal-400/20 text-teal-300 px-1.5 py-0.5 rounded-full font-mono uppercase tracking-wider font-bold border border-teal-400/30">
+                      Active
+                    </span>
+                  </button>
+                </div>
+              ) : null}
+
               <button
                 onClick={() => {
                   navigate("/dashboard/workbenches");
                   onNavigate?.();
                 }}
-                className="flex items-center space-x-2 text-[10px] font-bold text-teal-500 hover:text-teal-400 transition-colors tracking-widest uppercase py-1"
+                className="flex items-center space-x-2 text-[10px] font-bold text-teal-500 hover:text-teal-400 transition-colors tracking-widest uppercase py-1 px-1"
               >
                 <span className="text-lg leading-none mb-0.5">+</span>
                 <span>VIEW ALL</span>

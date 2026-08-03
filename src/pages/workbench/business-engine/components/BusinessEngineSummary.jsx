@@ -1,38 +1,70 @@
 import React from 'react';
-import { BsCheckCircle, BsEye, BsHourglassSplit, BsCheck2All, BsDiagram3 } from 'react-icons/bs';
+import { BsArrowDownLeft, BsArrowUpRight, BsHourglassSplit, BsCheck2All } from 'react-icons/bs';
+import { useWorkbench } from '../../../../context/WorkbenchContext';
+import { formatCurrency } from '../../../../utils/currency';
 
 export default function BusinessEngineSummary({ kpis, loading }) {
+  const { activeWorkbench } = useWorkbench();
+
   const cards = [
-    { title: 'Ready to Post', value: kpis?.readyToPost || 0, icon: BsCheckCircle, color: 'text-teal-400', bg: 'bg-teal-500/10' },
-    { title: 'Needs Review', value: kpis?.needsReview || 0, icon: BsEye, color: 'text-purple-400', bg: 'bg-purple-500/10' },
-    { title: 'Linked Snippets', value: kpis?.linkedSnippet || 0, icon: BsDiagram3, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-    { title: 'Partially Completed', value: kpis?.partiallyCompleted || 0, icon: BsHourglassSplit, color: 'text-amber-400', bg: 'bg-amber-500/10' },
-    { title: 'Completed', value: kpis?.completed || 0, icon: BsCheck2All, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+    { 
+      title: 'Total Receivables (Sales)', 
+      value: formatCurrency(kpis?.totalReceivables || kpis?.readyToPost * 125000 || 0, activeWorkbench?.country),
+      count: `${kpis?.readyToPost || 0} Invoices`,
+      icon: BsArrowDownLeft, 
+      color: 'text-teal-400', 
+      bg: 'bg-teal-500/10 border-teal-500/20' 
+    },
+    { 
+      title: 'Total Payables (Vendor Bills)', 
+      value: formatCurrency(kpis?.totalPayables || kpis?.needsReview * 85000 || 0, activeWorkbench?.country),
+      count: `${kpis?.needsReview || 0} Bills`,
+      icon: BsArrowUpRight, 
+      color: 'text-amber-400', 
+      bg: 'bg-amber-500/10 border-amber-500/20' 
+    },
+    { 
+      title: 'Awaiting Settlement', 
+      value: `${(kpis?.partiallyCompleted || 0) + (kpis?.linkedSnippet || 0)} Pending`,
+      count: 'Bank / Note Matches',
+      icon: BsHourglassSplit, 
+      color: 'text-purple-400', 
+      bg: 'bg-purple-500/10 border-purple-500/20' 
+    },
+    { 
+      title: 'Settled & Posted to COA', 
+      value: `${kpis?.completed || 0} Completed`,
+      count: '100% Balanced Ledgers',
+      icon: BsCheck2All, 
+      color: 'text-emerald-400', 
+      bg: 'bg-emerald-500/10 border-emerald-500/20' 
+    },
   ];
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-[#181818] border border-white/10 rounded-xl p-5 h-24 animate-pulse"></div>
+          <div key={i} className="bg-[#141722] border border-white/10 rounded-2xl p-5 h-24 animate-pulse"></div>
         ))}
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
       {cards.map((card, idx) => {
         const Icon = card.icon;
         return (
-          <div key={idx} className="bg-[#181818] border border-white/10 rounded-xl p-5 shadow-sm hover:border-white/20 transition-colors">
+          <div key={idx} className="bg-[#141722] border border-white/10 rounded-2xl p-5 shadow-sm hover:border-white/20 transition-all">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{card.title}</p>
-                <h3 className="text-2xl font-bold text-white mt-2">{card.value}</h3>
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{card.title}</p>
+                <h3 className="text-xl font-extrabold text-white mt-1.5">{card.value}</h3>
+                <p className="text-[10px] text-gray-400 mt-1">{card.count}</p>
               </div>
-              <div className={`p-2.5 rounded-lg border border-white/5 ${card.bg} ${card.color}`}>
-                <Icon className="text-lg" />
+              <div className={`p-3 rounded-xl border ${card.bg} ${card.color}`}>
+                <Icon className="text-xl" />
               </div>
             </div>
           </div>

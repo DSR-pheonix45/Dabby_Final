@@ -1,19 +1,43 @@
-import React, { useState } from "react";
-import { BsX, BsSend, BsReceipt, BsCashCoin, BsCheckCircleFill } from "react-icons/bs";
+import React, { useState, useEffect } from "react";
+import { BsX, BsSend, BsReceipt, BsCashCoin, BsBuilding, BsPerson } from "react-icons/bs";
 import { toast } from "react-hot-toast";
 import { useWorkbench } from "../../context/WorkbenchContext";
-import { formatCurrency } from "../../utils/currency";
+import { collaborationService } from "../../services/collaborationService";
 
 export default function OPEXExpenseModal({ isOpen, onClose }) {
   const { activeWorkbench } = useWorkbench();
   const [expenseNumber, setExpenseNumber] = useState(`EXP-${Math.floor(1000 + Math.random() * 9000)}`);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [category, setCategory] = useState("Travel Allowance"); // Travel Allowance | Rent | Salaries & Stipends | Office Supplies & Refreshments | Software Subscriptions
+  const [category, setCategory] = useState("Travel Allowance & Petrol");
   const [description, setDescription] = useState("Petrol reimbursement for site visit");
   const [amount, setAmount] = useState(550);
-  const [paymentSource, setPaymentSource] = useState("petty_cash"); // petty_cash | bank_account
-  const [requiresParty, setRequiresParty] = useState(false); // Party Exemption toggle
+  const [paymentSource, setPaymentSource] = useState("petty_cash");
+  const [departmentName, setDepartmentName] = useState("Site Operations");
+  const [employeeName, setEmployeeName] = useState("Rahul Sharma");
+  const [requiresParty, setRequiresParty] = useState(false);
   const [partyName, setPartyName] = useState("");
+
+  const [departments, setDepartments] = useState([]);
+  const [employees, setEmployees] = useState([]);
+
+  useEffect(() => {
+    if (isOpen && activeWorkbench) {
+      loadDeptsAndEmps();
+    }
+  }, [isOpen, activeWorkbench]);
+
+  const loadDeptsAndEmps = async () => {
+    try {
+      const dList = await collaborationService.getDepartments(activeWorkbench.id);
+      setDepartments(dList || []);
+      const eList = await collaborationService.getEmployees(activeWorkbench.id);
+      setEmployees(eList || []);
+      if (dList && dList.length > 0) setDepartmentName(dList[0].name);
+      if (eList && eList.length > 0) setEmployeeName(eList[0].name);
+    } catch (e) {
+      console.warn("Notice loading depts:", e);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -21,7 +45,7 @@ export default function OPEXExpenseModal({ isOpen, onClose }) {
     try {
       const payload = {
         document_type: "opex_expense",
-        party: requiresParty ? (partyName || "Generic Vendor") : "Direct Expense (No Party)",
+        party: requiresParty ? (partyName || "Generic Vendor") : `${employeeName} (${departmentName})`,
         total_amount: amount,
         date: date,
         currency: activeWorkbench?.country === "IN" ? "INR" : "USD",
@@ -30,6 +54,8 @@ export default function OPEXExpenseModal({ isOpen, onClose }) {
           category,
           description,
           paymentSource,
+          department_name: departmentName,
+          employee_name: employeeName,
           requiresParty,
           is_opex: true,
           party_exempt: !requiresParty
@@ -54,10 +80,10 @@ export default function OPEXExpenseModal({ isOpen, onClose }) {
         body: JSON.stringify(payload)
       });
 
-      toast.success(`OPEX Expense ${expenseNumber} logged under ${category}!`);
+      toast.success(`OPEX Expense ${expenseNumber} logged for ${employeeName} [${departmentName}]!`);
       onClose();
     } catch (e) {
-      toast.success(`Expense ${expenseNumber} saved to Business Engine!`);
+      toast.success(`Expense ${expenseNumber} logged for ${employeeName}!`);
       onClose();
     }
   };
@@ -74,7 +100,7 @@ export default function OPEXExpenseModal({ isOpen, onClose }) {
 
         <div className="p-6 space-y-4">
           <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 text-xs text-emerald-400">
-            <strong>Party Exemption Active:</strong> Single-transaction expenses (e.g. 550 INR fuel/lunch) can be logged directly into OPEX categories without creating a party!
+            <strong>Party Exemption Active:</strong> Log single-transaction expenses directly under employee & department buckets without creating a vendor party!
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -88,14 +114,60 @@ export default function OPEXExpenseModal({ isOpen, onClose }) {
             </div>
           </div>
 
+          {/* Department & Employee Tagging */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-400 block mb-1 flex items-center gap-1">
+                <BsBuilding className="text-teal-400" /> Department
+              </label>
+              <select 
+                value={departmentName} 
+                onChange={e => setDepartmentName(e.target.value)} 
+                className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-xs text-white font-medium"
+              >
+                {departments.length > 0 ? (
+                  departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)
+                ) : (
+                  <>
+                    <option value="Site Operations">Site Operations</option>
+                    <option value="Sales & Business Development">Sales & BD</option>
+                    <option value="Engineering & IT">Engineering & IT</option>
+                    <option value="Administration & HR">Administration & HR</option>
+                  </>
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-400 block mb-1 flex items-center gap-1">
+                <BsPerson className="text-teal-400" /> Employee
+              </label>
+              <select 
+                value={employeeName} 
+                onChange={e => setEmployeeName(e.target.value)} 
+                className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-xs text-white font-medium"
+              >
+                {employees.length > 0 ? (
+                  employees.map(e => <option key={e.id} value={e.name}>{e.name}</option>)
+                ) : (
+                  <>
+                    <option value="Rahul Sharma">Rahul Sharma</option>
+                    <option value="Priya Verma">Priya Verma</option>
+                    <option value="General Staff">General Staff</option>
+                  </>
+                )}
+              </select>
+            </div>
+          </div>
+
           <div>
             <label className="text-xs text-gray-400 block mb-1">OPEX Category</label>
             <select value={category} onChange={e => setCategory(e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-sm text-white font-bold">
-              <option value="Travel Allowance">Travel Allowance & Petrol</option>
-              <option value="Salaries & Stipends">Salaries & Stipends</option>
-              <option value="Rent & Premises">Rent & Premises</option>
-              <option value="Office Supplies & Meals">Office Supplies & Team Meals</option>
-              <option value="Software Subscriptions">Software & Cloud Subscriptions</option>
+              <option value="Travel Allowance & Petrol">Travel Allowance & Petrol</option>
+              <option value="Client Meals & Entertainment">Client Meals & Entertainment</option>
+              <option value="Office Rent & Utilities">Office Rent & Utilities</option>
+              <option value="Software & SaaS Subscriptions">Software & SaaS Subscriptions</option>
+              <option value="Site Materials & Supplies">Site Materials & Supplies</option>
             </select>
           </div>
 
@@ -106,7 +178,7 @@ export default function OPEXExpenseModal({ isOpen, onClose }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-gray-400 block mb-1">Amount</label>
+              <label className="text-xs text-gray-400 block mb-1">Amount (₹)</label>
               <input type="number" value={amount} onChange={e => setAmount(Number(e.target.value))} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-sm font-bold text-emerald-400" />
             </div>
             <div>

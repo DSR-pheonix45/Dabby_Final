@@ -777,7 +777,7 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
     setLoading(true);
 
     try {
-      // Send ONLY columns that exist on the workbenches table in Supabase
+      // Prepare workbench creation payload
       const payload = {
         name: formData.name.trim(),
         legal_name: formData.legal_name.trim() || null,
@@ -787,23 +787,64 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
         business_type: formData.business_type,
         fiscal_year_start: formData.fiscal_year_start,
         books_start_date: formData.books_start_date,
+        cin: formData.cin ? formData.cin.toUpperCase() : null,
+        gstin: formData.gstin ? formData.gstin.toUpperCase() : null,
+        pan: formData.pan ? formData.pan.toUpperCase() : null,
         created_by: user.id
       };
 
+      let insertedWb = null;
       const { data, error } = await supabase
         .from("workbenches")
         .insert([payload])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.warn("Insert error with tax columns, retrying without strict tax columns:", error);
+        // Fallback insert if columns are missing from table schema
+        const fallbackPayload = {
+          name: formData.name.trim(),
+          legal_name: formData.legal_name.trim() || null,
+          country: formData.country || "India",
+          currency: formData.currency || "INR",
+          industry: formData.industry,
+          business_type: formData.business_type,
+          fiscal_year_start: formData.fiscal_year_start,
+          books_start_date: formData.books_start_date,
+          created_by: user.id
+        };
+        const { data: retryData, error: retryErr } = await supabase
+          .from("workbenches")
+          .insert([fallbackPayload])
+          .select()
+          .single();
+        if (retryErr) throw retryErr;
+        insertedWb = retryData;
+      } else {
+        insertedWb = data;
+      }
+
+      // Persist collected CIN, GSTIN, PAN to workspace settings cache so they show up in Workbench Settings
+      if (insertedWb && insertedWb.id) {
+        const settingsCache = {
+          name: insertedWb.name,
+          legal_name: insertedWb.legal_name,
+          cin: formData.cin ? formData.cin.toUpperCase() : "",
+          gstin: formData.gstin ? formData.gstin.toUpperCase() : "",
+          pan: formData.pan ? formData.pan.toUpperCase() : "",
+          address: { street: "", city: "", state: "", pincode: "", country: insertedWb.country || "India" },
+          bank_accounts: []
+        };
+        localStorage.setItem(`dabby_wb_settings_${insertedWb.id}`, JSON.stringify(settingsCache));
+      }
 
       // Auto-assign owner in workbench_members
       try {
         await supabase
           .from("workbench_members")
           .insert({
-            workbench_id: data.id,
+            workbench_id: insertedWb.id,
             user_id: user.id,
             role: "owner",
             status: "active"
@@ -815,7 +856,7 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
       // Auto-insert scanned COA accounts into workbench_accounts (Company Master)
       if (scannedAccounts.length > 0 && (coaConfirmed || formData.coa_source === "ai_recommender" || formData.coa_source === "standard")) {
         const coaRows = scannedAccounts.map(acc => ({
-          workbench_id: data.id,
+          workbench_id: insertedWb.id,
           account_class: acc.account_class,
           group_code: acc.group_code,
           full_code: acc.full_code,
@@ -833,7 +874,7 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
       }
 
       toast.success("Workbench created successfully!");
-      if (onSuccess) onSuccess(data);
+      if (onSuccess) onSuccess(insertedWb);
       onClose();
     } catch (error) {
       console.error("Error creating workbench:", error);

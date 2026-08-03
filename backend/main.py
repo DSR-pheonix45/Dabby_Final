@@ -17,9 +17,10 @@ else:
 
 
 import auth
-from routers import ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, assets, rulesets, plans, superadmin, ingestion, business_events, settlements, collaboration, di_coa, di_documents, di_ledger, workbench_accounts, petty_cash, coa_translation, tb_snapshots
+from routers import ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, assets, rulesets, plans, superadmin, ingestion, settlements, collaboration, di_coa, di_documents, di_ledger, workbench_accounts, petty_cash, coa_translation
 
 app = FastAPI(title="Datalis API", description="FastAPI Backend for Datalis", version="1.0.0")
+
 
 # Configure CORS.
 # In production the frontend calls /api/* on its own origin (Vercel) and Vercel
@@ -57,7 +58,6 @@ app.include_router(plans.router, prefix="/api/plans", tags=["Plans"])
 app.include_router(investor.router, prefix="/api/investor", tags=["Investor"])
 app.include_router(rulesets.router, prefix="/api/rulesets", tags=["Rulesets"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])
-app.include_router(business_events.router, prefix="/api/events", tags=["Business Events"])
 app.include_router(collaboration.router, prefix="/api/collaboration", tags=["Collaboration"])
 app.include_router(context.router, prefix="/api/context", tags=["Context Analysis"])
 app.include_router(di_coa.router, prefix="/api/di/coa", tags=["Document Intelligence COA"])
@@ -66,7 +66,6 @@ app.include_router(di_ledger.router, prefix="/api/di/ledger", tags=["Universal L
 app.include_router(settlements.router, prefix="/api/settlements", tags=["Settlements"])
 app.include_router(workbench_accounts.router, prefix="/api/workbench-accounts", tags=["Workbench Accounts"])
 app.include_router(petty_cash.router, prefix="/api/petty-cash", tags=["Petty Cash"])
-app.include_router(tb_snapshots.router, prefix="/api/tb-snapshots", tags=["Trial Balance Snapshots"])
 
 @app.get("/health")
 def health_check():

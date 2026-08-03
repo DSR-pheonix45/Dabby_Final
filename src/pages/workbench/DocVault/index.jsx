@@ -5,6 +5,9 @@ import { checkPdfPassword, verifyPdfPassword } from "../../../utils/pdfDecrypter
 import { toast } from "react-hot-toast";
 import { useDropzone } from "react-dropzone";
 import { BsCloudUpload, BsShieldLock } from "react-icons/bs";
+import { collaborationService } from "../../../services/collaborationService";
+import { classifyDocumentParties } from "../../../utils/docPartyClassifier";
+import NewPartyDetectedModal from "../../../components/DocVault/NewPartyDetectedModal";
 import DocumentList from "./DocumentList";
 import RightPanel from "./RightPanel";
 import PreviewTab from "./tabs/PreviewTab";
@@ -43,7 +46,7 @@ export default function DocVaultIndex() {
   const [unlocking, setUnlocking] = useState(false);
   const [lockedFile, setLockedFile] = useState(null);
   const loadDocuments = async () => {
-    if (!activeWorkbench) return;
+    if (!activeWorkbench) return [];
     setLoading(true);
     try {
       const docs = await diService.getDocuments(activeWorkbench.id);
@@ -64,8 +67,10 @@ export default function DocVaultIndex() {
         const updated = enhancedDocs.find(d => d.id === selectedDoc.id);
         if (updated) setSelectedDoc(updated);
       }
+      return enhancedDocs;
     } catch (err) {
       toast.error("Failed to load documents");
+      return [];
     } finally {
       setLoading(false);
     }
@@ -73,7 +78,44 @@ export default function DocVaultIndex() {
 
   useEffect(() => {
     loadDocuments();
+    const handleRefresh = () => loadDocuments();
+    window.addEventListener("docVaultUpdated", handleRefresh);
+    return () => window.removeEventListener("docVaultUpdated", handleRefresh);
   }, [activeWorkbench]);
+
+  const handleDeleteDocument = async (docId, e) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm("Are you sure you want to delete this document from Doc Vault?")) return;
+
+    try {
+      await diService.deleteDocument(docId);
+      toast.success("Document deleted from Doc Vault");
+      if (selectedDoc?.id === docId) {
+        setSelectedDoc(null);
+      }
+      loadDocuments();
+    } catch (err) {
+      console.error("Delete error:", err);
+      toast.error("Failed to delete document");
+    }
+  };
+
+  const handleScanDocument = async (docId) => {
+    if (!docId) return;
+    const toastId = toast.loading("Scanning document with Gemini Vision OCR...");
+    try {
+      await diService.processDocument(docId);
+      toast.success("Document scanned & extracted successfully!", { id: toastId });
+      const updatedDocs = await loadDocuments();
+      if (updatedDocs) {
+        const match = updatedDocs.find(d => d.id === docId);
+        if (match) setSelectedDoc(match);
+      }
+    } catch (err) {
+      console.error("Scan error:", err);
+      toast.error("Failed to scan document: " + (err.message || err), { id: toastId });
+    }
+  };
 
   const onDrop = useCallback(async (acceptedFiles) => {
     if (acceptedFiles.length === 0 || !activeWorkbench) return;
@@ -115,6 +157,11 @@ export default function DocVaultIndex() {
     }
   };
 
+  const [showNewPartyModal, setShowNewPartyModal] = useState(false);
+  const [detectedPartyInfo, setDetectedPartyInfo] = useState(null);
+  const [savedParties, setSavedParties] = useState([]);
+  const [activeDocForPartyLink, setActiveDocForPartyLink] = useState(null);
+
   const handleUploadWithHint = async (hint) => {
     if (!pendingFile || !activeWorkbench) return;
     const file = pendingFile;
@@ -130,10 +177,26 @@ export default function DocVaultIndex() {
       
       toast.loading("AI parsing in progress...", { id: "upload" });
       
-      await diService.processDocument(res.document_id, hint, currentPassword);
+      const processRes = await diService.processDocument(res.document_id, hint, currentPassword);
       
       toast.success("Document parsed successfully!", { id: "upload" });
-      loadDocuments();
+      const freshDocs = await loadDocuments();
+      const freshDoc = freshDocs.find(d => d.id === res.document_id) || processRes;
+
+      // Scan parties & trigger warning modal if counterparty is unregistered
+      try {
+        const partiesList = await collaborationService.getParties(activeWorkbench.id);
+        setSavedParties(partiesList || []);
+        
+        const partyScan = classifyDocumentParties(freshDoc, activeWorkbench, partiesList || []);
+        if (!partyScan.isRegistered && partyScan.externalParty?.name) {
+          setActiveDocForPartyLink(freshDoc);
+          setDetectedPartyInfo(partyScan.externalParty);
+          setShowNewPartyModal(true);
+        }
+      } catch (scanErr) {
+        console.error("Party scan error:", scanErr);
+      }
     } catch (err) {
       toast.error(err.message || "Upload failed", { id: "upload" });
     } finally {
@@ -188,6 +251,7 @@ export default function DocVaultIndex() {
               loading={loading} 
               selectedDoc={selectedDoc} 
               onSelect={setSelectedDoc}
+              onDelete={handleDeleteDocument}
               uploading={uploading}
             />
           </Panel>
@@ -202,7 +266,7 @@ export default function DocVaultIndex() {
               <PanelGroup orientation="horizontal">
                 {/* Preview Tab (Always visible next to data) */}
                 <Panel defaultSize={40} minSize={20} className="border-r border-white/5">
-                  <PreviewTab doc={selectedDoc} />
+                  <PreviewTab doc={selectedDoc} onDelete={handleDeleteDocument} onScan={handleScanDocument} />
                 </Panel>
                 
                 <PanelResizeHandle className="w-1.5 bg-[#0D0D0D] hover:bg-teal-500/50 cursor-col-resize transition-colors z-10 flex flex-col justify-center items-center">
@@ -313,6 +377,19 @@ export default function DocVaultIndex() {
           </div>
         </div>
       )}
+
+      {/* New Party Warning Popup Modal */}
+      <NewPartyDetectedModal
+        isOpen={showNewPartyModal}
+        onClose={() => setShowNewPartyModal(false)}
+        workbenchId={activeWorkbench?.id}
+        documentObj={activeDocForPartyLink}
+        externalParty={detectedPartyInfo}
+        savedParties={savedParties}
+        onPartyLinked={() => {
+          loadDocuments();
+        }}
+      />
     </div>
   );
 }
