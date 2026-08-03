@@ -9,6 +9,8 @@ import { supabase } from "./supabase";
  * JSON content-type when sending a string body. Returns the raw Response so
  * existing `res.ok` / `res.json()` call sites keep working unchanged.
  */
+const BACKEND_BASE = (import.meta.env.VITE_API_URL || "https://dabbyfinal-production-95b5.up.railway.app").replace(/\/$/, "");
+
 export async function apiFetch(path, options = {}) {
   let token;
   try {
@@ -29,7 +31,11 @@ export async function apiFetch(path, options = {}) {
     headers["Content-Type"] = "application/json";
   }
 
-  return fetch(path, { ...options, headers });
+  const fullUrl = path.startsWith("http")
+    ? path
+    : `${BACKEND_BASE}${path.startsWith("/") ? "" : "/"}${path}`;
+
+  return fetch(fullUrl, { ...options, headers });
 }
 
 /**
