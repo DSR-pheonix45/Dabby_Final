@@ -124,6 +124,23 @@ def get_members(workbench_id: str, user = Depends(get_current_user)):
     res = supabase.table("workbench_members").select("*").eq("workbench_id", workbench_id).execute()
     members = res.data or []
     
+    # Auto-heal: ensure creator is present in workbench_members as owner
+    try:
+        wb_res = supabase.table("workbenches").select("created_by").eq("id", workbench_id).execute()
+        if wb_res.data and wb_res.data[0].get("created_by"):
+            creator_id = wb_res.data[0]["created_by"]
+            if not any(m.get("user_id") == creator_id for m in members):
+                supabase.table("workbench_members").upsert({
+                    "workbench_id": workbench_id,
+                    "user_id": creator_id,
+                    "role": "owner",
+                    "status": "active"
+                }, on_conflict="workbench_id,user_id").execute()
+                res = supabase.table("workbench_members").select("*").eq("workbench_id", workbench_id).execute()
+                members = res.data or []
+    except Exception as e:
+        print(f"Notice auto-healing workbench owner: {e}")
+
     if members:
         user_ids = list({m["user_id"] for m in members if m.get("user_id")})
         if user_ids:
