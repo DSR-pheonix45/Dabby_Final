@@ -19,7 +19,7 @@ worker and doesn't fit Vercel's ephemeral serverless model.
 2. In the service **Settings → Root Directory**, set it to **`backend`**.
    (Railway then finds `backend/requirements.txt`, `backend/railway.json`, and starts with `uvicorn main:app --host 0.0.0.0 --port $PORT`.)
 3. **Settings → Networking → Generate Domain** to get a public URL like
-   `https://dabby-backend-production.up.railway.app`.
+   `https://dabbyfinal-production-95b5.up.railway.app`.
 4. Add the environment **Variables** (Settings → Variables) — same values as your `.env.local`:
 
    | Variable | Value |
