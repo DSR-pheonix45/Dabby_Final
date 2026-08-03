@@ -20,6 +20,27 @@ export default function VoucherPickerModal({ isOpen, onClose, onSelectVoucher, f
     }
   }, [isOpen, activeWorkbench]);
 
+  const safeStr = (v, fallback = "") => {
+    if (v === null || v === undefined) return fallback;
+    if (typeof v === "object") {
+      if (v.value !== undefined) return safeStr(v.value, fallback);
+      if (v.name !== undefined) return safeStr(v.name, fallback);
+      if (v.label !== undefined) return safeStr(v.label, fallback);
+      return fallback;
+    }
+    return String(v);
+  };
+
+  const safeNum = (v, fallback = 0) => {
+    if (v === null || v === undefined) return fallback;
+    if (typeof v === "object") {
+      if (v.value !== undefined) return safeNum(v.value, fallback);
+      if (v.amount !== undefined) return safeNum(v.amount, fallback);
+    }
+    const n = Number(v);
+    return isNaN(n) ? fallback : n;
+  };
+
   const loadVouchers = async () => {
     setLoading(true);
     try {
@@ -30,17 +51,26 @@ export default function VoucherPickerModal({ isOpen, onClose, onSelectVoucher, f
         const note = doc.di_analysis_notes?.[0] || {};
         const ext = note.extracted_data || {};
         
-        const party = ext.vendor_name || ext.supplier_name || ext.biller_name || ext.customer_name || ext.party_name || doc.original_filename || "Unknown Party";
-        const rawAmt = ext.total_amount || ext.invoice_total || ext.amount || note.amount || 0;
-        const docType = ext.document_type || note.event_type || (doc.original_filename?.toLowerCase().includes("invoice") ? "sales_invoice" : "voucher");
-        const docNum = ext.invoice_number || ext.voucher_number || ext.po_number || doc.id?.substring(0, 8);
-        const date = ext.invoice_date || ext.date || doc.created_at?.split("T")[0] || new Date().toISOString().split("T")[0];
+        const partyRaw = ext.vendor_name || ext.supplier_name || ext.biller_name || ext.customer_name || ext.party_name || note.parties?.issuer?.name || note.parties?.recipient?.name || doc.original_filename || "Unknown Party";
+        const party = safeStr(partyRaw, "Unknown Party");
+
+        const rawAmt = ext.total_amount || ext.invoice_total || ext.amount || note.amount || note.money?.total_amount || 0;
+        const amount = safeNum(rawAmt, 0);
+
+        const rawDocType = ext.document_type || note.event_type || note.document_type || (doc.original_filename?.toLowerCase().includes("invoice") ? "sales_invoice" : "voucher");
+        const docType = safeStr(rawDocType, "voucher");
+
+        const rawDocNum = ext.invoice_number || ext.voucher_number || ext.po_number || doc.id?.substring(0, 8);
+        const docNum = safeStr(rawDocNum, doc.id?.substring(0, 8));
+
+        const rawDate = ext.invoice_date || ext.date || doc.created_at?.split("T")[0] || new Date().toISOString().split("T")[0];
+        const date = safeStr(rawDate, new Date().toISOString().split("T")[0]);
 
         return {
           id: doc.id,
           filename: doc.original_filename,
           party,
-          amount: Number(rawAmt),
+          amount,
           docType: docType.toLowerCase(),
           docNum,
           date,

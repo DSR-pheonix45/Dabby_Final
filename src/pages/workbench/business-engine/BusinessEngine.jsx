@@ -31,35 +31,69 @@ export default function BusinessEngine() {
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState(null);
 
+  const safeStr = (v, fallback = "") => {
+    if (v === null || v === undefined) return fallback;
+    if (typeof v === "object") {
+      if (v.value !== undefined) return safeStr(v.value, fallback);
+      if (v.name !== undefined) return safeStr(v.name, fallback);
+      if (v.label !== undefined) return safeStr(v.label, fallback);
+      return fallback;
+    }
+    return String(v);
+  };
+
+  const safeNum = (v, fallback = 0) => {
+    if (v === null || v === undefined) return fallback;
+    if (typeof v === "object") {
+      if (v.value !== undefined) return safeNum(v.value, fallback);
+      if (v.amount !== undefined) return safeNum(v.amount, fallback);
+    }
+    const n = Number(v);
+    return isNaN(n) ? fallback : n;
+  };
+
   const createTradeFromDoc = (doc) => {
     if (!doc) return;
     const note = doc.di_analysis_notes?.[0] || {};
     const ext = note.extracted_data || {};
-    const party = ext.vendor_name || ext.supplier_name || ext.biller_name || ext.customer_name || ext.party_name || doc.original_filename || "Unknown Party";
-    const rawAmt = ext.total_amount || ext.invoice_total || ext.amount || note.amount || 0;
+
+    const partyRaw = ext.vendor_name || ext.supplier_name || ext.biller_name || ext.customer_name || ext.party_name || note.parties?.issuer?.name || note.parties?.recipient?.name || doc.original_filename || "Unknown Party";
+    const party = safeStr(partyRaw, "Unknown Party");
+
+    const rawAmt = ext.total_amount || ext.invoice_total || ext.amount || note.amount || note.money?.total_amount || 0;
+    const amount = safeNum(rawAmt, 0);
+
+    const rawDocType = ext.document_type || note.event_type || note.document_type || "VOUCHER";
+    const docType = safeStr(rawDocType, "VOUCHER");
+
+    const rawDocNum = ext.invoice_number || ext.voucher_number || ext.po_number || doc.id?.substring(0, 8);
+    const docNum = safeStr(rawDocNum, doc.id?.substring(0, 8));
+
+    const rawDate = ext.invoice_date || ext.date || doc.created_at?.split("T")[0] || new Date().toISOString().split("T")[0];
+    const date = safeStr(rawDate, new Date().toISOString().split("T")[0]);
 
     const newTrade = {
       id: `TRD-${Date.now().toString().substring(6)}`,
-      title: `${ext.document_type || "VOUCHER"} - ${party}`,
+      title: `${docType.toUpperCase()} - ${party}`,
       tradeType: doc.original_filename?.toLowerCase().includes("bill") || doc.original_filename?.toLowerCase().includes("po") ? "payable" : "receivable",
       party,
-      amount: Number(rawAmt),
-      date: ext.invoice_date || new Date().toISOString().split("T")[0],
+      amount,
+      date,
       status: "UNSETTLED",
       initiatorVoucher: {
         id: doc.id,
-        voucherNo: ext.invoice_number || doc.id?.substring(0, 8),
-        docType: ext.document_type || "sales_invoice",
+        voucherNo: docNum,
+        docType,
         party,
-        amount: Number(rawAmt),
-        date: ext.invoice_date || new Date().toISOString().split("T")[0],
+        amount,
+        date,
         filename: doc.original_filename
       },
       settlementVouchers: [],
       adjustmentNotes: [],
-      netTarget: Number(rawAmt),
+      netTarget: amount,
       totalSettled: 0,
-      remainingOutstanding: Number(rawAmt),
+      remainingOutstanding: amount,
       settlementPercent: 0
     };
 
@@ -117,23 +151,23 @@ export default function BusinessEngine() {
         if (Array.isArray(events) && events.length > 0) {
           const backendTrades = events.map(ev => ({
             id: ev.id,
-            title: `${ev.event_type?.toUpperCase()} - ${ev.counterparty || "Trade"}`,
-            tradeType: ev.event_type?.toLowerCase().includes("purchase") || ev.event_type?.toLowerCase().includes("payable") ? "payable" : "receivable",
-            party: ev.counterparty || "Vendor/Customer",
-            amount: Number(ev.amount || 0),
-            date: ev.event_date || new Date().toISOString().split("T")[0],
+            title: `${safeStr(ev.event_type, "EVENT").toUpperCase()} - ${safeStr(ev.counterparty, "Trade")}`,
+            tradeType: safeStr(ev.event_type).toLowerCase().includes("purchase") || safeStr(ev.event_type).toLowerCase().includes("payable") ? "payable" : "receivable",
+            party: safeStr(ev.counterparty, "Vendor/Customer"),
+            amount: safeNum(ev.amount, 0),
+            date: safeStr(ev.event_date, new Date().toISOString().split("T")[0]),
             status: ev.event_status === "COMPILED" ? "SETTLED" : "UNSETTLED",
             initiatorVoucher: {
               id: ev.document_id,
-              voucherNo: ev.id?.substring(0, 8),
-              docType: ev.event_type,
-              party: ev.counterparty,
-              amount: Number(ev.amount || 0),
-              date: ev.event_date
+              voucherNo: safeStr(ev.id)?.substring(0, 8),
+              docType: safeStr(ev.event_type, "sales_invoice"),
+              party: safeStr(ev.counterparty),
+              amount: safeNum(ev.amount, 0),
+              date: safeStr(ev.event_date)
             },
             settlementVouchers: [],
             adjustmentNotes: [],
-            remainingOutstanding: ev.event_status === "COMPILED" ? 0 : Number(ev.amount || 0),
+            remainingOutstanding: ev.event_status === "COMPILED" ? 0 : safeNum(ev.amount, 0),
             settlementPercent: ev.event_status === "COMPILED" ? 100 : 0
           }));
 

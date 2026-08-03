@@ -42,13 +42,41 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
   // Posting status
   const [posting, setPosting] = useState(false);
 
+  const safeStr = (v, fallback = "") => {
+    if (v === null || v === undefined) return fallback;
+    if (typeof v === "object") {
+      if (v.value !== undefined) return safeStr(v.value, fallback);
+      if (v.name !== undefined) return safeStr(v.name, fallback);
+      if (v.label !== undefined) return safeStr(v.label, fallback);
+      return fallback;
+    }
+    return String(v);
+  };
+
+  const safeNum = (v, fallback = 0) => {
+    if (v === null || v === undefined) return fallback;
+    if (typeof v === "object") {
+      if (v.value !== undefined) return safeNum(v.value, fallback);
+      if (v.amount !== undefined) return safeNum(v.amount, fallback);
+    }
+    const n = Number(v);
+    return isNaN(n) ? fallback : n;
+  };
+
   useEffect(() => {
     if (trade) {
-      setTradeTitle(trade.title || trade.party || "New Trade Transaction");
-      setTradeType(trade.tradeType || (trade.type?.toLowerCase().includes("purchase") ? "payable" : "receivable"));
-      setPartyName(trade.party || trade.counterparty || "");
-      setTargetDate(trade.date || new Date().toISOString().split("T")[0]);
-      setInitiatorVoucher(trade.initiatorVoucher || null);
+      setTradeTitle(safeStr(trade.title || trade.party || "New Trade Transaction"));
+      setTradeType(safeStr(trade.tradeType || (safeStr(trade.type).toLowerCase().includes("purchase") ? "payable" : "receivable"), "receivable"));
+      setPartyName(safeStr(trade.party || trade.counterparty || ""));
+      setTargetDate(safeStr(trade.date || new Date().toISOString().split("T")[0]));
+      setInitiatorVoucher(trade.initiatorVoucher ? {
+        ...trade.initiatorVoucher,
+        voucherNo: safeStr(trade.initiatorVoucher.voucherNo),
+        docType: safeStr(trade.initiatorVoucher.docType),
+        party: safeStr(trade.initiatorVoucher.party),
+        amount: safeNum(trade.initiatorVoucher.amount),
+        date: safeStr(trade.initiatorVoucher.date)
+      } : null);
       setSettlementVouchers(trade.settlementVouchers || trade.settlements || []);
       setAdjustmentNotes(trade.adjustmentNotes || []);
     } else {

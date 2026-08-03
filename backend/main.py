@@ -17,17 +17,11 @@ else:
 
 
 import auth
-from routers import ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, assets, rulesets, plans, superadmin, ingestion, settlements, collaboration, di_coa, di_documents, di_ledger, workbench_accounts, petty_cash, coa_translation
+from routers import ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, assets, rulesets, plans, superadmin, ingestion, settlements, collaboration, di_coa, di_documents, di_ledger, workbench_accounts, petty_cash, coa_translation, business_events
 
 app = FastAPI(title="Datalis API", description="FastAPI Backend for Datalis", version="1.0.0")
 
-
 # Configure CORS.
-# In production the frontend calls /api/* on its own origin (Vercel) and Vercel
-# rewrites that server-side to this backend, so CORS usually isn't triggered.
-# We still allow localhost (dev) + any *.vercel.app + an optional FRONTEND_ORIGIN
-# (comma-separated) for direct browser calls / previews.
-_extra_origins = [o.strip() for o in os.environ.get("FRONTEND_ORIGIN", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -64,6 +58,7 @@ app.include_router(di_coa.router, prefix="/api/di/coa", tags=["Document Intellig
 app.include_router(di_documents.router, prefix="/api/di/documents", tags=["Document Intelligence Vault"])
 app.include_router(di_ledger.router, prefix="/api/di/ledger", tags=["Universal Ledger"])
 app.include_router(settlements.router, prefix="/api/settlements", tags=["Settlements"])
+app.include_router(business_events.router, prefix="/api/events", tags=["Business Events"])
 app.include_router(workbench_accounts.router, prefix="/api/workbench-accounts", tags=["Workbench Accounts"])
 app.include_router(petty_cash.router, prefix="/api/petty-cash", tags=["Petty Cash"])
 
