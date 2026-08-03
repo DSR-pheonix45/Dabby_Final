@@ -65,6 +65,15 @@ export default function PreviewTab({ doc, onDelete, onScan }) {
           {doc.original_filename}
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('trade:create_from_doc', { detail: doc }));
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-gradient-to-r from-teal-400 to-emerald-400 text-black text-xs font-extrabold transition-all shadow-md hover:opacity-95"
+            title="Create a Trade Transaction in Business Engine using this voucher"
+          >
+            🚀 Send to Business Engine
+          </button>
           {onScan && (
             <button
               onClick={handleScan}
