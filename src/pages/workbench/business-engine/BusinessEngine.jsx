@@ -31,51 +31,71 @@ export default function BusinessEngine() {
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState(null);
 
-  // Load persistent trades for active workbench
+  const createTradeFromDoc = (doc) => {
+    if (!doc) return;
+    const note = doc.di_analysis_notes?.[0] || {};
+    const ext = note.extracted_data || {};
+    const party = ext.vendor_name || ext.supplier_name || ext.biller_name || ext.customer_name || ext.party_name || doc.original_filename || "Unknown Party";
+    const rawAmt = ext.total_amount || ext.invoice_total || ext.amount || note.amount || 0;
+
+    const newTrade = {
+      id: `TRD-${Date.now().toString().substring(6)}`,
+      title: `${ext.document_type || "VOUCHER"} - ${party}`,
+      tradeType: doc.original_filename?.toLowerCase().includes("bill") || doc.original_filename?.toLowerCase().includes("po") ? "payable" : "receivable",
+      party,
+      amount: Number(rawAmt),
+      date: ext.invoice_date || new Date().toISOString().split("T")[0],
+      status: "UNSETTLED",
+      initiatorVoucher: {
+        id: doc.id,
+        voucherNo: ext.invoice_number || doc.id?.substring(0, 8),
+        docType: ext.document_type || "sales_invoice",
+        party,
+        amount: Number(rawAmt),
+        date: ext.invoice_date || new Date().toISOString().split("T")[0],
+        filename: doc.original_filename
+      },
+      settlementVouchers: [],
+      adjustmentNotes: [],
+      netTarget: Number(rawAmt),
+      totalSettled: 0,
+      remainingOutstanding: Number(rawAmt),
+      settlementPercent: 0
+    };
+
+    setSelectedTrade(newTrade);
+    setIsTradeModalOpen(true);
+    toast("Pre-loaded voucher from Doc Vault!", { icon: "🚀" });
+  };
+
+  // Load persistent trades for active workbench & check for pending Doc Vault vouchers
   useEffect(() => {
     if (activeWorkbench) {
       loadTrades();
+
+      // Check if there is a pending document sent from Doc Vault
+      const keyWb = `dabby_pending_trade_doc_${activeWorkbench.id}`;
+      const keyGen = "dabby_pending_trade_doc";
+      const pendingStr = localStorage.getItem(keyWb) || localStorage.getItem(keyGen);
+
+      if (pendingStr) {
+        try {
+          const doc = JSON.parse(pendingStr);
+          localStorage.removeItem(keyWb);
+          localStorage.removeItem(keyGen);
+          createTradeFromDoc(doc);
+        } catch (err) {
+          console.error("Notice: error loading pending trade doc:", err);
+        }
+      }
     }
   }, [activeWorkbench]);
 
   // Listen for Doc Vault "Send to Business Engine" trigger
   useEffect(() => {
     const handleCreateFromDoc = (e) => {
-      const doc = e.detail;
-      if (doc) {
-        const note = doc.di_analysis_notes?.[0] || {};
-        const ext = note.extracted_data || {};
-        const party = ext.vendor_name || ext.supplier_name || ext.biller_name || ext.customer_name || ext.party_name || doc.original_filename || "Unknown Party";
-        const rawAmt = ext.total_amount || ext.invoice_total || ext.amount || note.amount || 0;
-
-        const newTrade = {
-          id: `TRD-${Date.now().toString().substring(6)}`,
-          title: `${ext.document_type || "VOUCHER"} - ${party}`,
-          tradeType: doc.original_filename?.toLowerCase().includes("bill") || doc.original_filename?.toLowerCase().includes("po") ? "payable" : "receivable",
-          party,
-          amount: Number(rawAmt),
-          date: ext.invoice_date || new Date().toISOString().split("T")[0],
-          status: "UNSETTLED",
-          initiatorVoucher: {
-            id: doc.id,
-            voucherNo: ext.invoice_number || doc.id?.substring(0, 8),
-            docType: ext.document_type || "sales_invoice",
-            party,
-            amount: Number(rawAmt),
-            date: ext.invoice_date || new Date().toISOString().split("T")[0],
-            filename: doc.original_filename
-          },
-          settlementVouchers: [],
-          adjustmentNotes: [],
-          netTarget: Number(rawAmt),
-          totalSettled: 0,
-          remainingOutstanding: Number(rawAmt),
-          settlementPercent: 0
-        };
-
-        setSelectedTrade(newTrade);
-        setIsTradeModalOpen(true);
-        toast("Pre-loaded voucher from Doc Vault!", { icon: "🚀" });
+      if (e.detail) {
+        createTradeFromDoc(e.detail);
       }
     };
 

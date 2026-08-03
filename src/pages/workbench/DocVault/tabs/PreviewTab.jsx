@@ -1,19 +1,27 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../../lib/supabase';
-import { BsFileEarmarkPdf, BsImage, BsFileEarmarkText, BsDownload, BsTrash, BsLightningChargeFill } from 'react-icons/bs';
+import { useWorkbench } from '../../../../context/WorkbenchContext';
+import { toast } from 'react-hot-toast';
+import { BsFileEarmarkPdf, BsImage, BsFileEarmarkText, BsDownload, BsTrash } from 'react-icons/bs';
 
 export default function PreviewTab({ doc, onDelete, onScan }) {
+  const navigate = useNavigate();
+  const { activeWorkbench } = useWorkbench();
   const [url, setUrl] = useState(null);
-  const [scanning, setScanning] = useState(false);
 
-  const handleScan = async () => {
-    if (!onScan || !doc) return;
-    setScanning(true);
-    try {
-      await onScan(doc.id);
-    } finally {
-      setScanning(false);
+  const handleSendToBusinessEngine = () => {
+    if (!doc) return;
+
+    const wbId = activeWorkbench?.id || doc.workbench_id;
+    if (wbId) {
+      localStorage.setItem(`dabby_pending_trade_doc_${wbId}`, JSON.stringify(doc));
     }
+    localStorage.setItem('dabby_pending_trade_doc', JSON.stringify(doc));
+
+    window.dispatchEvent(new CustomEvent('trade:create_from_doc', { detail: doc }));
+    toast.success('Voucher sent! Opening Business Engine...');
+    navigate('/dashboard/workbench/business-engine');
   };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -66,9 +74,7 @@ export default function PreviewTab({ doc, onDelete, onScan }) {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              window.dispatchEvent(new CustomEvent('trade:create_from_doc', { detail: doc }));
-            }}
+            onClick={handleSendToBusinessEngine}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-400 to-emerald-400 text-black text-xs font-extrabold transition-all shadow-md hover:opacity-95"
             title="Create a Trade Transaction in Business Engine using this voucher"
           >
