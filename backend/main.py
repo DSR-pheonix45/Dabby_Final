@@ -22,6 +22,7 @@ from routers import ai, coa, ledger, ops, context, inventory, investor, tasks, b
 app = FastAPI(title="Datalis API", description="FastAPI Backend for Datalis", version="1.0.0")
 
 # Configure CORS.
+_extra_origins = [o.strip() for o in os.environ.get("FRONTEND_ORIGIN", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
