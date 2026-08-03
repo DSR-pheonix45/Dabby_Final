@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BsSearch, BsFileEarmarkText, BsExclamationCircle, BsTrash } from 'react-icons/bs';
 import { useWorkbench } from '../../../context/WorkbenchContext';
 import { formatCurrency } from '../../../utils/currency';
+import { classifyDocumentParties } from '../../../utils/docPartyClassifier';
 
 const StatusBadge = ({ status }) => {
   const styles = {
@@ -83,9 +84,8 @@ export default function DocumentList({ documents, loading, selectedDoc, onSelect
               // Only show Needs Review icon if specifically Needs Review
               const showWarning = doc.derivedStatus === 'Needs Review';
               
-              const ufoIssuer = note.parties?.issuer?.name;
-              const ufoRecipient = note.parties?.recipient?.name;
-              const partyName = ufoIssuer || ufoRecipient || data.parties?.vendor?.value || data.parties?.customer?.value || "Unknown Party";
+              const classified = classifyDocumentParties(doc, activeWorkbench);
+              const partyName = classified.externalParty?.name || "Unknown Party";
 
               return (
                 <div 

@@ -52,13 +52,47 @@ export default function BusinessEngine() {
     return isNaN(n) ? fallback : n;
   };
 
+  const getCounterpartyName = (doc, activeWb) => {
+    if (!doc) return "Unknown Party";
+
+    const note = doc.di_analysis_notes?.[0] || doc.analysis_notes || {};
+    const ext = note.extracted_data || {};
+    const parties = note.parties || ext.parties || {};
+
+    const sellerObj = parties.issuer || parties.seller || parties.vendor || ext.vendor_name || ext.supplier_name || ext.biller_name || {};
+    const sellerName = safeStr(typeof sellerObj === "object" ? (sellerObj.name || sellerObj.value || "") : sellerObj).trim();
+
+    const buyerObj = parties.recipient || parties.buyer || parties.customer || ext.customer_name || ext.recipient_name || ext.buyer_name || {};
+    const buyerName = safeStr(typeof buyerObj === "object" ? (buyerObj.name || buyerObj.value || "") : buyerObj).trim();
+
+    const myCompanyNames = [
+      activeWb?.name,
+      activeWb?.legal_name,
+      activeWb?.legalName
+    ].filter(Boolean).map(n => safeStr(n).toLowerCase().trim());
+
+    const isSellerUs = myCompanyNames.some(my => my && sellerName && (sellerName.toLowerCase().includes(my) || my.includes(sellerName.toLowerCase())));
+    const isBuyerUs = myCompanyNames.some(my => my && buyerName && (buyerName.toLowerCase().includes(my) || my.includes(buyerName.toLowerCase())));
+
+    if (isSellerUs && buyerName) return buyerName;
+    if (isBuyerUs && sellerName) return sellerName;
+    if (buyerName && myCompanyNames.some(my => my && sellerName.toLowerCase().includes(my))) return buyerName;
+    if (sellerName && myCompanyNames.some(my => my && buyerName.toLowerCase().includes(my))) return sellerName;
+
+    const docType = safeStr(ext.document_type || note.document_type || note.event_type || "").toLowerCase();
+    if (docType.includes("sales") || docType.includes("receipt")) {
+      return buyerName || (isSellerUs ? "" : sellerName) || "Customer";
+    }
+
+    return (isSellerUs ? buyerName : sellerName) || buyerName || sellerName || safeStr(ext.party_name) || doc.original_filename || "Unknown Party";
+  };
+
   const createTradeFromDoc = (doc) => {
     if (!doc) return;
     const note = doc.di_analysis_notes?.[0] || {};
     const ext = note.extracted_data || {};
 
-    const partyRaw = ext.vendor_name || ext.supplier_name || ext.biller_name || ext.customer_name || ext.party_name || note.parties?.issuer?.name || note.parties?.recipient?.name || doc.original_filename || "Unknown Party";
-    const party = safeStr(partyRaw, "Unknown Party");
+    const party = getCounterpartyName(doc, activeWorkbench);
 
     const rawAmt = ext.total_amount || ext.invoice_total || ext.amount || note.amount || note.money?.total_amount || 0;
     const amount = safeNum(rawAmt, 0);
