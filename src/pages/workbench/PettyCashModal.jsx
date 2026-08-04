@@ -3,6 +3,7 @@ import { BsX, BsCashCoin, BsCheckCircle, BsClockHistory, BsShieldCheck } from "r
 import { toast } from "react-hot-toast";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { formatCurrency } from "../../utils/currency";
+import { apiFetch } from "../../lib/apiClient";
 
 export default function PettyCashModal({ isOpen, onClose }) {
   const { activeWorkbench } = useWorkbench();
@@ -15,7 +16,7 @@ export default function PettyCashModal({ isOpen, onClose }) {
 
   useEffect(() => {
     if (activeWorkbench?.id) {
-      fetch(`/api/petty-cash/balance/${activeWorkbench.id}`)
+      apiFetch(`/api/petty-cash/balance/${activeWorkbench.id}`)
         .then(r => r.json())
         .then(d => setBalance(d.balance || 0.0))
         .catch(() => setBalance(25000.0));
@@ -26,9 +27,8 @@ export default function PettyCashModal({ isOpen, onClose }) {
 
   const handleRequestTopup = async () => {
     try {
-      await fetch("/api/petty-cash/topup", {
+      await apiFetch("/api/petty-cash/topup", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           workbench_id: activeWorkbench?.id,
           amount: topupAmount,
@@ -47,7 +47,7 @@ export default function PettyCashModal({ isOpen, onClose }) {
 
   const handleApprove = async (reqId, amt) => {
     try {
-      await fetch(`/api/petty-cash/approve/${reqId}`, { method: "POST" });
+      await apiFetch(`/api/petty-cash/approve/${reqId}`, { method: "POST" });
       setBalance(prev => prev + amt);
       setPendingRequests(pendingRequests.filter(r => r.id !== reqId));
       toast.success(`Approved! ${formatCurrency(amt, activeWorkbench?.country)} added to Petty Cash bucket!`);

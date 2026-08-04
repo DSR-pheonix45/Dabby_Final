@@ -52,7 +52,7 @@ export default function SuperadminDashboard() {
 
         // Call the check-waitlist endpoint (which checks superadmin table first)
         const email = session.user.email;
-        const res = await fetch(`/api/plans/check-waitlist?email=${encodeURIComponent(email)}`);
+        const res = await apiFetch(`/api/plans/check-waitlist?email=${encodeURIComponent(email)}`);
         if (res.ok) {
           const data = await res.json();
           if (data.is_superadmin) {

@@ -63,9 +63,8 @@ export default function OPEXExpenseModal({ isOpen, onClose }) {
       };
 
       if (paymentSource === "petty_cash") {
-        await fetch("/api/petty-cash/deduct", {
+        await apiFetch("/api/petty-cash/deduct", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             workbench_id: activeWorkbench?.id,
             amount: amount,
@@ -74,9 +73,8 @@ export default function OPEXExpenseModal({ isOpen, onClose }) {
         });
       }
 
-      await fetch("/api/events/from-document/draft", {
+      await apiFetch("/api/events/from-document/draft", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
 

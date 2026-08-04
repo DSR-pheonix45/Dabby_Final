@@ -91,7 +91,7 @@ export default function Signup() {
       
       // Check if email is on the approved waitlist first
       try {
-        const checkRes = await fetch(`/api/plans/check-waitlist?email=${encodeURIComponent(trimmedEmail)}`);
+        const checkRes = await apiFetch(`/api/plans/check-waitlist?email=${encodeURIComponent(trimmedEmail)}`);
         if (checkRes.ok) {
           const checkData = await checkRes.json();
           if (!checkData.approved) {

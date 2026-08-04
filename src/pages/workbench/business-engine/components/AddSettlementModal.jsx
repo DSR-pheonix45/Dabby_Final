@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast';
 import { formatCurrency } from '../../../../utils/currency';
 import { useWorkbench } from '../../../../context/WorkbenchContext';
 import { diService } from '../../../../services/diService';
+import { apiFetch } from '../../../../lib/apiClient';
 
 export default function AddSettlementModal({ isOpen, onClose, data }) {
   const { activeWorkbench } = useWorkbench();
@@ -28,9 +29,8 @@ export default function AddSettlementModal({ isOpen, onClose, data }) {
     setLoading(true);
     try {
       if (paymentSource === 'petty_cash' && actionType === 'DIRECT_EXPENSE') {
-        await fetch('/api/petty-cash/deduct', {
+        await apiFetch('/api/petty-cash/deduct', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             workbench_id: activeWorkbench.id,
             amount: Number(manualAmount),

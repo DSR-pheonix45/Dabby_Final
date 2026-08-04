@@ -677,110 +677,93 @@ export const backendService = {
   },
 
   async getSuperadminStats() {
-    const headers = await this.getAuthHeaders();
-    const response = await fetch('/api/superadmin/stats', {
-      headers
-    });
+    const response = await apiFetch('/api/superadmin/stats');
     if (!response.ok) {
-      const err = await response.json();
+      const err = await response.json().catch(() => ({}));
       throw new Error(err.detail || 'Failed to fetch superadmin stats');
     }
     return await response.json();
   },
 
   async updateWaitlistStatus(email, status) {
-    const headers = await this.getAuthHeaders();
-    const response = await fetch('/api/superadmin/waitlist/update-status', {
+    const response = await apiFetch('/api/superadmin/waitlist/update-status', {
       method: 'POST',
-      headers,
       body: JSON.stringify({ email, status })
     });
     if (!response.ok) {
-      const err = await response.json();
+      const err = await response.json().catch(() => ({}));
       throw new Error(err.detail || 'Failed to update waitlist status');
     }
     return await response.json();
   },
 
   async addWaitlistEmail(email, status = 'approved') {
-    const headers = await this.getAuthHeaders();
-    const response = await fetch('/api/superadmin/waitlist/add', {
+    const response = await apiFetch('/api/superadmin/waitlist/add', {
       method: 'POST',
-      headers,
       body: JSON.stringify({ email, status })
     });
     if (!response.ok) {
-      const err = await response.json();
+      const err = await response.json().catch(() => ({}));
       throw new Error(err.detail || 'Failed to add waitlist email');
     }
     return await response.json();
   },
 
   async addGroqKey(apiKey, label) {
-    const headers = await this.getAuthHeaders();
-    const response = await fetch('/api/superadmin/groq-keys/add', {
+    const response = await apiFetch('/api/superadmin/groq-keys/add', {
       method: 'POST',
-      headers,
       body: JSON.stringify({ api_key: apiKey, label })
     });
     if (!response.ok) {
-      const err = await response.json();
+      const err = await response.json().catch(() => ({}));
       throw new Error(err.detail || 'Failed to add Groq key');
     }
     return await response.json();
   },
 
   async updateGroqKeyStatus(id, status) {
-    const headers = await this.getAuthHeaders();
-    const response = await fetch('/api/superadmin/groq-keys/update-status', {
+    const response = await apiFetch('/api/superadmin/groq-keys/update-status', {
       method: 'POST',
-      headers,
       body: JSON.stringify({ id, status })
     });
     if (!response.ok) {
-      const err = await response.json();
+      const err = await response.json().catch(() => ({}));
       throw new Error(err.detail || 'Failed to update Groq key status');
     }
     return await response.json();
   },
 
   async deleteGroqKey(id) {
-    const headers = await this.getAuthHeaders();
-    const response = await fetch('/api/superadmin/groq-keys/delete', {
+    const response = await apiFetch('/api/superadmin/groq-keys/delete', {
       method: 'POST',
-      headers,
       body: JSON.stringify({ id })
     });
     if (!response.ok) {
-      const err = await response.json();
+      const err = await response.json().catch(() => ({}));
       throw new Error(err.detail || 'Failed to delete Groq key');
     }
     return await response.json();
   },
 
   async changeWorkbenchPlan(userId, plan) {
-    const headers = await this.getAuthHeaders();
-    const response = await fetch('/api/superadmin/user/set-plan', {
+    const response = await apiFetch('/api/superadmin/user/set-plan', {
       method: 'POST',
-      headers,
       body: JSON.stringify({ user_id: userId, plan })
     });
     if (!response.ok) {
-      const err = await response.json();
+      const err = await response.json().catch(() => ({}));
       throw new Error(err.detail || 'Failed to change plan');
     }
     return await response.json();
   },
 
   async simulatePayment(userId, email, amount, plan) {
-    const headers = await this.getAuthHeaders();
-    const response = await fetch('/api/superadmin/payments/simulate', {
+    const response = await apiFetch('/api/superadmin/payments/simulate', {
       method: 'POST',
-      headers,
       body: JSON.stringify({ user_id: userId, email, amount, plan })
     });
     if (!response.ok) {
-      const err = await response.json();
+      const err = await response.json().catch(() => ({}));
       throw new Error(err.detail || 'Failed to simulate payment');
     }
     return await response.json();
@@ -788,10 +771,8 @@ export const backendService = {
 
   async logPageView(path) {
     try {
-      const headers = await this.getAuthHeaders();
-      await fetch('/api/plans/log-view', {
+      await apiFetch('/api/plans/log-view', {
         method: 'POST',
-        headers,
         body: JSON.stringify({ path })
       });
     } catch (e) {

@@ -6,6 +6,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { apiFetch } from '../lib/apiClient';
 
 const MODEL = "llama-3.3-70b-versatile";
 const FALLBACK_MODEL = "llama-3.1-8b-instant";
@@ -352,16 +353,10 @@ function extractJSON(text) {
 // ─── Groq API Call ───────────────────────────────────────────────────────────
 
 async function callGroq(systemPrompt, userPrompt, model = MODEL) {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
   const endpoint = "/api/ai/generate-template";
 
-  const res = await fetch(endpoint, {
+  const res = await apiFetch(endpoint, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    },
     body: JSON.stringify({
       systemPrompt,
       userMsg: userPrompt,

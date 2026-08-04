@@ -57,9 +57,8 @@ export default function DebitNoteModal({ isOpen, onClose }) {
         metadata: { dnNumber, originalInvoiceRef, reason }
       };
 
-      await fetch("/api/events/from-document/draft", {
+      await apiFetch("/api/events/from-document/draft", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
 

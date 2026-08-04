@@ -45,10 +45,10 @@ export default function EmployeeExpensePortal() {
         if (wb) setWorkbenchInfo(wb);
 
         // Fetch depts & employees
-        const deptsRes = await fetch(`/api/collaboration/${workbenchId}/departments`);
+        const deptsRes = await apiFetch(`/api/collaboration/${workbenchId}/departments`);
         if (deptsRes.ok) setDepartments(await deptsRes.json());
 
-        const empsRes = await fetch(`/api/collaboration/${workbenchId}/employees`);
+        const empsRes = await apiFetch(`/api/collaboration/${workbenchId}/employees`);
         if (empsRes.ok) setEmployees(await empsRes.json());
       }
     } catch (err) {
