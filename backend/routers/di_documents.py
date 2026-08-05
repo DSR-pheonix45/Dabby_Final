@@ -72,7 +72,13 @@ async def upload_document(
 
         # Automatically trigger background AI extraction
         import asyncio
-        asyncio.create_task(process_document(document_id))
+        async def _safe_bg_process(doc_id):
+            try:
+                await process_document(doc_id)
+            except Exception as bg_err:
+                print(f"[BG_PROCESS] Background processing finished for document {doc_id}: {bg_err}")
+
+        asyncio.create_task(_safe_bg_process(document_id))
 
         return {"status": "success", "document_id": document_id}
     except Exception as e:
@@ -130,6 +136,31 @@ async def process_document(document_id: str, hint: Optional[str] = None, passwor
         from services.bank_statement_parser import BankStatementParser
         import json
         
+        # Candidate Gemini models for automatic fallback on 429 quota errors
+        gemini_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite"]
+
+        def call_gemini_with_fallback(prompt_arg, system_prompt=None, response_json=False):
+            last_err = None
+            for m_name in gemini_models:
+                try:
+                    kwargs = {}
+                    if system_prompt:
+                        kwargs["system_instruction"] = system_prompt
+                    if response_json:
+                        kwargs["generation_config"] = {"response_mime_type": "application/json", "temperature": 0.1}
+                    model = genai.GenerativeModel(m_name, **kwargs)
+                    return model.generate_content(prompt_arg), m_name
+                except Exception as e_m:
+                    last_err = e_m
+                    err_s = str(e_m).lower()
+                    if any(x in err_s for x in ["429", "quota", "resource_exhausted", "rate_limit"]):
+                        print(f"[GEMINI FALLBACK] Model '{m_name}' quota/rate limit hit: {e_m}. Trying next fallback model...")
+                        continue
+                    raise e_m
+            if last_err:
+                raise last_err
+            raise Exception("All Gemini fallback models failed due to quota/rate limits.")
+
         # We will define the extraction pipelines as nested async functions for clarity
         async def run_gemini_pipeline():
             gemini_key = os.environ.get("GEMINI_API_KEY")
@@ -153,12 +184,7 @@ async def process_document(document_id: str, hint: Optional[str] = None, passwor
                   "confidence": 0.99
                 }
                 """
-                class_model = genai.GenerativeModel(
-                    GEMINI_MODEL,
-                    system_instruction=class_prompt,
-                    generation_config={"response_mime_type": "application/json", "temperature": 0.1}
-                )
-                class_res = class_model.generate_content([document_part, "Classify this document."])
+                class_res, _ = call_gemini_with_fallback([document_part, "Classify this document."], system_prompt=class_prompt, response_json=True)
                 try:
                     class_text = class_res.text.strip()
                     if class_text.startswith("```json"): class_text = class_text[7:-3].strip()
@@ -222,12 +248,7 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
     "analysis": "Human-readable interpretation of the financial impact (2-3 sentences)."
 }}
 """
-                model = genai.GenerativeModel(
-                    GEMINI_MODEL,
-                    system_instruction=system_prompt,
-                    generation_config={"response_mime_type": "application/json", "temperature": 0.1}
-                )
-                response = model.generate_content([document_part, "Extract the financial details from this document."])
+                response, _ = call_gemini_with_fallback([document_part, "Extract the financial details from this document."], system_prompt=system_prompt, response_json=True)
                 analysis_text = response.text.strip()
                 if analysis_text.startswith("```json"): analysis_text = analysis_text[7:-3].strip()
                 elif analysis_text.startswith("```"): analysis_text = analysis_text[3:-3].strip()
@@ -314,9 +335,9 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
                   "confidence": 0.99
                 }
                 """
-                completion = GroqPool.execute(
-                    lambda client: client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
+                completion = GroqPool.execute_with_model_fallback(
+                    lambda m: lambda client: client.chat.completions.create(
+                        model=m,
                         messages=[
                             {"role": "system", "content": class_prompt},
                             {"role": "user", "content": f"Document text:\n{extracted_text[:80000]}"}
@@ -382,9 +403,9 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
     "analysis": "Human-readable interpretation of the financial impact (2-3 sentences)."
 }}
 """
-                completion = GroqPool.execute(
-                    lambda client: client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
+                completion = GroqPool.execute_with_model_fallback(
+                    lambda m: lambda client: client.chat.completions.create(
+                        model=m,
                         messages=[
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": f"Document text:\n{extracted_text[:80000]}"}

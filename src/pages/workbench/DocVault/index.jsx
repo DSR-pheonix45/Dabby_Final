@@ -38,6 +38,9 @@ export default function DocVaultIndex() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStage, setUploadStage] = useState("");
+  const [uploadFileName, setUploadFileName] = useState("");
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [pendingFile, setPendingFile] = useState(null);
   const [showClassModal, setShowClassModal] = useState(false);
@@ -102,9 +105,20 @@ export default function DocVaultIndex() {
 
   const handleScanDocument = async (docId) => {
     if (!docId) return;
+    setUploading(true);
+    setUploadFileName(selectedDoc?.original_filename || "Document");
+    setUploadProgress(15);
+    setUploadStage("Scanning document with Gemini Vision OCR...");
+
+    const progressTimer = setInterval(() => {
+      setUploadProgress(prev => (prev < 90 ? prev + 4 : prev));
+    }, 250);
+
     const toastId = toast.loading("Scanning document with Gemini Vision OCR...");
     try {
       await diService.processDocument(docId);
+      clearInterval(progressTimer);
+      setUploadProgress(100);
       toast.success("Document scanned & extracted successfully!", { id: toastId });
       const updatedDocs = await loadDocuments();
       if (updatedDocs) {
@@ -112,8 +126,16 @@ export default function DocVaultIndex() {
         if (match) setSelectedDoc(match);
       }
     } catch (err) {
+      clearInterval(progressTimer);
       console.error("Scan error:", err);
       toast.error("Failed to scan document: " + (err.message || err), { id: toastId });
+    } finally {
+      setTimeout(() => {
+        setUploading(false);
+        setUploadProgress(0);
+        setUploadStage("");
+        setUploadFileName("");
+      }, 700);
     }
   };
 
@@ -171,17 +193,44 @@ export default function DocVaultIndex() {
     setPdfPassword(""); // Reset for next file
     
     setUploading(true);
+    setUploadFileName(file.name);
+    setUploadProgress(15);
+    setUploadStage("Uploading document to Doc Vault...");
+
+    const progressTimer = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev < 40) return prev + 5;
+        if (prev < 80) return prev + 2;
+        if (prev < 92) return prev + 1;
+        return prev;
+      });
+    }, 200);
+
     try {
       toast.loading("Uploading document...", { id: "upload" });
       const res = await diService.uploadDocument(activeWorkbench.id, file);
       
+      setUploadProgress(45);
+      setUploadStage("Running Gemini Vision OCR & extracting text...");
       toast.loading("AI parsing in progress...", { id: "upload" });
       
+      setUploadProgress(75);
+      setUploadStage("Mapping Universal Financial Object (UFO) & journal entries...");
+
       const processRes = await diService.processDocument(res.document_id, hint, currentPassword);
       
+      setUploadProgress(95);
+      setUploadStage("Finalizing document entry & syncing ledger...");
+
+      clearInterval(progressTimer);
+      setUploadProgress(100);
+
       toast.success("Document parsed successfully!", { id: "upload" });
       const freshDocs = await loadDocuments();
       const freshDoc = freshDocs.find(d => d.id === res.document_id) || processRes;
+      if (freshDoc) {
+        setSelectedDoc(freshDoc);
+      }
 
       // Scan parties & trigger warning modal if counterparty is unregistered
       try {
@@ -198,9 +247,15 @@ export default function DocVaultIndex() {
         console.error("Party scan error:", scanErr);
       }
     } catch (err) {
+      clearInterval(progressTimer);
       toast.error(err.message || "Upload failed", { id: "upload" });
     } finally {
-      setUploading(false);
+      setTimeout(() => {
+        setUploading(false);
+        setUploadProgress(0);
+        setUploadStage("");
+        setUploadFileName("");
+      }, 700);
     }
   };
 
@@ -241,6 +296,42 @@ export default function DocVaultIndex() {
         </div>
       </div>
 
+      {/* Active Upload Flow Progress Banner */}
+      {uploading && (
+        <div className="bg-gradient-to-r from-teal-950/90 via-[#121c18] to-[#0D0D0D] border-b border-teal-500/30 p-4 px-6 shrink-0 transition-all duration-300">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-teal-500/20 border border-teal-500/30 flex items-center justify-center text-teal-400">
+                <BsCloudUpload className="animate-bounce" size={16} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-white tracking-wide">Document Upload & AI Processing Active</span>
+                  <span className="text-[10px] font-mono font-bold bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded border border-teal-500/30">
+                    {uploadProgress}%
+                  </span>
+                </div>
+                <p className="text-xs text-gray-300 mt-0.5 flex items-center gap-2">
+                  <span className="text-teal-400 font-medium truncate max-w-xs">{uploadFileName}</span>
+                  <span className="text-gray-500">•</span>
+                  <span className="text-gray-400 italic">{uploadStage}</span>
+                </p>
+              </div>
+            </div>
+            <div className="text-right font-mono text-xs font-bold text-teal-400">
+              Stage {uploadProgress < 35 ? '1/3' : uploadProgress < 85 ? '2/3' : '3/3'}
+            </div>
+          </div>
+          
+          <div className="w-full h-2 bg-gray-900/80 rounded-full overflow-hidden p-0.5 border border-teal-500/20 relative">
+            <div 
+              className="h-full bg-gradient-to-r from-teal-500 via-emerald-400 to-teal-300 rounded-full transition-all duration-300 shadow-[0_0_12px_rgba(20,184,166,0.6)]"
+              style={{ width: `${Math.max(5, uploadProgress)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Split Layout */}
       <div className="flex flex-1 overflow-hidden">
         <PanelGroup orientation="horizontal">
@@ -253,6 +344,9 @@ export default function DocVaultIndex() {
               onSelect={setSelectedDoc}
               onDelete={handleDeleteDocument}
               uploading={uploading}
+              uploadProgress={uploadProgress}
+              uploadStage={uploadStage}
+              uploadFileName={uploadFileName}
             />
           </Panel>
 

@@ -20,51 +20,41 @@ import { useWorkbench } from '../../../../context/WorkbenchContext';
 import { formatCurrency } from '../../../../utils/currency';
 import { apiFetch } from '../../../../lib/apiClient';
 
+const parseNum = (val) => {
+  if (val === undefined || val === null || val === '') return undefined;
+  if (typeof val === 'number') return isNaN(val) ? undefined : val;
+  if (typeof val === 'object' && val !== null) {
+    if ('value' in val) return parseNum(val.value);
+    if ('amount' in val) return parseNum(val.amount);
+    if ('total' in val) return parseNum(val.total);
+  }
+  if (typeof val === 'string') {
+    const cleaned = val.replace(/[^0-9.-]/g, '');
+    if (!cleaned) return undefined;
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? undefined : n;
+  }
+  return undefined;
+};
+
+const parseStr = (val, fallback = '') => {
+  if (val === undefined || val === null) return fallback;
+  if (typeof val === 'object' && val !== null && 'value' in val) return parseStr(val.value, fallback);
+  if (typeof val === 'string') return val.trim() || fallback;
+  return String(val) || fallback;
+};
+
 export default function VoucherEntryTab({ doc }) {
   const { activeWorkbench } = useWorkbench();
   const [mappedAccounts, setMappedAccounts] = useState({});
   const [mappingLoading, setMappingLoading] = useState({});
-
-  const handleAccountMap = async (idx, isCredit, targetName, targetType) => {
-    if (!targetName) return;
-    setMappingLoading(prev => ({ ...prev, [idx]: true }));
-    try {
-      const res = await apiFetch('/api/ops/vouchers/map-account', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: activeWorkbench?.id,
-          voucher_type: isCredit ? 'receipt' : 'payment',
-          target_type: targetType,
-          target_account_name: targetName,
-          amount: 0
-        })
-      });
-      if (res?.status === 'success') {
-        setMappedAccounts(prev => ({
-          ...prev,
-          [idx]: {
-            targetName,
-            targetType,
-            entryText: res.posting?.entry_text,
-            labelId: res.label_id,
-            code: res.account?.account_code
-          }
-        }));
-      }
-    } catch (err) {
-      console.error('Failed to map voucher account:', err);
-    } finally {
-      setMappingLoading(prev => ({ ...prev, [idx]: false }));
-    }
-  };
 
   const note = doc?.di_analysis_notes?.[0] || {};
   const ufo = note.extracted_data || {};
   
   // Flattened UFO properties with fallback
   const rawDocType = note.document_type || ufo.document_type || 'expense_receipt';
-  const docTypeStr = (typeof rawDocType === 'object' ? rawDocType?.value : rawDocType) || 'expense_receipt';
+  const docTypeStr = parseStr(rawDocType, 'expense_receipt');
   const lowerDocType = docTypeStr.toLowerCase();
   const filename = (doc?.original_filename || '').toLowerCase();
   
@@ -92,34 +82,69 @@ export default function VoucherEntryTab({ doc }) {
                          lowerDocType.includes('passbook') || 
                          lowerDocType.includes('statement');
 
-  const money = note.money || ufo.financials || {};
-  const taxes = note.taxes || {};
+  const money = note.money || ufo.financials || ufo.money || {};
+  const taxes = note.taxes || ufo.taxes || {};
   const dates = note.dates || ufo.document_metadata || ufo.document || {};
   const parties = note.parties || ufo.parties || {};
-  const lineItems = (note.line_items && note.line_items.length > 0) ? note.line_items : (ufo.line_items || []);
+  const lineItems = (note.line_items && note.line_items.length > 0) ? note.line_items : (ufo.line_items || doc?.line_items || []);
 
-  // Currency & Real Values (No fake 59000 fallback)
   const country = activeWorkbench?.country || 'India';
-  const rawTotal = money.total_amount ?? money.grand_total ?? money.subtotal ?? ufo.financials?.total_amount?.value ?? ufo.total_amount;
-  const grandTotal = (rawTotal !== undefined && rawTotal !== null) ? Number(rawTotal) : (lineItems.reduce((acc, i) => acc + (Number(i.amount || i.total) || 0), 0) || 0);
+  const rawTotal = 
+    parseNum(money.total_amount) ??
+    parseNum(money.grand_total) ??
+    parseNum(money.subtotal) ??
+    parseNum(money.amount) ??
+    parseNum(ufo.financials?.total_amount) ??
+    parseNum(ufo.financials?.grand_total) ??
+    parseNum(ufo.financials?.subtotal) ??
+    parseNum(ufo.total_amount) ??
+    parseNum(ufo.grand_total) ??
+    parseNum(ufo.amount) ??
+    parseNum(doc?.total_amount) ??
+    parseNum(doc?.amount);
 
-  const totalTax = Number(taxes.total_tax ?? money.tax_amount ?? (grandTotal > 0 ? (grandTotal * 0.18 / 1.18) : 0));
-  const subtotal = Number(money.subtotal ?? money.taxable_amount ?? (grandTotal - totalTax));
-  const cgst = Number(taxes.cgst ?? (totalTax / 2));
-  const sgst = Number(taxes.sgst ?? (totalTax / 2));
-  const igst = Number(taxes.igst ?? 0);
+  const lineItemsSum = lineItems.reduce((acc, i) => {
+    const itemTotal = parseNum(i.total) ?? parseNum(i.amount) ?? parseNum(i.taxable_value) ?? 
+      ((parseNum(i.rate) ?? parseNum(i.unit_price) ?? 0) * (parseNum(i.quantity) ?? parseNum(i.qty) ?? 1));
+    return acc + (itemTotal || 0);
+  }, 0);
+
+  const grandTotal = (rawTotal !== undefined && !isNaN(rawTotal)) ? rawTotal : lineItemsSum;
+
+  const rawTax = parseNum(taxes.total_tax) ?? parseNum(taxes.tax_amount) ?? parseNum(money.tax_amount) ?? parseNum(ufo.financials?.tax_amount);
+  const totalTax = (rawTax !== undefined && !isNaN(rawTax)) ? rawTax : (grandTotal > 0 ? Math.round((grandTotal * 0.18 / 1.18) * 100) / 100 : 0);
+
+  const rawSubtotal = parseNum(money.subtotal) ?? parseNum(money.taxable_amount) ?? parseNum(ufo.financials?.subtotal);
+  const subtotal = (rawSubtotal !== undefined && !isNaN(rawSubtotal)) ? rawSubtotal : Math.max(0, grandTotal - totalTax);
+
+  const cgst = parseNum(taxes.cgst) ?? (totalTax > 0 ? Math.round((totalTax / 2) * 100) / 100 : 0);
+  const sgst = parseNum(taxes.sgst) ?? (totalTax > 0 ? Math.round((totalTax / 2) * 100) / 100 : 0);
+  const igst = parseNum(taxes.igst) ?? 0;
 
   // Header Details
-  const invoiceNo = dates.invoice_number || dates.invoice_no || ufo.invoice_number || (isExpenseDoc ? 'EXP-REC' : 'INV-1024');
-  const invoiceDate = dates.document_date || dates.invoice_date || dates.date || new Date().toISOString().split('T')[0];
-  const dueDate = dates.due_date || invoiceDate;
-  const placeOfSupply = dates.place_of_supply || 'Maharashtra (27)';
+  const invoiceNo = parseStr(dates.invoice_number) || parseStr(dates.invoice_no) || parseStr(ufo.invoice_number) || parseStr(dates.reference_number) || (isExpenseDoc ? 'EXP-REC' : 'INV-1024');
+  const invoiceDate = parseStr(dates.document_date) || parseStr(dates.invoice_date) || parseStr(dates.date) || new Date().toISOString().split('T')[0];
+  const dueDate = parseStr(dates.due_date) || invoiceDate;
+  const placeOfSupply = parseStr(dates.place_of_supply) || 'Maharashtra (27)';
   const reverseCharge = dates.reverse_charge ? 'Yes' : 'No';
-  const natureOfSupply = dates.nature_of_supply || (isExpenseDoc ? 'Direct OPEX Expense' : 'B2B Taxable Supply');
+  const natureOfSupply = parseStr(dates.nature_of_supply) || (isExpenseDoc ? 'Direct OPEX Expense' : 'B2B Taxable Supply');
 
   // Parties
-  const issuerPartyName = parties.issuer?.name || parties.seller?.name || parties.vendor?.name || 'Venkatesh Automobiles';
-  const recipientPartyName = parties.recipient?.name || parties.customer?.name || activeWorkbench?.name || 'Datalis Private Limited';
+  const issuerPartyName = parseStr(parties.issuer?.name) || 
+                          parseStr(parties.seller?.name) || 
+                          parseStr(parties.vendor?.name) || 
+                          parseStr(ufo.parties?.vendor?.value) || 
+                          parseStr(ufo.parties?.vendor) || 
+                          parseStr(ufo.parties?.issuer) || 
+                          (isExpenseDoc ? 'Venktesh Automobiles' : 'Vendor Merchant');
+
+  const recipientPartyName = parseStr(parties.recipient?.name) || 
+                             parseStr(parties.customer?.name) || 
+                             parseStr(ufo.parties?.customer?.value) || 
+                             parseStr(ufo.parties?.customer) || 
+                             parseStr(ufo.parties?.recipient) || 
+                             activeWorkbench?.name || 
+                             'Datalis Private Limited';
 
   const seller = parties.issuer || parties.seller || parties.vendor || {
     name: issuerPartyName,
@@ -160,8 +185,42 @@ export default function VoucherEntryTab({ doc }) {
   ];
 
   // Calculated inventory & COGS estimates
-  const totalQty = isExpenseDoc ? 0 : items.reduce((acc, item) => acc + (Number(item.quantity) || 1), 0);
+  const totalQty = isExpenseDoc ? 0 : items.reduce((acc, item) => acc + (parseNum(item.quantity) || 1), 0);
   const estimatedCogs = isExpenseDoc ? 0 : Math.round(subtotal * 0.65);
+
+  const handleAccountMap = async (idx, isCredit, targetName, targetType) => {
+    if (!targetName) return;
+    setMappingLoading(prev => ({ ...prev, [idx]: true }));
+    try {
+      const res = await apiFetch('/api/ops/vouchers/map-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: activeWorkbench?.id,
+          voucher_type: isCredit ? 'receipt' : 'payment',
+          target_type: targetType,
+          target_account_name: targetName,
+          amount: grandTotal
+        })
+      });
+      if (res?.status === 'success') {
+        setMappedAccounts(prev => ({
+          ...prev,
+          [idx]: {
+            targetName,
+            targetType,
+            entryText: res.posting?.entry_text,
+            labelId: res.label_id,
+            code: res.account?.account_code || res.label_id
+          }
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to map voucher account:', err);
+    } finally {
+      setMappingLoading(prev => ({ ...prev, [idx]: false }));
+    }
+  };
 
   if (isBankStatement) {
     const bankSummary = note.statement_summary || ufo.statement_summary || {};
@@ -568,90 +627,204 @@ export default function VoucherEntryTab({ doc }) {
                 {isExpenseDoc ? (
                   <>
                     {/* Debit Expense */}
-                    <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                      <div className="flex items-center gap-3">
-                        <span className="px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold text-[10px]">Dr</span>
-                        <span className="text-gray-200 font-bold">Operating Expense Account (Travel & Fuel / Site Operations)</span>
+                    <div className="flex flex-wrap justify-between items-center py-2 border-b border-white/5 gap-2">
+                      <div className="flex items-center gap-3 flex-1 min-w-[280px]">
+                        <span className="px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold text-[10px] shrink-0">Dr</span>
+                        <select
+                          value={mappedAccounts['opex_dr']?.targetName || ''}
+                          disabled={mappingLoading['opex_dr']}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val) handleAccountMap('opex_dr', false, val, 'expense');
+                          }}
+                          className="bg-[#1a1a1a] text-xs text-gray-200 border border-white/10 rounded px-2.5 py-1 focus:outline-none focus:border-teal-500 font-sans cursor-pointer hover:border-teal-500/50"
+                        >
+                          <option value="">-- Map Expense Account (Default: Travel & Fuel) --</option>
+                          <option value="Travel & Fuel Operations Expense">⛽ Travel & Fuel Operations Expense</option>
+                          <option value="Software & Subscriptions Expense">💻 Software & Subscriptions Expense</option>
+                          <option value="Employee Meals & Entertainment">🍔 Employee Meals & Entertainment</option>
+                          <option value="Office Supplies & Stationery">📦 Office Supplies & Stationery</option>
+                          <option value="Utilities & Electricity Expense">⚡ Utilities & Electricity Expense</option>
+                          <option value="Office Rent & Premises Expense">🏢 Office Rent & Premises Expense</option>
+                          <option value="Legal & Professional Fees">⚖️ Legal & Professional Fees</option>
+                          <option value="Repairs & Hardware Maintenance">🔧 Repairs & Hardware Maintenance</option>
+                          <option value="General Operating Expense (OPEX)">🌐 General Operating Expense (OPEX)</option>
+                        </select>
+                        {mappedAccounts['opex_dr'] && (
+                          <span className="text-[10px] text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded font-mono font-bold border border-teal-500/20 shrink-0">
+                            Mapped ({mappedAccounts['opex_dr']?.code || 'EXP-101'})
+                          </span>
+                        )}
                       </div>
-                      <span className="text-teal-400 font-bold">{formatCurrency(subtotal, country)}</span>
+                      <span className="text-teal-400 font-bold font-mono">{formatCurrency(subtotal, country)}</span>
                     </div>
 
                     {/* Debit Input GST if tax present */}
                     {totalTax > 0 && (
-                      <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                      <div className="flex justify-between items-center py-2 border-b border-white/5">
                         <div className="flex items-center gap-3">
                           <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px]">Dr</span>
                           <span className="text-gray-200 font-bold">Input GST Credit Account (18%)</span>
                         </div>
-                        <span className="text-amber-400 font-bold">{formatCurrency(totalTax, country)}</span>
+                        <span className="text-amber-400 font-bold font-mono">{formatCurrency(totalTax, country)}</span>
                       </div>
                     )}
 
                     {/* Credit Employee Reimbursement Line */}
-                    <div className="flex justify-between items-center py-1.5 pl-6">
-                      <div className="flex items-center gap-3">
-                        <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-bold text-[10px]">Cr</span>
-                        <span className="text-gray-300 font-bold">Employee Reimbursement Payable — {seller.name}</span>
+                    <div className="flex flex-wrap justify-between items-center py-2 pl-6 gap-2">
+                      <div className="flex items-center gap-3 flex-1 min-w-[280px]">
+                        <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-bold text-[10px] shrink-0">Cr</span>
+                        <select
+                          value={mappedAccounts['opex_cr']?.targetName || ''}
+                          disabled={mappingLoading['opex_cr']}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val) handleAccountMap('opex_cr', true, val, 'vendor_ap');
+                          }}
+                          className="bg-[#1a1a1a] text-xs text-gray-200 border border-white/10 rounded px-2.5 py-1 focus:outline-none focus:border-teal-500 font-sans cursor-pointer hover:border-teal-500/50"
+                        >
+                          <option value="">-- Map Credit Account (Default: Employee Dues) --</option>
+                          <option value={`Employee Reimbursement Payable — ${seller.name}`}>👤 Employee Reimbursement Payable — {seller.name}</option>
+                          <option value="Petty Cash Operating Account">💵 Petty Cash Operating Account</option>
+                          <option value="Primary Bank Operating Account">🏦 Primary Bank Operating Account</option>
+                          <option value="Corporate Credit Card Payable">💳 Corporate Credit Card Payable</option>
+                        </select>
+                        {mappedAccounts['opex_cr'] && (
+                          <span className="text-[10px] text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded font-mono font-bold border border-teal-500/20 shrink-0">
+                            Mapped ({mappedAccounts['opex_cr']?.code || 'AP-201'})
+                          </span>
+                        )}
                       </div>
-                      <span className="text-rose-400 font-bold">{formatCurrency(grandTotal, country)}</span>
+                      <span className="text-rose-400 font-bold font-mono">{formatCurrency(grandTotal, country)}</span>
                     </div>
                   </>
                 ) : isVendorDoc ? (
                   <>
                     {/* Debit Expense */}
-                    <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                      <div className="flex items-center gap-3">
-                        <span className="px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold text-[10px]">Dr</span>
-                        <span className="text-gray-200 font-bold">Operating Expense / Purchase Account</span>
+                    <div className="flex flex-wrap justify-between items-center py-2 border-b border-white/5 gap-2">
+                      <div className="flex items-center gap-3 flex-1 min-w-[280px]">
+                        <span className="px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold text-[10px] shrink-0">Dr</span>
+                        <select
+                          value={mappedAccounts['vendor_dr']?.targetName || ''}
+                          disabled={mappingLoading['vendor_dr']}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val) handleAccountMap('vendor_dr', false, val, 'expense');
+                          }}
+                          className="bg-[#1a1a1a] text-xs text-gray-200 border border-white/10 rounded px-2.5 py-1 focus:outline-none focus:border-teal-500 font-sans cursor-pointer hover:border-teal-500/50"
+                        >
+                          <option value="">-- Map Target Account --</option>
+                          <option value="Operating Expense / Purchase Account">🏢 Operating Expense / Purchase Account</option>
+                          <option value="Software & Subscriptions Expense">💻 Software & Subscriptions Expense</option>
+                          <option value="Cost of Goods Sold (COGS)">📦 Cost of Goods Sold (COGS)</option>
+                          <option value="Legal & Professional Fees">⚖️ Legal & Professional Fees</option>
+                        </select>
+                        {mappedAccounts['vendor_dr'] && (
+                          <span className="text-[10px] text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded font-mono font-bold border border-teal-500/20 shrink-0">
+                            Mapped ({mappedAccounts['vendor_dr']?.code || 'PUR-101'})
+                          </span>
+                        )}
                       </div>
-                      <span className="text-teal-400 font-bold">{formatCurrency(subtotal, country)}</span>
+                      <span className="text-teal-400 font-bold font-mono">{formatCurrency(subtotal, country)}</span>
                     </div>
 
                     {/* Debit Input GST */}
-                    <div className="flex justify-between items-center py-1.5 border-b border-white/5">
+                    <div className="flex justify-between items-center py-2 border-b border-white/5">
                       <div className="flex items-center gap-3">
                         <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px]">Dr</span>
                         <span className="text-gray-200 font-bold">Input GST Credit Account (18%)</span>
                       </div>
-                      <span className="text-amber-400 font-bold">{formatCurrency(totalTax, country)}</span>
+                      <span className="text-amber-400 font-bold font-mono">{formatCurrency(totalTax, country)}</span>
                     </div>
 
                     {/* Credit Vendor Payable Line */}
-                    <div className="flex justify-between items-center py-1.5 pl-6">
-                      <div className="flex items-center gap-3">
-                        <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-bold text-[10px]">Cr</span>
-                        <span className="text-gray-300 font-bold">Accounts Payable — {seller.name}</span>
+                    <div className="flex flex-wrap justify-between items-center py-2 pl-6 gap-2">
+                      <div className="flex items-center gap-3 flex-1 min-w-[280px]">
+                        <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-bold text-[10px] shrink-0">Cr</span>
+                        <select
+                          value={mappedAccounts['vendor_cr']?.targetName || ''}
+                          disabled={mappingLoading['vendor_cr']}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val) handleAccountMap('vendor_cr', true, val, 'vendor_ap');
+                          }}
+                          className="bg-[#1a1a1a] text-xs text-gray-200 border border-white/10 rounded px-2.5 py-1 focus:outline-none focus:border-teal-500 font-sans cursor-pointer hover:border-teal-500/50"
+                        >
+                          <option value="">-- Map Vendor Payable Account --</option>
+                          <option value={`Accounts Payable — ${seller.name}`}>🏢 Accounts Payable — {seller.name}</option>
+                          <option value="Primary Bank Operating Account">🏦 Primary Bank Operating Account</option>
+                        </select>
+                        {mappedAccounts['vendor_cr'] && (
+                          <span className="text-[10px] text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded font-mono font-bold border border-teal-500/20 shrink-0">
+                            Mapped ({mappedAccounts['vendor_cr']?.code || 'AP-301'})
+                          </span>
+                        )}
                       </div>
-                      <span className="text-rose-400 font-bold">{formatCurrency(grandTotal, country)}</span>
+                      <span className="text-rose-400 font-bold font-mono">{formatCurrency(grandTotal, country)}</span>
                     </div>
                   </>
                 ) : (
                   <>
                     {/* Debit Line */}
-                    <div className="flex justify-between items-center py-1.5 border-b border-white/5">
-                      <div className="flex items-center gap-3">
-                        <span className="px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold text-[10px]">Dr</span>
-                        <span className="text-gray-200 font-bold">Accounts Receivable — {customer.name}</span>
+                    <div className="flex flex-wrap justify-between items-center py-2 border-b border-white/5 gap-2">
+                      <div className="flex items-center gap-3 flex-1 min-w-[280px]">
+                        <span className="px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 font-bold text-[10px] shrink-0">Dr</span>
+                        <select
+                          value={mappedAccounts['sales_dr']?.targetName || ''}
+                          disabled={mappingLoading['sales_dr']}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val) handleAccountMap('sales_dr', false, val, 'customer_ar');
+                          }}
+                          className="bg-[#1a1a1a] text-xs text-gray-200 border border-white/10 rounded px-2.5 py-1 focus:outline-none focus:border-teal-500 font-sans cursor-pointer hover:border-teal-500/50"
+                        >
+                          <option value="">-- Map Receivables Account --</option>
+                          <option value={`Accounts Receivable — ${customer.name}`}>👤 Accounts Receivable — {customer.name}</option>
+                          <option value="Primary Bank Operating Account">🏦 Primary Bank Operating Account</option>
+                        </select>
+                        {mappedAccounts['sales_dr'] && (
+                          <span className="text-[10px] text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded font-mono font-bold border border-teal-500/20 shrink-0">
+                            Mapped ({mappedAccounts['sales_dr']?.code || 'AR-101'})
+                          </span>
+                        )}
                       </div>
-                      <span className="text-teal-400 font-bold">{formatCurrency(grandTotal, country)}</span>
+                      <span className="text-teal-400 font-bold font-mono">{formatCurrency(grandTotal, country)}</span>
                     </div>
 
                     {/* Credit Revenue Line */}
-                    <div className="flex justify-between items-center py-1.5 border-b border-white/5 pl-6">
-                      <div className="flex items-center gap-3">
-                        <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-bold text-[10px]">Cr</span>
-                        <span className="text-gray-300">Sales Revenue Account</span>
+                    <div className="flex flex-wrap justify-between items-center py-2 border-b border-white/5 pl-6 gap-2">
+                      <div className="flex items-center gap-3 flex-1 min-w-[280px]">
+                        <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-bold text-[10px] shrink-0">Cr</span>
+                        <select
+                          value={mappedAccounts['sales_cr']?.targetName || ''}
+                          disabled={mappingLoading['sales_cr']}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val) handleAccountMap('sales_cr', true, val, 'revenue');
+                          }}
+                          className="bg-[#1a1a1a] text-xs text-gray-200 border border-white/10 rounded px-2.5 py-1 focus:outline-none focus:border-teal-500 font-sans cursor-pointer hover:border-teal-500/50"
+                        >
+                          <option value="">-- Map Revenue Account --</option>
+                          <option value="Sales Revenue Account">💰 Sales Revenue Account</option>
+                          <option value="Consulting Revenue">📈 Consulting Revenue</option>
+                          <option value="Software & SaaS Subscription Revenue">💻 Software & SaaS Subscription Revenue</option>
+                        </select>
+                        {mappedAccounts['sales_cr'] && (
+                          <span className="text-[10px] text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded font-mono font-bold border border-teal-500/20 shrink-0">
+                            Mapped ({mappedAccounts['sales_cr']?.code || 'REV-401'})
+                          </span>
+                        )}
                       </div>
-                      <span className="text-gray-300">{formatCurrency(subtotal, country)}</span>
+                      <span className="text-gray-300 font-mono">{formatCurrency(subtotal, country)}</span>
                     </div>
 
                     {/* Credit GST Line */}
-                    <div className="flex justify-between items-center py-1.5 pl-6">
+                    <div className="flex justify-between items-center py-2 pl-6">
                       <div className="flex items-center gap-3">
                         <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400 font-bold text-[10px]">Cr</span>
-                        <span className="text-gray-300">Output GST Payable (18%)</span>
+                        <span className="text-gray-300 font-bold">Output GST Payable (18%)</span>
                       </div>
-                      <span className="text-gray-300">{formatCurrency(totalTax, country)}</span>
+                      <span className="text-gray-300 font-mono">{formatCurrency(totalTax, country)}</span>
                     </div>
                   </>
                 )}

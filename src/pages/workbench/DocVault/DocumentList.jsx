@@ -23,7 +23,24 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-export default function DocumentList({ documents, loading, selectedDoc, onSelect, onDelete, uploading }) {
+const parseNum = (val) => {
+  if (val === undefined || val === null || val === '') return undefined;
+  if (typeof val === 'number') return isNaN(val) ? undefined : val;
+  if (typeof val === 'object' && val !== null) {
+    if ('value' in val) return parseNum(val.value);
+    if ('amount' in val) return parseNum(val.amount);
+    if ('total' in val) return parseNum(val.total);
+  }
+  if (typeof val === 'string') {
+    const cleaned = val.replace(/[^0-9.-]/g, '');
+    if (!cleaned) return undefined;
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? undefined : n;
+  }
+  return undefined;
+};
+
+export default function DocumentList({ documents, loading, selectedDoc, onSelect, onDelete, uploading, uploadProgress = 0, uploadStage = "", uploadFileName = "" }) {
   const [search, setSearch] = useState("");
   const { activeWorkbench } = useWorkbench();
 
@@ -36,7 +53,7 @@ export default function DocumentList({ documents, loading, selectedDoc, onSelect
       doc.original_filename.toLowerCase().includes(term) ||
       party.toLowerCase().includes(term) ||
       ref.toLowerCase().includes(term) ||
-      doc.derivedStatus.toLowerCase().includes(term)
+      (doc.derivedStatus && doc.derivedStatus.toLowerCase().includes(term))
     );
   });
 
@@ -56,13 +73,32 @@ export default function DocumentList({ documents, loading, selectedDoc, onSelect
         </div>
       </div>
 
+      {/* Active Uploading Progress Card */}
+      {uploading && (
+        <div className="p-4 bg-teal-950/40 border-b border-teal-500/30 animate-pulse">
+          <div className="flex items-center justify-between text-xs font-bold text-teal-400 mb-1.5">
+            <span className="truncate pr-2">{uploadFileName || "Uploading document..."}</span>
+            <span className="font-mono shrink-0">{uploadProgress}%</span>
+          </div>
+          <div className="text-[10px] text-gray-400 mb-2 truncate">
+            {uploadStage || "Processing OCR & AI analysis..."}
+          </div>
+          <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden border border-teal-500/20">
+            <div 
+              className="h-full bg-gradient-to-r from-teal-500 to-emerald-400 rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(20,184,166,0.6)]"
+              style={{ width: `${Math.max(5, uploadProgress)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* List */}
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="p-8 text-center text-gray-500 animate-pulse text-sm">Loading documents...</div>
         ) : filteredDocs.length === 0 ? (
           <div className="p-8 text-center text-gray-500 text-sm">
-            {uploading ? "Uploading..." : "No documents found."}
+            {uploading ? "Uploading document..." : "No documents found."}
           </div>
         ) : (
           <div className="divide-y divide-white/5">
@@ -77,9 +113,15 @@ export default function DocumentList({ documents, loading, selectedDoc, onSelect
               
               const refNumber = data.document?.reference_number?.value || "No Ref";
               
-              const amount = note.money?.total_amount !== undefined ? note.money?.total_amount : data.financials?.total_amount?.value;
+              const amount = 
+                parseNum(note.money?.total_amount) ?? 
+                parseNum(note.money?.subtotal) ?? 
+                parseNum(data.financials?.total_amount) ?? 
+                parseNum(data.total_amount) ??
+                parseNum(doc.total_amount) ??
+                parseNum(doc.amount);
               
-              const displayAmount = amount !== undefined ? formatCurrency(amount, activeWorkbench?.country) : "-";
+              const displayAmount = amount !== undefined && !isNaN(amount) ? formatCurrency(amount, activeWorkbench?.country) : "-";
               
               // Only show Needs Review icon if specifically Needs Review
               const showWarning = doc.derivedStatus === 'Needs Review';

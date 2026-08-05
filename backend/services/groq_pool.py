@@ -142,3 +142,32 @@ class GroqPool:
         if last_error:
             raise last_error
         raise Exception("Failed to execute function against Groq pool.")
+
+    @classmethod
+    def execute_with_model_fallback(
+        cls, 
+        fn_builder: Callable[[str], Callable[[Groq], Any]], 
+        models: List[str] = None
+    ) -> Any:
+        """
+        Tries executing a request with primary model. If a 429 rate limit or token quota error occurs,
+        automatically falls back to secondary models (e.g. llama-3.1-8b-instant, mixtral-8x7b-32768).
+        """
+        if not models:
+            models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
+            
+        last_error = None
+        for m in models:
+            try:
+                fn = fn_builder(m)
+                return cls.execute(fn)
+            except Exception as e:
+                last_error = e
+                err_str = str(e).lower()
+                if any(x in err_str for x in ["rate limit", "429", "limit_exceeded", "tpd", "tokens per day"]):
+                    print(f"[GROQ_POOL] Model '{m}' rate limited. Falling back to next model in fallback list...")
+                    continue
+                raise e
+        if last_error:
+            raise last_error
+        raise Exception("All Groq fallback models failed.")
