@@ -7,7 +7,7 @@ import { toast } from "react-hot-toast";
 
 import { 
   BsPlusLg, BsSearch, BsGrid3X3GapFill, BsListTask, BsKanban, 
-  BsFolderFill, BsArrowUpRight, BsReceiptCutoff, BsCheck2All,
+  BsFolderFill, BsArrowDownLeft, BsArrowUpRight, BsReceiptCutoff, BsCheck2All,
   BsHourglassSplit, BsCashCoin, BsTag, BsLightningCharge, BsTrash,
   BsPencilSquare, BsDiagram3, BsBuilding, BsFileEarmarkText, BsCpu
 } from "react-icons/bs";
@@ -531,7 +531,7 @@ export default function BusinessEngine() {
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base ${
                             trade.tradeType === "receivable" ? "bg-teal-500/10 text-teal-400 border border-teal-500/20" : "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"
                           }`}>
-                            {trade.tradeType === "receivable" ? "💼" : "🛒"}
+                            {trade.tradeType === "receivable" ? <BsArrowDownLeft size={20} className="text-teal-400" /> : <BsArrowUpRight size={20} className="text-cyan-400" />}
                           </div>
                           <div>
                             <h3 className="text-sm font-extrabold text-white group-hover:text-teal-300 transition-colors line-clamp-1">
@@ -563,7 +563,7 @@ export default function BusinessEngine() {
                         </div>
                         <div className="flex justify-between text-xs font-semibold">
                           <span className="text-gray-400">Receipts/Payments:</span>
-                          <span className="text-emerald-400 font-mono">
+                          <span className={`font-mono ${trade.settlementVouchers?.length > 0 ? "text-emerald-400" : "text-gray-400"}`}>
                             {trade.settlementVouchers?.length || 0} Linked
                           </span>
                         </div>

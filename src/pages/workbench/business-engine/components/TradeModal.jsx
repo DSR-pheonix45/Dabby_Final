@@ -3,7 +3,7 @@ import {
   BsXLg, BsFileEarmarkText, BsPlusLg, BsTrash, BsCheck2All, 
   BsCashCoin, BsBuildingCheck, BsLightningChargeFill, BsArrowRepeat,
   BsReceiptCutoff, BsBoxSeam, BsCheckCircleFill, BsExclamationTriangleFill,
-  BsDiagram3, BsTag, BsCalendar3
+  BsDiagram3, BsTag, BsCalendar3, BsArrowDownLeft, BsArrowUpRight
 } from "react-icons/bs";
 import { useWorkbench } from "../../../../context/WorkbenchContext";
 import { formatCurrency } from "../../../../utils/currency";
@@ -282,7 +282,7 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg ${
                 tradeType === "receivable" ? "bg-teal-500/20 text-teal-400 border border-teal-500/30" : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30"
               }`}>
-                {tradeType === "receivable" ? "💼" : "🛒"}
+                {tradeType === "receivable" ? <BsArrowDownLeft size={20} className="text-teal-400" /> : <BsArrowUpRight size={20} className="text-cyan-400" />}
               </div>
               <div>
                 <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
