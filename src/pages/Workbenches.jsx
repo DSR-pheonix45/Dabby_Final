@@ -5,6 +5,7 @@ import { BsSearch, BsGrid, BsListUl, BsThreeDots, BsPencil, BsTrash, BsX } from 
 import { HiChevronDown } from "react-icons/hi";
 import CreateWorkbenchModal from "../components/Workbenches/CreateWorkbenchModal";
 import { supabase } from "../lib/supabase";
+import { collaborationService } from "../services/collaborationService";
 import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 
@@ -22,18 +23,19 @@ export default function Workbenches() {
 
   const handleDelete = async (id, e) => {
     e.stopPropagation();
-    if (!window.confirm("Are you sure you want to delete this workbench?")) return;
+    if (!window.confirm("Are you sure you want to delete this workbench and all its data?")) return;
     
     setOpenDropdown(null);
-    const { error } = await supabase.from("workbenches").delete().eq("id", id);
-    if (error) {
-      toast.error("Failed to delete workbench");
-    } else {
-      toast.success("Workbench deleted");
+    try {
+      await collaborationService.deleteWorkbench(id);
+      toast.success("Workbench deleted successfully");
       if (activeWorkbench?.id === id) {
         changeActiveWorkbench(null);
       }
       fetchWorkbenches();
+    } catch (err) {
+      console.error("Delete workbench error:", err);
+      toast.error(err.message || "Failed to delete workbench");
     }
   };
 

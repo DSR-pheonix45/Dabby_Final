@@ -49,6 +49,17 @@ export const collaborationService = {
     return res.json();
   },
 
+  async deleteWorkbench(workbenchId) {
+    const res = await apiFetch(`/api/collaboration/workbenches/${workbenchId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.message || "Failed to delete workbench");
+    }
+    return res.json();
+  },
+
   async addTradeVessel(workbenchId, partyId, vesselData) {
     const res = await apiFetch(`/api/collaboration/${workbenchId}/parties/${partyId}/vessels`, {
       method: "POST",

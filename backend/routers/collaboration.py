@@ -628,3 +628,45 @@ def update_claim_status(workbench_id: str, claim_id: str, payload: ClaimStatusUp
     return target_claim or {"id": claim_id, "status": payload.status}
 
 
+@router.delete("/workbenches/{workbench_id}")
+async def delete_workbench_full(workbench_id: str, user=Depends(get_current_user)):
+    """
+    Cascade-delete all child data (documents, accounts, members, events, drafts, parties, tasks)
+    and permanently delete the workbench row.
+    """
+    try:
+        user_id = user.get("id") if isinstance(user, dict) else getattr(user, "id", None)
+
+        # 1. Fetch document IDs belonging to this workbench
+        doc_res = supabase.table("di_documents").select("id").eq("workbench_id", workbench_id).execute()
+        doc_ids = [d["id"] for d in (doc_res.data or [])]
+
+        # 2. Delete child tables referencing document_id or workbench_id
+        if doc_ids:
+            try: supabase.table("di_analysis_notes").delete().in_("document_id", doc_ids).execute()
+            except Exception: pass
+            try: supabase.table("di_document_processing_logs").delete().in_("document_id", doc_ids).execute()
+            except Exception: pass
+            try: supabase.table("trade_drafts").delete().in_("document_id", doc_ids).execute()
+            except Exception: pass
+            try: supabase.table("business_events").delete().in_("document_id", doc_ids).execute()
+            except Exception: pass
+
+        # Delete by workbench_id for all dependent tables
+        for table in ["workbench_members", "di_documents", "di_accounts", "di_ledger_transactions", 
+                      "parties", "workbench_accounts", "workbench_tasks"]:
+            try:
+                supabase.table(table).delete().eq("workbench_id", workbench_id).execute()
+            except Exception as tbl_err:
+                print(f"[WARNING] Delete child rows for {table}:", tbl_err)
+
+        # 3. Finally delete the workbench entry
+        res = supabase.table("workbenches").delete().eq("id", workbench_id).execute()
+        return {"status": "success", "message": "Workbench and all associated data permanently deleted."}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to delete workbench: {str(e)}")
+
+
+

@@ -22,6 +22,21 @@ export default function WorkbenchSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [logoFile, setLogoFile] = useState(null);
   const [coaAccounts, setCoaAccounts] = useState([]);
+
+  const handleDeleteWorkbench = async () => {
+    if (!activeWorkbench) return;
+    if (!window.confirm(`Are you sure you want to permanently delete '${activeWorkbench.name}' and all associated documents, parties, accounts, and ledger data? This action cannot be undone.`)) return;
+
+    try {
+      await collaborationService.deleteWorkbench(activeWorkbench.id);
+      toast.success("Workbench permanently deleted");
+      changeActiveWorkbench(null);
+      await fetchWorkbenches();
+    } catch (err) {
+      console.error("Delete workbench error:", err);
+      toast.error(err.message || "Failed to delete workbench");
+    }
+  };
   
   const [formData, setFormData] = useState({
     name: activeWorkbench?.name || "",
@@ -606,7 +621,10 @@ export default function WorkbenchSettings() {
                     <h4 className="text-white font-medium">Delete Workbench</h4>
                     <p className="text-sm text-gray-500 mt-1">Permanently remove this workbench and all associated data.</p>
                   </div>
-                  <button className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 font-medium rounded-md transition-colors border border-red-500/20">
+                  <button 
+                    onClick={handleDeleteWorkbench}
+                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 font-medium rounded-md transition-colors border border-red-500/20"
+                  >
                     Delete Workbench
                   </button>
                 </div>
