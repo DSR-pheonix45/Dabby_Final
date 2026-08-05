@@ -275,10 +275,10 @@ export default function BusinessEngine() {
   const pendingCount = trades.filter(t => t.status !== "SETTLED").length;
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#0F111A] overflow-hidden font-sans text-gray-200">
+    <div className="flex-1 flex flex-col h-full bg-[#111111] overflow-hidden font-sans text-gray-200">
       
       {/* Google Drive Style Header Bar */}
-      <div className="px-6 lg:px-10 py-5 border-b border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#141724]/90 backdrop-blur-md z-10">
+      <div className="px-6 lg:px-10 py-5 border-b border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#181818]/50 backdrop-blur-md z-10">
         <div>
           <h1 className="text-2xl font-extrabold text-white tracking-tight flex items-center gap-2.5">
             <BsCpu className="text-teal-400" />
@@ -358,7 +358,7 @@ export default function BusinessEngine() {
               className={`p-4 rounded-2xl border transition-all cursor-pointer ${
                 activeTab === "receivable" 
                   ? "bg-teal-500/10 border-teal-500/50 shadow-lg shadow-teal-500/5" 
-                  : "bg-[#141724] border-white/10 hover:border-teal-500/30 hover:bg-[#181C2E]"
+                  : "bg-[#181818] border-white/10 hover:border-teal-500/30 hover:bg-[#222222]"
               }`}
             >
               <div className="flex items-center justify-between mb-3">
@@ -381,7 +381,7 @@ export default function BusinessEngine() {
               className={`p-4 rounded-2xl border transition-all cursor-pointer ${
                 activeTab === "payable" 
                   ? "bg-cyan-500/10 border-cyan-500/50 shadow-lg shadow-cyan-500/5" 
-                  : "bg-[#141724] border-white/10 hover:border-cyan-500/30 hover:bg-[#181C2E]"
+                  : "bg-[#181818] border-white/10 hover:border-cyan-500/30 hover:bg-[#222222]"
               }`}
             >
               <div className="flex items-center justify-between mb-3">
@@ -404,7 +404,7 @@ export default function BusinessEngine() {
               className={`p-4 rounded-2xl border transition-all cursor-pointer ${
                 activeTab === "settled" 
                   ? "bg-emerald-500/10 border-emerald-500/50 shadow-lg shadow-emerald-500/5" 
-                  : "bg-[#141724] border-white/10 hover:border-emerald-500/30 hover:bg-[#181C2E]"
+                  : "bg-[#181818] border-white/10 hover:border-emerald-500/30 hover:bg-[#222222]"
               }`}
             >
               <div className="flex items-center justify-between mb-3">
@@ -427,7 +427,7 @@ export default function BusinessEngine() {
               className={`p-4 rounded-2xl border transition-all cursor-pointer ${
                 activeTab === "pending" 
                   ? "bg-amber-500/10 border-amber-500/50 shadow-lg shadow-amber-500/5" 
-                  : "bg-[#141724] border-white/10 hover:border-amber-500/30 hover:bg-[#181C2E]"
+                  : "bg-[#181818] border-white/10 hover:border-amber-500/30 hover:bg-[#222222]"
               }`}
             >
               <div className="flex items-center justify-between mb-3">
@@ -479,7 +479,7 @@ export default function BusinessEngine() {
               placeholder="Search trade title, party, or voucher..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-[#141724] border border-white/10 rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-teal-500/50"
+              className="w-full pl-10 pr-4 py-2 bg-[#181818] border border-white/10 rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-teal-500/50"
             />
           </div>
 
@@ -489,7 +489,7 @@ export default function BusinessEngine() {
         {viewMode === "cards" && (
           <div>
             {filteredTrades.length === 0 ? (
-              <div className="py-20 text-center bg-[#141724]/50 border border-dashed border-white/10 rounded-3xl p-8">
+              <div className="py-20 text-center bg-[#181818]/50 border border-dashed border-white/10 rounded-3xl p-8">
                 <div className="w-16 h-16 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 mx-auto mb-4">
                   <BsDiagram3 size={28} />
                 </div>
@@ -516,7 +516,7 @@ export default function BusinessEngine() {
                       setSelectedTrade(trade);
                       setIsTradeModalOpen(true);
                     }}
-                    className="p-5 bg-[#141724] hover:bg-[#181C2E] border border-white/10 hover:border-teal-500/40 rounded-2xl transition-all shadow-lg hover:shadow-2xl cursor-pointer flex flex-col justify-between group relative overflow-hidden"
+                    className="p-5 bg-[#181818] hover:bg-[#222222] border border-white/10 hover:border-teal-500/40 rounded-2xl transition-all shadow-lg hover:shadow-2xl cursor-pointer flex flex-col justify-between group relative overflow-hidden"
                   >
                     
                     {/* Top Accent Line */}
@@ -644,9 +644,9 @@ export default function BusinessEngine() {
 
         {/* VIEW MODE 3: LIST TABLE VIEW */}
         {viewMode === "table" && (
-          <div className="bg-[#141724] border border-white/10 rounded-2xl overflow-hidden shadow-xl">
+          <div className="bg-[#181818] border border-white/10 rounded-2xl overflow-hidden shadow-xl">
             <table className="w-full text-left text-xs font-sans">
-              <thead className="bg-[#181C2E] border-b border-white/10 text-gray-400 uppercase tracking-wider font-extrabold">
+              <thead className="bg-[#111111]/50 border-b border-white/10 text-gray-400 uppercase tracking-wider font-extrabold">
                 <tr>
                   <th className="p-4">Trade Reference</th>
                   <th className="p-4">Counterparty</th>

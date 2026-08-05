@@ -274,10 +274,10 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
   return (
     <>
       <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-        <div className="bg-[#12141F] border border-white/10 rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col font-sans">
+        <div className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col font-sans">
           
           {/* Top Bar Header */}
-          <div className="px-6 py-4 border-b border-white/10 bg-[#171A29] flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-white/10 bg-[#181818] flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg ${
                 tradeType === "receivable" ? "bg-teal-500/20 text-teal-400 border border-teal-500/30" : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30"
@@ -660,7 +660,7 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
           </div>
 
           {/* Footer Action Controls */}
-          <div className="px-6 py-4 border-t border-white/10 bg-[#171A29] flex items-center justify-between">
+          <div className="px-6 py-4 border-t border-white/10 bg-[#181818] flex items-center justify-between">
             <button
               onClick={handlePostToCOA}
               disabled={posting || !initiatorVoucher}

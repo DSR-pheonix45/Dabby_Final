@@ -397,7 +397,7 @@ export default function Members() {
       {/* Add Department Modal */}
       {isAddDeptOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#141722] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-4">
+          <div className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-4">
             <h2 className="text-lg font-bold text-white">Add New Department</h2>
             <form onSubmit={handleCreateDepartment} className="space-y-4 text-xs">
               <div>
@@ -447,7 +447,7 @@ export default function Members() {
       {/* Add Employee Modal */}
       {isAddEmpOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#141722] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-4">
+          <div className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-4">
             <h2 className="text-lg font-bold text-white">Add Non-Login Employee</h2>
             <form onSubmit={handleCreateEmployee} className="space-y-4 text-xs">
               <div>

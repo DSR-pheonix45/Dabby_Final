@@ -96,7 +96,7 @@ export default function CreateAdjustmentNoteModal({ isOpen, onClose, documentCar
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 font-sans">
-      <div className="bg-[#121620] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-fadeIn">
+      <div className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-fadeIn">
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black/40">
@@ -180,7 +180,7 @@ export default function CreateAdjustmentNoteModal({ isOpen, onClose, documentCar
             <select
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="w-full bg-[#181c26] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+              className="w-full bg-[#111111] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
             >
               <option value="Sales Return & Goods Rejection">Sales Return & Goods Rejection</option>
               <option value="Price Difference & Rebate">Price Difference & Rebate</option>

@@ -146,10 +146,10 @@ export default function VoucherPickerModal({ isOpen, onClose, onSelectVoucher, f
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-[#141722] border border-white/10 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+      <div className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
         
         {/* Header */}
-        <div className="p-5 border-b border-white/10 flex items-center justify-between bg-[#1A1E2E]">
+        <div className="p-5 border-b border-white/10 flex items-center justify-between bg-[#181818]">
           <div>
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
               <BsFileEarmarkText className="text-teal-400" />
@@ -168,7 +168,7 @@ export default function VoucherPickerModal({ isOpen, onClose, onSelectVoucher, f
         </div>
 
         {/* Search & Filter */}
-        <div className="p-4 border-b border-white/5 bg-[#12141F] flex items-center gap-3">
+        <div className="p-4 border-b border-white/5 bg-[#111111] flex items-center gap-3">
           <div className="relative flex-1">
             <BsSearch className="absolute left-3.5 top-3 text-gray-400 text-sm" />
             <input 
