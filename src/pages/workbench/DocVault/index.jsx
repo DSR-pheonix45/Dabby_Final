@@ -17,17 +17,21 @@ import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "reac
 export const deriveDocumentStatus = (doc) => {
   const logs = doc.di_document_processing_logs || [];
   
-  if (logs.some(l => l.status === 'failed')) return 'Failed';
   if (logs.some(l => l.stage === 'post' && l.status === 'success')) return 'Posted';
-  
-  const analysisLog = logs.find(l => l.stage === 'analysis');
-  if (analysisLog?.status === 'success') {
-    // Check confidence in analysis note
-    const note = doc.di_analysis_notes?.[0];
-    if (note && note.confidence >= 0.90) return 'Ready to Post';
+
+  const note = doc.di_analysis_notes?.[0];
+  const hasAnalysisSuccess = logs.some(l => l.stage === 'analysis' && l.status === 'success');
+
+  // If analysis succeeded OR an analysis note exists with data, the document extraction was successful!
+  if (hasAnalysisSuccess || (note && Object.keys(note).length > 0)) {
+    const confidence = note?.confidence ?? 0.95;
+    if (confidence >= 0.90) return 'Ready to Post';
     return 'Needs Review';
   }
   
+  // Only return Failed if there is an explicit failed log and NO successful analysis note
+  if (logs.some(l => l.status === 'failed')) return 'Failed';
+
   if (logs.some(l => l.stage === 'ocr' || l.stage === 'analysis')) return 'Processing';
   
   return 'Uploaded';
@@ -48,9 +52,10 @@ export default function DocVaultIndex() {
   const [pdfPassword, setPdfPassword] = useState("");
   const [unlocking, setUnlocking] = useState(false);
   const [lockedFile, setLockedFile] = useState(null);
-  const loadDocuments = async () => {
+  
+  const loadDocuments = async (silent = false) => {
     if (!activeWorkbench) return [];
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const docs = await diService.getDocuments(activeWorkbench.id);
       
@@ -75,13 +80,13 @@ export default function DocVaultIndex() {
       toast.error("Failed to load documents");
       return [];
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadDocuments();
-    const handleRefresh = () => loadDocuments();
+    const handleRefresh = () => loadDocuments(true);
     window.addEventListener("docVaultUpdated", handleRefresh);
     return () => window.removeEventListener("docVaultUpdated", handleRefresh);
   }, [activeWorkbench]);
@@ -96,7 +101,7 @@ export default function DocVaultIndex() {
       if (selectedDoc?.id === docId) {
         setSelectedDoc(null);
       }
-      loadDocuments();
+      loadDocuments(true);
     } catch (err) {
       console.error("Delete error:", err);
       toast.error("Failed to delete document");
@@ -120,7 +125,7 @@ export default function DocVaultIndex() {
       clearInterval(progressTimer);
       setUploadProgress(100);
       toast.success("Document scanned & extracted successfully!", { id: toastId });
-      const updatedDocs = await loadDocuments();
+      const updatedDocs = await loadDocuments(true);
       if (updatedDocs) {
         const match = updatedDocs.find(d => d.id === docId);
         if (match) setSelectedDoc(match);
@@ -210,6 +215,13 @@ export default function DocVaultIndex() {
       toast.loading("Uploading document...", { id: "upload" });
       const res = await diService.uploadDocument(activeWorkbench.id, file);
       
+      // Step 1: Immediately refresh list silently so document shows in list and auto-selects!
+      const initialDocs = await loadDocuments(true);
+      const uploadedDoc = initialDocs.find(d => d.id === res.document_id);
+      if (uploadedDoc) {
+        setSelectedDoc(uploadedDoc);
+      }
+
       setUploadProgress(45);
       setUploadStage("Running Gemini Vision OCR & extracting text...");
       toast.loading("AI parsing in progress...", { id: "upload" });
@@ -226,7 +238,9 @@ export default function DocVaultIndex() {
       setUploadProgress(100);
 
       toast.success("Document parsed successfully!", { id: "upload" });
-      const freshDocs = await loadDocuments();
+      
+      // Step 2: Refresh list again silently to show extracted status (Ready to Post) & values
+      const freshDocs = await loadDocuments(true);
       const freshDoc = freshDocs.find(d => d.id === res.document_id) || processRes;
       if (freshDoc) {
         setSelectedDoc(freshDoc);
