@@ -280,7 +280,7 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
           <div className="px-6 py-4 border-b border-white/10 bg-[#171A29] flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg ${
-                tradeType === "receivable" ? "bg-teal-500/20 text-teal-400 border border-teal-500/30" : "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                tradeType === "receivable" ? "bg-teal-500/20 text-teal-400 border border-teal-500/30" : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30"
               }`}>
                 {tradeType === "receivable" ? "💼" : "🛒"}
               </div>

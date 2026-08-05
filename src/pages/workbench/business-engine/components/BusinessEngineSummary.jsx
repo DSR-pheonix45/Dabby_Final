@@ -28,8 +28,8 @@ export default function BusinessEngineSummary({ kpis, loading }) {
       value: `${(kpis?.partiallyCompleted || 0) + (kpis?.linkedSnippet || 0)} Pending`,
       count: 'Bank / Note Matches',
       icon: BsHourglassSplit, 
-      color: 'text-purple-400', 
-      bg: 'bg-purple-500/10 border-purple-500/20' 
+      color: 'text-cyan-400', 
+      bg: 'bg-cyan-500/10 border-cyan-500/20' 
     },
     { 
       title: 'Settled & Posted to COA', 

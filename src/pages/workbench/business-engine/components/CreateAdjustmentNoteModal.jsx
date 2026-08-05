@@ -101,7 +101,7 @@ export default function CreateAdjustmentNoteModal({ isOpen, onClose, documentCar
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black/40">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
               <BsFileEarmarkMinus size={22} />
             </div>
             <div>
@@ -158,7 +158,7 @@ export default function CreateAdjustmentNoteModal({ isOpen, onClose, documentCar
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full bg-black/40 border border-white/10 rounded-lg px-3.5 py-2.5 text-sm text-white font-bold focus:outline-none focus:border-purple-500"
+                className="w-full bg-black/40 border border-white/10 rounded-lg px-3.5 py-2.5 text-sm text-white font-bold focus:outline-none focus:border-cyan-500"
               />
             </div>
 
@@ -169,7 +169,7 @@ export default function CreateAdjustmentNoteModal({ isOpen, onClose, documentCar
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-black/40 border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500"
+                className="w-full bg-black/40 border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500"
               />
             </div>
           </div>
@@ -180,7 +180,7 @@ export default function CreateAdjustmentNoteModal({ isOpen, onClose, documentCar
             <select
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="w-full bg-[#181c26] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+              className="w-full bg-[#181c26] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
             >
               <option value="Sales Return & Goods Rejection">Sales Return & Goods Rejection</option>
               <option value="Price Difference & Rebate">Price Difference & Rebate</option>
@@ -202,7 +202,7 @@ export default function CreateAdjustmentNoteModal({ isOpen, onClose, documentCar
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 bg-purple-500 hover:bg-purple-400 text-black font-bold rounded-lg text-xs transition-all shadow-md shadow-purple-500/20 disabled:opacity-50 flex items-center gap-1.5"
+              className="px-5 py-2 bg-gradient-to-r from-teal-400 to-emerald-400 hover:opacity-95 text-black font-extrabold rounded-lg text-xs transition-all shadow-md shadow-teal-500/20 disabled:opacity-50 flex items-center gap-1.5"
             >
               <BsCheckCircleFill size={14} />
               <span>{loading ? "Issuing Note..." : `Issue ${noteType === "credit_note" ? "Credit Note" : "Debit Note"}`}</span>

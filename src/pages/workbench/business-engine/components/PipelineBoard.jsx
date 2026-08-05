@@ -13,7 +13,7 @@ const STAGES = [
     id: 'proformas_bills', 
     label: '2. Proformas & Pending Bills', 
     icon: BsHourglassSplit,
-    color: 'text-purple-400'
+    color: 'text-cyan-400'
   },
   { 
     id: 'unsettled_invoices', 

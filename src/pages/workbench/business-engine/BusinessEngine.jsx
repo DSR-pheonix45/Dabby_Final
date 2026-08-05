@@ -380,15 +380,15 @@ export default function BusinessEngine() {
               onClick={() => setActiveTab("payable")}
               className={`p-4 rounded-2xl border transition-all cursor-pointer ${
                 activeTab === "payable" 
-                  ? "bg-purple-500/10 border-purple-500/50 shadow-lg shadow-purple-500/5" 
-                  : "bg-[#141724] border-white/10 hover:border-purple-500/30 hover:bg-[#181C2E]"
+                  ? "bg-cyan-500/10 border-cyan-500/50 shadow-lg shadow-cyan-500/5" 
+                  : "bg-[#141724] border-white/10 hover:border-cyan-500/30 hover:bg-[#181C2E]"
               }`}
             >
               <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
                   <BsFolderFill size={20} />
                 </div>
-                <span className="text-xs font-bold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded">
+                <span className="text-xs font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded">
                   {trades.filter(t => t.tradeType === "payable").length} Trades
                 </span>
               </div>
@@ -521,7 +521,7 @@ export default function BusinessEngine() {
                     
                     {/* Top Accent Line */}
                     <div className={`absolute top-0 left-0 right-0 h-1 ${
-                      trade.status === "SETTLED" ? "bg-emerald-400" : trade.tradeType === "receivable" ? "bg-teal-400" : "bg-purple-400"
+                      trade.status === "SETTLED" ? "bg-emerald-400" : trade.tradeType === "receivable" ? "bg-teal-400" : "bg-cyan-400"
                     }`} />
 
                     <div>
@@ -529,7 +529,7 @@ export default function BusinessEngine() {
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div className="flex items-center space-x-3">
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base ${
-                            trade.tradeType === "receivable" ? "bg-teal-500/10 text-teal-400 border border-teal-500/20" : "bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                            trade.tradeType === "receivable" ? "bg-teal-500/10 text-teal-400 border border-teal-500/20" : "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"
                           }`}>
                             {trade.tradeType === "receivable" ? "💼" : "🛒"}
                           </div>

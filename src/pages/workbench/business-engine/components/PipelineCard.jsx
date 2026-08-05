@@ -94,7 +94,7 @@ export default function PipelineCard({
         <button
           type="button"
           onClick={() => onOpenAdjustmentNote(card)}
-          className="py-1.5 px-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
+          className="py-1.5 px-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
           title="Issue Credit or Debit Note"
         >
           <BsFileEarmarkMinus size={11} />
