@@ -118,13 +118,13 @@ export default function Parties() {
 
                   <div className="flex justify-between items-start mb-6 mt-2">
                     <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center
-                      ${isOwner ? 'border-yellow-500/30 text-yellow-500 bg-yellow-500/5' : 'border-blue-500/30 text-blue-500 bg-blue-500/5'}
+                      ${isOwner ? 'border-yellow-500/30 text-yellow-500 bg-yellow-500/5' : 'border-teal-500/30 text-teal-400 bg-teal-500/10'}
                     `}>
                       {isOwner ? <BsShieldCheck size={20} /> : <BsBuilding size={20} />}
                     </div>
                     
                     <div className={`text-[9px] font-bold px-3 py-1 rounded-full border uppercase tracking-wider
-                      ${isOwner ? 'border-yellow-500/30 text-yellow-500' : 'border-blue-500/30 text-blue-400'}
+                      ${isOwner ? 'border-yellow-500/30 text-yellow-500' : 'border-teal-500/30 text-teal-400 bg-teal-500/10'}
                     `}>
                       {isOwner ? "Self (Owner)" : "Corporation"}
                     </div>
