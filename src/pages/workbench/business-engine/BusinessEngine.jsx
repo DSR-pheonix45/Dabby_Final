@@ -179,31 +179,38 @@ export default function BusinessEngine() {
       const local = localStorage.getItem(`dabby_trades_${activeWorkbench.id}`);
       let parsed = local ? JSON.parse(local) : [];
 
-      // 2. Fetch backend events to combine seamlessly
+      // 2. Fetch backend events to combine seamlessly (scoped to active workbench)
       try {
-        const events = await diService.listEvents(user?.id || "");
+        const events = await diService.listEvents(user?.id || "", activeWorkbench.id);
         if (Array.isArray(events) && events.length > 0) {
-          const backendTrades = events.map(ev => ({
-            id: ev.id,
-            title: `${safeStr(ev.event_type, "EVENT").toUpperCase()} - ${safeStr(ev.counterparty, "Trade")}`,
-            tradeType: safeStr(ev.event_type).toLowerCase().includes("purchase") || safeStr(ev.event_type).toLowerCase().includes("payable") ? "payable" : "receivable",
-            party: safeStr(ev.counterparty, "Vendor/Customer"),
-            amount: safeNum(ev.amount, 0),
-            date: safeStr(ev.event_date, new Date().toISOString().split("T")[0]),
-            status: ev.event_status === "COMPILED" ? "SETTLED" : "UNSETTLED",
-            initiatorVoucher: {
-              id: ev.document_id,
-              voucherNo: safeStr(ev.id)?.substring(0, 8),
-              docType: safeStr(ev.event_type, "sales_invoice"),
-              party: safeStr(ev.counterparty),
+          const backendTrades = events
+            .filter(ev => {
+              if (ev.workbench_id && ev.workbench_id !== activeWorkbench.id) return false;
+              if (ev.event_metadata?.workbench_id && ev.event_metadata.workbench_id !== activeWorkbench.id) return false;
+              return true;
+            })
+            .map(ev => ({
+              id: ev.id,
+              workbenchId: activeWorkbench.id,
+              title: `${safeStr(ev.event_type, "EVENT").toUpperCase()} - ${safeStr(ev.counterparty, "Trade")}`,
+              tradeType: safeStr(ev.event_type).toLowerCase().includes("purchase") || safeStr(ev.event_type).toLowerCase().includes("payable") ? "payable" : "receivable",
+              party: safeStr(ev.counterparty, "Vendor/Customer"),
               amount: safeNum(ev.amount, 0),
-              date: safeStr(ev.event_date)
-            },
-            settlementVouchers: [],
-            adjustmentNotes: [],
-            remainingOutstanding: ev.event_status === "COMPILED" ? 0 : safeNum(ev.amount, 0),
-            settlementPercent: ev.event_status === "COMPILED" ? 100 : 0
-          }));
+              date: safeStr(ev.event_date, new Date().toISOString().split("T")[0]),
+              status: ev.event_status === "COMPILED" ? "SETTLED" : "UNSETTLED",
+              initiatorVoucher: {
+                id: ev.document_id,
+                voucherNo: safeStr(ev.id)?.substring(0, 8),
+                docType: safeStr(ev.event_type, "sales_invoice"),
+                party: safeStr(ev.counterparty),
+                amount: safeNum(ev.amount, 0),
+                date: safeStr(ev.event_date)
+              },
+              settlementVouchers: [],
+              adjustmentNotes: [],
+              remainingOutstanding: ev.event_status === "COMPILED" ? 0 : safeNum(ev.amount, 0),
+              settlementPercent: ev.event_status === "COMPILED" ? 100 : 0
+            }));
 
           // Merge without duplicates
           const existingIds = new Set(parsed.map(p => p.id));

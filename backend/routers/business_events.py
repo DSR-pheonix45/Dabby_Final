@@ -43,13 +43,14 @@ async def approve_draft(draft_id: str, user=Depends(verify_user_access)):
 @router.get("/user/{user_id}", dependencies=[Depends(verify_user_access)])
 async def list_business_events(
     user_id: str,
+    workbench_id: Optional[str] = None,
     status: Optional[str] = None,
     event_type: Optional[str] = None,
     limit: int = 50,
     offset: int = 0
 ):
     try:
-        return await business_event_registry.list_for_workbench(user_id, status, event_type, limit, offset)
+        return await business_event_registry.list_for_workbench(user_id, status, event_type, limit, offset, workbench_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

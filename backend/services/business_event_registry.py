@@ -204,16 +204,21 @@ class BusinessEventRegistry:
         event_type: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
+        workbench_id: Optional[str] = None,
     ) -> list:
         q = (
             supabase.table("business_events")
                     .select("*")
-                    .eq("user_id", user_id)
                     .eq("is_superseded", False)
                     .order("event_date", desc=True, nullsfirst=False)
                     .limit(limit)
                     .offset(offset)
         )
+        if workbench_id:
+            q = q.eq("workbench_id", workbench_id)
+        elif user_id:
+            q = q.eq("user_id", user_id)
+
         if event_status: q = q.eq("event_status", event_status)
         if event_type:   q = q.eq("event_type",   event_type)
         result = q.execute()

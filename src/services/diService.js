@@ -106,8 +106,11 @@ export const diService = {
     return res.json();
   },
 
-  async listEvents(userId) {
-    const res = await apiFetch(`/api/events/user/${userId}`);
+  async listEvents(userId, workbenchId = null) {
+    const params = new URLSearchParams();
+    if (workbenchId) params.append('workbench_id', workbenchId);
+    const queryString = params.toString();
+    const res = await apiFetch(`/api/events/user/${userId}${queryString ? '?' + queryString : ''}`);
     if (!res.ok) throw new Error('Failed to fetch business events');
     return res.json();
   },
