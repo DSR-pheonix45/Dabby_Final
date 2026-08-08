@@ -347,107 +347,38 @@ export default function Settings() {
                 <div className="space-y-6">
                   {/* Current Plan Info */}
                   <div className="bg-black/40 border border-white/10 rounded-xl p-4 lg:p-6">
-                    <h4 className="text-white font-medium mb-1">Current Plan</h4>
-                    <p className="text-2xl font-bold text-[#00C6C2] capitalize mb-2">
-                      {subscription?.plans?.name || subscription?.plan_id || "Free"} Plan
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      Status: <span className="text-white capitalize">{subscription?.status || "Active"}</span>
-                    </p>
-                  </div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h4 className="text-white font-medium mb-1">Workspace Plan</h4>
+                        <p className="text-2xl font-bold text-[#00C6C2] capitalize mb-1">
+                          Unlimited Standard Access
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          Status: <span className="text-teal-400 font-semibold uppercase">Active • Full Access Unlocked</span>
+                        </p>
+                      </div>
+                      <div className="p-3 bg-[#00C6C2]/10 border border-[#00C6C2]/30 rounded-xl text-[#00C6C2]">
+                        <Sparkles className="w-6 h-6" />
+                      </div>
+                    </div>
 
-                  {/* Available Plans */}
-                  <div>
-                    <h4 className="text-lg font-medium text-white mb-4">Available Plans</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {plansList.length > 0 ? plansList.map((plan) => (
-                        <div key={plan.id} className={`p-5 rounded-xl border ${subscription?.plan_id === plan.id ? 'bg-[#00C6C2]/10 border-[#00C6C2] shadow-[0_0_15px_rgba(0,198,194,0.1)]' : 'bg-white/5 border-white/10'} flex flex-col justify-between`}>
-                          <div>
-                            <h5 className="text-white font-bold text-lg capitalize">{plan.name}</h5>
-                            <div className="my-3">
-                              <span className="text-2xl font-bold text-white">₹{plan.price_inr != null ? plan.price_inr : (plan.price || plan.price_monthly || plan.amount || 0)}</span>
-                              <span className="text-gray-400 text-sm">/mo</span>
-                            </div>
-                            {plan.description && <p className="text-sm text-gray-400 mb-4">{plan.description}</p>}
-                          </div>
-                          <button
-                            onClick={() => {
-                              if (plan.id === 'go') window.open('https://rzp.io/rzp/fki0zDFJ', '_blank');
-                              if (plan.id === 'pro') window.open('https://rzp.io/rzp/geIFJn7n', '_blank');
-                            }}
-                            disabled={subscription?.plan_id === plan.id}
-                            className={`w-full py-2 rounded-lg font-semibold text-sm transition-all ${subscription?.plan_id === plan.id ? 'bg-white/10 text-gray-400 cursor-not-allowed' : 'bg-[#00C6C2] text-black hover:bg-[#00FFD1]'}`}
-                          >
-                            {subscription?.plan_id === plan.id ? 'Current Plan' : 'Upgrade Plan'}
-                          </button>
-                        </div>
-                      )) : (
-                        // Fallback static plans
-                        <>
-                          <div className="p-5 rounded-xl border bg-white/5 border-white/10 flex flex-col justify-between">
-                            <div>
-                              <h5 className="text-white font-bold text-lg">Free</h5>
-                              <div className="my-3"><span className="text-2xl font-bold text-white">₹0</span><span className="text-gray-400 text-sm">/mo</span></div>
-                              <ul className="text-sm text-gray-400 space-y-2 mb-4">
-                                <li className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-[#00C6C2]" /> Limited access to AI</li>
-                                <li className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-gray-600" /> No workbench access</li>
-                              </ul>
-                            </div>
-                            <button className="w-full py-2 rounded-lg font-semibold text-sm bg-white/10 text-gray-400 cursor-not-allowed">Current Plan</button>
-                          </div>
-                          <div className="p-5 rounded-xl border bg-[#00C6C2]/10 border-[#00C6C2] flex flex-col justify-between">
-                            <div>
-                              <h5 className="text-[#00C6C2] font-bold text-lg flex items-center gap-2">Go <Sparkles className="w-4 h-4" /></h5>
-                              <div className="my-3"><span className="text-2xl font-bold text-white">₹5000</span><span className="text-gray-400 text-sm">/mo</span></div>
-                              <ul className="text-sm text-gray-400 space-y-2 mb-4">
-                                <li className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-[#00C6C2]" /> Good access to AI</li>
-                                <li className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-[#00C6C2]" /> Limited workbench features</li>
-                              </ul>
-                            </div>
-                            <button
-                              onClick={() => window.open('https://rzp.io/rzp/fki0zDFJ', '_blank')}
-                              className="w-full py-2 rounded-lg font-semibold text-sm bg-[#00C6C2] text-black hover:bg-[#00FFD1] transition-all"
-                            >
-                              Upgrade to Go
-                            </button>
-                          </div>
-                          <div className="p-5 rounded-xl border bg-white/5 border-white/10 flex flex-col justify-between">
-                            <div>
-                              <h5 className="text-white font-bold text-lg">Pro</h5>
-                              <div className="my-3"><span className="text-2xl font-bold text-white">₹10000</span><span className="text-gray-400 text-sm">/mo</span></div>
-                              <ul className="text-sm text-gray-400 space-y-2 mb-4">
-                                <li className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-[#00C6C2]" /> Better access to AI</li>
-                                <li className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-[#00C6C2]" /> Good access of workbench</li>
-                              </ul>
-                            </div>
-                            <button
-                              onClick={() => window.open('https://rzp.io/rzp/geIFJn7n', '_blank')}
-                              className="w-full py-2 rounded-lg font-semibold text-sm bg-white/10 hover:bg-white/20 text-white transition-all"
-                            >
-                              Upgrade to Pro
-                            </button>
-                          </div>
-                          <div className="p-5 rounded-xl border bg-white/5 border-white/10 flex flex-col justify-between">
-                            <div>
-                              <h5 className="text-purple-400 font-bold text-lg">Enterprise</h5>
-                              <div className="my-3"><span className="text-2xl font-bold text-white">₹20000</span><span className="text-gray-400 text-sm">/member/mo</span></div>
-                              <ul className="text-sm text-gray-400 space-y-2 mb-4">
-                                <li className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-purple-400" /> Best AI features</li>
-                                <li className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-purple-400" /> Custom branding</li>
-                                <li className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-purple-400" /> Dedicated account manager</li>
-                              </ul>
-                            </div>
-                            <button
-                              onClick={() => window.open('mailto:opportunities@datalis.in', '_blank')}
-                              className="w-full py-2 rounded-lg font-semibold text-sm bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20 transition-all"
-                            >
-                              Contact Sales
-                            </button>
-                          </div>
-                        </>
-                      )}
+                    <div className="pt-4 border-t border-white/10 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-300">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-[#00C6C2]" />
+                        <span>Unlimited AI Queries</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-[#00C6C2]" />
+                        <span>Unlimited Document Ingestion</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-[#00C6C2]" />
+                        <span>All Workbench Features Enabled</span>
+                      </div>
                     </div>
                   </div>
+                </div>
+              )}
                 </div>
               )}
             </div>

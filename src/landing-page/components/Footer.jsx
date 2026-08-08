@@ -5,7 +5,6 @@ import { useTheme } from "../../context/ThemeContext";
 const footerLinks = {
   Product: [
     { name: "Features", href: "/features" },
-    { name: "Pricing", href: "/pricing" },
     { name: "Integrations", href: "/integrations" },
     { name: "API", href: "/api" },
   ],
