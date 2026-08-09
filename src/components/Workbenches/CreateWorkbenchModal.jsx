@@ -3,6 +3,7 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../hooks/useAuth";
 import { toast } from "react-hot-toast";
 import { accountService } from "../../services/accountService";
+import { generateLicenseKey, generateAccessPassword } from "../../utils/workbenchCredentials";
 import { 
   BsX, 
   BsBuilding, 
@@ -21,7 +22,11 @@ import {
   BsTrash,
   BsFileEarmarkSpreadsheet,
   BsSearch,
-  BsPlusLg
+  BsPlusLg,
+  BsKeyFill,
+  BsLockFill,
+  BsCheck2,
+  BsShieldCheck
 } from "react-icons/bs";
 
 const STEPS = [
@@ -382,6 +387,9 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [createdWbSuccess, setCreatedWbSuccess] = useState(null);
+  const [copiedKeySuccess, setCopiedKeySuccess] = useState(false);
+  const [copiedPassSuccess, setCopiedPassSuccess] = useState(false);
 
   // COA File AI Scanning State
   const [isScanningCoa, setIsScanningCoa] = useState(false);
@@ -777,6 +785,10 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
     setLoading(true);
 
     try {
+      // Auto-generate credentials
+      const licenseKey = generateLicenseKey();
+      const accessPassword = generateAccessPassword();
+
       // Prepare workbench creation payload
       const payload = {
         name: formData.name.trim(),
@@ -790,7 +802,9 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
         cin: formData.cin ? formData.cin.toUpperCase() : null,
         gstin: formData.gstin ? formData.gstin.toUpperCase() : null,
         pan: formData.pan ? formData.pan.toUpperCase() : null,
-        created_by: user.id
+        created_by: user.id,
+        license_key: licenseKey,
+        access_password: accessPassword,
       };
 
       let insertedWb = null;
@@ -812,7 +826,9 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
           business_type: formData.business_type,
           fiscal_year_start: formData.fiscal_year_start,
           books_start_date: formData.books_start_date,
-          created_by: user.id
+          created_by: user.id,
+          license_key: licenseKey,
+          access_password: accessPassword,
         };
         const { data: retryData, error: retryErr } = await supabase
           .from("workbenches")
@@ -823,6 +839,12 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
         insertedWb = retryData;
       } else {
         insertedWb = data;
+      }
+
+      // Ensure insertedWb contains generated keys if db omitted them in select
+      if (insertedWb) {
+        insertedWb.license_key = insertedWb.license_key || licenseKey;
+        insertedWb.access_password = insertedWb.access_password || accessPassword;
       }
 
       // Persist collected CIN, GSTIN, PAN to workspace settings cache so they show up in Workbench Settings
@@ -875,7 +897,7 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
 
       toast.success("Workbench created successfully!");
       if (onSuccess) onSuccess(insertedWb);
-      onClose();
+      setCreatedWbSuccess(insertedWb);
     } catch (error) {
       console.error("Error creating workbench:", error);
       toast.error(error.message || "Failed to create workbench");
@@ -883,6 +905,92 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
       setLoading(false);
     }
   };
+
+  if (createdWbSuccess) {
+    const key = createdWbSuccess.license_key || "WB-KEY-GENERATED";
+    const pass = createdWbSuccess.access_password || "Wb-Pass-Generated";
+    return (
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div className="bg-[#0E1117] border border-white/10 rounded-2xl shadow-2xl w-full max-w-md p-6 font-dm-sans">
+          <div className="text-center">
+            <div className="w-12 h-12 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+              <BsCheckCircleFill className="w-6 h-6" />
+            </div>
+            <h2 className="text-xl font-bold text-white">Workbench Created!</h2>
+            <p className="text-xs text-gray-400 mt-1">"{createdWbSuccess.name}" is ready to use</p>
+          </div>
+
+          <div className="mt-6 space-y-3">
+            <div className="bg-[#181C24] border border-white/10 rounded-xl p-3.5 space-y-1">
+              <div className="text-[11px] font-medium text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                <BsKeyFill className="text-emerald-400" /> License Key
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-sm font-bold text-emerald-400 tracking-wider">{key}</span>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(key);
+                    setCopiedKeySuccess(true);
+                    toast.success("License Key copied!");
+                    setTimeout(() => setCopiedKeySuccess(false), 2000);
+                  }}
+                  className="p-1.5 text-xs text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  {copiedKeySuccess ? <BsCheck2 className="text-emerald-400" /> : <BsCopy />}
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-[#181C24] border border-white/10 rounded-xl p-3.5 space-y-1">
+              <div className="text-[11px] font-medium text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                <BsLockFill className="text-emerald-400" /> Access Password
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-sm font-bold text-white tracking-wider">{pass}</span>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(pass);
+                    setCopiedPassSuccess(true);
+                    toast.success("Access Password copied!");
+                    setTimeout(() => setCopiedPassSuccess(false), 2000);
+                  }}
+                  className="p-1.5 text-xs text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  {copiedPassSuccess ? <BsCheck2 className="text-emerald-400" /> : <BsCopy />}
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-300/90 leading-relaxed">
+              🔑 Save these credentials! Enter this License Key & Password on any other device/account to gain instant access to this workbench.
+            </div>
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
+            <button
+              onClick={() => {
+                const text = `Workbench: ${createdWbSuccess.name}\nLicense Key: ${key}\nAccess Password: ${pass}`;
+                navigator.clipboard.writeText(text);
+                toast.success("All credentials copied!");
+              }}
+              className="px-4 py-2 text-xs font-medium text-white bg-white/10 hover:bg-white/15 rounded-xl transition-colors flex items-center gap-1.5"
+            >
+              <BsCopy /> Copy All
+            </button>
+            <button
+              onClick={() => {
+                setCreatedWbSuccess(null);
+                onClose();
+              }}
+              className="px-5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-colors"
+            >
+              Done & Enter Workbench
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4">

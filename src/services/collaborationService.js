@@ -49,6 +49,21 @@ export const collaborationService = {
     return res.json();
   },
 
+  async accessByLicense(licenseKey, accessPassword) {
+    const res = await apiFetch(`/api/collaboration/access-by-license`, {
+      method: "POST",
+      body: JSON.stringify({
+        license_key: licenseKey,
+        access_password: accessPassword,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || "Failed to access workbench with provided credentials");
+    }
+    return data;
+  },
+
   async addTradeVessel(workbenchId, partyId, vesselData) {
     const res = await apiFetch(`/api/collaboration/${workbenchId}/parties/${partyId}/vessels`, {
       method: "POST",

@@ -46,18 +46,42 @@ export function WorkbenchProvider({ children }) {
 
       if (error) throw error;
 
-      setWorkbenches(data || []);
+      let list = data || [];
+
+      // Auto-heal missing license keys / passwords for legacy workbenches
+      const healPromises = list.map(async (wb) => {
+        if (!wb.license_key || !wb.access_password) {
+          const newKey = wb.license_key || `WB-${wb.id.substring(0, 4).toUpperCase()}-${wb.id.substring(4, 8).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+          const newPass = wb.access_password || `Wb-${wb.id.substring(0, 6)}`;
+          try {
+            await supabase.from("workbenches").update({
+              license_key: newKey,
+              access_password: newPass
+            }).eq("id", wb.id);
+            wb.license_key = newKey;
+            wb.access_password = newPass;
+          } catch (e) {
+            wb.license_key = newKey;
+            wb.access_password = newPass;
+          }
+        }
+        return wb;
+      });
+
+      list = await Promise.all(healPromises);
+
+      setWorkbenches(list);
 
       // If we have workbenches, set the active one
-      if (data && data.length > 0) {
+      if (list && list.length > 0) {
         // Try to restore previous active workbench from localStorage
         const savedWorkbenchId = localStorage.getItem("dabby_active_workbench");
-        const found = data.find((w) => w.id === savedWorkbenchId);
+        const found = list.find((w) => w.id === savedWorkbenchId);
         if (found) {
           setActiveWorkbench(found);
         } else {
-          setActiveWorkbench(data[0]);
-          localStorage.setItem("dabby_active_workbench", data[0].id);
+          setActiveWorkbench(list[0]);
+          localStorage.setItem("dabby_active_workbench", list[0].id);
         }
       } else {
         setActiveWorkbench(null);

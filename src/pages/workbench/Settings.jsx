@@ -8,7 +8,14 @@ import {
   BsBank, 
   BsPlusLg, 
   BsTrash, 
-  BsLink45Deg
+  BsLink45Deg,
+  BsKeyFill,
+  BsLockFill,
+  BsCopy,
+  BsCheck2,
+  BsEye,
+  BsEyeSlash,
+  BsShieldCheck
 } from "react-icons/bs";
 import { collaborationService } from "../../services/collaborationService";
 import { accountService } from "../../services/accountService";
@@ -22,6 +29,9 @@ export default function WorkbenchSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [logoFile, setLogoFile] = useState(null);
   const [coaAccounts, setCoaAccounts] = useState([]);
+  const [showSettingsPass, setShowSettingsPass] = useState(false);
+  const [copiedSettingsKey, setCopiedSettingsKey] = useState(false);
+  const [copiedSettingsPass, setCopiedSettingsPass] = useState(false);
   
   const [formData, setFormData] = useState({
     name: activeWorkbench?.name || "",
@@ -319,7 +329,77 @@ export default function WorkbenchSettings() {
                 </div>
               </div>
 
-              {/* Section 2: Statutory & Legal Identifiers */}
+              {/* Section 1.5: License Key & Access Password */}
+              <div className="bg-[#181818] border border-white/10 rounded-xl overflow-hidden">
+                <div className="p-6 border-b border-white/10 flex items-center space-x-3">
+                  <div className="p-2 bg-amber-500/10 rounded-lg text-amber-400 border border-amber-500/20">
+                    <BsShieldCheck size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-white">Workbench License & Access Credentials</h3>
+                    <p className="text-sm text-gray-500">Use these credentials to access this workbench from any other device or account.</p>
+                  </div>
+                </div>
+                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* License Key */}
+                  <div className="bg-[#141414] border border-white/10 rounded-xl p-4 space-y-2">
+                    <label className="text-xs font-medium text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <BsKeyFill className="text-amber-400" /> License Key
+                    </label>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-base font-bold text-emerald-400 tracking-wider">
+                        {activeWorkbench?.license_key || "WB-PENDING-KEY"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(activeWorkbench?.license_key || "");
+                          setCopiedSettingsKey(true);
+                          toast.success("License Key copied!");
+                          setTimeout(() => setCopiedSettingsKey(false), 2000);
+                        }}
+                        className="p-2 text-xs text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-1"
+                      >
+                        {copiedSettingsKey ? <BsCheck2 className="text-emerald-400 w-4 h-4" /> : <BsCopy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Access Password */}
+                  <div className="bg-[#141414] border border-white/10 rounded-xl p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <BsLockFill className="text-amber-400" /> Access Password
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowSettingsPass(!showSettingsPass)}
+                        className="text-xs text-gray-400 hover:text-white flex items-center gap-1"
+                      >
+                        {showSettingsPass ? <BsEyeSlash /> : <BsEye />}
+                        {showSettingsPass ? "Hide" : "Show"}
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-base font-bold text-white tracking-wider">
+                        {showSettingsPass ? (activeWorkbench?.access_password || "Wb-PendingPass") : "••••••••••••"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(activeWorkbench?.access_password || "");
+                          setCopiedSettingsPass(true);
+                          toast.success("Access Password copied!");
+                          setTimeout(() => setCopiedSettingsPass(false), 2000);
+                        }}
+                        className="p-2 text-xs text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-1"
+                      >
+                        {copiedSettingsPass ? <BsCheck2 className="text-emerald-400 w-4 h-4" /> : <BsCopy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div className="bg-[#181818] border border-white/10 rounded-xl overflow-hidden">
                 <div className="p-6 border-b border-white/10 flex items-center space-x-3">
                   <div className="p-2 bg-white/5 rounded-lg text-teal-400">

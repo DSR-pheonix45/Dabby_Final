@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { useWorkbench } from "../context/WorkbenchContext";
 import { useAuth } from "../hooks/useAuth";
-import { BsSearch, BsGrid, BsListUl, BsThreeDots, BsPencil, BsTrash, BsX } from "react-icons/bs";
+import { BsSearch, BsGrid, BsListUl, BsThreeDots, BsPencil, BsTrash, BsX, BsKeyFill } from "react-icons/bs";
 import { HiChevronDown } from "react-icons/hi";
 import CreateWorkbenchModal from "../components/Workbenches/CreateWorkbenchModal";
+import AccessWorkbenchModal from "../components/Workbenches/AccessWorkbenchModal";
+import LicenseCredentialsModal from "../components/Workbenches/LicenseCredentialsModal";
 import { supabase } from "../lib/supabase";
 import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
@@ -11,6 +13,8 @@ import { useNavigate } from "react-router-dom";
 export default function Workbenches() {
   const { workbenches, activeWorkbench, changeActiveWorkbench, fetchWorkbenches } = useWorkbench();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+  const [selectedLicenseWb, setSelectedLicenseWb] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [openDropdown, setOpenDropdown] = useState(null);
   const [statusFilter, setStatusFilter] = useState("Status");
@@ -180,6 +184,15 @@ export default function Workbenches() {
             </div>
 
             <button
+              onClick={() => setIsAccessModalOpen(true)}
+              className="flex items-center space-x-2 px-3.5 py-1.5 bg-[#1A1A1A] hover:bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold text-sm rounded-md transition-colors shadow-sm"
+              title="Access an existing workbench using its License Key & Password"
+            >
+              <BsKeyFill size={14} />
+              <span>Access Workbench</span>
+            </button>
+
+            <button
               onClick={() => setIsCreateModalOpen(true)}
               className="flex items-center space-x-2 px-3 py-1.5 bg-teal-500 hover:bg-teal-400 text-black font-semibold text-sm rounded-md transition-colors"
             >
@@ -231,9 +244,20 @@ export default function Workbenches() {
                   </button>
                   {openDropdown === wb.id && (
                     <div 
-                      className="absolute right-0 mt-1 w-36 bg-[#1A1A1A] border border-white/10 rounded-md shadow-lg overflow-hidden z-30"
+                      className="absolute right-0 mt-1 w-40 bg-[#1A1A1A] border border-white/10 rounded-md shadow-lg overflow-hidden z-30"
                       onClick={(e) => e.stopPropagation()}
                     >
+                      <button
+                        className="w-full text-left px-4 py-2 text-sm text-amber-400 hover:bg-white/5 flex items-center space-x-2 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedLicenseWb(wb);
+                          setOpenDropdown(null);
+                        }}
+                      >
+                        <BsKeyFill size={12} />
+                        <span>Key & Password</span>
+                      </button>
                       <button
                         className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white flex items-center space-x-2 transition-colors"
                         onClick={(e) => {
@@ -265,6 +289,17 @@ export default function Workbenches() {
                 <span className="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide bg-white/5 text-gray-400 rounded">
                   {wb.currency}
                 </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedLicenseWb(wb);
+                  }}
+                  className="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 rounded border border-amber-500/20 flex items-center gap-1 transition-colors ml-auto"
+                  title="View License Key & Access Password"
+                >
+                  <BsKeyFill className="w-2.5 h-2.5" />
+                  Key
+                </button>
                 {activeWorkbench?.id === wb.id && (
                   <span className="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide bg-teal-500/10 text-teal-400 rounded ml-auto border border-teal-500/20">
                     Active
@@ -288,6 +323,21 @@ export default function Workbenches() {
           await fetchWorkbenches();
           changeActiveWorkbench(newWb);
         }}
+      />
+
+      <AccessWorkbenchModal
+        isOpen={isAccessModalOpen}
+        onClose={() => setIsAccessModalOpen(false)}
+        onSuccess={async (wb) => {
+          await fetchWorkbenches();
+          changeActiveWorkbench(wb);
+        }}
+      />
+
+      <LicenseCredentialsModal
+        isOpen={!!selectedLicenseWb}
+        onClose={() => setSelectedLicenseWb(null)}
+        workbench={selectedLicenseWb}
       />
 
       {renamingWorkbench && (

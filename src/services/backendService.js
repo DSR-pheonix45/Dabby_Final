@@ -126,6 +126,10 @@ export const backendService = {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Generate credentials
+      const licenseKey = extraData.license_key || generateLicenseKey();
+      const accessPassword = extraData.access_password || generateAccessPassword();
+
       // 1. Insert into workbenches table
       const baseRow = {
         name: name.trim(),
@@ -143,6 +147,8 @@ export const backendService = {
         incorporation_date: extraData.incorporation_date || null,
         fy_start: extraData.fy_start || 'April',
         status: 'active',
+        license_key: licenseKey,
+        access_password: accessPassword,
       };
 
       let { data: workbench, error: wbError } = await supabase

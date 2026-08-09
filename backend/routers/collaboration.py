@@ -87,6 +87,10 @@ class RoleInvite(BaseModel):
 class JoinToken(BaseModel):
     token: str
 
+class AccessByLicense(BaseModel):
+    license_key: str
+    access_password: str
+
 class RoleUpdate(BaseModel):
     role: str
 
@@ -217,6 +221,75 @@ def join_workbench(payload: JoinToken, user = Depends(get_current_user_no_waitli
         raise HTTPException(status_code=400, detail="Invite link has expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=400, detail="Invalid invite link")
+
+@router.post("/access-by-license")
+def access_by_license(payload: AccessByLicense, user = Depends(get_current_user_no_waitlist)):
+    clean_key = payload.license_key.strip().upper()
+    clean_pass = payload.access_password.strip()
+    
+    if not clean_key or not clean_pass:
+        raise HTTPException(status_code=400, detail="Both License Key and Password are required.")
+        
+    # Query workbench by license_key
+    wb_res = supabase.table("workbenches").select("*").eq("license_key", clean_key).execute()
+    if not wb_res.data:
+        raise HTTPException(status_code=404, detail="Invalid License Key or Workbench not found.")
+        
+    wb = wb_res.data[0]
+    
+    # Check access_password
+    stored_password = (wb.get("access_password") or "").strip()
+    if not stored_password or stored_password != clean_pass:
+        raise HTTPException(status_code=401, detail="Incorrect Access Password for this Workbench.")
+        
+    workbench_id = wb["id"]
+    user_id = user["id"]
+    
+    # Check if user is already a member
+    existing = supabase.table("workbench_members").select("*").eq("workbench_id", workbench_id).eq("user_id", user_id).execute()
+    if existing.data:
+        return {
+            "status": "already_member",
+            "workbench": wb,
+            "membership": existing.data[0]
+        }
+        
+    # Insert new active member into workbench_members
+    res = supabase.table("workbench_members").insert({
+        "workbench_id": workbench_id,
+        "user_id": user_id,
+        "role": "admin",
+        "status": "active"
+    }).execute()
+    
+    # Best-effort insert into user_members table
+    try:
+        supabase.table("user_members").insert({
+            "user_id": user_id,
+            "workbench_id": workbench_id,
+            "role": "admin"
+        }).execute()
+    except Exception:
+        pass
+
+    # Log activity
+    try:
+        supabase.table("activity_logs").insert({
+            "workbench_id": workbench_id,
+            "user_id": user_id,
+            "action_type": "member_joined_via_license",
+            "entity_type": "member",
+            "entity_id": user_id,
+            "description": "User joined workbench via License Key and Password"
+        }).execute()
+    except Exception:
+        pass
+        
+    return {
+        "status": "success",
+        "workbench": wb,
+        "membership": res.data[0] if res.data else {}
+    }
 
 @router.put("/{workbench_id}/members/{target_user_id}/role")
 def update_member_role(workbench_id: str, target_user_id: str, payload: RoleUpdate, user = Depends(get_current_user)):
