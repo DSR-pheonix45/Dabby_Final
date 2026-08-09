@@ -64,6 +64,20 @@ export const collaborationService = {
     return data;
   },
 
+  async updatePassword(workbenchId, accessPassword) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/password`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        access_password: accessPassword,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || "Failed to update workbench password");
+    }
+    return data;
+  },
+
   async addTradeVessel(workbenchId, partyId, vesselData) {
     const res = await apiFetch(`/api/collaboration/${workbenchId}/parties/${partyId}/vessels`, {
       method: "POST",

@@ -1,14 +1,34 @@
-import React, { useState } from "react";
-import { BsX, BsKeyFill, BsLockFill, BsCopy, BsCheck2, BsEye, BsEyeSlash, BsShieldCheck } from "react-icons/bs";
+import React, { useState, useEffect } from "react";
+import { BsX, BsKeyFill, BsLockFill, BsCopy, BsCheck2, BsEye, BsEyeSlash, BsShieldCheck, BsPencil, BsCheckCircleFill } from "react-icons/bs";
 import { toast } from "react-hot-toast";
+import { useAuth } from "../../hooks/useAuth";
+import { useWorkbench } from "../../context/WorkbenchContext";
+import { collaborationService } from "../../services/collaborationService";
 
 export default function LicenseCredentialsModal({ isOpen, onClose, workbench }) {
+  const { user } = useAuth();
+  const { fetchWorkbenches } = useWorkbench();
   const [showPassword, setShowPassword] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
 
+  // Edit password state
+  const [isEditingPass, setIsEditingPass] = useState(false);
+  const [newPassInput, setNewPassInput] = useState("");
+  const [isSavingPass, setIsSavingPass] = useState(false);
+
+  useEffect(() => {
+    if (workbench) {
+      setNewPassInput(workbench.access_password || "");
+      setIsEditingPass(false);
+    }
+  }, [workbench]);
+
   if (!isOpen || !workbench) return null;
+
+  // Check if current user is the owner of this workbench
+  const isOwner = user && workbench && workbench.created_by === user.id;
 
   const licenseKey = workbench.license_key || "WB-PENDING-KEY";
   const accessPassword = workbench.access_password || "Wb-PendingPass";
@@ -33,6 +53,28 @@ export default function LicenseCredentialsModal({ isOpen, onClose, workbench }) 
     setCopiedAll(true);
     toast.success("Credentials copied to clipboard!");
     setTimeout(() => setCopiedAll(false), 2000);
+  };
+
+  const handleSavePassword = async (e) => {
+    e.preventDefault();
+    if (!newPassInput.trim()) {
+      toast.error("Password cannot be empty");
+      return;
+    }
+
+    setIsSavingPass(true);
+    try {
+      await collaborationService.updatePassword(workbench.id, newPassInput.trim());
+      workbench.access_password = newPassInput.trim();
+      await fetchWorkbenches();
+      toast.success("Access Password updated successfully!");
+      setIsEditingPass(false);
+    } catch (err) {
+      console.error("Failed to update password:", err);
+      toast.error(err.message || "Failed to update password");
+    } finally {
+      setIsSavingPass(false);
+    }
   };
 
   return (
@@ -71,6 +113,7 @@ export default function LicenseCredentialsModal({ isOpen, onClose, workbench }) 
               <button
                 onClick={handleCopyKey}
                 className="p-2 text-xs text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-1"
+                title="Copy License Key"
               >
                 {copiedKey ? <BsCheck2 className="text-emerald-400 w-4 h-4" /> : <BsCopy className="w-4 h-4" />}
               </button>
@@ -83,29 +126,86 @@ export default function LicenseCredentialsModal({ isOpen, onClose, workbench }) 
               <span className="flex items-center gap-1.5">
                 <BsLockFill className="text-amber-400" /> Access Password
               </span>
-              <button
-                onClick={() => setShowPassword(!showPassword)}
-                className="text-xs text-gray-400 hover:text-white flex items-center gap-1"
-              >
-                {showPassword ? <BsEyeSlash /> : <BsEye />}
-                {showPassword ? "Hide" : "Show"}
-              </button>
+              <div className="flex items-center gap-2">
+                {isOwner && !isEditingPass && (
+                  <button
+                    onClick={() => {
+                      setShowPassword(true);
+                      setIsEditingPass(true);
+                    }}
+                    className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 transition-colors"
+                    title="Edit Password (Owner Only)"
+                  >
+                    <BsPencil size={10} /> Edit
+                  </button>
+                )}
+                {!isEditingPass && (
+                  <button
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-xs text-gray-400 hover:text-white flex items-center gap-1"
+                  >
+                    {showPassword ? <BsEyeSlash /> : <BsEye />}
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-sm font-bold text-white tracking-wider">
-                {showPassword ? accessPassword : "••••••••••••"}
-              </span>
-              <button
-                onClick={handleCopyPassword}
-                className="p-2 text-xs text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-1"
-              >
-                {copiedPassword ? <BsCheck2 className="text-emerald-400 w-4 h-4" /> : <BsCopy className="w-4 h-4" />}
-              </button>
-            </div>
+
+            {isEditingPass ? (
+              <form onSubmit={handleSavePassword} className="space-y-2.5 pt-1">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={newPassInput}
+                    onChange={(e) => setNewPassInput(e.target.value)}
+                    placeholder="Enter new access password"
+                    className="w-full bg-[#121212] border border-amber-500/50 rounded-lg px-3 py-1.5 text-sm text-white font-mono focus:outline-none focus:border-amber-400"
+                    autoFocus
+                    required
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingPass(false);
+                      setNewPassInput(accessPassword);
+                    }}
+                    className="px-2.5 py-1 text-xs text-gray-400 hover:text-white rounded transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingPass}
+                    className="px-3 py-1 text-xs font-semibold text-black bg-amber-400 hover:bg-amber-300 rounded transition-colors flex items-center gap-1 disabled:opacity-50"
+                  >
+                    {isSavingPass ? "Saving..." : "Save Password"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-sm font-bold text-white tracking-wider">
+                  {showPassword ? accessPassword : "••••••••••••"}
+                </span>
+                <button
+                  onClick={handleCopyPassword}
+                  className="p-2 text-xs text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-1"
+                  title="Copy Access Password"
+                >
+                  {copiedPassword ? <BsCheck2 className="text-emerald-400 w-4 h-4" /> : <BsCopy className="w-4 h-4" />}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-300/90 leading-relaxed">
-            🔑 Share these credentials to grant members or other devices access to this workbench.
+            {isOwner ? (
+              <span>👑 You are the Owner of this workbench. You can view or edit the password above at any time.</span>
+            ) : (
+              <span>🔑 Share these credentials to grant members or other devices access to this workbench. Only the Owner can edit the password.</span>
+            )}
           </div>
         </div>
 

@@ -91,6 +91,9 @@ class AccessByLicense(BaseModel):
     license_key: str
     access_password: str
 
+class PasswordUpdate(BaseModel):
+    access_password: str
+
 class RoleUpdate(BaseModel):
     role: str
 
@@ -289,6 +292,53 @@ def access_by_license(payload: AccessByLicense, user = Depends(get_current_user_
         "status": "success",
         "workbench": wb,
         "membership": res.data[0] if res.data else {}
+    }
+
+@router.patch("/{workbench_id}/password")
+def update_workbench_password(workbench_id: str, payload: PasswordUpdate, user = Depends(get_current_user_no_waitlist)):
+    new_pass = payload.access_password.strip()
+    if not new_pass:
+        raise HTTPException(status_code=400, detail="Password cannot be empty.")
+
+    # 1. Verify workbench exists
+    wb_res = supabase.table("workbenches").select("*").eq("id", workbench_id).execute()
+    if not wb_res.data:
+        raise HTTPException(status_code=404, detail="Workbench not found.")
+
+    wb = wb_res.data[0]
+
+    # 2. Strict owner verification
+    is_creator = wb.get("created_by") == user["id"]
+    is_owner_member = False
+    if not is_creator:
+        mem_res = supabase.table("workbench_members").select("role").eq("workbench_id", workbench_id).eq("user_id", user["id"]).execute()
+        if mem_res.data and mem_res.data[0].get("role") == "owner":
+            is_owner_member = True
+
+    if not is_creator and not is_owner_member:
+        raise HTTPException(status_code=403, detail="Only the owner of this workbench is allowed to edit its access password.")
+
+    # 3. Update password in workbenches table
+    res = supabase.table("workbenches").update({"access_password": new_pass}).eq("id", workbench_id).execute()
+    
+    # Log activity
+    try:
+        supabase.table("activity_logs").insert({
+            "workbench_id": workbench_id,
+            "user_id": user["id"],
+            "action_type": "workbench_password_updated",
+            "entity_type": "workbench",
+            "entity_id": workbench_id,
+            "description": "Owner updated workbench access password"
+        }).execute()
+    except Exception:
+        pass
+
+    return {
+        "status": "success",
+        "message": "Access password updated successfully.",
+        "access_password": new_pass,
+        "workbench": res.data[0] if res.data else wb
     }
 
 @router.put("/{workbench_id}/members/{target_user_id}/role")

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useWorkbench } from "../../context/WorkbenchContext";
+import { useAuth } from "../../hooks/useAuth";
 import { 
   BsGear, 
   BsBuilding, 
@@ -15,7 +16,8 @@ import {
   BsCheck2,
   BsEye,
   BsEyeSlash,
-  BsShieldCheck
+  BsShieldCheck,
+  BsPencil
 } from "react-icons/bs";
 import { collaborationService } from "../../services/collaborationService";
 import { accountService } from "../../services/accountService";
@@ -24,6 +26,7 @@ import CompanyMaster from "./CompanyMaster";
 import { supabase } from "../../lib/supabase";
 
 export default function WorkbenchSettings() {
+  const { user } = useAuth();
   const { activeWorkbench, changeActiveWorkbench, fetchWorkbenches } = useWorkbench();
   const [activeTab, setActiveTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
@@ -32,6 +35,9 @@ export default function WorkbenchSettings() {
   const [showSettingsPass, setShowSettingsPass] = useState(false);
   const [copiedSettingsKey, setCopiedSettingsKey] = useState(false);
   const [copiedSettingsPass, setCopiedSettingsPass] = useState(false);
+  const [isEditingSettingsPass, setIsEditingSettingsPass] = useState(false);
+  const [newSettingsPassInput, setNewSettingsPassInput] = useState("");
+  const [isSavingSettingsPass, setIsSavingSettingsPass] = useState(false);
   
   const [formData, setFormData] = useState({
     name: activeWorkbench?.name || "",
@@ -371,32 +377,103 @@ export default function WorkbenchSettings() {
                       <label className="text-xs font-medium text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
                         <BsLockFill className="text-amber-400" /> Access Password
                       </label>
-                      <button
-                        type="button"
-                        onClick={() => setShowSettingsPass(!showSettingsPass)}
-                        className="text-xs text-gray-400 hover:text-white flex items-center gap-1"
-                      >
-                        {showSettingsPass ? <BsEyeSlash /> : <BsEye />}
-                        {showSettingsPass ? "Hide" : "Show"}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {user && activeWorkbench && activeWorkbench.created_by === user.id && !isEditingSettingsPass && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowSettingsPass(true);
+                              setNewSettingsPassInput(activeWorkbench.access_password || "");
+                              setIsEditingSettingsPass(true);
+                            }}
+                            className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 transition-colors"
+                            title="Edit Password (Owner Only)"
+                          >
+                            <BsPencil size={10} /> Edit
+                          </button>
+                        )}
+                        {!isEditingSettingsPass && (
+                          <button
+                            type="button"
+                            onClick={() => setShowSettingsPass(!showSettingsPass)}
+                            className="text-xs text-gray-400 hover:text-white flex items-center gap-1"
+                          >
+                            {showSettingsPass ? <BsEyeSlash /> : <BsEye />}
+                            {showSettingsPass ? "Hide" : "Show"}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-base font-bold text-white tracking-wider">
-                        {showSettingsPass ? (activeWorkbench?.access_password || "Wb-PendingPass") : "••••••••••••"}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(activeWorkbench?.access_password || "");
-                          setCopiedSettingsPass(true);
-                          toast.success("Access Password copied!");
-                          setTimeout(() => setCopiedSettingsPass(false), 2000);
+
+                    {isEditingSettingsPass ? (
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          if (!newSettingsPassInput.trim()) {
+                            toast.error("Password cannot be empty");
+                            return;
+                          }
+                          setIsSavingSettingsPass(true);
+                          try {
+                            await collaborationService.updatePassword(activeWorkbench.id, newSettingsPassInput.trim());
+                            activeWorkbench.access_password = newSettingsPassInput.trim();
+                            await fetchWorkbenches();
+                            toast.success("Access Password updated successfully!");
+                            setIsEditingSettingsPass(false);
+                          } catch (err) {
+                            console.error("Failed to update password:", err);
+                            toast.error(err.message || "Failed to update password");
+                          } finally {
+                            setIsSavingSettingsPass(false);
+                          }
                         }}
-                        className="p-2 text-xs text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-1"
+                        className="space-y-2 pt-1"
                       >
-                        {copiedSettingsPass ? <BsCheck2 className="text-emerald-400 w-4 h-4" /> : <BsCopy className="w-4 h-4" />}
-                      </button>
-                    </div>
+                        <input
+                          type="text"
+                          value={newSettingsPassInput}
+                          onChange={(e) => setNewSettingsPassInput(e.target.value)}
+                          placeholder="Enter new access password"
+                          className="w-full bg-[#121212] border border-amber-500/50 rounded-lg px-3 py-1 text-sm text-white font-mono focus:outline-none focus:border-amber-400"
+                          autoFocus
+                          required
+                        />
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingSettingsPass(false)}
+                            className="px-2.5 py-1 text-xs text-gray-400 hover:text-white rounded transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={isSavingSettingsPass}
+                            className="px-3 py-1 text-xs font-semibold text-black bg-amber-400 hover:bg-amber-300 rounded transition-colors disabled:opacity-50"
+                          >
+                            {isSavingSettingsPass ? "Saving..." : "Save Password"}
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-base font-bold text-white tracking-wider">
+                          {showSettingsPass ? (activeWorkbench?.access_password || "Wb-PendingPass") : "••••••••••••"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(activeWorkbench?.access_password || "");
+                            setCopiedSettingsPass(true);
+                            toast.success("Access Password copied!");
+                            setTimeout(() => setCopiedSettingsPass(false), 2000);
+                          }}
+                          className="p-2 text-xs text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-1"
+                        >
+                          {copiedSettingsPass ? <BsCheck2 className="text-emerald-400 w-4 h-4" /> : <BsCopy className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
