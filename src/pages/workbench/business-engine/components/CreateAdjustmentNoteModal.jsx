@@ -96,10 +96,10 @@ export default function CreateAdjustmentNoteModal({ isOpen, onClose, documentCar
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 font-sans">
-      <div className="bg-[#121620] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-fadeIn">
+      <div className="bg-[#181818] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-fadeIn">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black/40">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#181818]">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
               <BsFileEarmarkMinus size={22} />
@@ -120,7 +120,7 @@ export default function CreateAdjustmentNoteModal({ isOpen, onClose, documentCar
           {/* Note Type Selector */}
           <div>
             <label className="block text-xs font-semibold text-gray-300 mb-1.5">Note Type</label>
-            <div className="grid grid-cols-2 gap-2 p-1 bg-black/40 border border-white/10 rounded-xl">
+            <div className="grid grid-cols-2 gap-2 p-1 bg-white/5 border border-white/10 rounded-xl">
               <button
                 type="button"
                 onClick={() => setNoteType("credit_note")}
@@ -158,7 +158,7 @@ export default function CreateAdjustmentNoteModal({ isOpen, onClose, documentCar
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full bg-black/40 border border-white/10 rounded-lg px-3.5 py-2.5 text-sm text-white font-bold focus:outline-none focus:border-purple-500"
+                className="w-full bg-[#222222] border border-white/10 rounded-lg px-3.5 py-2.5 text-sm text-white font-bold focus:outline-none focus:border-purple-500"
               />
             </div>
 
@@ -169,7 +169,7 @@ export default function CreateAdjustmentNoteModal({ isOpen, onClose, documentCar
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-black/40 border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500"
+                className="w-full bg-[#222222] border border-white/10 rounded-lg px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-purple-500"
               />
             </div>
           </div>
@@ -180,7 +180,7 @@ export default function CreateAdjustmentNoteModal({ isOpen, onClose, documentCar
             <select
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="w-full bg-[#181c26] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+              className="w-full bg-[#222222] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
             >
               <option value="Sales Return & Goods Rejection">Sales Return & Goods Rejection</option>
               <option value="Price Difference & Rebate">Price Difference & Rebate</option>

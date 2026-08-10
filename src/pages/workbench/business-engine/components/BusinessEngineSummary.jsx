@@ -45,7 +45,7 @@ export default function BusinessEngineSummary({ kpis, loading }) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-[#141722] border border-white/10 rounded-2xl p-5 h-24 animate-pulse"></div>
+          <div key={i} className="bg-[#181818] border border-white/10 rounded-2xl p-5 h-24 animate-pulse"></div>
         ))}
       </div>
     );
@@ -56,7 +56,7 @@ export default function BusinessEngineSummary({ kpis, loading }) {
       {cards.map((card, idx) => {
         const Icon = card.icon;
         return (
-          <div key={idx} className="bg-[#141722] border border-white/10 rounded-2xl p-5 shadow-sm hover:border-white/20 transition-all">
+          <div key={idx} className="bg-[#181818] border border-white/10 rounded-2xl p-5 shadow-sm hover:border-white/20 transition-all">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{card.title}</p>

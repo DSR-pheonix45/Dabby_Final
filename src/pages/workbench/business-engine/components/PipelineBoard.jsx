@@ -56,7 +56,7 @@ export default function PipelineBoard({
 
   if (loading) {
     return (
-      <div className="flex h-[600px] bg-[#141722] border border-white/10 rounded-2xl overflow-hidden animate-pulse">
+      <div className="flex h-[600px] bg-[#181818] border border-white/10 rounded-2xl overflow-hidden animate-pulse">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="flex-1 min-w-[300px] border-r border-white/5 p-4 space-y-4">
             <div className="h-6 bg-white/5 rounded w-1/2 mb-6"></div>
@@ -85,7 +85,7 @@ export default function PipelineBoard({
   };
 
   return (
-    <div className="flex h-[calc(100vh-280px)] min-h-[600px] bg-[#12141C] border border-white/10 rounded-2xl overflow-x-auto overflow-y-hidden custom-scrollbar snap-x">
+    <div className="flex h-[calc(100vh-280px)] min-h-[600px] bg-[#181818] border border-white/10 rounded-2xl overflow-x-auto overflow-y-hidden custom-scrollbar snap-x">
       {STAGES.map(stage => {
         const stageCards = cards.filter(c => getCardStageId(c) === stage.id || c.stage === stage.id);
         
