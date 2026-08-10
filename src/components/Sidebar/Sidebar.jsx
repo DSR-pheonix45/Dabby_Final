@@ -278,7 +278,7 @@ export default function Sidebar({
                         key={wb.id}
                         onClick={() => {
                           changeActiveWorkbench(wb);
-                          navigate("/dashboard/workbench/business-engine");
+                          navigate("/dashboard/workbench/members");
                           onNavigate?.();
                         }}
                         className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 group/wb ${
@@ -312,7 +312,7 @@ export default function Sidebar({
                 <div className="mb-2">
                   <button
                     onClick={() => {
-                      navigate("/dashboard/workbench/business-engine");
+                      navigate("/dashboard/workbench/members");
                       onNavigate?.();
                     }}
                     className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30 shadow-md"

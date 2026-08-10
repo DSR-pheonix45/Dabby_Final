@@ -22,13 +22,13 @@ export default function WorkbenchLayout() {
   }
 
   const navItems = [
-    { label: "Business Engine", path: "/dashboard/workbench/business-engine", icon: BsCpu },
-    { label: "Financials", path: "/dashboard/workbench/ledger", icon: BsJournalText },
     { label: "Members", path: "/dashboard/workbench/members", icon: BsPerson },
     { label: "Parties", path: "/dashboard/workbench/parties", icon: BsBuilding },
-    { label: "COA", path: "/dashboard/workbench/coa", icon: BsDiagram3 },
     { label: "Doc Vault", path: "/dashboard/workbench/doc-vault", icon: BsFileEarmarkText },
+    { label: "Business Engine", path: "/dashboard/workbench/business-engine", icon: BsCpu },
     { label: "OPS", path: "/dashboard/workbench/ops", icon: BsGraphUp },
+    { label: "Financials", path: "/dashboard/workbench/ledger", icon: BsJournalText },
+    { label: "COA", path: "/dashboard/workbench/coa", icon: BsDiagram3 },
     { label: "Settings", path: "/dashboard/workbench/settings", icon: BsGear },
   ];
 
