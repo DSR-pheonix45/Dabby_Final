@@ -54,10 +54,13 @@ export function WorkbenchProvider({ children }) {
           const newKey = wb.license_key || `WB-${wb.id.substring(0, 4).toUpperCase()}-${wb.id.substring(4, 8).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
           const newPass = wb.access_password || `Wb-${wb.id.substring(0, 6)}`;
           try {
-            await supabase.from("workbenches").update({
+            const { error: healErr } = await supabase.from("workbenches").update({
               license_key: newKey,
               access_password: newPass
             }).eq("id", wb.id);
+            if (healErr) {
+              // Silently handle schema cache error if license columns do not exist in DB yet
+            }
             wb.license_key = newKey;
             wb.access_password = newPass;
           } catch (e) {

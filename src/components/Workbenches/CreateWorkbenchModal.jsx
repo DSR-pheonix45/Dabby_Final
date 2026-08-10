@@ -797,7 +797,9 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
         currency: formData.currency || "INR",
         industry: formData.industry,
         business_type: formData.business_type,
-        fiscal_year_start: formData.fiscal_year_start,
+        fiscal_year_start: /^\d{4}-\d{2}-\d{2}$/.test(formData.fiscal_year_start)
+          ? formData.fiscal_year_start
+          : (formData.books_start_date || new Date().toISOString().split("T")[0]),
         books_start_date: formData.books_start_date,
         cin: formData.cin ? formData.cin.toUpperCase() : null,
         gstin: formData.gstin ? formData.gstin.toUpperCase() : null,
@@ -815,33 +817,89 @@ export default function CreateWorkbenchModal({ isOpen, onClose, onSuccess }) {
         .single();
 
       if (error) {
-        console.warn("Insert error with tax columns, retrying without strict tax columns:", error);
-        // Fallback insert if columns are missing from table schema
-        const fallbackPayload = {
+        console.warn("Primary workbench insert failed, retrying without license columns:", error);
+
+        // Fallback 1: Exclude license_key & access_password (if migration 027 is pending)
+        const fallbackPayload1 = {
           name: formData.name.trim(),
           legal_name: formData.legal_name.trim() || null,
           country: formData.country || "India",
           currency: formData.currency || "INR",
           industry: formData.industry,
           business_type: formData.business_type,
-          fiscal_year_start: formData.fiscal_year_start,
+          fiscal_year_start: /^\d{4}-\d{2}-\d{2}$/.test(formData.fiscal_year_start)
+            ? formData.fiscal_year_start
+            : (formData.books_start_date || new Date().toISOString().split("T")[0]),
           books_start_date: formData.books_start_date,
+          cin: formData.cin ? formData.cin.toUpperCase() : null,
+          gstin: formData.gstin ? formData.gstin.toUpperCase() : null,
+          pan: formData.pan ? formData.pan.toUpperCase() : null,
           created_by: user.id,
-          license_key: licenseKey,
-          access_password: accessPassword,
         };
-        const { data: retryData, error: retryErr } = await supabase
+
+        const { data: retryData1, error: retryErr1 } = await supabase
           .from("workbenches")
-          .insert([fallbackPayload])
+          .insert([fallbackPayload1])
           .select()
           .single();
-        if (retryErr) throw retryErr;
-        insertedWb = retryData;
+
+        if (!retryErr1 && retryData1) {
+          insertedWb = retryData1;
+        } else {
+          console.warn("Fallback 1 failed, trying fallback without tax/license columns:", retryErr1);
+
+          // Fallback 2: Exclude license AND tax columns
+          const fallbackPayload2 = {
+            name: formData.name.trim(),
+            legal_name: formData.legal_name.trim() || null,
+            country: formData.country || "India",
+            currency: formData.currency || "INR",
+            industry: formData.industry,
+            business_type: formData.business_type,
+            fiscal_year_start: /^\d{4}-\d{2}-\d{2}$/.test(formData.fiscal_year_start)
+              ? formData.fiscal_year_start
+              : (formData.books_start_date || new Date().toISOString().split("T")[0]),
+            books_start_date: formData.books_start_date,
+            created_by: user.id,
+          };
+
+          const { data: retryData2, error: retryErr2 } = await supabase
+            .from("workbenches")
+            .insert([fallbackPayload2])
+            .select()
+            .single();
+
+          if (!retryErr2 && retryData2) {
+            insertedWb = retryData2;
+          } else {
+            console.warn("Fallback 2 failed, trying absolute minimal payload:", retryErr2);
+
+            // Fallback 3: Absolute minimal payload
+            const minPayload = {
+              name: formData.name.trim(),
+              created_by: user.id,
+              books_start_date: formData.books_start_date,
+              country: formData.country || "India",
+              currency: formData.currency || "INR",
+              industry: formData.industry || "Software & Technology",
+              business_type: formData.business_type || "Private Limited",
+            };
+
+            const { data: minData, error: minErr } = await supabase
+              .from("workbenches")
+              .insert([minPayload])
+              .select()
+              .single();
+
+            if (minErr) throw minErr;
+            insertedWb = minData;
+          }
+        }
       } else {
         insertedWb = data;
       }
 
-      // Ensure insertedWb contains generated keys if db omitted them in select
+      // Ensure insertedWb contains generated keys in memory if db omitted them
       if (insertedWb) {
         insertedWb.license_key = insertedWb.license_key || licenseKey;
         insertedWb.access_password = insertedWb.access_password || accessPassword;

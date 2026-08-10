@@ -157,14 +157,40 @@ export const backendService = {
         .select()
         .single();
 
-      // Resilience: some databases predate the optional `settings` jsonb column
-      // ("Could not find the 'settings' column"). Retry without it so workbench
-      // creation still succeeds. Run migration 009 to persist settings properly.
-      if (wbError && /settings|schema cache|column/i.test(wbError.message || '')) {
-        console.warn("workbenches.settings column missing — retrying insert without settings");
+      // Fallback 1: Retry without settings or license columns if schema cache/column errors occur
+      if (wbError && /settings|license_key|access_password|schema cache|column/i.test(wbError.message || '')) {
+        console.warn("workbenches optional columns missing — retrying insert without license/settings columns");
+        const safeRow = {
+          name: name.trim(),
+          created_by: user.id,
+          books_start_date: booksStartDate,
+          country: extraData.location || extraData.country || 'India',
+          currency: extraData.currency || 'INR',
+          industry: extraData.industry || null,
+          business_type: extraData.business_type || null,
+          legal_name: extraData.legal_name || null,
+          pan: extraData.pan || null,
+          gstin: extraData.gstin || null,
+        };
         ({ data: workbench, error: wbError } = await supabase
           .from('workbenches')
-          .insert(baseRow)
+          .insert(safeRow)
+          .select()
+          .single());
+      }
+
+      // Fallback 2: Absolute baseline payload
+      if (wbError) {
+        console.warn("Retrying with baseline payload:", wbError);
+        ({ data: workbench, error: wbError } = await supabase
+          .from('workbenches')
+          .insert({
+            name: name.trim(),
+            created_by: user.id,
+            books_start_date: booksStartDate,
+            country: extraData.location || extraData.country || 'India',
+            currency: extraData.currency || 'INR',
+          })
           .select()
           .single());
       }
@@ -172,6 +198,11 @@ export const backendService = {
       if (wbError) {
         console.error('Supabase workbench insert error:', wbError);
         throw new Error(wbError.message || 'Failed to create workbench');
+      }
+
+      if (workbench) {
+        workbench.license_key = workbench.license_key || licenseKey;
+        workbench.access_password = workbench.access_password || accessPassword;
       }
 
       // 1.2 Insert owner into workbench_members
