@@ -304,7 +304,7 @@ export default function BusinessEngine() {
             className="flex items-center space-x-2.5 px-5 py-2.5 bg-gradient-to-r from-teal-400 to-emerald-400 text-black font-black text-xs rounded-xl shadow-lg shadow-teal-500/20 hover:opacity-95 transition-all transform hover:-translate-y-0.5"
           >
             <BsPlusLg size={15} />
-            <span>+ New Trade</span>
+            <span>New Trade</span>
           </button>
 
           {/* View Mode Switcher */}
