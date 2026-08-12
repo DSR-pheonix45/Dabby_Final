@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
 import { toast } from "react-hot-toast";
+import { collaborationService } from "../services/collaborationService";
 
 const WorkbenchContext = createContext();
 
@@ -108,9 +109,26 @@ export function WorkbenchProvider({ children }) {
   const deleteWorkbench = async (workbenchId) => {
     if (!workbenchId) return { error: new Error("No workbench ID provided") };
 
+    // Primary Attempt: Backend FastAPI endpoint (uses Service Role Key to bypass RLS)
     try {
-      // 1. Delete di_ledger_transactions (PostgreSQL CASCADE automatically deletes all di_ledger_entries,
-      // freeing di_accounts from the di_ledger_entries_account_id_fkey constraint)
+      await collaborationService.deleteWorkbench(workbenchId);
+      if (activeWorkbench?.id === workbenchId) {
+        setActiveWorkbench(null);
+        localStorage.removeItem("dabby_active_workbench");
+      }
+      try {
+        localStorage.removeItem(`dabby_wb_settings_${workbenchId}`);
+      } catch (e) {}
+
+      await fetchWorkbenches();
+      return { error: null };
+    } catch (apiErr) {
+      console.warn("[deleteWorkbench] Backend API call failed, attempting client-side cascade cleanup:", apiErr);
+    }
+
+    // Fallback Attempt: Direct Supabase Client CASCADE cleanup
+    try {
+      // 1. Delete di_ledger_transactions (PostgreSQL CASCADE automatically deletes all di_ledger_entries)
       try {
         await supabase.from("di_ledger_transactions").delete().eq("workbench_id", workbenchId);
       } catch (e) {
@@ -146,17 +164,22 @@ export function WorkbenchProvider({ children }) {
         await supabase.from("di_documents").delete().eq("workbench_id", workbenchId);
       } catch (e) {}
 
-      // 5. Delete workbench_accounts
+      // 5. Delete parties
+      try {
+        await supabase.from("parties").delete().eq("workbench_id", workbenchId);
+      } catch (e) {}
+
+      // 6. Delete workbench_accounts
       try {
         await supabase.from("workbench_accounts").delete().eq("workbench_id", workbenchId);
       } catch (e) {}
 
-      // 6. Delete workbench_members membership row
+      // 7. Delete workbench_members membership row
       try {
         await supabase.from("workbench_members").delete().eq("workbench_id", workbenchId);
       } catch (e) {}
 
-      // 7. Delete parent workbench record
+      // 8. Delete parent workbench record
       const { error } = await supabase
         .from("workbenches")
         .delete()
@@ -179,7 +202,7 @@ export function WorkbenchProvider({ children }) {
       await fetchWorkbenches();
       return { error: null };
     } catch (err) {
-      console.error("deleteWorkbench error:", err);
+      console.error("deleteWorkbench fallback error:", err);
       return { error: err };
     }
   };

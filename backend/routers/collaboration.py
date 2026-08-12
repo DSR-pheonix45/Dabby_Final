@@ -751,3 +751,68 @@ def update_claim_status(workbench_id: str, claim_id: str, payload: ClaimStatusUp
     return target_claim or {"id": claim_id, "status": payload.status}
 
 
+@router.delete("/{workbench_id}")
+def delete_workbench(workbench_id: str, current_user: dict = Depends(get_current_user_no_waitlist)):
+    # 1. Clean up di_ledger_transactions (triggers ON DELETE CASCADE on di_ledger_entries in Postgres)
+    try:
+        supabase.table("di_ledger_transactions").delete().eq("workbench_id", workbench_id).execute()
+    except Exception as e:
+        print("[WARNING] di_ledger_transactions delete:", e)
+
+    # 2. Clean up di_workbench_labels
+    try:
+        supabase.table("di_workbench_labels").delete().eq("workbench_id", workbench_id).execute()
+    except Exception as e:
+        pass
+
+    # 3. Clean up di_accounts (safe now that di_ledger_entries are removed)
+    try:
+        supabase.table("di_accounts").delete().eq("workbench_id", workbench_id).execute()
+    except Exception as e:
+        pass
+
+    # 4. Clean up di_documents and child notes/logs
+    try:
+        res = supabase.table("di_documents").select("id").eq("workbench_id", workbench_id).execute()
+        if res.data and len(res.data) > 0:
+            doc_ids = [d["id"] for d in res.data]
+            try:
+                supabase.table("di_analysis_notes").delete().in_("document_id", doc_ids).execute()
+            except Exception as e:
+                pass
+            try:
+                supabase.table("di_document_processing_logs").delete().in_("document_id", doc_ids).execute()
+            except Exception as e:
+                pass
+        supabase.table("di_documents").delete().eq("workbench_id", workbench_id).execute()
+    except Exception as e:
+        pass
+
+    # 5. Clean up parties
+    try:
+        supabase.table("parties").delete().eq("workbench_id", workbench_id).execute()
+    except Exception as e:
+        pass
+
+    # 6. Clean up workbench_accounts
+    try:
+        supabase.table("workbench_accounts").delete().eq("workbench_id", workbench_id).execute()
+    except Exception as e:
+        pass
+
+    # 7. Clean up workbench_members
+    try:
+        supabase.table("workbench_members").delete().eq("workbench_id", workbench_id).execute()
+    except Exception as e:
+        pass
+
+    # 8. Delete parent workbench record (bypasses RLS using Service Role key)
+    try:
+        del_res = supabase.table("workbenches").delete().eq("id", workbench_id).execute()
+        return {"success": True, "message": "Workbench deleted successfully", "data": del_res.data}
+    except Exception as e:
+        print("[ERROR] Failed to delete workbench row:", e)
+        raise HTTPException(status_code=500, detail=f"Failed to delete workbench: {str(e)}")
+
+
+

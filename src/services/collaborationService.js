@@ -148,5 +148,16 @@ export const collaborationService = {
     });
     if (!res.ok) throw new Error("Failed to update claim status");
     return res.json();
+  },
+
+  async deleteWorkbench(workbenchId) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to delete workbench");
+    }
+    return res.json();
   }
 };
