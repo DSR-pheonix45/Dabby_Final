@@ -182,7 +182,7 @@ export default function SalesInvoiceModal({ isOpen, onClose }) {
     }));
   };
 
-  const handlePartyPreset = (e) => {
+  const handleSelectPresetParty = (e) => {
     const matched = PRESET_PARTIES.find(p => p.name === e.target.value);
     if (matched) setParty(matched);
   };
