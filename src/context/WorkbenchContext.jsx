@@ -109,28 +109,48 @@ export function WorkbenchProvider({ children }) {
     if (!workbenchId) return { error: new Error("No workbench ID provided") };
 
     try {
-      // 1. Delete workbench_records first while user is still an active workbench_member
+      // 1. Delete di_ledger_entries first (references di_accounts via account_id)
+      try {
+        await supabase.from("di_ledger_entries").delete().eq("workbench_id", workbenchId);
+      } catch (e) {}
+
+      // 2. Delete di_journals & di_journal_entries
+      try {
+        await supabase.from("di_journals").delete().eq("workbench_id", workbenchId);
+      } catch (e) {}
+      try {
+        await supabase.from("di_journal_entries").delete().eq("workbench_id", workbenchId);
+      } catch (e) {}
+
+      // 3. Delete di_workbench_labels
+      try {
+        await supabase.from("di_workbench_labels").delete().eq("workbench_id", workbenchId);
+      } catch (e) {}
+
+      // 4. Delete di_accounts (safe now that di_ledger_entries are removed)
+      try {
+        await supabase.from("di_accounts").delete().eq("workbench_id", workbenchId);
+      } catch (e) {}
+
+      // 5. Delete di_documents
+      try {
+        await supabase.from("di_documents").delete().eq("workbench_id", workbenchId);
+      } catch (e) {}
+
+      // 6. Delete workbench_records & workbench_accounts
       try {
         await supabase.from("workbench_records").delete().eq("workbench_id", workbenchId);
-      } catch (e) {
-        console.warn("workbench_records cleanup warning:", e);
-      }
-
-      // 2. Delete workbench_accounts while user is still an active workbench_member
+      } catch (e) {}
       try {
         await supabase.from("workbench_accounts").delete().eq("workbench_id", workbenchId);
-      } catch (e) {
-        console.warn("workbench_accounts cleanup warning:", e);
-      }
+      } catch (e) {}
 
-      // 3. Delete workbench_members membership row
+      // 7. Delete workbench_members membership row
       try {
         await supabase.from("workbench_members").delete().eq("workbench_id", workbenchId);
-      } catch (e) {
-        console.warn("workbench_members cleanup warning:", e);
-      }
+      } catch (e) {}
 
-      // 4. Delete the parent workbench record
+      // 8. Delete the parent workbench record
       const { error } = await supabase
         .from("workbenches")
         .delete()
