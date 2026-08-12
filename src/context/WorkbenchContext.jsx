@@ -108,45 +108,50 @@ export function WorkbenchProvider({ children }) {
   const deleteWorkbench = async (workbenchId) => {
     if (!workbenchId) return { error: new Error("No workbench ID provided") };
 
-    // 1. Delete dependent child table rows referencing workbench_id
-    // to prevent PostgreSQL Foreign Key constraint (409 Conflict) errors.
-    const childTables = [
-      "workbench_members",
-      "workbench_accounts",
-      "workbench_records",
-      "user_documents",
-      "parties",
-      "entities",
-      "di_analysis_notes",
-      "di_document_processing_logs",
-      "user_datasets",
-      "raw_imports"
-    ];
-
-    await Promise.allSettled(
-      childTables.map((table) =>
-        supabase.from(table).delete().eq("workbench_id", workbenchId)
-      )
-    );
-
-    // 2. Delete primary workbench record
-    const { error } = await supabase
-      .from("workbenches")
-      .delete()
-      .eq("id", workbenchId);
-
-    if (!error) {
-      if (activeWorkbench?.id === workbenchId) {
-        setActiveWorkbench(null);
-        localStorage.removeItem("dabby_active_workbench");
-      }
+    try {
+      // 1. Delete workbench_records first while user is still an active workbench_member
       try {
-        localStorage.removeItem(`dabby_wb_settings_${workbenchId}`);
-      } catch (e) {}
-      await fetchWorkbenches();
-    }
+        await supabase.from("workbench_records").delete().eq("workbench_id", workbenchId);
+      } catch (e) {
+        console.warn("workbench_records cleanup warning:", e);
+      }
 
-    return { error };
+      // 2. Delete workbench_accounts while user is still an active workbench_member
+      try {
+        await supabase.from("workbench_accounts").delete().eq("workbench_id", workbenchId);
+      } catch (e) {
+        console.warn("workbench_accounts cleanup warning:", e);
+      }
+
+      // 3. Delete workbench_members membership row
+      try {
+        await supabase.from("workbench_members").delete().eq("workbench_id", workbenchId);
+      } catch (e) {
+        console.warn("workbench_members cleanup warning:", e);
+      }
+
+      // 4. Delete the parent workbench record
+      const { error } = await supabase
+        .from("workbenches")
+        .delete()
+        .eq("id", workbenchId);
+
+      if (!error) {
+        if (activeWorkbench?.id === workbenchId) {
+          setActiveWorkbench(null);
+          localStorage.removeItem("dabby_active_workbench");
+        }
+        try {
+          localStorage.removeItem(`dabby_wb_settings_${workbenchId}`);
+        } catch (e) {}
+        await fetchWorkbenches();
+      }
+
+      return { error };
+    } catch (err) {
+      console.error("deleteWorkbench error:", err);
+      return { error: err };
+    }
   };
 
   return (
