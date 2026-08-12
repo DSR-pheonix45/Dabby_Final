@@ -203,6 +203,9 @@ export default function SalesInvoiceModal({ isOpen, onClose }) {
   const taxableAmount = Math.max(0, subtotal - discountAmount);
   const taxRate = 0.18; // 18% GST
   const totalTax = taxableAmount * taxRate;
+  const cgstTotal = totalTax / 2;
+  const sgstTotal = totalTax / 2;
+  const igstTotal = totalTax;
   const grandTotal = taxableAmount + totalTax;
 
   const currentStageObj = STAGES.find(s => s.key === stage);
@@ -877,7 +880,7 @@ export default function SalesInvoiceModal({ isOpen, onClose }) {
               </div>
               {discountAmount > 0 && (
                 <div className="flex justify-between text-teal-400 font-medium">
-                  <span>Discount ({selectedDiscountTag?.code})</span>
+                  <span>Discount ({activeDiscountTag?.code})</span>
                   <span>- ₹{discountAmount.toLocaleString('en-IN')}</span>
                 </div>
               )}
