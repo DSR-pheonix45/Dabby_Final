@@ -28,7 +28,7 @@ import { supabase } from "../../lib/supabase";
 
 export default function WorkbenchSettings() {
   const { user } = useAuth();
-  const { activeWorkbench, changeActiveWorkbench, fetchWorkbenches } = useWorkbench();
+  const { activeWorkbench, deleteWorkbench } = useWorkbench();
   const [activeTab, setActiveTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
   const [logoFile, setLogoFile] = useState(null);
@@ -835,21 +835,12 @@ export default function WorkbenchSettings() {
                   if (!activeWorkbench?.id) return;
                   setIsDeletingWb(true);
                   try {
-                    const { error } = await supabase
-                      .from("workbenches")
-                      .delete()
-                      .eq("id", activeWorkbench.id);
+                    const { error } = await deleteWorkbench(activeWorkbench.id);
 
                     if (error) throw error;
 
                     toast.success(`Workbench "${activeWorkbench.name}" deleted successfully`);
-                    try {
-                      localStorage.removeItem(`dabby_wb_settings_${activeWorkbench.id}`);
-                    } catch (e) {}
-
                     setIsDeleteModalOpen(false);
-                    changeActiveWorkbench(null);
-                    await fetchWorkbenches();
                     navigate("/dashboard/workbenches");
                   } catch (err) {
                     console.error("Failed to delete workbench:", err);

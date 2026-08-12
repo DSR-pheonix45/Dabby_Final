@@ -11,7 +11,7 @@ import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 
 export default function Workbenches() {
-  const { workbenches, activeWorkbench, changeActiveWorkbench, fetchWorkbenches } = useWorkbench();
+  const { workbenches, activeWorkbench, changeActiveWorkbench, fetchWorkbenches, deleteWorkbench } = useWorkbench();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
   const [selectedLicenseWb, setSelectedLicenseWb] = useState(null);
@@ -29,15 +29,11 @@ export default function Workbenches() {
     if (!window.confirm("Are you sure you want to delete this workbench?")) return;
     
     setOpenDropdown(null);
-    const { error } = await supabase.from("workbenches").delete().eq("id", id);
+    const { error } = await deleteWorkbench(id);
     if (error) {
-      toast.error("Failed to delete workbench");
+      toast.error("Failed to delete workbench: " + (error.message || "Unknown error"));
     } else {
       toast.success("Workbench deleted");
-      if (activeWorkbench?.id === id) {
-        changeActiveWorkbench(null);
-      }
-      fetchWorkbenches();
     }
   };
 

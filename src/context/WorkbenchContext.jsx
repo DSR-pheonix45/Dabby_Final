@@ -105,6 +105,50 @@ export function WorkbenchProvider({ children }) {
     }
   };
 
+  const deleteWorkbench = async (workbenchId) => {
+    if (!workbenchId) return { error: new Error("No workbench ID provided") };
+
+    // 1. Delete dependent child table rows referencing workbench_id
+    // to prevent PostgreSQL Foreign Key constraint (409 Conflict) errors.
+    const childTables = [
+      "workbench_members",
+      "workbench_accounts",
+      "workbench_records",
+      "user_documents",
+      "parties",
+      "entities",
+      "di_analysis_notes",
+      "di_document_processing_logs",
+      "user_datasets",
+      "raw_imports"
+    ];
+
+    await Promise.allSettled(
+      childTables.map((table) =>
+        supabase.from(table).delete().eq("workbench_id", workbenchId)
+      )
+    );
+
+    // 2. Delete primary workbench record
+    const { error } = await supabase
+      .from("workbenches")
+      .delete()
+      .eq("id", workbenchId);
+
+    if (!error) {
+      if (activeWorkbench?.id === workbenchId) {
+        setActiveWorkbench(null);
+        localStorage.removeItem("dabby_active_workbench");
+      }
+      try {
+        localStorage.removeItem(`dabby_wb_settings_${workbenchId}`);
+      } catch (e) {}
+      await fetchWorkbenches();
+    }
+
+    return { error };
+  };
+
   return (
     <WorkbenchContext.Provider
       value={{
@@ -115,6 +159,7 @@ export function WorkbenchProvider({ children }) {
         loading,
         fetchWorkbenches,
         changeActiveWorkbench,
+        deleteWorkbench,
       }}
     >
       {children}
