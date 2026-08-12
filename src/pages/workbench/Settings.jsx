@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { useAuth } from "../../hooks/useAuth";
 import { 
@@ -37,7 +38,10 @@ export default function WorkbenchSettings() {
   const [copiedSettingsPass, setCopiedSettingsPass] = useState(false);
   const [isEditingSettingsPass, setIsEditingSettingsPass] = useState(false);
   const [newSettingsPassInput, setNewSettingsPassInput] = useState("");
-  const [isSavingSettingsPass, setIsSavingSettingsPass] = useState(false);
+  const navigate = useNavigate();
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [confirmWbNameInput, setConfirmWbNameInput] = useState("");
+  const [isDeletingWb, setIsDeletingWb] = useState(false);
   
   const [formData, setFormData] = useState({
     name: activeWorkbench?.name || "",
@@ -763,7 +767,13 @@ export default function WorkbenchSettings() {
                     <h4 className="text-white font-medium">Delete Workbench</h4>
                     <p className="text-sm text-gray-500 mt-1">Permanently remove this workbench and all associated data.</p>
                   </div>
-                  <button className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 font-medium rounded-md transition-colors border border-red-500/20">
+                  <button 
+                    onClick={() => {
+                      setConfirmWbNameInput("");
+                      setIsDeleteModalOpen(true);
+                    }}
+                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 font-medium rounded-md transition-colors border border-red-500/20"
+                  >
                     Delete Workbench
                   </button>
                 </div>
@@ -778,6 +788,85 @@ export default function WorkbenchSettings() {
         </div>
 
       </div>
+
+      {/* Delete Workbench Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#141414] border border-red-500/30 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl space-y-5 p-6 font-dm-sans">
+            <div className="flex items-center space-x-3 text-red-500">
+              <div className="p-2.5 bg-red-500/10 rounded-xl border border-red-500/20">
+                <BsTrash size={22} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Delete Workbench</h3>
+                <p className="text-xs text-red-400 font-medium">Irreversible Action</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-300">
+              Are you sure you want to permanently delete <strong className="text-white">{activeWorkbench?.name}</strong>? All associated data, financial records, members, and settings will be permanently removed.
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-400">
+                To confirm, type <span className="text-red-400 font-mono font-bold">{activeWorkbench?.name}</span> below:
+              </label>
+              <input
+                type="text"
+                value={confirmWbNameInput}
+                onChange={(e) => setConfirmWbNameInput(e.target.value)}
+                placeholder={activeWorkbench?.name}
+                className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-2 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(false)}
+                disabled={isDeletingWb}
+                className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!activeWorkbench?.id) return;
+                  setIsDeletingWb(true);
+                  try {
+                    const { error } = await supabase
+                      .from("workbenches")
+                      .delete()
+                      .eq("id", activeWorkbench.id);
+
+                    if (error) throw error;
+
+                    toast.success(`Workbench "${activeWorkbench.name}" deleted successfully`);
+                    try {
+                      localStorage.removeItem(`dabby_wb_settings_${activeWorkbench.id}`);
+                    } catch (e) {}
+
+                    setIsDeleteModalOpen(false);
+                    changeActiveWorkbench(null);
+                    await fetchWorkbenches();
+                    navigate("/dashboard/workbenches");
+                  } catch (err) {
+                    console.error("Failed to delete workbench:", err);
+                    toast.error("Failed to delete workbench: " + (err.message || "Unknown error"));
+                  } finally {
+                    setIsDeletingWb(false);
+                  }
+                }}
+                disabled={isDeletingWb || confirmWbNameInput.trim() !== activeWorkbench?.name}
+                className="px-5 py-2 bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-500/20 flex items-center gap-2"
+              >
+                {isDeletingWb ? "Deleting..." : "Yes, Delete Workbench"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
