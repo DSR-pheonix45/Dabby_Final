@@ -109,12 +109,42 @@ export function WorkbenchProvider({ children }) {
     if (!workbenchId) return { error: new Error("No workbench ID provided") };
 
     try {
-      // 1. Delete di_ledger_entries first (references di_accounts via account_id)
+      // 1. Fetch account IDs belonging to this workbench from di_accounts
+      // and delete referencing di_ledger_entries by account_id (prevents di_ledger_entries_account_id_fkey 409 conflict)
+      try {
+        const { data: accounts } = await supabase
+          .from("di_accounts")
+          .select("id")
+          .eq("workbench_id", workbenchId);
+
+        if (accounts && accounts.length > 0) {
+          const accountIds = accounts.map((a) => a.id);
+          await supabase
+            .from("di_ledger_entries")
+            .delete()
+            .in("account_id", accountIds);
+        }
+      } catch (e) {
+        console.warn("di_ledger_entries cleanup by account_id warning:", e);
+      }
+
+      // Also attempt delete on di_ledger_entries by workbench_id if column exists
       try {
         await supabase.from("di_ledger_entries").delete().eq("workbench_id", workbenchId);
       } catch (e) {}
 
-      // 2. Delete di_journals & di_journal_entries
+      // 2. Delete dependent event & draft records
+      try {
+        await supabase.from("di_event_settlements").delete().eq("workbench_id", workbenchId);
+      } catch (e) {}
+      try {
+        await supabase.from("di_business_events").delete().eq("workbench_id", workbenchId);
+      } catch (e) {}
+      try {
+        await supabase.from("di_trade_drafts").delete().eq("workbench_id", workbenchId);
+      } catch (e) {}
+
+      // 3. Delete di_journals & di_journal_entries
       try {
         await supabase.from("di_journals").delete().eq("workbench_id", workbenchId);
       } catch (e) {}
@@ -122,52 +152,67 @@ export function WorkbenchProvider({ children }) {
         await supabase.from("di_journal_entries").delete().eq("workbench_id", workbenchId);
       } catch (e) {}
 
-      // 3. Delete di_workbench_labels
+      // 4. Delete di_workbench_labels
       try {
         await supabase.from("di_workbench_labels").delete().eq("workbench_id", workbenchId);
       } catch (e) {}
 
-      // 4. Delete di_accounts (safe now that di_ledger_entries are removed)
+      // 5. Delete di_accounts (safe now that di_ledger_entries references are deleted)
       try {
         await supabase.from("di_accounts").delete().eq("workbench_id", workbenchId);
       } catch (e) {}
 
-      // 5. Delete di_documents
+      // 6. Delete Document Vault records (di_documents and child notes/logs)
       try {
+        const { data: docs } = await supabase
+          .from("di_documents")
+          .select("id")
+          .eq("workbench_id", workbenchId);
+
+        if (docs && docs.length > 0) {
+          const docIds = docs.map((d) => d.id);
+          try {
+            await supabase.from("di_analysis_notes").delete().in("document_id", docIds);
+          } catch (e) {}
+          try {
+            await supabase.from("di_document_processing_logs").delete().in("document_id", docIds);
+          } catch (e) {}
+        }
         await supabase.from("di_documents").delete().eq("workbench_id", workbenchId);
       } catch (e) {}
 
-      // 6. Delete workbench_records & workbench_accounts
-      try {
-        await supabase.from("workbench_records").delete().eq("workbench_id", workbenchId);
-      } catch (e) {}
+      // 7. Delete workbench_accounts
       try {
         await supabase.from("workbench_accounts").delete().eq("workbench_id", workbenchId);
       } catch (e) {}
 
-      // 7. Delete workbench_members membership row
+      // 8. Delete workbench_members membership row
       try {
         await supabase.from("workbench_members").delete().eq("workbench_id", workbenchId);
       } catch (e) {}
 
-      // 8. Delete the parent workbench record
+      // 9. Delete parent workbench record
       const { error } = await supabase
         .from("workbenches")
         .delete()
         .eq("id", workbenchId);
 
-      if (!error) {
-        if (activeWorkbench?.id === workbenchId) {
-          setActiveWorkbench(null);
-          localStorage.removeItem("dabby_active_workbench");
-        }
-        try {
-          localStorage.removeItem(`dabby_wb_settings_${workbenchId}`);
-        } catch (e) {}
-        await fetchWorkbenches();
+      if (error) {
+        console.error("Error deleting workbench record:", error);
+        return { error };
       }
 
-      return { error };
+      // Cleanup local storage & active workbench state
+      if (activeWorkbench?.id === workbenchId) {
+        setActiveWorkbench(null);
+        localStorage.removeItem("dabby_active_workbench");
+      }
+      try {
+        localStorage.removeItem(`dabby_wb_settings_${workbenchId}`);
+      } catch (e) {}
+
+      await fetchWorkbenches();
+      return { error: null };
     } catch (err) {
       console.error("deleteWorkbench error:", err);
       return { error: err };
