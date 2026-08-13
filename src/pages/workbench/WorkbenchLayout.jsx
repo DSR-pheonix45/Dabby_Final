@@ -25,6 +25,7 @@ export default function WorkbenchLayout() {
     { label: "Members", path: "/dashboard/workbench/members", icon: BsPerson },
     { label: "Parties", path: "/dashboard/workbench/parties", icon: BsBuilding },
     { label: "Doc Vault", path: "/dashboard/workbench/doc-vault", icon: BsFileEarmarkText },
+    { label: "Generators", path: "/dashboard/workbench/generators", icon: BsLightningCharge },
     { label: "Business Engine", path: "/dashboard/workbench/business-engine", icon: BsCpu },
     { label: "OPS", path: "/dashboard/workbench/ops", icon: BsGraphUp },
     { label: "Financials", path: "/dashboard/workbench/ledger", icon: BsJournalText },
@@ -83,9 +84,9 @@ export default function WorkbenchLayout() {
             <div className="flex items-center space-x-3 pb-4 shrink-0">
               <div className="h-6 w-[1px] bg-white/10 mr-2 hidden md:block"></div>
               <button 
-                onClick={() => setIsGeneratorModalOpen(true)}
+                onClick={() => navigate("/dashboard/workbench/generators")}
                 className="flex items-center space-x-2 px-3 py-1.5 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 rounded-lg text-sm font-semibold transition-colors"
-                title="Generators"
+                title="Generators Studio"
               >
                 <BsLightningCharge />
                 <span>Generators</span>

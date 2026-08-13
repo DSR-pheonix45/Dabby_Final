@@ -4,7 +4,7 @@ import { toast } from "react-hot-toast";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { collaborationService } from "../../services/collaborationService";
 
-export default function OPEXExpenseModal({ isOpen, onClose }) {
+export default function OPEXExpenseModal({ isOpen = true, onClose, isPage = false }) {
   const { activeWorkbench } = useWorkbench();
   const [expenseNumber, setExpenseNumber] = useState(`EXP-${Math.floor(1000 + Math.random() * 9000)}`);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
