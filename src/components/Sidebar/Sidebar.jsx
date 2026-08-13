@@ -9,12 +9,14 @@ import {
   BsChevronRight,
   BsClockHistory,
   BsPlusLg,
-  BsBuilding
+  BsBuilding,
+  BsLaptop
 } from "react-icons/bs";
 import { useAuth } from "../../hooks/useAuth";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import ChatSearch from "../ChatSearch";
 import { supabase } from "../../lib/supabase";
+import DesktopShortcutModal from "../common/DesktopShortcutModal";
 
 const SidebarButton = ({
   icon: IconComponent,
@@ -159,6 +161,7 @@ export default function Sidebar({
   };
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isDesktopModalOpen, setIsDesktopModalOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState([]);
 
 
@@ -382,6 +385,15 @@ export default function Sidebar({
           >
             Settings
           </SidebarButton>
+
+          <SidebarButton
+            icon={BsLaptop}
+            isCollapsed={isCollapsed}
+            isActive={false}
+            onClick={() => setIsDesktopModalOpen(true)}
+          >
+            Add Desktop Icon
+          </SidebarButton>
         </div>
       </div>
 
@@ -394,6 +406,12 @@ export default function Sidebar({
           loadChatSession(chat.id);
           setIsSearchOpen(false);
         }}
+      />
+
+      {/* Desktop Shortcut / PWA Modal */}
+      <DesktopShortcutModal
+        isOpen={isDesktopModalOpen}
+        onClose={() => setIsDesktopModalOpen(false)}
       />
     </div>
   );
