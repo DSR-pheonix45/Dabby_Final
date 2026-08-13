@@ -6,7 +6,7 @@ import autoTable from "jspdf-autotable";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { formatCurrency } from "../../utils/currency";
 
-export default function DebitNoteModal({ isOpen = true, onClose, isPage = false }) {
+export default function DebitNoteModal({ isOpen, onClose }) {
   const { activeWorkbench } = useWorkbench();
   const [dnNumber, setDnNumber] = useState(`DN-${Math.floor(1000 + Math.random() * 9000)}`);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);

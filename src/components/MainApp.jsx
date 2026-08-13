@@ -17,7 +17,6 @@ import WorkbenchSettings from "../pages/workbench/Settings";
 import JoinWorkbench from "../pages/workbench/JoinWorkbench";
 import COA from "../pages/workbench/COA";
 import DocVault from "../pages/workbench/DocVault";
-import GeneratorPage from "../pages/workbench/GeneratorPage";
 import OPS from "../pages/workbench/ops/OPS";
 import BusinessEngine from "../pages/workbench/business-engine/BusinessEngine";
 import LedgerView from "../pages/workbench/LedgerView";
@@ -723,8 +722,6 @@ Based on the Profit & Loss statement provided, the business shows stable operati
               <Route path="parties" element={<Parties />} />
               <Route path="coa" element={<COA />} />
               <Route path="doc-vault" element={<DocVault />} />
-              <Route path="generators" element={<GeneratorPage />} />
-              <Route path="generator/:type" element={<GeneratorPage />} />
               <Route path="ops" element={<OPS />} />
               <Route path="settings" element={<WorkbenchSettings />} />
             </Route>

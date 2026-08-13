@@ -3,7 +3,7 @@ import { BsX, BsTag, BsPlus, BsCheck2, BsClipboard, BsCheckCircleFill, BsShieldC
 import { toast } from "react-hot-toast";
 import { getStoredDiscountTags, saveDiscountTag } from "./generatorStore";
 
-export default function DiscountCouponModal({ isOpen = true, onClose, isPage = false }) {
+export default function DiscountCouponModal({ isOpen, onClose }) {
   const [tags, setTags] = useState([]);
   const [code, setCode] = useState("");
   const [type, setType] = useState("percentage"); // 'percentage' or 'flat'

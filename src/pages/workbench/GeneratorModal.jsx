@@ -1,8 +1,7 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { 
   BsX, BsFileEarmarkText, BsCartCheck, BsArrowReturnLeft, BsTag, 
-  BsChevronRight, BsLightningCharge, BsArrowUpRight, BsReceipt, BsCalculator, BsBoxArrowUpRight
+  BsChevronRight, BsLightningCharge, BsArrowUpRight, BsReceipt, BsCalculator
 } from "react-icons/bs";
 import SalesInvoiceModal from "../../components/Generator/SalesInvoiceModal";
 import PurchaseOrderModal from "../../components/Generator/PurchaseOrderModal";
@@ -14,7 +13,6 @@ import DebitNoteModal from "../../components/Generator/DebitNoteModal";
 import OPEXExpenseModal from "../../components/Generator/OPEXExpenseModal";
 
 export default function GeneratorModal({ isOpen, onClose }) {
-  const navigate = useNavigate();
   const [activeModal, setActiveModal] = useState(null);
 
   if (!isOpen) return null;
@@ -79,8 +77,7 @@ export default function GeneratorModal({ isOpen, onClose }) {
   ];
 
   const handleSelectOption = (optId) => {
-    onClose();
-    navigate(`/dashboard/workbench/generator/${optId}`);
+    setActiveModal(optId);
   };
 
   const handleCloseSubModal = () => {
@@ -100,7 +97,7 @@ export default function GeneratorModal({ isOpen, onClose }) {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white tracking-tight">Stage 0: Workbench Document Generators</h2>
-                <p className="text-xs text-gray-400">Generate trade documents in Full-Page Studio (Logo, Letterhead & Auto-Scheduled Billing)</p>
+                <p className="text-xs text-gray-400">Generate trade documents (PDF saved to Doc Vault & dispatched to Business Engine)</p>
               </div>
             </div>
             <button onClick={onClose} className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors">
@@ -122,7 +119,7 @@ export default function GeneratorModal({ isOpen, onClose }) {
                     <div className="h-10 w-10 rounded-lg bg-[#1e1e1e] border border-white/10 flex items-center justify-center">
                       <Icon className="text-xl" />
                     </div>
-                    <BsBoxArrowUpRight className="text-gray-400 group-hover:text-white transition-all text-xs" />
+                    <BsChevronRight className="text-gray-400 group-hover:text-white transition-all text-xs" />
                   </div>
                   <h3 className="text-sm font-bold text-white mb-1">{opt.name}</h3>
                   <p className="text-[11px] text-gray-300 line-clamp-3 leading-snug">{opt.desc}</p>
@@ -133,13 +130,22 @@ export default function GeneratorModal({ isOpen, onClose }) {
 
           {/* Quick info banner */}
           <div className="px-6 py-4 bg-[#181818] border-t border-white/10 flex items-center justify-between text-xs text-gray-400">
-            <span>Click any generator to open full-page studio with logo/letterhead customization.</span>
+            <span>Skip generators to upload external PDFs directly into <strong>Doc Vault</strong>.</span>
             <button onClick={onClose} className="px-4 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white font-semibold">
               Close
             </button>
           </div>
         </div>
       </div>
+
+      {activeModal === "sales_invoice" && <SalesInvoiceModal isOpen={true} onClose={handleCloseSubModal} />}
+      {activeModal === "quotation" && <QuotationModal isOpen={true} onClose={handleCloseSubModal} />}
+      {activeModal === "proforma" && <ProformaInvoiceModal isOpen={true} onClose={handleCloseSubModal} />}
+      {activeModal === "purchase_order" && <PurchaseOrderModal isOpen={true} onClose={handleCloseSubModal} />}
+      {activeModal === "credit_note" && <CreditNoteModal isOpen={true} onClose={handleCloseSubModal} />}
+      {activeModal === "debit_note" && <DebitNoteModal isOpen={true} onClose={handleCloseSubModal} />}
+      {activeModal === "opex_expense" && <OPEXExpenseModal isOpen={true} onClose={handleCloseSubModal} />}
+      {activeModal === "coupons" && <DiscountCouponModal isOpen={true} onClose={handleCloseSubModal} />}
     </>
   );
 }

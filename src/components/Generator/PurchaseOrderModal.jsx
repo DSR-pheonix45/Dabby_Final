@@ -16,7 +16,7 @@ const PRESET_VENDORS = [
   { name: "MicroChip Components Ltd", gstin: "29AAACM8877K1Z9", address: "Electronics City, Bengaluru, KA - 560100", email: "procurement@microchipcomponents.in" }
 ];
 
-export default function PurchaseOrderModal({ isOpen = true, onClose, isPage = false }) {
+export default function PurchaseOrderModal({ isOpen, onClose }) {
   const { activeWorkbench } = useWorkbench();
   const { user } = useAuth();
   const company = getWorkbenchCompanyDetails(activeWorkbench, user);

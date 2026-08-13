@@ -5,7 +5,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { getStoredInvoices, saveCreditNote } from "./generatorStore";
 
-export default function CreditNoteModal({ isOpen = true, onClose, isPage = false }) {
+export default function CreditNoteModal({ isOpen, onClose }) {
   const [cnNumber, setCnNumber] = useState(`CN-${Math.floor(1000 + Math.random() * 9000)}`);
   const [cnDate, setCnDate] = useState(new Date().toISOString().split("T")[0]);
 
