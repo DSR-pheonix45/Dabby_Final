@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useWorkbench } from "../../context/WorkbenchContext";
-import { BsPerson, BsBuilding, BsGear, BsFileEarmarkText, BsDiagram3, BsGraphUp, BsCpu, BsJournalText, BsLightningCharge, BsFileEarmarkBarGraph } from "react-icons/bs";
+import { BsPerson, BsBuilding, BsGear, BsFileEarmarkText, BsDiagram3, BsGraphUp, BsJournalText, BsLightningCharge, BsFileEarmarkBarGraph, BsCartCheck, BsBagCheck } from "react-icons/bs";
 import GeneratorModal from "./GeneratorModal";
 import ReportsModal from "./ReportsModal";
 
@@ -25,7 +25,8 @@ export default function WorkbenchLayout() {
     { label: "Members", path: "/dashboard/workbench/members", icon: BsPerson },
     { label: "Parties", path: "/dashboard/workbench/parties", icon: BsBuilding },
     { label: "Doc Vault", path: "/dashboard/workbench/doc-vault", icon: BsFileEarmarkText },
-    { label: "Business Engine", path: "/dashboard/workbench/business-engine", icon: BsCpu },
+    { label: "Sales", path: "/dashboard/workbench/sales", icon: BsCartCheck },
+    { label: "Purchases & Expenses", path: "/dashboard/workbench/purchases", icon: BsBagCheck },
     { label: "OPS", path: "/dashboard/workbench/ops", icon: BsGraphUp },
     { label: "Financials", path: "/dashboard/workbench/ledger", icon: BsJournalText },
     { label: "COA", path: "/dashboard/workbench/coa", icon: BsDiagram3 },

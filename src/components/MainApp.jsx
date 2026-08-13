@@ -18,7 +18,8 @@ import JoinWorkbench from "../pages/workbench/JoinWorkbench";
 import COA from "../pages/workbench/COA";
 import DocVault from "../pages/workbench/DocVault";
 import OPS from "../pages/workbench/ops/OPS";
-import BusinessEngine from "../pages/workbench/business-engine/BusinessEngine";
+import SalesFlow from "../pages/workbench/flows/SalesFlow";
+import PurchasesFlow from "../pages/workbench/flows/PurchasesFlow";
 import LedgerView from "../pages/workbench/LedgerView";
 import OnboardingTour from "./Onboarding/OnboardingTour";
 import FeedbackModal from "./ChatArea/FeedbackModal";
@@ -716,7 +717,9 @@ Based on the Profit & Loss statement provided, the business shows stable operati
             <Route path="join" element={<JoinWorkbench />} />
             <Route path="workbenches" element={<Workbenches />} />
             <Route path="workbench" element={<WorkbenchLayout />}>
-              <Route path="business-engine" element={<BusinessEngine />} />
+              <Route path="sales" element={<SalesFlow />} />
+              <Route path="purchases" element={<PurchasesFlow />} />
+              <Route path="business-engine" element={<Navigate to="/dashboard/workbench/sales" replace />} />
               <Route path="ledger" element={<LedgerView />} />
               <Route path="members" element={<Members />} />
               <Route path="parties" element={<Parties />} />
