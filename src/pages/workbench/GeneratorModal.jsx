@@ -1,19 +1,12 @@
-import React, { useState } from "react";
+import React from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   BsX, BsFileEarmarkText, BsCartCheck, BsArrowReturnLeft, BsTag, 
   BsChevronRight, BsLightningCharge, BsArrowUpRight, BsReceipt, BsCalculator
 } from "react-icons/bs";
-import SalesInvoiceModal from "../../components/Generator/SalesInvoiceModal";
-import PurchaseOrderModal from "../../components/Generator/PurchaseOrderModal";
-import CreditNoteModal from "../../components/Generator/CreditNoteModal";
-import DiscountCouponModal from "../../components/Generator/DiscountCouponModal";
-import QuotationModal from "../../components/Generator/QuotationModal";
-import ProformaInvoiceModal from "../../components/Generator/ProformaInvoiceModal";
-import DebitNoteModal from "../../components/Generator/DebitNoteModal";
-import OPEXExpenseModal from "../../components/Generator/OPEXExpenseModal";
 
 export default function GeneratorModal({ isOpen, onClose }) {
-  const [activeModal, setActiveModal] = useState(null);
+  const navigate = useNavigate();
 
   if (!isOpen) return null;
 
@@ -77,75 +70,61 @@ export default function GeneratorModal({ isOpen, onClose }) {
   ];
 
   const handleSelectOption = (optId) => {
-    setActiveModal(optId);
-  };
-
-  const handleCloseSubModal = () => {
-    setActiveModal(null);
+    onClose();
+    navigate(`/dashboard/workbench/generator/${optId}`);
   };
 
   return (
-    <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-dm-sans">
-        <div className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl">
-          
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-white/10 bg-[#181818]">
-            <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
-                <BsLightningCharge size={20} />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-white tracking-tight">Stage 0: Workbench Document Generators</h2>
-                <p className="text-xs text-gray-400">Generate trade documents (PDF saved to Doc Vault & dispatched to Business Engine)</p>
-              </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-dm-sans">
+      <div className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-white/10 bg-[#181818]">
+          <div className="flex items-center space-x-3">
+            <div className="h-10 w-10 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+              <BsLightningCharge size={20} />
             </div>
-            <button onClick={onClose} className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors">
-              <BsX size={26} />
-            </button>
+            <div>
+              <h2 className="text-xl font-bold text-white tracking-tight">Stage 0: Workbench Document Generators</h2>
+              <p className="text-xs text-gray-400">Generate trade documents (PDF saved to Doc Vault & dispatched to Business Engine)</p>
+            </div>
           </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors">
+            <BsX size={26} />
+          </button>
+        </div>
 
-          {/* Generator Cards */}
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
-            {options.map((opt) => {
-              const Icon = opt.icon;
-              return (
-                <button
-                  key={opt.id}
-                  onClick={() => handleSelectOption(opt.id)}
-                  className={`flex flex-col text-left p-4 rounded-xl border bg-gradient-to-br ${opt.color} hover:scale-[1.02] transition-all duration-200 group relative overflow-hidden`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="h-10 w-10 rounded-lg bg-[#1e1e1e] border border-white/10 flex items-center justify-center">
-                      <Icon className="text-xl" />
-                    </div>
-                    <BsChevronRight className="text-gray-400 group-hover:text-white transition-all text-xs" />
+        {/* Generator Cards */}
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
+          {options.map((opt) => {
+            const Icon = opt.icon;
+            return (
+              <button
+                key={opt.id}
+                onClick={() => handleSelectOption(opt.id)}
+                className={`flex flex-col text-left p-4 rounded-xl border bg-gradient-to-br ${opt.color} hover:scale-[1.02] transition-all duration-200 group relative overflow-hidden`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="h-10 w-10 rounded-lg bg-[#1e1e1e] border border-white/10 flex items-center justify-center">
+                    <Icon className="text-xl" />
                   </div>
-                  <h3 className="text-sm font-bold text-white mb-1">{opt.name}</h3>
-                  <p className="text-[11px] text-gray-300 line-clamp-3 leading-snug">{opt.desc}</p>
-                </button>
-              );
-            })}
-          </div>
+                  <BsChevronRight className="text-gray-400 group-hover:text-white transition-all text-xs" />
+                </div>
+                <h3 className="text-sm font-bold text-white mb-1">{opt.name}</h3>
+                <p className="text-[11px] text-gray-300 line-clamp-3 leading-snug">{opt.desc}</p>
+              </button>
+            );
+          })}
+        </div>
 
-          {/* Quick info banner */}
-          <div className="px-6 py-4 bg-[#181818] border-t border-white/10 flex items-center justify-between text-xs text-gray-400">
-            <span>Skip generators to upload external PDFs directly into <strong>Doc Vault</strong>.</span>
-            <button onClick={onClose} className="px-4 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white font-semibold">
-              Close
-            </button>
-          </div>
+        {/* Quick info banner */}
+        <div className="px-6 py-4 bg-[#181818] border-t border-white/10 flex items-center justify-between text-xs text-gray-400">
+          <span>Skip generators to upload external PDFs directly into <strong>Doc Vault</strong>.</span>
+          <button onClick={onClose} className="px-4 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white font-semibold">
+            Close
+          </button>
         </div>
       </div>
-
-      {activeModal === "sales_invoice" && <SalesInvoiceModal isOpen={true} onClose={handleCloseSubModal} />}
-      {activeModal === "quotation" && <QuotationModal isOpen={true} onClose={handleCloseSubModal} />}
-      {activeModal === "proforma" && <ProformaInvoiceModal isOpen={true} onClose={handleCloseSubModal} />}
-      {activeModal === "purchase_order" && <PurchaseOrderModal isOpen={true} onClose={handleCloseSubModal} />}
-      {activeModal === "credit_note" && <CreditNoteModal isOpen={true} onClose={handleCloseSubModal} />}
-      {activeModal === "debit_note" && <DebitNoteModal isOpen={true} onClose={handleCloseSubModal} />}
-      {activeModal === "opex_expense" && <OPEXExpenseModal isOpen={true} onClose={handleCloseSubModal} />}
-      {activeModal === "coupons" && <DiscountCouponModal isOpen={true} onClose={handleCloseSubModal} />}
-    </>
+    </div>
   );
 }
