@@ -58,7 +58,10 @@ export function usePWAInstall() {
   };
 
   const downloadDesktopShortcut = () => {
-    const appUrl = window.location.origin;
+    // Default to the production URL https://www.datalis.in/
+    const appUrl = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? 'https://www.datalis.in/'
+      : (window.location.origin || 'https://www.datalis.in/');
     // Create Windows Internet Shortcut (.url format)
     const fileContent = `[InternetShortcut]\r\nURL=${appUrl}\r\nIconIndex=0\r\n[{000214A0-0000-0000-C000-00000000046B}]\r\nProp3=19,2\r\n`;
     const blob = new Blob([fileContent], { type: 'application/x-ms-shortcut' });

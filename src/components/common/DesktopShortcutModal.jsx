@@ -47,8 +47,8 @@ export default function DesktopShortcutModal({ isOpen, onClose }) {
 
         {/* Modal Header */}
         <div className="flex items-center gap-3 mb-5">
-          <div className="p-3 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-400">
-            <Monitor className="w-6 h-6" />
+          <div className="p-2 rounded-xl bg-teal-500/10 border border-teal-500/20">
+            <img src="/dabby-logo.svg" alt="Dabby Logo" className="w-8 h-8" />
           </div>
           <div>
             <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
@@ -58,7 +58,7 @@ export default function DesktopShortcutModal({ isOpen, onClose }) {
               </span>
             </h2>
             <p className="text-xs text-neutral-400 mt-0.5">
-              Launch Dabby instantly from your computer desktop anytime
+              Launch Dabby (https://www.datalis.in) directly from your desktop
             </p>
           </div>
         </div>
