@@ -35,7 +35,6 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
   // Client Billing Details
   const [partyName, setPartyName] = useState("");
   const [clientGstin, setClientGstin] = useState("");
-  const [clientPan, setClientPan] = useState("");
   const [clientAddress, setClientAddress] = useState("");
   const [placeOfSupply, setPlaceOfSupply] = useState("");
 
@@ -365,7 +364,6 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
                     onSelectParty={(p) => {
                       setPartyName(p.name);
                       if (p.gstin) setClientGstin(p.gstin);
-                      if (p.pan) setClientPan(p.pan);
                       if (p.address) setClientAddress(p.address);
                     }}
                   />
@@ -382,25 +380,15 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-gray-400 mb-0.5">PAN Number</label>
+                    <label className="block text-[10px] text-gray-400 mb-0.5">Place of Supply (State)</label>
                     <input
                       type="text"
-                      value={clientPan}
-                      onChange={(e) => setClientPan(e.target.value)}
-                      placeholder="e.g. AABCU9603R"
-                      className="w-full bg-[#1e1e1e] border border-white/10 rounded px-2.5 py-1.5 text-white uppercase focus:outline-none focus:border-teal-500"
+                      value={placeOfSupply}
+                      onChange={(e) => setPlaceOfSupply(e.target.value)}
+                      placeholder="e.g. 27 - Maharashtra"
+                      className="w-full bg-[#1e1e1e] border border-white/10 rounded px-2.5 py-1.5 text-white focus:outline-none focus:border-teal-500"
                     />
                   </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] text-gray-400 mb-0.5">Place of Supply (State)</label>
-                  <input
-                    type="text"
-                    value={placeOfSupply}
-                    onChange={(e) => setPlaceOfSupply(e.target.value)}
-                    placeholder="e.g. 27 - Maharashtra"
-                    className="w-full bg-[#1e1e1e] border border-white/10 rounded px-2.5 py-1.5 text-white focus:outline-none focus:border-teal-500"
-                  />
                 </div>
                 <div>
                   <label className="block text-[10px] text-gray-400 mb-0.5">Billing & Registered Address</label>
