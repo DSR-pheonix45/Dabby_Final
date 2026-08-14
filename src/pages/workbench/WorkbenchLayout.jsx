@@ -37,7 +37,7 @@ export default function WorkbenchLayout() {
     <div className="h-full flex flex-col bg-[#111111] font-dm-sans">
       {/* Workbench Navigation Header */}
       <div className="border-b border-white/10 bg-[#181818] px-6 lg:px-10 pt-6">
-        <div className="max-w-7xl mx-auto flex flex-col space-y-6">
+        <div className="w-full flex flex-col space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="h-12 w-12 bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded-xl flex items-center justify-center text-2xl font-bold overflow-hidden shrink-0">

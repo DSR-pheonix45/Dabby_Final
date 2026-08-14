@@ -74,7 +74,7 @@ export default function OPS() {
 
       {/* Main Tab Content Area */}
       <div className="flex-1 overflow-auto px-6 lg:px-10 py-8">
-        <div className="max-w-7xl mx-auto">
+        <div className="w-full">
           {activeTab === 'ar' && <AccountsReceivable key={refreshKey} workbenchId={workbenchId} />}
           {activeTab === 'ap' && <AccountsPayable key={refreshKey} workbenchId={workbenchId} />}
           {activeTab === 'budgeting' && <Budgeting key={refreshKey} workbenchId={workbenchId} />}
