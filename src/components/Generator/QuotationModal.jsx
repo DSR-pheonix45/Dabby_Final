@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { BsX, BsSend, BsFileEarmarkPdf, BsTag, BsGear, BsTrash, BsPlusLg, BsBuilding } from "react-icons/bs";
+import { BsX, BsSend, BsFileEarmarkPdf, BsTag, BsGear, BsTrash, BsPlusLg, BsBuilding, BsInfoCircle } from "react-icons/bs";
 import { toast } from "react-hot-toast";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { formatCurrency } from "../../utils/currency";
@@ -9,6 +9,7 @@ import { saveDocumentToDocVaultAndEngine } from "../../utils/docVaultExporter";
 import DynamicColumnConfigurator, { DEFAULT_COLUMNS } from "./DynamicColumnConfigurator";
 import PartySelector from "./PartySelector";
 import DocumentBrandingToolbar from "./DocumentBrandingToolbar";
+import HsnLookupModal from "./HsnLookupModal";
 
 export default function QuotationModal({ isOpen, onClose, isPage = false }) {
   const { activeWorkbench } = useWorkbench();
@@ -20,6 +21,24 @@ export default function QuotationModal({ isOpen, onClose, isPage = false }) {
   const [expiryDate, setExpiryDate] = useState(
     new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
   );
+  
+  // HSN Lookup Modal State
+  const [isHsnModalOpen, setIsHsnModalOpen] = useState(false);
+  const [targetHsnIdx, setTargetHsnIdx] = useState(null);
+
+  const openHsnFinder = (idx) => {
+    setTargetHsnIdx(idx);
+    setIsHsnModalOpen(true);
+  };
+
+  const handleApplyHsn = (hsnItem) => {
+    if (targetHsnIdx === null) return;
+    const updated = [...items];
+    if (updated[targetHsnIdx]) {
+      updated[targetHsnIdx].hsn = hsnItem.code;
+      setItems(updated);
+    }
+  };
   
   // Branding & Template State
   const [templateStyle, setTemplateStyle] = useState("modern");
@@ -345,6 +364,27 @@ export default function QuotationModal({ isOpen, onClose, isPage = false }) {
                         </div>
                       );
                     }
+                    if (col.id === "hsn") {
+                      return (
+                        <div key={col.id} className="relative flex-1 min-w-[90px] flex items-center">
+                          <input
+                            type="text"
+                            value={it.hsn !== undefined ? it.hsn : ""}
+                            onChange={(e) => updateItem(idx, "hsn", e.target.value)}
+                            placeholder="HSN/SAC"
+                            className="w-full bg-[#1e1e1e] border border-white/10 rounded pl-2 pr-5 py-1.5 text-xs text-white text-left font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => openHsnFinder(idx)}
+                            className="absolute right-1 text-teal-400 hover:text-teal-300 p-0.5"
+                            title="Search GST HSN/SAC Directory"
+                          >
+                            <BsInfoCircle size={12} />
+                          </button>
+                        </div>
+                      );
+                    }
                     return (
                       <input
                         key={col.id}
@@ -411,6 +451,11 @@ export default function QuotationModal({ isOpen, onClose, isPage = false }) {
     return (
       <div className="flex-1 w-full bg-[#111111] overflow-y-auto p-4 sm:p-6 lg:p-8 font-dm-sans">
         {content}
+        <HsnLookupModal
+          isOpen={isHsnModalOpen}
+          onClose={() => setIsHsnModalOpen(false)}
+          onSelectHsn={handleApplyHsn}
+        />
       </div>
     );
   }
@@ -418,6 +463,11 @@ export default function QuotationModal({ isOpen, onClose, isPage = false }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-dm-sans overflow-y-auto">
       {content}
+      <HsnLookupModal
+        isOpen={isHsnModalOpen}
+        onClose={() => setIsHsnModalOpen(false)}
+        onSelectHsn={handleApplyHsn}
+      />
     </div>
   );
 }

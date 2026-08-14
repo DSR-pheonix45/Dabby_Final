@@ -15,6 +15,7 @@ import { saveDocumentToDocVaultAndEngine } from "../../utils/docVaultExporter";
 import PartySelector from "./PartySelector";
 import DynamicColumnConfigurator, { DEFAULT_COLUMNS } from "./DynamicColumnConfigurator";
 import DocumentBrandingToolbar from "./DocumentBrandingToolbar";
+import HsnLookupModal from "./HsnLookupModal";
 
 export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
   const { activeWorkbench } = useWorkbench();
@@ -24,6 +25,29 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
   const [docNumber, setDocNumber] = useState(`INV-${Math.floor(1000 + Math.random() * 9000)}`);
   const [docDate, setDocDate] = useState(new Date().toISOString().split("T")[0]);
   const [dueDate, setDueDate] = useState("");
+
+  // HSN Lookup Modal State
+  const [isHsnModalOpen, setIsHsnModalOpen] = useState(false);
+  const [targetHsnItemId, setTargetHsnItemId] = useState(null);
+
+  const openHsnFinder = (itemId) => {
+    setTargetHsnItemId(itemId);
+    setIsHsnModalOpen(true);
+  };
+
+  const handleApplyHsn = (hsnItem) => {
+    if (!targetHsnItemId) return;
+    setLineItems(prev => prev.map(item => {
+      if (item.id === targetHsnItemId) {
+        return {
+          ...item,
+          hsnSac: hsnItem.code,
+          taxRate: isGstRegistered ? hsnItem.rate : 0
+        };
+      }
+      return item;
+    }));
+  };
 
   // Branding & Template State
   const [templateStyle, setTemplateStyle] = useState("modern");
@@ -497,14 +521,34 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
                     />
                   </div>
                   <div className="col-span-4 md:col-span-1">
-                    <label className="block text-[10px] text-gray-400 mb-0.5">HSN/SAC</label>
-                    <input
-                      type="text"
-                      value={item.hsnSac}
-                      onChange={(e) => updateLineItem(item.id, "hsnSac", e.target.value)}
-                      placeholder="e.g. 8471"
-                      className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-teal-500"
-                    />
+                    <div className="flex items-center justify-between mb-0.5">
+                      <label className="block text-[10px] text-gray-400">HSN/SAC</label>
+                      <button
+                        type="button"
+                        onClick={() => openHsnFinder(item.id)}
+                        className="text-teal-400 hover:text-teal-300 transition-colors p-0.5"
+                        title="Search GST HSN/SAC Code Directory"
+                      >
+                        <BsInfoCircle size={11} />
+                      </button>
+                    </div>
+                    <div className="relative flex items-center">
+                      <input
+                        type="text"
+                        value={item.hsnSac}
+                        onChange={(e) => updateLineItem(item.id, "hsnSac", e.target.value)}
+                        placeholder="e.g. 8471"
+                        className="w-full bg-[#222] border border-white/10 rounded pl-2 pr-5 py-1 text-white focus:outline-none focus:border-teal-500 font-mono text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => openHsnFinder(item.id)}
+                        className="absolute right-1.5 text-teal-400 hover:text-teal-300 p-0.5"
+                        title="Search HSN/SAC Directory"
+                      >
+                        <BsInfoCircle size={12} />
+                      </button>
+                    </div>
                   </div>
                   <div className="col-span-4 md:col-span-1">
                     <label className="block text-[10px] text-gray-400 mb-0.5">Qty</label>
@@ -880,6 +924,11 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
     return (
       <div className="flex-1 w-full bg-[#111111] overflow-y-auto p-4 sm:p-6 lg:p-8 font-dm-sans">
         {content}
+        <HsnLookupModal
+          isOpen={isHsnModalOpen}
+          onClose={() => setIsHsnModalOpen(false)}
+          onSelectHsn={handleApplyHsn}
+        />
       </div>
     );
   }
@@ -887,6 +936,11 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-dm-sans overflow-y-auto">
       {content}
+      <HsnLookupModal
+        isOpen={isHsnModalOpen}
+        onClose={() => setIsHsnModalOpen(false)}
+        onSelectHsn={handleApplyHsn}
+      />
     </div>
   );
 }
