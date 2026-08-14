@@ -12,8 +12,16 @@ export default function PreviewTab({ doc, onDelete, onScan }) {
   const { activeWorkbench } = useWorkbench();
   const [url, setUrl] = useState(null);
 
-  const handleSendToFlow = () => {
+  const handleSendToBusinessEngine = () => {
     if (!doc) return;
+
+    if (activeWorkbench) {
+      localStorage.setItem(`dabby_pending_trade_doc_${activeWorkbench.id}`, JSON.stringify(doc));
+    } else {
+      localStorage.setItem("dabby_pending_trade_doc", JSON.stringify(doc));
+    }
+
+    window.dispatchEvent(new CustomEvent("trade:create_from_doc", { detail: doc }));
 
     const classified = classifyDocumentParties(doc, activeWorkbench);
     const isSales = classified.classification === 'sales_invoice';
@@ -22,6 +30,8 @@ export default function PreviewTab({ doc, onDelete, onScan }) {
     toast.success(`Opening ${isSales ? 'Sales' : 'Purchases & Expenses'} Flow...`);
     navigate(targetPath);
   };
+
+  const handleSendToFlow = handleSendToBusinessEngine;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
