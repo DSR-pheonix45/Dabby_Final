@@ -34,19 +34,8 @@ export default function PurchasesFlow() {
 
       // Filter & categorize documents belonging to Purchases/Expenses Flow
       const purchaseDocs = allDocs.filter(doc => {
-        const note = doc.di_analysis_notes?.[0] || {};
-        const docType = (note.document_type || doc.document_type || '').toLowerCase();
         const classified = classifyDocumentParties(doc, activeWorkbench);
-
-        // Purchase/Expense types or classified as vendor_invoice
-        return (
-          docType.includes('vendor') || 
-          docType.includes('purchase') || 
-          docType.includes('expense') || 
-          docType.includes('bill') || 
-          docType.includes('debit') ||
-          classified.classification === 'vendor_invoice'
-        );
+        return classified.classification === 'vendor_invoice';
       });
 
       purchaseDocs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));

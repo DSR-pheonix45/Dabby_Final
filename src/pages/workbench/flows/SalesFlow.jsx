@@ -34,18 +34,8 @@ export default function SalesFlow() {
       
       // Filter & categorize documents belonging to Sales Flow
       const salesDocs = allDocs.filter(doc => {
-        const note = doc.di_analysis_notes?.[0] || {};
-        const docType = (note.document_type || doc.document_type || '').toLowerCase();
         const classified = classifyDocumentParties(doc, activeWorkbench);
-        
-        // Sales types or classified as sales_invoice
-        return (
-          docType.includes('sales') || 
-          docType.includes('customer') || 
-          docType.includes('quotation') || 
-          docType.includes('receipt') || 
-          classified.classification === 'sales_invoice'
-        );
+        return classified.classification === 'sales_invoice';
       });
 
       salesDocs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
