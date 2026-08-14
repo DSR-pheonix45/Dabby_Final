@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional, Dict
 from pydantic import BaseModel
 from supabase_client import supabase
@@ -488,9 +488,12 @@ def get_activity_logs(workbench_id: str, user = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/user/notifications")
-def get_notifications(user = Depends(get_current_user)):
+def get_notifications(workbench_id: Optional[str] = Query(None), user = Depends(get_current_user)):
     try:
-        res = supabase.table("notifications").select("*").eq("user_id", user["id"]).order("created_at", desc=True).limit(20).execute()
+        query = supabase.table("notifications").select("*").eq("user_id", user["id"])
+        if workbench_id:
+            query = query.eq("workbench_id", workbench_id)
+        res = query.order("created_at", desc=True).limit(20).execute()
         return res.data or []
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

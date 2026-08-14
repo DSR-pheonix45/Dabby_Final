@@ -70,6 +70,21 @@ async def upload_document(
             "status": "success"
         }).execute()
 
+        # Emit workbench-encapsulated notification to workbench members
+        try:
+            members_res = supabase.table("workbench_members").select("user_id").eq("workbench_id", workbench_id).execute()
+            if members_res.data:
+                notif_rows = [{
+                    "workbench_id": workbench_id,
+                    "user_id": m["user_id"],
+                    "title": "New Document Uploaded",
+                    "message": f"New file '{file.filename}' was uploaded to Document Vault.",
+                    "link": "/dashboard/workbench/doc-vault"
+                } for m in members_res.data]
+                supabase.table("notifications").insert(notif_rows).execute()
+        except Exception as notif_err:
+            print("[WARNING] Could not emit document upload notification:", notif_err)
+
         # Automatically trigger background AI extraction
         import asyncio
         asyncio.create_task(process_document(document_id))
