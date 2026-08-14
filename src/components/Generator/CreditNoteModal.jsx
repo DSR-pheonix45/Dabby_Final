@@ -5,15 +5,20 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { getStoredInvoices, saveCreditNote } from "./generatorStore";
 import PartySelector from "./PartySelector";
+import { useWorkbench } from "../../context/WorkbenchContext";
+import { getWorkbenchCompanyDetails } from "../../utils/workbenchCompanyHelper";
 
 export default function CreditNoteModal({ isOpen, onClose, isPage = false }) {
+  const { activeWorkbench } = useWorkbench();
+  const company = getWorkbenchCompanyDetails(activeWorkbench);
+
   const [cnNumber, setCnNumber] = useState(`CN-${Math.floor(1000 + Math.random() * 9000)}`);
   const [cnDate, setCnDate] = useState(new Date().toISOString().split("T")[0]);
 
   const [invoices, setInvoices] = useState([]);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("custom");
   const [manualInvoiceRef, setManualInvoiceRef] = useState("");
-  const [manualPartyName, setManualPartyName] = useState("");
+  const [selectedParty, setSelectedParty] = useState({ name: "", gstin: "", address: "" });
   const [manualInvoiceAmount, setManualInvoiceAmount] = useState(0);
 
   const [reason, setReason] = useState("Settlement Discount / Volume Adjustment");
@@ -22,10 +27,23 @@ export default function CreditNoteModal({ isOpen, onClose, isPage = false }) {
   const [remarks, setRemarks] = useState("Settlement add-on value discount applied per mutual agreement.");
 
   useEffect(() => {
-    const list = getStoredInvoices();
-    setInvoices(list);
-    if (list.length > 0) {
-      setSelectedInvoiceId(list[0].id);
+    // Purge legacy demo invoices from localStorage
+    const rawList = getStoredInvoices();
+    const cleanList = rawList.filter(i => 
+      i.partyName !== "Apex Logistics Ltd" && 
+      i.partyName !== "Zenith Tech Solutions" && 
+      !i.id?.includes("2026-001") && 
+      !i.id?.includes("2026-002") &&
+      !i.id?.includes("2983")
+    );
+    if (cleanList.length !== rawList.length) {
+      try {
+        localStorage.setItem('dabby_generator_invoices', JSON.stringify(cleanList));
+      } catch (e) {}
+    }
+    setInvoices(cleanList);
+    if (cleanList.length > 0) {
+      setSelectedInvoiceId(cleanList[0].id);
     } else {
       setSelectedInvoiceId("custom");
     }
@@ -35,8 +53,8 @@ export default function CreditNoteModal({ isOpen, onClose, isPage = false }) {
   const isCustomRef = selectedInvoiceId === "custom" || !activeInvoice;
 
   const targetInvoiceNo = isCustomRef ? (manualInvoiceRef || "INV-REF") : (activeInvoice.invoiceNumber || activeInvoice.id);
-  const targetPartyName = isCustomRef ? (manualPartyName || "Customer") : (activeInvoice.partyName || "Customer");
-  const targetPartyGstin = isCustomRef ? "" : (activeInvoice.partyGstin || "");
+  const targetPartyName = isCustomRef ? (selectedParty.name || "Customer") : (activeInvoice.partyName || selectedParty.name || "Customer");
+  const targetPartyGstin = isCustomRef ? (selectedParty.gstin || "") : (activeInvoice.partyGstin || selectedParty.gstin || "");
   const originalInvoiceAmount = isCustomRef ? (Number(manualInvoiceAmount) || 0) : (Number(activeInvoice.amount) || 0);
 
   // Settlement Discount calculation
@@ -57,7 +75,7 @@ export default function CreditNoteModal({ isOpen, onClose, isPage = false }) {
       const doc = new jsPDF();
       doc.setFontSize(20);
       doc.setTextColor(239, 68, 68);
-      doc.text("DABBY ENTERPRISE PVT LTD", 14, 20);
+      doc.text(company.legalName || company.name || activeWorkbench?.name || "WORKBENCH COMPANY", 14, 20);
 
       doc.setFontSize(14);
       doc.setTextColor(40, 40, 40);
@@ -218,12 +236,12 @@ export default function CreditNoteModal({ isOpen, onClose, isPage = false }) {
             {selectedInvoiceId === "custom" && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                 <div>
-                  <label className="block text-gray-400 mb-1">Party / Customer Name</label>
+                  <label className="block text-gray-400 mb-1">Select Customer / Workbench Party</label>
                   <PartySelector
-                    value={manualPartyName}
+                    value={selectedParty.name}
                     placeholder="Select or Search Client..."
                     filterType="customer"
-                    onSelectParty={(p) => setManualPartyName(p.name)}
+                    onSelectParty={(p) => setSelectedParty({ name: p.name || "", gstin: p.gstin || "", address: p.address || "" })}
                   />
                 </div>
                 <div>
