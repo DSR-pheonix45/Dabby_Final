@@ -153,7 +153,12 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
   const igstTotal = totalTax;
   const grandTotal = taxableAmount + totalTax;
 
-  const currentStageObj = STAGES.find(s => s.key === stage);
+  const currentStageObj = {
+    key: "SALES_INVOICE",
+    title: "Tax Invoice (Sales)",
+    badge: "Tax Sales Invoice",
+    badgeColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+  };
 
   // PDF Exporter with auto-fitted Workbench company settings
   const handleExportPDF = () => {
