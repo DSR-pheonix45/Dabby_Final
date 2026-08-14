@@ -14,6 +14,7 @@ import { getWorkbenchCompanyDetails } from "../../utils/workbenchCompanyHelper";
 import { saveDocumentToDocVaultAndEngine } from "../../utils/docVaultExporter";
 import PartySelector from "./PartySelector";
 import DynamicColumnConfigurator, { DEFAULT_COLUMNS } from "./DynamicColumnConfigurator";
+import DocumentBrandingToolbar from "./DocumentBrandingToolbar";
 
 export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
   const { activeWorkbench } = useWorkbench();
@@ -23,6 +24,13 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
   const [docNumber, setDocNumber] = useState(`INV-${Math.floor(1000 + Math.random() * 9000)}`);
   const [docDate, setDocDate] = useState(new Date().toISOString().split("T")[0]);
   const [dueDate, setDueDate] = useState("");
+
+  // Branding & Template State
+  const [templateStyle, setTemplateStyle] = useState("modern");
+  const [logo, setLogo] = useState(company.logo || null);
+  const [letterhead, setLetterhead] = useState(null);
+  const [stamp, setStamp] = useState(null);
+  const [signature, setSignature] = useState(null);
 
   // Client Billing Details
   const [partyName, setPartyName] = useState("");
@@ -163,6 +171,11 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
       senderPan: company.pan,
       senderCin: company.cin,
       senderEmail: company.email,
+      logo: logo,
+      letterhead: letterhead,
+      stamp: stamp,
+      signature: signature,
+      templateStyle: templateStyle,
       clientName: partyName || "Client",
       clientAddress: clientAddress || "",
       placeOfSupply: placeOfSupply || "",
@@ -306,6 +319,20 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
               />
             </div>
           </div>
+
+          {/* Document Branding, Letterhead & PDF Template Selector */}
+          <DocumentBrandingToolbar
+            templateStyle={templateStyle}
+            setTemplateStyle={setTemplateStyle}
+            logo={logo}
+            setLogo={setLogo}
+            letterhead={letterhead}
+            setLetterhead={setLetterhead}
+            stamp={stamp}
+            setStamp={setStamp}
+            signature={signature}
+            setSignature={setSignature}
+          />
 
           {/* Step 2: Client Billing & Shipping Details */}
           <div className="p-5 rounded-xl bg-white/5 border border-white/5 space-y-4">

@@ -8,6 +8,7 @@ import { getWorkbenchCompanyDetails } from "../../utils/workbenchCompanyHelper";
 import { saveDocumentToDocVaultAndEngine } from "../../utils/docVaultExporter";
 import DynamicColumnConfigurator, { DEFAULT_COLUMNS } from "./DynamicColumnConfigurator";
 import PartySelector from "./PartySelector";
+import DocumentBrandingToolbar from "./DocumentBrandingToolbar";
 
 export default function ProformaInvoiceModal({ isOpen, onClose, isPage = false }) {
   const { activeWorkbench } = useWorkbench();
@@ -16,6 +17,13 @@ export default function ProformaInvoiceModal({ isOpen, onClose, isPage = false }
 
   const [proformaNumber, setProformaNumber] = useState(`PI-${Math.floor(1000 + Math.random() * 9000)}`);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  
+  // Branding & Template State
+  const [templateStyle, setTemplateStyle] = useState("modern");
+  const [logo, setLogo] = useState(company.logo || null);
+  const [letterhead, setLetterhead] = useState(null);
+  const [stamp, setStamp] = useState(null);
+  const [signature, setSignature] = useState(null);
   
   // Billing Details
   const [partyName, setPartyName] = useState("");
@@ -79,6 +87,11 @@ export default function ProformaInvoiceModal({ isOpen, onClose, isPage = false }
       senderPan: company.pan,
       senderCin: company.cin,
       senderEmail: company.email,
+      logo: logo,
+      letterhead: letterhead,
+      stamp: stamp,
+      signature: signature,
+      templateStyle: templateStyle,
       clientName: partyName,
       clientAddress: clientAddress,
       placeOfSupply: placeOfSupply,
@@ -162,6 +175,20 @@ export default function ProformaInvoiceModal({ isOpen, onClose, isPage = false }
             <label className="text-xs text-gray-400 block mb-1">Project / Contract Scope Name</label>
             <input value={projectEstimateName} onChange={e => setProjectEstimateName(e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-sm text-white" />
           </div>
+
+          {/* Document Branding, Letterhead & PDF Template Selector */}
+          <DocumentBrandingToolbar
+            templateStyle={templateStyle}
+            setTemplateStyle={setTemplateStyle}
+            logo={logo}
+            setLogo={setLogo}
+            letterhead={letterhead}
+            setLetterhead={setLetterhead}
+            stamp={stamp}
+            setStamp={setStamp}
+            signature={signature}
+            setSignature={setSignature}
+          />
 
           {/* Billing & Shipping Section */}
           <div className="p-4 bg-[#181818] border border-white/10 rounded-xl space-y-3">
