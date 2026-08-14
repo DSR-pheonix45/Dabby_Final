@@ -16,7 +16,12 @@ export const classifyDocumentParties = (documentObj, activeWorkbench, savedParti
   // Extract analysis notes or legacy parties
   const notes = documentObj.di_analysis_notes?.[0] || documentObj.analysis_notes || {};
   const extractedParties = notes.parties || notes.extracted_data?.parties || documentObj.parties || {};
-  const docTypeHint = (notes.document_type || notes.extracted_data?.document_type || documentObj.document_type || "").toLowerCase();
+  
+  const rawTypeHint = notes.document_type || notes.extracted_data?.document_type || documentObj.document_type || "";
+  const docTypeHint = (typeof rawTypeHint === 'object' ? (rawTypeHint.value || "") : String(rawTypeHint)).toLowerCase();
+  
+  const predictedLabel = (notes.extracted_data?.predicted_label || notes.predicted_label || "").toLowerCase();
+  const classificationType = (notes.classification_type || "").toLowerCase();
 
   // Seller / Issuer details
   const sellerObj = extractedParties.issuer || extractedParties.seller || extractedParties.vendor || {};
@@ -57,13 +62,32 @@ export const classifyDocumentParties = (documentObj, activeWorkbench, savedParti
   let externalAddress = "";
   let recommendedType = "vendor";
 
-  if (isSeller || docTypeHint.includes("sales")) {
+  const isSalesDoc = (
+    isSeller || 
+    classificationType === "sales_invoice" || 
+    predictedLabel.includes("sales") || 
+    predictedLabel.includes("sale") || 
+    docTypeHint.includes("sales") || 
+    docTypeHint.includes("customer")
+  );
+
+  const isVendorDoc = (
+    isBuyer || 
+    classificationType === "vendor_invoice" || 
+    predictedLabel.includes("purchase") || 
+    predictedLabel.includes("expense") || 
+    docTypeHint.includes("vendor") || 
+    docTypeHint.includes("purchase") || 
+    docTypeHint.includes("expense")
+  );
+
+  if (isSalesDoc && (!isBuyer || isSeller)) {
     classification = "sales_invoice";
     externalName = buyerName || (isSeller ? "" : sellerName) || notes.party_name || "";
     externalGstin = buyerGstin || sellerGstin;
     externalAddress = buyerAddress || sellerAddress;
     recommendedType = "customer";
-  } else if (isBuyer || docTypeHint.includes("vendor") || docTypeHint.includes("purchase")) {
+  } else if (isVendorDoc) {
     classification = "vendor_invoice";
     externalName = sellerName || (isBuyer ? "" : buyerName) || notes.party_name || "";
     externalGstin = sellerGstin || buyerGstin;
