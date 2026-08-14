@@ -532,23 +532,13 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
                         <BsInfoCircle size={11} />
                       </button>
                     </div>
-                    <div className="relative flex items-center">
-                      <input
-                        type="text"
-                        value={item.hsnSac}
-                        onChange={(e) => updateLineItem(item.id, "hsnSac", e.target.value)}
-                        placeholder="e.g. 8471"
-                        className="w-full bg-[#222] border border-white/10 rounded pl-2 pr-5 py-1 text-white focus:outline-none focus:border-teal-500 font-mono text-xs"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => openHsnFinder(item.id)}
-                        className="absolute right-1.5 text-teal-400 hover:text-teal-300 p-0.5"
-                        title="Search HSN/SAC Directory"
-                      >
-                        <BsInfoCircle size={12} />
-                      </button>
-                    </div>
+                    <input
+                      type="text"
+                      value={item.hsnSac}
+                      onChange={(e) => updateLineItem(item.id, "hsnSac", e.target.value)}
+                      placeholder="e.g. 8471"
+                      className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-teal-500 font-mono text-xs"
+                    />
                   </div>
                   <div className="col-span-4 md:col-span-1">
                     <label className="block text-[10px] text-gray-400 mb-0.5">Qty</label>

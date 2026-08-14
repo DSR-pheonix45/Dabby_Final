@@ -333,7 +333,19 @@ export default function QuotationModal({ isOpen, onClose, isPage = false }) {
                     col.type === "number" || col.type === "amount" ? "text-right" : "text-left"
                   }`}
                 >
-                  <span className="truncate">{col.label}</span>
+                  <span className="truncate flex items-center gap-1">
+                    <span>{col.label}</span>
+                    {col.id === "hsn" && (
+                      <button
+                        type="button"
+                        onClick={() => openHsnFinder(0)}
+                        className="text-teal-400 hover:text-teal-300 transition-colors p-0.5"
+                        title="Search GST HSN/SAC Code Directory"
+                      >
+                        <BsInfoCircle size={11} />
+                      </button>
+                    )}
+                  </span>
                   {col.removable && (
                     <button
                       type="button"
@@ -366,23 +378,14 @@ export default function QuotationModal({ isOpen, onClose, isPage = false }) {
                     }
                     if (col.id === "hsn") {
                       return (
-                        <div key={col.id} className="relative flex-1 min-w-[90px] flex items-center">
-                          <input
-                            type="text"
-                            value={it.hsn !== undefined ? it.hsn : ""}
-                            onChange={(e) => updateItem(idx, "hsn", e.target.value)}
-                            placeholder="HSN/SAC"
-                            className="w-full bg-[#1e1e1e] border border-white/10 rounded pl-2 pr-5 py-1.5 text-xs text-white text-left font-mono"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => openHsnFinder(idx)}
-                            className="absolute right-1 text-teal-400 hover:text-teal-300 p-0.5"
-                            title="Search GST HSN/SAC Directory"
-                          >
-                            <BsInfoCircle size={12} />
-                          </button>
-                        </div>
+                        <input
+                          key={col.id}
+                          type="text"
+                          value={it.hsn !== undefined ? it.hsn : ""}
+                          onChange={(e) => updateItem(idx, "hsn", e.target.value)}
+                          placeholder="HSN/SAC"
+                          className="flex-1 min-w-[90px] bg-[#1e1e1e] border border-white/10 rounded p-1.5 text-xs text-white text-left font-mono"
+                        />
                       );
                     }
                     return (
