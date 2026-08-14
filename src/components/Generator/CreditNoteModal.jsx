@@ -4,14 +4,17 @@ import { toast } from "react-hot-toast";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { getStoredInvoices, saveCreditNote } from "./generatorStore";
+import PartySelector from "./PartySelector";
 
 export default function CreditNoteModal({ isOpen, onClose, isPage = false }) {
   const [cnNumber, setCnNumber] = useState(`CN-${Math.floor(1000 + Math.random() * 9000)}`);
   const [cnDate, setCnDate] = useState(new Date().toISOString().split("T")[0]);
 
   const [invoices, setInvoices] = useState([]);
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState("custom");
   const [manualInvoiceRef, setManualInvoiceRef] = useState("");
+  const [manualPartyName, setManualPartyName] = useState("");
+  const [manualInvoiceAmount, setManualInvoiceAmount] = useState(0);
 
   const [reason, setReason] = useState("Settlement Discount / Volume Adjustment");
   const [settlementType, setSettlementType] = useState("flat"); // 'flat' or 'percent'
@@ -23,14 +26,18 @@ export default function CreditNoteModal({ isOpen, onClose, isPage = false }) {
     setInvoices(list);
     if (list.length > 0) {
       setSelectedInvoiceId(list[0].id);
+    } else {
+      setSelectedInvoiceId("custom");
     }
   }, [isOpen]);
 
   const activeInvoice = invoices.find(i => i.id === selectedInvoiceId);
-  const targetInvoiceNo = activeInvoice ? activeInvoice.invoiceNumber : (manualInvoiceRef || "INV-2026-001");
-  const targetPartyName = activeInvoice ? activeInvoice.partyName : "Apex Logistics Ltd";
-  const targetPartyGstin = activeInvoice ? activeInvoice.partyGstin : "27AABCU9603R1ZM";
-  const originalInvoiceAmount = activeInvoice ? activeInvoice.amount : 145000;
+  const isCustomRef = selectedInvoiceId === "custom" || !activeInvoice;
+
+  const targetInvoiceNo = isCustomRef ? (manualInvoiceRef || "INV-REF") : (activeInvoice.invoiceNumber || activeInvoice.id);
+  const targetPartyName = isCustomRef ? (manualPartyName || "Customer") : (activeInvoice.partyName || "Customer");
+  const targetPartyGstin = isCustomRef ? "" : (activeInvoice.partyGstin || "");
+  const originalInvoiceAmount = isCustomRef ? (Number(manualInvoiceAmount) || 0) : (Number(activeInvoice.amount) || 0);
 
   // Settlement Discount calculation
   let creditAmount = 0;
@@ -179,18 +186,18 @@ export default function CreditNoteModal({ isOpen, onClose, isPage = false }) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-gray-400 mb-1">Select Existing System Invoice</label>
+                <label className="block text-gray-400 mb-1">Select System Invoice</label>
                 <select
                   value={selectedInvoiceId}
                   onChange={(e) => setSelectedInvoiceId(e.target.value)}
                   className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none"
                 >
+                  <option value="custom">-- Enter Custom / External Invoice Reference --</option>
                   {invoices.map(inv => (
                     <option key={inv.id} value={inv.id}>
-                      {inv.invoiceNumber} - {inv.partyName} (₹{inv.amount.toLocaleString('en-IN')})
+                      {inv.invoiceNumber || inv.id} - {inv.partyName} (₹{Number(inv.amount || 0).toLocaleString('en-IN')})
                     </option>
                   ))}
-                  <option value="custom">-- Custom Reference --</option>
                 </select>
               </div>
 
@@ -207,6 +214,30 @@ export default function CreditNoteModal({ isOpen, onClose, isPage = false }) {
                 </div>
               )}
             </div>
+
+            {selectedInvoiceId === "custom" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                <div>
+                  <label className="block text-gray-400 mb-1">Party / Customer Name</label>
+                  <PartySelector
+                    value={manualPartyName}
+                    placeholder="Select or Search Client..."
+                    filterType="customer"
+                    onSelectParty={(p) => setManualPartyName(p.name)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-400 mb-1">Original Invoice Value (₹)</label>
+                  <input
+                    type="number"
+                    value={manualInvoiceAmount}
+                    onChange={(e) => setManualInvoiceAmount(parseFloat(e.target.value) || 0)}
+                    placeholder="e.g. 50000"
+                    className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="p-3 rounded-lg bg-[#181818] border border-white/5 text-gray-300 flex justify-between items-center">
               <div>
