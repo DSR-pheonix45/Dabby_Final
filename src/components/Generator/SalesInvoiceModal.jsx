@@ -14,44 +14,10 @@ import { getWorkbenchCompanyDetails } from "../../utils/workbenchCompanyHelper";
 import { saveDocumentToDocVaultAndEngine } from "../../utils/docVaultExporter";
 import PartySelector from "./PartySelector";
 
-const STAGES = [
-  {
-    key: "QUOTATION",
-    label: "1. Quotation",
-    title: "Quotation",
-    badge: "First Initialization",
-    badgeColor: "bg-blue-500/10 text-blue-400 border-blue-500/30",
-    desc: "First initialization phase: Non-binding preliminary estimate provided to the customer."
-  },
-  {
-    key: "PROFORMA",
-    label: "2. Proforma Invoice",
-    title: "Proforma Invoice",
-    badge: "Negotiation & Tentative",
-    badgeColor: "bg-amber-500/10 text-amber-400 border-amber-500/30",
-    desc: "Negotiation phase: Tentative costing & draft breakdown issued prior to delivery/payment."
-  },
-  {
-    key: "SALES_INVOICE",
-    label: "3. Sales Invoice",
-    title: "Tax Invoice (Sales)",
-    badge: "Absolute Locked-in Value",
-    badgeColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
-    desc: "Final stage: Absolute locked-in value tax document & legally binding bill."
-  }
-];
-
 const PRESET_PARTIES = [
   { name: "Apex Logistics Ltd", gstin: "27AABCU9603R1ZM", pan: "AABCU9603R", address: "Plot 42, MIDC Industrial Area, Mumbai, MH - 400093", email: "accounts@apexlogistics.in" },
   { name: "Zenith Tech Solutions", gstin: "29AAACZ1234F1Z5", pan: "AAACZ1234F", address: "Outer Ring Rd, Bellandur, Bengaluru, KA - 560103", email: "billing@zenithtech.io" },
   { name: "Global Trading Corp", gstin: "07AAACG5678H1Z1", pan: "AAACG5678H", address: "Connaught Place, New Delhi, DL - 110001", email: "finance@globaltrading.com" }
-];
-
-const PRESET_SKUS = [
-  { sku: "SKU-CONV-88", name: "Industrial Conveyor Belt (Heavy Duty)", hsn: "8428", rate: 45000 },
-  { sku: "SKU-SRV-01", name: "Cloud Server Rack 42U Hardware", hsn: "8471", rate: 75000 },
-  { sku: "SKU-SENS-12", name: "IoT Thermal Sensor Probe Assembly", hsn: "9031", rate: 3200 },
-  { sku: "SKU-MOT-09", name: "3-Phase Induction Motor 5HP", hsn: "8501", rate: 18500 }
 ];
 
 export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
@@ -59,8 +25,8 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
   const { user } = useAuth();
   const company = getWorkbenchCompanyDetails(activeWorkbench, user);
 
-  const [stage, setStage] = useState("QUOTATION");
-  const [docNumber, setDocNumber] = useState(`QT-${Math.floor(1000 + Math.random() * 9000)}`);
+  const [stage] = useState("SALES_INVOICE");
+  const [docNumber, setDocNumber] = useState(`INV-${Math.floor(1000 + Math.random() * 9000)}`);
   const [docDate, setDocDate] = useState(new Date().toISOString().split("T")[0]);
   const [dueDate, setDueDate] = useState("");
 
@@ -133,26 +99,17 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
 
   // Line items
   const [lineItems, setLineItems] = useState([
-    { id: 1, sku: "CUSTOM", description: "", hsnSac: "", qty: 1, rate: 0 }
+    { id: 1, sku: "", description: "", hsnSac: "", qty: 1, rate: 0 }
   ]);
 
   useEffect(() => {
     setDiscountTags(getStoredDiscountTags());
   }, []);
 
-  // Update Document Prefix based on stage
-  const handleStageChange = (newStage) => {
-    setStage(newStage);
-    const rand = Math.floor(1000 + Math.random() * 9000);
-    if (newStage === "QUOTATION") setDocNumber(`QT-${rand}`);
-    else if (newStage === "PROFORMA") setDocNumber(`PI-${rand}`);
-    else setDocNumber(`INV-${rand}`);
-  };
-
   const addLineItem = () => {
     setLineItems([
       ...lineItems,
-      { id: Date.now(), sku: "CUSTOM", description: "", hsnSac: "9983", qty: 1, rate: 0 }
+      { id: Date.now(), sku: "", description: "", hsnSac: "", qty: 1, rate: 0 }
     ]);
   };
 
@@ -164,18 +121,6 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
   const updateLineItem = (id, field, value) => {
     setLineItems(lineItems.map(item => {
       if (item.id === id) {
-        if (field === "sku") {
-          const matchedPreset = PRESET_SKUS.find(s => s.sku === value);
-          if (matchedPreset) {
-            return {
-              ...item,
-              sku: value,
-              description: matchedPreset.name,
-              hsnSac: matchedPreset.hsn,
-              rate: matchedPreset.rate
-            };
-          }
-        }
         return { ...item, [field]: value };
       }
       return item;
@@ -369,53 +314,17 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
             </div>
             <div>
               <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                Sales & Invoice Generator
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${currentStageObj.badgeColor}`}>
-                  {currentStageObj.badge}
+                Sales Tax Invoice Generator
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium border bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                  Tax Sales Invoice
                 </span>
               </h2>
-              <p className="text-xs text-gray-400">Build Quotations, Proforma Invoices, and Locked-in Tax Sales Invoices</p>
+              <p className="text-xs text-gray-400">Issue locked-in tax sales invoices directly to customers</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors">
             <BsX size={26} />
           </button>
-        </div>
-
-        {/* 3-Stage Selector Tabs */}
-        <div className="bg-[#161616] border-b border-white/10 px-6 py-3">
-          <div className="grid grid-cols-3 gap-3">
-            {STAGES.map((s) => {
-              const active = stage === s.key;
-              return (
-                <button
-                  key={s.key}
-                  onClick={() => handleStageChange(s.key)}
-                  className={`flex flex-col p-3 rounded-xl border text-left transition-all ${
-                    active 
-                      ? "bg-teal-500/10 border-teal-500/50 text-white shadow-lg shadow-teal-500/5" 
-                      : "bg-white/5 border-white/5 text-gray-400 hover:bg-white/10 hover:border-white/20"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`font-semibold text-sm ${active ? "text-teal-400" : "text-gray-300"}`}>
-                      {s.label}
-                    </span>
-                    {active && <BsCheckCircleFill className="text-teal-400 text-sm" />}
-                  </div>
-                  <span className="text-[11px] text-gray-400 line-clamp-1">{s.desc}</span>
-                </button>
-              );
-            })}
-          </div>
-          
-          {/* Stage Explanation Banner */}
-          <div className="mt-3 p-2.5 rounded-lg bg-teal-500/5 border border-teal-500/20 text-xs text-gray-300 flex items-center gap-2">
-            <BsInfoCircle className="text-teal-400 text-base shrink-0" />
-            <span>
-              <strong>Current Workflow Stage ({currentStageObj.title}):</strong> {currentStageObj.desc}
-            </span>
-          </div>
         </div>
 
         {/* Modal Scrollable Body */}
@@ -593,17 +502,14 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
               {lineItems.map((item, idx) => (
                 <div key={item.id} className="p-3 rounded-lg bg-[#181818] border border-white/5 grid grid-cols-12 gap-2 items-center text-xs">
                   <div className="col-span-12 md:col-span-3">
-                    <label className="block text-[10px] text-gray-400 mb-0.5">Select Inventory SKU</label>
-                    <select
-                      value={item.sku}
+                    <label className="block text-[10px] text-gray-400 mb-0.5">SKU / Item Code</label>
+                    <input
+                      type="text"
+                      value={item.sku || ""}
                       onChange={(e) => updateLineItem(item.id, "sku", e.target.value)}
-                      className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none"
-                    >
-                      <option value="">-- Select SKU --</option>
-                      {PRESET_SKUS.map(s => (
-                        <option key={s.sku} value={s.sku}>{s.sku} - {s.name}</option>
-                      ))}
-                    </select>
+                      placeholder="e.g. SKU-101 / Item Code"
+                      className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-teal-500"
+                    />
                   </div>
                   <div className="col-span-12 md:col-span-3">
                     <label className="block text-[10px] text-gray-400 mb-0.5">Description</label>

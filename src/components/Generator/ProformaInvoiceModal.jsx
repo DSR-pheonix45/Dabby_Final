@@ -42,7 +42,7 @@ export default function ProformaInvoiceModal({ isOpen, onClose, isPage = false }
 
   if (!isOpen) return null;
 
-  const addItem = () => setItems([...items, { description: "New Estimate Item", subDetails: "", hsn: "7308", qty: 1, unit: "pcs", rate: 10000 }]);
+  const addItem = () => setItems([...items, { description: "", subDetails: "", hsn: "", qty: 1, unit: "pcs", rate: 0 }]);
   const updateItem = (idx, field, val) => {
     const updated = [...items];
     updated[idx][field] = field === "qty" || field === "rate" ? Number(val) || 0 : val;
