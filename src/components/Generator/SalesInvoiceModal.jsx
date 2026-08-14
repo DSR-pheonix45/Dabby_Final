@@ -182,6 +182,8 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
       shipToName: shipToSameAsBilling ? partyName : shipToName,
       shipToAddress: shipToSameAsBilling ? clientAddress : shipToAddress,
       items: sanitizeItems(lineItems),
+      discountAmount: discountAmount,
+      discountLabel: activeDiscountTag ? `${activeDiscountTag.code}` : "Discount Tag",
       columns,
       taxRate: isGstRegistered ? 18 : 0,
       isIgst: taxSchema === "IGST",

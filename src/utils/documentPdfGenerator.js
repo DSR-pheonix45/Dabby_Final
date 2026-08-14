@@ -40,6 +40,8 @@ export function generateStandardDocumentPDF(docData) {
     shipToAddress = "",
     // Line Items
     items = [],
+    discountAmount = 0,
+    discountLabel = "Discount",
     taxRate = 18,
     isIgst = false,
     
@@ -292,21 +294,46 @@ export function generateStandardDocumentPDF(docData) {
     ];
   });
 
-  // Calculate Subtotal & Tax
+  // Calculate Subtotal, Discount & Tax
   const subtotal = items.reduce((acc, it) => {
     const r = Number(it.rate) || 0;
     const q = Number(it.qty) || 0;
     return acc + (Number(it.amount) || (q * r));
   }, 0);
 
+  const effectiveDiscount = Number(discountAmount) || 0;
+  const taxableSubtotal = Math.max(0, subtotal - effectiveDiscount);
+
   const effectiveTaxRate = Number(taxRate) || 0;
-  const totalTaxAmount = (subtotal * effectiveTaxRate) / 100;
+  const totalTaxAmount = (taxableSubtotal * effectiveTaxRate) / 100;
   const cgstAmount = isIgst ? 0 : totalTaxAmount / 2;
   const sgstAmount = isIgst ? 0 : totalTaxAmount / 2;
   const igstAmount = isIgst ? totalTaxAmount : 0;
-  const grandTotal = subtotal + totalTaxAmount;
+  const grandTotal = taxableSubtotal + totalTaxAmount;
 
-  // Append Total Rows to Body
+  // Append Subtotal & Discount Rows if discount exists
+  if (effectiveDiscount > 0) {
+    tableBody.push([
+      "",
+      "SUBTOTAL",
+      "",
+      "",
+      ...(showSeparateUnitCol ? [""] : []),
+      "",
+      `Rs. ${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    ]);
+    tableBody.push([
+      "",
+      `LESS: DISCOUNT (${discountLabel || 'Tag Applied'})`,
+      "",
+      "",
+      ...(showSeparateUnitCol ? [""] : []),
+      "",
+      `- Rs. ${effectiveDiscount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    ]);
+  }
+
+  // Append Total Tax Rows to Body
   if (effectiveTaxRate > 0) {
     if (isIgst) {
       tableBody.push([
