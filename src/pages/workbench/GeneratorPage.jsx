@@ -25,23 +25,23 @@ export default function GeneratorPage() {
   const renderGenerator = () => {
     switch (type) {
       case "sales_invoice":
-        return <SalesInvoiceModal isOpen={true} onClose={handleClose} />;
+        return <SalesInvoiceModal isOpen={true} isPage={true} onClose={handleClose} />;
       case "quotation":
-        return <QuotationModal isOpen={true} onClose={handleClose} />;
+        return <QuotationModal isOpen={true} isPage={true} onClose={handleClose} />;
       case "proforma":
-        return <ProformaInvoiceModal isOpen={true} onClose={handleClose} />;
+        return <ProformaInvoiceModal isOpen={true} isPage={true} onClose={handleClose} />;
       case "purchase_order":
-        return <PurchaseOrderModal isOpen={true} onClose={handleClose} />;
+        return <PurchaseOrderModal isOpen={true} isPage={true} onClose={handleClose} />;
       case "credit_note":
-        return <CreditNoteModal isOpen={true} onClose={handleClose} />;
+        return <CreditNoteModal isOpen={true} isPage={true} onClose={handleClose} />;
       case "debit_note":
-        return <DebitNoteModal isOpen={true} onClose={handleClose} />;
+        return <DebitNoteModal isOpen={true} isPage={true} onClose={handleClose} />;
       case "opex_expense":
-        return <OPEXExpenseModal isOpen={true} onClose={handleClose} />;
+        return <OPEXExpenseModal isOpen={true} isPage={true} onClose={handleClose} />;
       case "coupons":
-        return <DiscountCouponModal isOpen={true} onClose={handleClose} />;
+        return <DiscountCouponModal isOpen={true} isPage={true} onClose={handleClose} />;
       default:
-        return <SalesInvoiceModal isOpen={true} onClose={handleClose} />;
+        return <SalesInvoiceModal isOpen={true} isPage={true} onClose={handleClose} />;
     }
   };
 

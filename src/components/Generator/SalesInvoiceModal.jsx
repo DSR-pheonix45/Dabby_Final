@@ -54,7 +54,7 @@ const PRESET_SKUS = [
   { sku: "SKU-MOT-09", name: "3-Phase Induction Motor 5HP", hsn: "8501", rate: 18500 }
 ];
 
-export default function SalesInvoiceModal({ isOpen, onClose }) {
+export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
   const { activeWorkbench } = useWorkbench();
   const { user } = useAuth();
   const company = getWorkbenchCompanyDetails(activeWorkbench, user);
@@ -354,11 +354,12 @@ export default function SalesInvoiceModal({ isOpen, onClose }) {
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !isPage) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-dm-sans overflow-y-auto">
-      <div className="bg-[#121212] border border-white/10 rounded-2xl w-full max-w-5xl my-8 overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+  const content = (
+    <div className={`bg-[#121212] border border-white/10 rounded-2xl w-full overflow-hidden shadow-2xl flex flex-col ${
+      isPage ? "max-w-6xl mx-auto my-6 border border-white/10" : "max-w-5xl my-8 max-h-[90vh]"
+    }`}>
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#181818]">
@@ -938,6 +939,19 @@ export default function SalesInvoiceModal({ isOpen, onClose }) {
         </div>
 
       </div>
+  );
+
+  if (isPage) {
+    return (
+      <div className="flex-1 w-full bg-[#111111] overflow-y-auto p-4 sm:p-6 lg:p-8 font-dm-sans">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-dm-sans overflow-y-auto">
+      {content}
     </div>
   );
 }

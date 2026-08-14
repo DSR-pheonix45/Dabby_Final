@@ -4,7 +4,7 @@ import { toast } from "react-hot-toast";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { collaborationService } from "../../services/collaborationService";
 
-export default function OPEXExpenseModal({ isOpen, onClose }) {
+export default function OPEXExpenseModal({ isOpen, onClose, isPage = false }) {
   const { activeWorkbench } = useWorkbench();
   const [expenseNumber, setExpenseNumber] = useState(`EXP-${Math.floor(1000 + Math.random() * 9000)}`);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -88,9 +88,12 @@ export default function OPEXExpenseModal({ isOpen, onClose }) {
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+  if (!isOpen && !isPage) return null;
+
+  const content = (
+    <div className={`bg-[#141414] border border-white/10 rounded-2xl w-full overflow-hidden shadow-2xl flex flex-col ${
+      isPage ? "max-w-6xl mx-auto my-6 border border-white/10" : "max-w-md"
+    }`}>
         <div className="flex items-center justify-between p-5 border-b border-white/10 bg-[#1a1a1a]">
           <h3 className="text-lg font-bold text-white flex items-center">
             <BsReceipt className="mr-2 text-emerald-400" /> Stage 0: Direct OPEX Expense Logger
@@ -217,6 +220,19 @@ export default function OPEXExpenseModal({ isOpen, onClose }) {
           </button>
         </div>
       </div>
+  );
+
+  if (isPage) {
+    return (
+      <div className="flex-1 w-full bg-[#111111] overflow-y-auto p-4 sm:p-6 lg:p-8 font-dm-sans">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-dm-sans overflow-y-auto">
+      {content}
     </div>
   );
 }
