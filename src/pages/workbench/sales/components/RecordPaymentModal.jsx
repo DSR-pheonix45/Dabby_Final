@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useWorkbench } from '../../../../context/WorkbenchContext';
 import { salesService } from '../../../../services/salesService';
 import { toast } from 'react-hot-toast';
-import { BsX, BsCashCoin, BsCheck2Circle, BsBuilding } from 'react-icons/bs';
+import { BsX, BsCashCoin, BsCheck2Circle } from 'react-icons/bs';
 
 export default function RecordPaymentModal({ isOpen, onClose, workbenchId, sale, onPaymentRecorded }) {
+  const { activeWorkbench } = useWorkbench();
   const [salesList, setSalesList] = useState([]);
   const [selectedSaleId, setSelectedSaleId] = useState(sale?.id || '');
   const [amount, setAmount] = useState('');
@@ -12,21 +14,35 @@ export default function RecordPaymentModal({ isOpen, onClose, workbenchId, sale,
   const [account, setAccount] = useState('HDFC Bank Main');
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !workbenchId) return;
-    const all = salesService.getSales(workbenchId);
-    const unpaid = all.filter(s => s.amount_due > 0 && s.status !== 'Cancelled' && s.status !== 'Returned');
-    setSalesList(unpaid);
 
-    if (sale) {
-      setSelectedSaleId(sale.id);
-      setAmount(sale.amount_due);
-    } else if (unpaid.length > 0 && !selectedSaleId) {
-      setSelectedSaleId(unpaid[0].id);
-      setAmount(unpaid[0].amount_due);
+    async function fetchReceivableSales() {
+      setLoading(true);
+      try {
+        const all = await salesService.getSalesWithDocVault(workbenchId, activeWorkbench);
+        const unpaid = all.filter(s => (s.amount_due === undefined || s.amount_due > 0) && s.status !== 'Cancelled' && s.status !== 'Returned');
+        setSalesList(unpaid);
+
+        if (sale) {
+          setSelectedSaleId(sale.id);
+          setAmount(sale.amount_due !== undefined ? sale.amount_due : sale.grand_total);
+        } else if (unpaid.length > 0) {
+          const first = unpaid[0];
+          setSelectedSaleId(first.id);
+          setAmount(first.amount_due !== undefined ? first.amount_due : first.grand_total);
+        }
+      } catch (err) {
+        console.error("Failed to fetch receivable sales:", err);
+      } finally {
+        setLoading(false);
+      }
     }
-  }, [isOpen, workbenchId, sale]);
+
+    fetchReceivableSales();
+  }, [isOpen, workbenchId, sale, activeWorkbench]);
 
   if (!isOpen) return null;
 
@@ -35,13 +51,15 @@ export default function RecordPaymentModal({ isOpen, onClose, workbenchId, sale,
   const handleSaleSelect = (id) => {
     setSelectedSaleId(id);
     const found = salesList.find(s => s.id === id);
-    if (found) setAmount(found.amount_due);
+    if (found) {
+      setAmount(found.amount_due !== undefined ? found.amount_due : found.grand_total);
+    }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!selectedSaleId) {
-      toast.error("Please select a sale transaction to settle.");
+      toast.error("Please select a sale invoice to settle.");
       return;
     }
     const payAmt = Number(amount);
@@ -50,6 +68,8 @@ export default function RecordPaymentModal({ isOpen, onClose, workbenchId, sale,
       return;
     }
 
+    const targetSale = salesList.find(s => s.id === selectedSaleId) || currentSale;
+
     try {
       const updated = salesService.recordPayment(workbenchId, selectedSaleId, {
         amount: payAmt,
@@ -57,7 +77,10 @@ export default function RecordPaymentModal({ isOpen, onClose, workbenchId, sale,
         method: method,
         account: account,
         reference: reference || `SETTLE-${Date.now().toString().slice(-6)}`,
-        notes: notes
+        notes: notes,
+        customerName: targetSale?.customer?.name,
+        grandTotal: targetSale?.grand_total,
+        referenceNumber: targetSale?.reference_number
       });
 
       toast.success(`Settlement of ₹${payAmt.toLocaleString()} recorded!`);
@@ -93,29 +116,35 @@ export default function RecordPaymentModal({ isOpen, onClose, workbenchId, sale,
         <form onSubmit={handleSubmit} className="pt-5 space-y-4">
           <div>
             <label className="block text-xs font-semibold text-gray-400 mb-1">Select Sale Invoice / Receivable</label>
-            <select
-              value={selectedSaleId}
-              onChange={(e) => handleSaleSelect(e.target.value)}
-              className="w-full bg-[#111111] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500/50"
-            >
-              <option value="">-- Select Receivable Sale --</option>
-              {salesList.map(s => (
-                <option key={s.id} value={s.id}>
-                  #{s.id} — {s.customer?.name} ({s.reference_number}) — Due: ₹{s.amount_due.toLocaleString()}
-                </option>
-              ))}
-            </select>
+            {loading ? (
+              <div className="p-3 text-xs text-gray-400 bg-[#111111] rounded-xl animate-pulse">Loading receivable invoices...</div>
+            ) : (
+              <select
+                value={selectedSaleId}
+                onChange={(e) => handleSaleSelect(e.target.value)}
+                className="w-full bg-[#111111] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500/50"
+              >
+                <option value="">-- Select Receivable Sale --</option>
+                {salesList.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.customer?.name || 'Customer'} ({s.reference_number || s.id}) — Outstanding: ₹{(s.amount_due !== undefined ? s.amount_due : s.grand_total).toLocaleString()}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {currentSale && (
-            <div className="p-3 bg-[#111111] border border-white/5 rounded-xl flex items-center justify-between text-xs">
+            <div className="p-3.5 bg-[#111111] border border-white/5 rounded-xl flex items-center justify-between text-xs">
               <div>
-                <div className="text-gray-400 font-semibold">{currentSale.customer?.name}</div>
-                <div className="text-[10px] text-gray-500 font-mono mt-0.5">{currentSale.reference_number}</div>
+                <div className="text-white font-bold">{currentSale.customer?.name || 'Customer'}</div>
+                <div className="text-[10px] text-teal-400 font-mono mt-0.5">{currentSale.reference_number || currentSale.id}</div>
               </div>
               <div className="text-right">
-                <div className="text-gray-400">Total: ₹{currentSale.grand_total.toLocaleString()}</div>
-                <div className="text-amber-400 font-bold">Outstanding: ₹{currentSale.amount_due.toLocaleString()}</div>
+                <div className="text-gray-400 text-[11px]">Total: ₹{currentSale.grand_total.toLocaleString()}</div>
+                <div className="text-amber-400 font-bold text-sm">
+                  Outstanding: ₹{(currentSale.amount_due !== undefined ? currentSale.amount_due : currentSale.grand_total).toLocaleString()}
+                </div>
               </div>
             </div>
           )}
