@@ -23,22 +23,64 @@ export const diService = {
     return res.json();
   },
 
-  // --- Document Vault Endpoints ---
+  // --- Document Vault & Folder Endpoints ---
+  async getFolders(workbenchId) {
+    const res = await apiFetch(`/api/di/documents/folders/${workbenchId}`);
+    if (!res.ok) throw new Error('Failed to fetch folders');
+    return res.json();
+  },
+
+  async createFolder(workbenchId, name, parentId = null, color = '#14b8a6') {
+    const res = await apiFetch(`/api/di/documents/folders`, {
+      method: 'POST',
+      body: JSON.stringify({ workbench_id: workbenchId, name, parent_id: parentId, color }),
+    });
+    if (!res.ok) throw new Error('Failed to create folder');
+    return res.json();
+  },
+
+  async updateFolder(folderId, payload) {
+    const res = await apiFetch(`/api/di/documents/folders/${folderId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Failed to update folder');
+    return res.json();
+  },
+
+  async deleteFolder(folderId) {
+    const res = await apiFetch(`/api/di/documents/folders/${folderId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete folder');
+    return res.json();
+  },
+
+  async moveDocument(documentId, folderId = null) {
+    const res = await apiFetch(`/api/di/documents/${documentId}/move`, {
+      method: 'PUT',
+      body: JSON.stringify({ folder_id: folderId }),
+    });
+    if (!res.ok) throw new Error('Failed to move document');
+    return res.json();
+  },
+
   async getDocuments(workbenchId) {
     const res = await apiFetch(`/api/di/documents/${workbenchId}`);
     if (!res.ok) throw new Error('Failed to fetch documents');
     return res.json();
   },
 
-  async uploadDocument(workbenchId, file) {
+  async uploadDocument(workbenchId, file, folderId = null) {
     const formData = new FormData();
     formData.append('workbench_id', workbenchId);
+    if (folderId) formData.append('folder_id', folderId);
     formData.append('file', file);
 
     const res = await apiFetch(`/api/di/documents/upload`, {
       method: 'POST',
       body: formData,
-    }, true); // Assuming true bypasses default JSON headers for FormData
+    }, true);
     if (!res.ok) throw new Error('Failed to upload document');
     return res.json();
   },

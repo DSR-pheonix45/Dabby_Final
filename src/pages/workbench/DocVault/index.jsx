@@ -8,6 +8,8 @@ import { BsCloudUpload, BsShieldLock } from "react-icons/bs";
 import { collaborationService } from "../../../services/collaborationService";
 import { classifyDocumentParties } from "../../../utils/docPartyClassifier";
 import NewPartyDetectedModal from "../../../components/DocVault/NewPartyDetectedModal";
+import CreateFolderModal from "../../../components/DocVault/CreateFolderModal";
+import MoveToFolderModal from "../../../components/DocVault/MoveToFolderModal";
 import DocumentList from "./DocumentList";
 import RightPanel from "./RightPanel";
 import PreviewTab from "./tabs/PreviewTab";
@@ -36,20 +38,29 @@ export const deriveDocumentStatus = (doc) => {
 export default function DocVaultIndex() {
   const { activeWorkbench } = useWorkbench();
   const [documents, setDocuments] = useState([]);
+  const [folders, setFolders] = useState([]);
+  const [currentFolderId, setCurrentFolderId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [pendingFile, setPendingFile] = useState(null);
   const [showClassModal, setShowClassModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
+  const [movingDoc, setMovingDoc] = useState(null);
+
   const [pdfPassword, setPdfPassword] = useState("");
   const [unlocking, setUnlocking] = useState(false);
   const [lockedFile, setLockedFile] = useState(null);
+
   const loadDocuments = async () => {
     if (!activeWorkbench) return [];
     setLoading(true);
     try {
-      const docs = await diService.getDocuments(activeWorkbench.id);
+      const [docs, fds] = await Promise.all([
+        diService.getDocuments(activeWorkbench.id).catch(() => []),
+        diService.getFolders(activeWorkbench.id).catch(() => [])
+      ]);
       
       // Inject derived status into the objects for easier frontend rendering
       const enhancedDocs = docs.map(doc => ({
@@ -61,6 +72,7 @@ export default function DocVaultIndex() {
       enhancedDocs.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
       
       setDocuments(enhancedDocs);
+      setFolders(fds || []);
       
       // Update selected doc reference if it exists
       if (selectedDoc) {
@@ -82,6 +94,44 @@ export default function DocVaultIndex() {
     window.addEventListener("docVaultUpdated", handleRefresh);
     return () => window.removeEventListener("docVaultUpdated", handleRefresh);
   }, [activeWorkbench]);
+
+  const handleCreateFolder = async (name, color) => {
+    if (!activeWorkbench) return;
+    try {
+      await diService.createFolder(activeWorkbench.id, name, currentFolderId, color);
+      toast.success(`Folder "${name}" created!`);
+      loadDocuments();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to create folder");
+    }
+  };
+
+  const handleDeleteFolder = async (folderId) => {
+    if (!window.confirm("Are you sure you want to delete this folder? Any files inside will revert to Root.")) return;
+    try {
+      await diService.deleteFolder(folderId);
+      toast.success("Folder deleted");
+      if (currentFolderId === folderId) {
+        setCurrentFolderId(null);
+      }
+      loadDocuments();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete folder");
+    }
+  };
+
+  const handleMoveDocument = async (docId, targetFolderId) => {
+    try {
+      await diService.moveDocument(docId, targetFolderId);
+      toast.success("Document moved!");
+      loadDocuments();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to move document");
+    }
+  };
 
   const handleDeleteDocument = async (docId, e) => {
     if (e) e.stopPropagation();
@@ -173,7 +223,7 @@ export default function DocVaultIndex() {
     setUploading(true);
     try {
       toast.loading("Uploading document...", { id: "upload" });
-      const res = await diService.uploadDocument(activeWorkbench.id, file);
+      const res = await diService.uploadDocument(activeWorkbench.id, file, currentFolderId);
       
       toast.loading("AI parsing in progress...", { id: "upload" });
       
@@ -245,9 +295,16 @@ export default function DocVaultIndex() {
       <div className="flex flex-1 overflow-hidden">
         <PanelGroup orientation="horizontal">
           {/* Left Panel */}
-          <Panel defaultSize={20} minSize={15} className="border-r border-white/5 flex flex-col bg-[#111111]">
+          <Panel defaultSize={22} minSize={18} className="border-r border-white/5 flex flex-col bg-[#111111]">
             <DocumentList 
               documents={documents} 
+              folders={folders}
+              currentFolderId={currentFolderId}
+              onSelectFolder={setCurrentFolderId}
+              onCreateFolder={() => setShowCreateFolderModal(true)}
+              onDeleteFolder={handleDeleteFolder}
+              onOpenMoveModal={(doc) => setMovingDoc(doc)}
+              onMoveDocument={handleMoveDocument}
               loading={loading} 
               selectedDoc={selectedDoc} 
               onSelect={setSelectedDoc}
@@ -261,7 +318,7 @@ export default function DocVaultIndex() {
           </PanelResizeHandle>
 
           {/* Right Panel */}
-          <Panel defaultSize={80} className="flex flex-col bg-[#0D0D0D] overflow-hidden relative">
+          <Panel defaultSize={78} className="flex flex-col bg-[#0D0D0D] overflow-hidden relative">
             {selectedDoc ? (
               <PanelGroup orientation="horizontal">
                 {/* Preview Tab (Always visible next to data) */}
@@ -284,13 +341,29 @@ export default function DocVaultIndex() {
               </PanelGroup>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
-                <BsShieldLock className="text-6xl mb-4 opacity-20" />
-                <p className="font-medium text-gray-400">Select a document to review</p>
+                <BsShieldLock className="text-6xl mb-4 opacity-20 text-teal-500" />
+                <p className="font-medium text-gray-400 text-sm">Select a document to review</p>
+                <p className="text-xs text-gray-600 mt-1">Organize files into folders and extract financial data automatically</p>
               </div>
             )}
           </Panel>
         </PanelGroup>
       </div>
+
+      {/* Modals */}
+      <CreateFolderModal
+        isOpen={showCreateFolderModal}
+        onClose={() => setShowCreateFolderModal(false)}
+        onCreate={handleCreateFolder}
+      />
+
+      <MoveToFolderModal
+        isOpen={!!movingDoc}
+        onClose={() => setMovingDoc(null)}
+        documentObj={movingDoc}
+        folders={folders}
+        onMove={handleMoveDocument}
+      />
 
       {showPasswordModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
