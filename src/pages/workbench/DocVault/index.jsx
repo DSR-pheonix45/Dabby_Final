@@ -4,18 +4,18 @@ import { diService } from "../../../services/diService";
 import { checkPdfPassword, verifyPdfPassword } from "../../../utils/pdfDecrypter";
 import { toast } from "react-hot-toast";
 import { useDropzone } from "react-dropzone";
-import { BsCloudUpload, BsShieldLock } from "react-icons/bs";
+import { BsArrowLeft, BsCloudUpload, BsShieldLock } from "react-icons/bs";
 import { collaborationService } from "../../../services/collaborationService";
 import { classifyDocumentParties } from "../../../utils/docPartyClassifier";
 import NewPartyDetectedModal from "../../../components/DocVault/NewPartyDetectedModal";
 import CreateFolderModal from "../../../components/DocVault/CreateFolderModal";
 import MoveToFolderModal from "../../../components/DocVault/MoveToFolderModal";
-import DocumentList from "./DocumentList";
+import DocVaultExplorer from "./DocVaultExplorer";
 import RightPanel from "./RightPanel";
 import PreviewTab from "./tabs/PreviewTab";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 
-// Utility to derive status dynamically since we skipped DDL changes for MVP
+// Utility to derive status dynamically
 export const deriveDocumentStatus = (doc) => {
   const logs = doc.di_document_processing_logs || [];
   
@@ -24,7 +24,6 @@ export const deriveDocumentStatus = (doc) => {
   
   const analysisLog = logs.find(l => l.stage === 'analysis');
   if (analysisLog?.status === 'success') {
-    // Check confidence in analysis note
     const note = doc.di_analysis_notes?.[0];
     if (note && note.confidence >= 0.90) return 'Ready to Post';
     return 'Needs Review';
@@ -62,19 +61,16 @@ export default function DocVaultIndex() {
         diService.getFolders(activeWorkbench.id).catch(() => [])
       ]);
       
-      // Inject derived status into the objects for easier frontend rendering
-      const enhancedDocs = docs.map(doc => ({
+      const enhancedDocs = (docs || []).map(doc => ({
         ...doc,
         derivedStatus: deriveDocumentStatus(doc)
       }));
       
-      // Sort by latest created first
       enhancedDocs.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
       
       setDocuments(enhancedDocs);
       setFolders(fds || []);
       
-      // Update selected doc reference if it exists
       if (selectedDoc) {
         const updated = enhancedDocs.find(d => d.id === selectedDoc.id);
         if (updated) setSelectedDoc(updated);
@@ -196,7 +192,6 @@ export default function DocVaultIndex() {
     try {
       await verifyPdfPassword(lockedFile, pdfPassword);
       setShowPasswordModal(false);
-      // We do NOT clear pdfPassword here, as we need it for the upload!
       setPendingFile(lockedFile);
       setLockedFile(null);
       setShowClassModal(true);
@@ -218,7 +213,7 @@ export default function DocVaultIndex() {
     const currentPassword = pdfPassword;
     setPendingFile(null);
     setShowClassModal(false);
-    setPdfPassword(""); // Reset for next file
+    setPdfPassword("");
     
     setUploading(true);
     try {
@@ -233,7 +228,6 @@ export default function DocVaultIndex() {
       const freshDocs = await loadDocuments();
       const freshDoc = freshDocs.find(d => d.id === res.document_id) || processRes;
 
-      // Scan parties & trigger warning modal if counterparty is unregistered
       try {
         const partiesList = await collaborationService.getParties(activeWorkbench.id);
         setSavedParties(partiesList || []);
@@ -271,84 +265,81 @@ export default function DocVaultIndex() {
     <div className="flex flex-col flex-1 h-full bg-[#0D0D0D] overflow-hidden text-gray-200 font-sans" {...getRootProps()}>
       <input {...getInputProps()} />
       
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
-            <BsShieldLock className="text-teal-500 text-lg" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-white tracking-tight">Doc Vault</h1>
-            <p className="text-xs text-gray-500 mt-0.5">Source of financial truth</p>
-          </div>
-        </div>
-        <div>
-          <label className="flex items-center gap-2 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 px-4 py-2 rounded-lg font-semibold text-sm cursor-pointer transition-colors">
-            <BsCloudUpload className="text-lg" />
-            Upload Document
-            <input type="file" className="hidden" onChange={(e) => onDrop(Array.from(e.target.files))} accept=".pdf,.jpg,.jpeg,.png" />
-          </label>
-        </div>
-      </div>
-
-      {/* Split Layout */}
-      <div className="flex flex-1 overflow-hidden">
-        <PanelGroup orientation="horizontal">
-          {/* Left Panel */}
-          <Panel defaultSize={22} minSize={18} className="border-r border-white/5 flex flex-col bg-[#111111]">
-            <DocumentList 
-              documents={documents} 
-              folders={folders}
-              currentFolderId={currentFolderId}
-              onSelectFolder={setCurrentFolderId}
-              onCreateFolder={() => setShowCreateFolderModal(true)}
-              onDeleteFolder={handleDeleteFolder}
-              onOpenMoveModal={(doc) => setMovingDoc(doc)}
-              onMoveDocument={handleMoveDocument}
-              loading={loading} 
-              selectedDoc={selectedDoc} 
-              onSelect={setSelectedDoc}
-              onDelete={handleDeleteDocument}
-              uploading={uploading}
-            />
-          </Panel>
-
-          <PanelResizeHandle className="w-1.5 bg-[#0D0D0D] hover:bg-teal-500/50 cursor-col-resize transition-colors z-10 flex flex-col justify-center items-center">
-            <div className="h-8 w-0.5 bg-white/20 rounded-full" />
-          </PanelResizeHandle>
-
-          {/* Right Panel */}
-          <Panel defaultSize={78} className="flex flex-col bg-[#0D0D0D] overflow-hidden relative">
-            {selectedDoc ? (
-              <PanelGroup orientation="horizontal">
-                {/* Preview Tab (Always visible next to data) */}
-                <Panel defaultSize={40} minSize={20} className="border-r border-white/5">
-                  <PreviewTab doc={selectedDoc} onDelete={handleDeleteDocument} onScan={handleScanDocument} />
-                </Panel>
-                
-                <PanelResizeHandle className="w-1.5 bg-[#0D0D0D] hover:bg-teal-500/50 cursor-col-resize transition-colors z-10 flex flex-col justify-center items-center">
-                  <div className="h-8 w-0.5 bg-white/20 rounded-full" />
-                </PanelResizeHandle>
-                
-                {/* Data Tabs */}
-                <Panel defaultSize={60} minSize={30} className="flex flex-col">
-                  <RightPanel 
-                    doc={selectedDoc} 
-                    onUpdate={loadDocuments} 
-                    onClose={() => setSelectedDoc(null)} 
-                  />
-                </Panel>
-              </PanelGroup>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
-                <BsShieldLock className="text-6xl mb-4 opacity-20 text-teal-500" />
-                <p className="font-medium text-gray-400 text-sm">Select a document to review</p>
-                <p className="text-xs text-gray-600 mt-1">Organize files into folders and extract financial data automatically</p>
+      {/* Dynamic View: If no document selected, show full Explorer Grid; otherwise show Document Viewer */}
+      {!selectedDoc ? (
+        <DocVaultExplorer
+          folders={folders}
+          documents={documents}
+          currentFolderId={currentFolderId}
+          onSelectFolder={setCurrentFolderId}
+          onCreateFolder={() => setShowCreateFolderModal(true)}
+          onDeleteFolder={handleDeleteFolder}
+          onSelectDocument={setSelectedDoc}
+          onDeleteDocument={handleDeleteDocument}
+          onOpenMoveModal={(doc) => setMovingDoc(doc)}
+          onMoveDocument={handleMoveDocument}
+          onDropFiles={onDrop}
+          loading={loading}
+          uploading={uploading}
+        />
+      ) : (
+        <div className="flex flex-col flex-1 h-full overflow-hidden">
+          {/* Header Bar in Document Viewer Mode */}
+          <div className="px-6 py-3 border-b border-white/5 bg-[#121214] flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setSelectedDoc(null)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-teal-400 font-semibold text-xs transition-colors border border-white/10"
+              >
+                <BsArrowLeft size={14} />
+                <span>Back to Explorer</span>
+              </button>
+              <div className="h-4 w-px bg-white/10" />
+              <div className="flex items-center gap-2 text-xs text-gray-400 truncate">
+                <span className="font-semibold text-white">{selectedDoc.original_filename}</span>
               </div>
-            )}
-          </Panel>
-        </PanelGroup>
-      </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setMovingDoc(selectedDoc)}
+                className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-semibold text-gray-300 hover:text-white border border-white/10 transition-colors"
+              >
+                Move Document
+              </button>
+              <button
+                onClick={(e) => handleDeleteDocument(selectedDoc.id, e)}
+                className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-xs font-semibold text-rose-400 border border-rose-500/20 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+
+          {/* Split Document Viewer Layout */}
+          <div className="flex-1 overflow-hidden">
+            <PanelGroup orientation="horizontal">
+              {/* Preview Tab (Always visible next to data) */}
+              <Panel defaultSize={40} minSize={20} className="border-r border-white/5">
+                <PreviewTab doc={selectedDoc} onDelete={handleDeleteDocument} onScan={handleScanDocument} />
+              </Panel>
+              
+              <PanelResizeHandle className="w-1.5 bg-[#0D0D0D] hover:bg-teal-500/50 cursor-col-resize transition-colors z-10 flex flex-col justify-center items-center">
+                <div className="h-8 w-0.5 bg-white/20 rounded-full" />
+              </PanelResizeHandle>
+              
+              {/* Data Tabs */}
+              <Panel defaultSize={60} minSize={30} className="flex flex-col">
+                <RightPanel 
+                  doc={selectedDoc} 
+                  onUpdate={loadDocuments} 
+                  onClose={() => setSelectedDoc(null)} 
+                />
+              </Panel>
+            </PanelGroup>
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       <CreateFolderModal

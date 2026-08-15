@@ -75,11 +75,12 @@ async def list_folders(workbench_id: str):
 async def create_folder(req: CreateFolderRequest):
     folder_id = str(uuid.uuid4())
     now_iso = datetime.datetime.utcnow().isoformat()
+    parent_id = req.parent_id if (req.parent_id and req.parent_id != "null" and req.parent_id != "") else None
     folder_row = {
         "id": folder_id,
         "workbench_id": req.workbench_id,
         "name": req.name,
-        "parent_id": req.parent_id,
+        "parent_id": parent_id,
         "color": req.color or "#14b8a6",
         "created_at": now_iso,
         "updated_at": now_iso
