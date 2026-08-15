@@ -9,12 +9,14 @@ import {
   BsChevronRight,
   BsClockHistory,
   BsPlusLg,
-  BsBuilding
+  BsBuilding,
+  BsLaptop
 } from "react-icons/bs";
 import { useAuth } from "../../hooks/useAuth";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import ChatSearch from "../ChatSearch";
 import { supabase } from "../../lib/supabase";
+import DesktopShortcutModal from "../common/DesktopShortcutModal";
 
 const SidebarButton = ({
   icon: IconComponent,
@@ -159,6 +161,7 @@ export default function Sidebar({
   };
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isDesktopModalOpen, setIsDesktopModalOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState([]);
 
 
@@ -278,7 +281,7 @@ export default function Sidebar({
                         key={wb.id}
                         onClick={() => {
                           changeActiveWorkbench(wb);
-                          navigate("/dashboard/workbench/business-engine");
+                          navigate("/dashboard/workbench/members");
                           onNavigate?.();
                         }}
                         className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 group/wb ${
@@ -312,7 +315,7 @@ export default function Sidebar({
                 <div className="mb-2">
                   <button
                     onClick={() => {
-                      navigate("/dashboard/workbench/business-engine");
+                      navigate("/dashboard/workbench/members");
                       onNavigate?.();
                     }}
                     className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30 shadow-md"
@@ -382,6 +385,15 @@ export default function Sidebar({
           >
             Settings
           </SidebarButton>
+
+          <SidebarButton
+            icon={BsLaptop}
+            isCollapsed={isCollapsed}
+            isActive={false}
+            onClick={() => setIsDesktopModalOpen(true)}
+          >
+            Add Desktop Icon
+          </SidebarButton>
         </div>
       </div>
 
@@ -394,6 +406,12 @@ export default function Sidebar({
           loadChatSession(chat.id);
           setIsSearchOpen(false);
         }}
+      />
+
+      {/* Desktop Shortcut / PWA Modal */}
+      <DesktopShortcutModal
+        isOpen={isDesktopModalOpen}
+        onClose={() => setIsDesktopModalOpen(false)}
       />
     </div>
   );

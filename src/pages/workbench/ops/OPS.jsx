@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useOutletContext, useLocation } from 'react-router-dom';
 import AccountsReceivable from './tabs/AccountsReceivable';
 import AccountsPayable from './tabs/AccountsPayable';
 import Budgeting from './tabs/Budgeting';
@@ -9,9 +9,16 @@ import { toast } from 'react-hot-toast';
 
 export default function OPS() {
   const { workbench } = useOutletContext() || {};
+  const location = useLocation();
   const workbenchId = workbench?.id;
-  const [activeTab, setActiveTab] = useState('ar');
+  const [activeTab, setActiveTab] = useState(location.state?.tab || 'ar');
   const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (location.state?.tab) {
+      setActiveTab(location.state.tab);
+    }
+  }, [location.state]);
 
   const tabs = [
     { id: 'ar', label: 'Accounts Receivable' },
@@ -67,7 +74,7 @@ export default function OPS() {
 
       {/* Main Tab Content Area */}
       <div className="flex-1 overflow-auto px-6 lg:px-10 py-8">
-        <div className="max-w-7xl mx-auto">
+        <div className="w-full">
           {activeTab === 'ar' && <AccountsReceivable key={refreshKey} workbenchId={workbenchId} />}
           {activeTab === 'ap' && <AccountsPayable key={refreshKey} workbenchId={workbenchId} />}
           {activeTab === 'budgeting' && <Budgeting key={refreshKey} workbenchId={workbenchId} />}

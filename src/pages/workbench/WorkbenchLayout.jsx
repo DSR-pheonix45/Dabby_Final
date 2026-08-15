@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useWorkbench } from "../../context/WorkbenchContext";
-import { BsPerson, BsBuilding, BsGear, BsFileEarmarkText, BsDiagram3, BsGraphUp, BsCpu, BsJournalText, BsLightningCharge, BsFileEarmarkBarGraph } from "react-icons/bs";
+import { BsPerson, BsBuilding, BsGear, BsFileEarmarkText, BsDiagram3, BsGraphUp, BsJournalText, BsLightningCharge, BsFileEarmarkBarGraph, BsCartCheck, BsBagCheck } from "react-icons/bs";
 import GeneratorModal from "./GeneratorModal";
 import ReportsModal from "./ReportsModal";
 
@@ -22,13 +22,14 @@ export default function WorkbenchLayout() {
   }
 
   const navItems = [
-    { label: "Business Engine", path: "/dashboard/workbench/business-engine", icon: BsCpu },
-    { label: "Financials", path: "/dashboard/workbench/ledger", icon: BsJournalText },
     { label: "Members", path: "/dashboard/workbench/members", icon: BsPerson },
     { label: "Parties", path: "/dashboard/workbench/parties", icon: BsBuilding },
-    { label: "COA", path: "/dashboard/workbench/coa", icon: BsDiagram3 },
     { label: "Doc Vault", path: "/dashboard/workbench/doc-vault", icon: BsFileEarmarkText },
+    { label: "Sales", path: "/dashboard/workbench/sales", icon: BsCartCheck },
+    { label: "Purchases & Expenses", path: "/dashboard/workbench/purchases", icon: BsBagCheck },
     { label: "OPS", path: "/dashboard/workbench/ops", icon: BsGraphUp },
+    { label: "Financials", path: "/dashboard/workbench/ledger", icon: BsJournalText },
+    { label: "COA", path: "/dashboard/workbench/coa", icon: BsDiagram3 },
     { label: "Settings", path: "/dashboard/workbench/settings", icon: BsGear },
   ];
 
@@ -36,7 +37,7 @@ export default function WorkbenchLayout() {
     <div className="h-full flex flex-col bg-[#111111] font-dm-sans">
       {/* Workbench Navigation Header */}
       <div className="border-b border-white/10 bg-[#181818] px-6 lg:px-10 pt-6">
-        <div className="max-w-7xl mx-auto flex flex-col space-y-6">
+        <div className="w-full flex flex-col space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="h-12 w-12 bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded-xl flex items-center justify-center text-2xl font-bold overflow-hidden shrink-0">

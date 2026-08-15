@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from supabase_client import supabase
 from services.ufo_mapper import UFOMapper
 from services.ai_service import GEMINI_MODEL
@@ -8,23 +8,170 @@ import uuid
 import json
 import base64
 import fitz
+import os
+import datetime
 
 router = APIRouter()
 
+DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+FOLDERS_FILE = os.path.join(DATA_DIR, "doc_vault_folders.json")
+DOC_MAPPINGS_FILE = os.path.join(DATA_DIR, "doc_folder_mappings.json")
+
+def _load_json(filepath, default):
+    if not os.path.exists(filepath):
+        return default
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return default
+
+def _save_json(filepath, data):
+    try:
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        print("[WARNING] Could not save json data:", e)
+
 class DocumentProcessRequest(BaseModel):
     workbench_id: str
+
+class CreateFolderRequest(BaseModel):
+    workbench_id: str
+    name: str
+    parent_id: Optional[str] = None
+    color: Optional[str] = "#14b8a6"
+
+class UpdateFolderRequest(BaseModel):
+    name: Optional[str] = None
+    color: Optional[str] = None
+    parent_id: Optional[str] = None
+
+class MoveDocumentRequest(BaseModel):
+    folder_id: Optional[str] = None
+
+@router.get("/folders/{workbench_id}")
+async def list_folders(workbench_id: str):
+    try:
+        res = supabase.table("di_folders").select("*").eq("workbench_id", workbench_id).execute()
+        if res.data is not None:
+            # Merge with local fallback to ensure no data loss
+            folders = res.data
+            local_folders = [f for f in _load_json(FOLDERS_FILE, []) if f.get("workbench_id") == workbench_id]
+            existing_ids = {f["id"] for f in folders}
+            for lf in local_folders:
+                if lf["id"] not in existing_ids:
+                    folders.append(lf)
+            return folders
+    except Exception:
+        pass
+    
+    folders = _load_json(FOLDERS_FILE, [])
+    wb_folders = [f for f in folders if f.get("workbench_id") == workbench_id]
+    return wb_folders
+
+@router.post("/folders")
+async def create_folder(req: CreateFolderRequest):
+    folder_id = str(uuid.uuid4())
+    now_iso = datetime.datetime.utcnow().isoformat()
+    parent_id = req.parent_id if (req.parent_id and req.parent_id != "null" and req.parent_id != "") else None
+    folder_row = {
+        "id": folder_id,
+        "workbench_id": req.workbench_id,
+        "name": req.name,
+        "parent_id": parent_id,
+        "color": req.color or "#14b8a6",
+        "created_at": now_iso,
+        "updated_at": now_iso
+    }
+    
+    try:
+        res = supabase.table("di_folders").insert(folder_row).execute()
+        if res.data:
+            folder_row = res.data[0]
+    except Exception as e:
+        print("[NOTICE] Supabase di_folders table insert notice (using local JSON store):", e)
+        
+    folders = _load_json(FOLDERS_FILE, [])
+    folders.append(folder_row)
+    _save_json(FOLDERS_FILE, folders)
+    return folder_row
+
+@router.put("/folders/{folder_id}")
+async def update_folder(folder_id: str, req: UpdateFolderRequest):
+    updates = {k: v for k, v in req.dict().items() if v is not None}
+    updates["updated_at"] = datetime.datetime.utcnow().isoformat()
+    
+    try:
+        supabase.table("di_folders").update(updates).eq("id", folder_id).execute()
+    except Exception:
+        pass
+        
+    folders = _load_json(FOLDERS_FILE, [])
+    updated_folder = None
+    for f in folders:
+        if f.get("id") == folder_id:
+            f.update(updates)
+            updated_folder = f
+            break
+    _save_json(FOLDERS_FILE, folders)
+    if not updated_folder:
+        updated_folder = {"id": folder_id, **updates}
+    return updated_folder
+
+@router.delete("/folders/{folder_id}")
+async def delete_folder(folder_id: str):
+    try:
+        supabase.table("di_folders").delete().eq("id", folder_id).execute()
+    except Exception:
+        pass
+        
+    folders = _load_json(FOLDERS_FILE, [])
+    folders = [f for f in folders if f.get("id") != folder_id]
+    _save_json(FOLDERS_FILE, folders)
+    
+    mappings = _load_json(DOC_MAPPINGS_FILE, {})
+    for d_id, f_id in list(mappings.items()):
+        if f_id == folder_id:
+            mappings[d_id] = None
+    _save_json(DOC_MAPPINGS_FILE, mappings)
+    
+    return {"status": "success", "deleted_folder_id": folder_id}
+
+@router.put("/{document_id}/move")
+async def move_document(document_id: str, req: MoveDocumentRequest):
+    target_folder_id = req.folder_id
+    try:
+        supabase.table("di_documents").update({"folder_id": target_folder_id}).eq("id", document_id).execute()
+    except Exception:
+        pass
+        
+    mappings = _load_json(DOC_MAPPINGS_FILE, {})
+    mappings[document_id] = target_folder_id
+    _save_json(DOC_MAPPINGS_FILE, mappings)
+    return {"status": "success", "document_id": document_id, "folder_id": target_folder_id}
 
 @router.get("/{workbench_id}")
 async def list_documents(workbench_id: str):
     try:
         res = supabase.table("di_documents").select("*, di_analysis_notes(*), di_document_processing_logs(*)").eq("workbench_id", workbench_id).execute()
-        return res.data
+        docs = res.data or []
+        mappings = _load_json(DOC_MAPPINGS_FILE, {})
+        for d in docs:
+            d_id = d.get("id")
+            if d_id in mappings:
+                d["folder_id"] = mappings[d_id]
+            elif "folder_id" not in d:
+                d["folder_id"] = None
+        return docs
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/upload")
 async def upload_document(
     workbench_id: str = Form(...),
+    folder_id: Optional[str] = Form(None),
     file: UploadFile = File(...)
 ):
     try:
@@ -58,10 +205,24 @@ async def upload_document(
             "size_bytes": len(file_bytes),
             "file_hash": str(uuid.uuid4()) # In real app, calculate real hash
         }
+        if folder_id:
+            doc_data["folder_id"] = folder_id
         
-        doc_res = supabase.table("di_documents").insert(doc_data).execute()
+        doc_res = None
+        try:
+            doc_res = supabase.table("di_documents").insert(doc_data).execute()
+        except Exception:
+            # If folder_id column doesn't exist on di_documents yet, retry without folder_id
+            doc_data_no_folder = {k: v for k, v in doc_data.items() if k != "folder_id"}
+            doc_res = supabase.table("di_documents").insert(doc_data_no_folder).execute()
+
         document_id = doc_res.data[0]['id']
         
+        if folder_id:
+            mappings = _load_json(DOC_MAPPINGS_FILE, {})
+            mappings[document_id] = folder_id
+            _save_json(DOC_MAPPINGS_FILE, mappings)
+
         # Log the upload
         supabase.table("di_document_processing_logs").insert({
             "document_id": document_id,
@@ -69,6 +230,21 @@ async def upload_document(
             "provider": "system",
             "status": "success"
         }).execute()
+
+        # Emit workbench-encapsulated notification to workbench members
+        try:
+            members_res = supabase.table("workbench_members").select("user_id").eq("workbench_id", workbench_id).execute()
+            if members_res.data:
+                notif_rows = [{
+                    "workbench_id": workbench_id,
+                    "user_id": m["user_id"],
+                    "title": "New Document Uploaded",
+                    "message": f"New file '{file.filename}' was uploaded to Document Vault.",
+                    "link": "/dashboard/workbench/doc-vault"
+                } for m in members_res.data]
+                supabase.table("notifications").insert(notif_rows).execute()
+        except Exception as notif_err:
+            print("[WARNING] Could not emit document upload notification:", notif_err)
 
         # Automatically trigger background AI extraction
         import asyncio

@@ -14,12 +14,12 @@ export default function PipelineColumn({
 }) {
   return (
     <div 
-      className="flex-1 min-w-[300px] max-w-[340px] flex flex-col bg-[#111319] border-r border-white/10 last:border-r-0 h-full"
+      className="flex-1 min-w-[300px] max-w-[340px] flex flex-col bg-[#141414] border-r border-white/10 last:border-r-0 h-full"
       onDrop={(e) => onDrop(e, stage.id)}
       onDragOver={onDragOver}
     >
       {/* Stage Header */}
-      <div className="p-4 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#141722] z-10">
+      <div className="p-4 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#181818] z-10">
         <h3 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
           {stage.icon && <stage.icon className={`text-base ${stage.color || 'text-teal-400'}`} />}
           {stage.label}

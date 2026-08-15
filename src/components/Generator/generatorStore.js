@@ -15,35 +15,8 @@ const DEFAULT_DISCOUNT_TAGS = [
   { id: 'tag_4', code: 'REF-PATEL', type: 'flat', value: 1000, minOrder: 10000, validUntil: '2026-12-31', active: true, desc: '₹1,000 Referral credit from Patel Enterprise' },
 ];
 
-// Initial mock invoices so user can immediately test linking Credit Notes
-const DEFAULT_INVOICES = [
-  {
-    id: 'INV-2026-001',
-    invoiceNumber: 'INV-2026-001',
-    stage: 'SALES_INVOICE',
-    date: '2026-07-15',
-    partyName: 'Apex Logistics Ltd',
-    partyGstin: '27AABCU9603R1ZM',
-    amount: 145000,
-    status: 'Issued',
-    lineItems: [
-      { description: 'Industrial Conveyor Belt (SKU-INV-88)', hsnSac: '8428', quantity: 2, rate: 61440, taxRate: 18, total: 145000 }
-    ]
-  },
-  {
-    id: 'INV-2026-002',
-    invoiceNumber: 'INV-2026-002',
-    stage: 'PROFORMA',
-    date: '2026-07-18',
-    partyName: 'Zenith Tech Solutions',
-    partyGstin: '29AAACZ1234F1Z5',
-    amount: 88500,
-    status: 'Pending Negotiation',
-    lineItems: [
-      { description: 'Cloud Server Rack Hardware (SKU-SRV-01)', hsnSac: '8471', quantity: 1, rate: 75000, taxRate: 18, total: 88500 }
-    ]
-  }
-];
+// Initial mock invoices array (empty by default so only real issued/uploaded invoices appear)
+const DEFAULT_INVOICES = [];
 
 export const getStoredInvoices = () => {
   try {

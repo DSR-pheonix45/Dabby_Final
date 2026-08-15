@@ -101,7 +101,7 @@ export default function COA() {
 
   return (
     <div className="flex-1 h-full bg-[#111111] overflow-y-auto">
-      <div className="p-8 max-w-7xl mx-auto space-y-8">
+      <div className="p-8 w-full space-y-8">
         
         {/* Header */}
         <div>

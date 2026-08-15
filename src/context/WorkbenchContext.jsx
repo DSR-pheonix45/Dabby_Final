@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
 import { toast } from "react-hot-toast";
+import { collaborationService } from "../services/collaborationService";
 
 const WorkbenchContext = createContext();
 
@@ -46,18 +47,45 @@ export function WorkbenchProvider({ children }) {
 
       if (error) throw error;
 
-      setWorkbenches(data || []);
+      let list = data || [];
+
+      // Auto-heal missing license keys / passwords for legacy workbenches
+      const healPromises = list.map(async (wb) => {
+        if (!wb.license_key || !wb.access_password) {
+          const newKey = wb.license_key || `WB-${wb.id.substring(0, 4).toUpperCase()}-${wb.id.substring(4, 8).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+          const newPass = wb.access_password || `Wb-${wb.id.substring(0, 6)}`;
+          try {
+            const { error: healErr } = await supabase.from("workbenches").update({
+              license_key: newKey,
+              access_password: newPass
+            }).eq("id", wb.id);
+            if (healErr) {
+              // Silently handle schema cache error if license columns do not exist in DB yet
+            }
+            wb.license_key = newKey;
+            wb.access_password = newPass;
+          } catch (e) {
+            wb.license_key = newKey;
+            wb.access_password = newPass;
+          }
+        }
+        return wb;
+      });
+
+      list = await Promise.all(healPromises);
+
+      setWorkbenches(list);
 
       // If we have workbenches, set the active one
-      if (data && data.length > 0) {
+      if (list && list.length > 0) {
         // Try to restore previous active workbench from localStorage
         const savedWorkbenchId = localStorage.getItem("dabby_active_workbench");
-        const found = data.find((w) => w.id === savedWorkbenchId);
+        const found = list.find((w) => w.id === savedWorkbenchId);
         if (found) {
           setActiveWorkbench(found);
         } else {
-          setActiveWorkbench(data[0]);
-          localStorage.setItem("dabby_active_workbench", data[0].id);
+          setActiveWorkbench(list[0]);
+          localStorage.setItem("dabby_active_workbench", list[0].id);
         }
       } else {
         setActiveWorkbench(null);
@@ -78,6 +106,107 @@ export function WorkbenchProvider({ children }) {
     }
   };
 
+  const deleteWorkbench = async (workbenchId) => {
+    if (!workbenchId) return { error: new Error("No workbench ID provided") };
+
+    // Primary Attempt: Backend FastAPI endpoint (uses Service Role Key to bypass RLS)
+    try {
+      await collaborationService.deleteWorkbench(workbenchId);
+      if (activeWorkbench?.id === workbenchId) {
+        setActiveWorkbench(null);
+        localStorage.removeItem("dabby_active_workbench");
+      }
+      try {
+        localStorage.removeItem(`dabby_wb_settings_${workbenchId}`);
+      } catch (e) {}
+
+      await fetchWorkbenches();
+      return { error: null };
+    } catch (apiErr) {
+      console.warn("[deleteWorkbench] Backend API call failed, attempting client-side cascade cleanup:", apiErr);
+    }
+
+    // Fallback Attempt: Direct Supabase Client CASCADE cleanup
+    try {
+      // 1. Delete di_ledger_transactions (PostgreSQL CASCADE automatically deletes all di_ledger_entries)
+      try {
+        await supabase.from("di_ledger_transactions").delete().eq("workbench_id", workbenchId);
+      } catch (e) {
+        console.warn("di_ledger_transactions cleanup warning:", e);
+      }
+
+      // 2. Delete di_workbench_labels
+      try {
+        await supabase.from("di_workbench_labels").delete().eq("workbench_id", workbenchId);
+      } catch (e) {}
+
+      // 3. Delete di_accounts (safe now that di_ledger_entries are cascade-deleted)
+      try {
+        await supabase.from("di_accounts").delete().eq("workbench_id", workbenchId);
+      } catch (e) {}
+
+      // 4. Delete Document Vault records (di_documents and child notes/logs)
+      try {
+        const { data: docs } = await supabase
+          .from("di_documents")
+          .select("id")
+          .eq("workbench_id", workbenchId);
+
+        if (docs && docs.length > 0) {
+          const docIds = docs.map((d) => d.id);
+          try {
+            await supabase.from("di_analysis_notes").delete().in("document_id", docIds);
+          } catch (e) {}
+          try {
+            await supabase.from("di_document_processing_logs").delete().in("document_id", docIds);
+          } catch (e) {}
+        }
+        await supabase.from("di_documents").delete().eq("workbench_id", workbenchId);
+      } catch (e) {}
+
+      // 5. Delete parties
+      try {
+        await supabase.from("parties").delete().eq("workbench_id", workbenchId);
+      } catch (e) {}
+
+      // 6. Delete workbench_accounts
+      try {
+        await supabase.from("workbench_accounts").delete().eq("workbench_id", workbenchId);
+      } catch (e) {}
+
+      // 7. Delete workbench_members membership row
+      try {
+        await supabase.from("workbench_members").delete().eq("workbench_id", workbenchId);
+      } catch (e) {}
+
+      // 8. Delete parent workbench record
+      const { error } = await supabase
+        .from("workbenches")
+        .delete()
+        .eq("id", workbenchId);
+
+      if (error) {
+        console.error("Error deleting workbench record:", error);
+        return { error };
+      }
+
+      // Cleanup local storage & active workbench state
+      if (activeWorkbench?.id === workbenchId) {
+        setActiveWorkbench(null);
+        localStorage.removeItem("dabby_active_workbench");
+      }
+      try {
+        localStorage.removeItem(`dabby_wb_settings_${workbenchId}`);
+      } catch (e) {}
+
+      await fetchWorkbenches();
+      return { error: null };
+    } catch (err) {
+      console.error("deleteWorkbench fallback error:", err);
+      return { error: err };
+    }
+  };
+
   return (
     <WorkbenchContext.Provider
       value={{
@@ -88,6 +217,7 @@ export function WorkbenchProvider({ children }) {
         loading,
         fetchWorkbenches,
         changeActiveWorkbench,
+        deleteWorkbench,
       }}
     >
       {children}

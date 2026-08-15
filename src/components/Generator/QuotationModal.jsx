@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { BsX, BsSend, BsFileEarmarkPdf, BsTag, BsGear, BsTrash, BsPlusLg, BsBuilding } from "react-icons/bs";
+import { BsX, BsSend, BsFileEarmarkPdf, BsTag, BsGear, BsTrash, BsPlusLg, BsBuilding, BsInfoCircle } from "react-icons/bs";
 import { toast } from "react-hot-toast";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { formatCurrency } from "../../utils/currency";
@@ -8,15 +8,44 @@ import { getWorkbenchCompanyDetails } from "../../utils/workbenchCompanyHelper";
 import { saveDocumentToDocVaultAndEngine } from "../../utils/docVaultExporter";
 import DynamicColumnConfigurator, { DEFAULT_COLUMNS } from "./DynamicColumnConfigurator";
 import PartySelector from "./PartySelector";
+import DocumentBrandingToolbar from "./DocumentBrandingToolbar";
+import HsnLookupModal from "./HsnLookupModal";
 
-export default function QuotationModal({ isOpen, onClose }) {
+export default function QuotationModal({ isOpen, onClose, isPage = false }) {
   const { activeWorkbench } = useWorkbench();
+  const company = getWorkbenchCompanyDetails(activeWorkbench);
+
   const [isSavingDoc, setIsSavingDoc] = useState(false);
   const [quoteNumber, setQuoteNumber] = useState(`QT-${Math.floor(1000 + Math.random() * 9000)}`);
   const [quoteDate, setQuoteDate] = useState(new Date().toISOString().split("T")[0]);
   const [expiryDate, setExpiryDate] = useState(
     new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
   );
+  
+  // HSN Lookup Modal State
+  const [isHsnModalOpen, setIsHsnModalOpen] = useState(false);
+  const [targetHsnIdx, setTargetHsnIdx] = useState(null);
+
+  const openHsnFinder = (idx) => {
+    setTargetHsnIdx(idx);
+    setIsHsnModalOpen(true);
+  };
+
+  const handleApplyHsn = (hsnItem) => {
+    if (targetHsnIdx === null) return;
+    const updated = [...items];
+    if (updated[targetHsnIdx]) {
+      updated[targetHsnIdx].hsn = hsnItem.code;
+      setItems(updated);
+    }
+  };
+  
+  // Branding & Template State
+  const [templateStyle, setTemplateStyle] = useState("modern");
+  const [logo, setLogo] = useState(company.logo || null);
+  const [letterhead, setLetterhead] = useState(null);
+  const [stamp, setStamp] = useState(null);
+  const [signature, setSignature] = useState(null);
   
   // Billing Details
   const [partyName, setPartyName] = useState("");
@@ -42,7 +71,7 @@ export default function QuotationModal({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  const addItem = () => setItems([...items, { description: "New Item", subDetails: "", hsn: "7308", qty: 1, unit: "pcs", rate: 5000 }]);
+  const addItem = () => setItems([...items, { description: "", subDetails: "", hsn: "", qty: 1, unit: "pcs", rate: 0 }]);
   const updateItem = (idx, field, val) => {
     const updated = [...items];
     updated[idx][field] = field === "qty" || field === "rate" ? Number(val) || 0 : val;
@@ -67,8 +96,6 @@ export default function QuotationModal({ isOpen, onClose }) {
     }));
   };
 
-  const company = getWorkbenchCompanyDetails(activeWorkbench);
-
   const generatePDFDoc = () => {
     return generateStandardDocumentPDF({
       documentType: "QUOTATION",
@@ -81,6 +108,11 @@ export default function QuotationModal({ isOpen, onClose }) {
       senderPan: company.pan,
       senderCin: company.cin,
       senderEmail: company.email,
+      logo: logo,
+      letterhead: letterhead,
+      stamp: stamp,
+      signature: signature,
+      templateStyle: templateStyle,
       clientName: partyName,
       clientAddress: clientAddress,
       placeOfSupply: placeOfSupply,
@@ -136,9 +168,12 @@ export default function QuotationModal({ isOpen, onClose }) {
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl">
+   if (!isOpen && !isPage) return null;
+
+  const content = (
+    <div className={`bg-[#141414] border border-white/10 rounded-2xl w-full overflow-hidden shadow-2xl flex flex-col ${
+      isPage ? "max-w-6xl mx-auto my-6 border border-white/10" : "max-w-4xl"
+    }`}>
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-white/10 bg-[#1a1a1a]">
           <h3 className="text-lg font-bold text-white flex items-center">
@@ -163,6 +198,20 @@ export default function QuotationModal({ isOpen, onClose }) {
               <input type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-sm text-white" />
             </div>
           </div>
+
+          {/* Document Branding, Letterhead & PDF Template Selector */}
+          <DocumentBrandingToolbar
+            templateStyle={templateStyle}
+            setTemplateStyle={setTemplateStyle}
+            logo={logo}
+            setLogo={setLogo}
+            letterhead={letterhead}
+            setLetterhead={setLetterhead}
+            stamp={stamp}
+            setStamp={setStamp}
+            signature={signature}
+            setSignature={setSignature}
+          />
 
           {/* Billing & Shipping Section */}
           <div className="p-4 bg-[#181818] border border-white/10 rounded-xl space-y-3">
@@ -284,7 +333,19 @@ export default function QuotationModal({ isOpen, onClose }) {
                     col.type === "number" || col.type === "amount" ? "text-right" : "text-left"
                   }`}
                 >
-                  <span className="truncate">{col.label}</span>
+                  <span className="truncate flex items-center gap-1">
+                    <span>{col.label}</span>
+                    {col.id === "hsn" && (
+                      <button
+                        type="button"
+                        onClick={() => openHsnFinder(0)}
+                        className="text-teal-400 hover:text-teal-300 transition-colors p-0.5"
+                        title="Search GST HSN/SAC Code Directory"
+                      >
+                        <BsInfoCircle size={11} />
+                      </button>
+                    )}
+                  </span>
                   {col.removable && (
                     <button
                       type="button"
@@ -313,6 +374,18 @@ export default function QuotationModal({ isOpen, onClose }) {
                         <div key={col.id} className="flex-1 min-w-[90px] text-right text-xs text-blue-400 font-bold px-2 py-1.5">
                           {formatCurrency(q * r, activeWorkbench?.country)}
                         </div>
+                      );
+                    }
+                    if (col.id === "hsn") {
+                      return (
+                        <input
+                          key={col.id}
+                          type="text"
+                          value={it.hsn !== undefined ? it.hsn : ""}
+                          onChange={(e) => updateItem(idx, "hsn", e.target.value)}
+                          placeholder="HSN/SAC"
+                          className="flex-1 min-w-[90px] bg-[#1e1e1e] border border-white/10 rounded p-1.5 text-xs text-white text-left font-mono"
+                        />
                       );
                     }
                     return (
@@ -375,6 +448,29 @@ export default function QuotationModal({ isOpen, onClose }) {
           </button>
         </div>
       </div>
+  );
+
+  if (isPage) {
+    return (
+      <div className="flex-1 w-full bg-[#111111] overflow-y-auto p-4 sm:p-6 lg:p-8 font-dm-sans">
+        {content}
+        <HsnLookupModal
+          isOpen={isHsnModalOpen}
+          onClose={() => setIsHsnModalOpen(false)}
+          onSelectHsn={handleApplyHsn}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-dm-sans overflow-y-auto">
+      {content}
+      <HsnLookupModal
+        isOpen={isHsnModalOpen}
+        onClose={() => setIsHsnModalOpen(false)}
+        onSelectHsn={handleApplyHsn}
+      />
     </div>
   );
 }

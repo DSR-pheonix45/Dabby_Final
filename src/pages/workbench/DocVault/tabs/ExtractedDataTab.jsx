@@ -63,7 +63,12 @@ export default function ExtractedDataTab({ doc, onUpdate }) {
   const handleFieldChange = (section, field, newValue) => {
     setData(prev => {
       const updated = { ...prev };
-      if (!updated[section]) updated[section] = {};
+      
+      // If section is a primitive (like string document_type or predicted_label)
+      if (typeof updated[section] !== 'object' || updated[section] === null) {
+        updated[section] = newValue;
+        return updated;
+      }
       
       if (typeof updated[section][field] === 'object' && updated[section][field] !== null) {
         updated[section][field] = { ...updated[section][field], value: newValue };

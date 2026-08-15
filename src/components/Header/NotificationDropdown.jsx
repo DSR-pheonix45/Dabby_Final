@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { BsBell, BsCheck2All } from "react-icons/bs";
+import { BsBell, BsCheck2All, BsBuilding } from "react-icons/bs";
 import { apiFetch } from "../../lib/apiClient";
 import { useNavigate } from "react-router-dom";
+import { useWorkbench } from "../../context/WorkbenchContext";
 
 export default function NotificationDropdown() {
+  const { activeWorkbench } = useWorkbench();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -14,7 +16,7 @@ export default function NotificationDropdown() {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 60000); // Poll every minute
     return () => clearInterval(interval);
-  }, []);
+  }, [activeWorkbench?.id]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -27,12 +29,15 @@ export default function NotificationDropdown() {
   }, []);
 
   const fetchNotifications = async () => {
+    if (!activeWorkbench?.id) return;
     try {
-      const res = await apiFetch('/api/collaboration/user/notifications');
+      const res = await apiFetch(`/api/collaboration/user/notifications?workbench_id=${encodeURIComponent(activeWorkbench.id)}`);
       if (res.ok) {
         const data = await res.json();
-        setNotifications(data);
-        setUnreadCount(data.filter(n => !n.is_read).length);
+        // Strict multi-tenant isolation fallback: filter strictly by active workbench ID
+        const workbenchEncapsulated = data.filter(n => n.workbench_id === activeWorkbench.id);
+        setNotifications(workbenchEncapsulated);
+        setUnreadCount(workbenchEncapsulated.filter(n => !n.is_read).length);
       }
     } catch (err) {
       console.error("Failed to fetch notifications");
@@ -74,10 +79,17 @@ export default function NotificationDropdown() {
 
       {isOpen && (
         <div className="absolute right-0 mt-2 w-80 bg-[#181818] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden font-dm-sans">
-          <div className="flex items-center justify-between p-4 border-b border-white/10 bg-[#1A1A1A]">
-            <h3 className="text-sm font-bold text-white">Notifications</h3>
+          <div className="flex items-center justify-between p-3.5 border-b border-white/10 bg-[#1A1A1A]">
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                Notifications
+              </h3>
+              <span className="text-[10px] text-teal-400 font-semibold flex items-center gap-1">
+                <BsBuilding className="text-[9px]" /> {activeWorkbench?.name || "Active Workbench"}
+              </span>
+            </div>
             {unreadCount > 0 && (
-              <span className="text-xs text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-full font-medium">
+              <span className="text-xs text-teal-400 bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded-full font-medium">
                 {unreadCount} new
               </span>
             )}

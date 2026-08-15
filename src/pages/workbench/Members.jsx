@@ -182,7 +182,7 @@ export default function Members() {
               className="flex items-center space-x-2 px-3.5 py-2 bg-teal-500 hover:bg-teal-400 text-black rounded-xl text-xs font-extrabold transition-all"
             >
               <BsPersonPlus size={14} />
-              <span>+ Invite Platform Member</span>
+              <span>Invite Platform Member</span>
             </button>
           )}
 
@@ -192,7 +192,7 @@ export default function Members() {
               className="flex items-center space-x-2 px-3.5 py-2 bg-teal-500 hover:bg-teal-400 text-black rounded-xl text-xs font-extrabold transition-all"
             >
               <BsPlusLg size={13} />
-              <span>+ Add Department</span>
+              <span>Add Department</span>
             </button>
           )}
 
@@ -202,7 +202,7 @@ export default function Members() {
               className="flex items-center space-x-2 px-3.5 py-2 bg-teal-500 hover:bg-teal-400 text-black rounded-xl text-xs font-extrabold transition-all"
             >
               <BsPlusLg size={13} />
-              <span>+ Add Employee</span>
+              <span>Add Employee</span>
             </button>
           )}
         </div>
@@ -251,7 +251,7 @@ export default function Members() {
 
       {/* Main Tab Content */}
       <div className="flex-1 overflow-auto p-6 lg:p-10">
-        <div className="max-w-7xl mx-auto space-y-6">
+        <div className="w-full space-y-6">
 
           {/* Search Bar */}
           <div className="relative max-w-md">

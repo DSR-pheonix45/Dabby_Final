@@ -3,11 +3,13 @@ import {
   BsThreeDots,
   BsGear,
   BsBoxArrowRight,
+  BsLaptop,
 } from "react-icons/bs";
 import { HiChevronDown } from "react-icons/hi";
 import { useAuth } from "../../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import NotificationDropdown from "./NotificationDropdown";
+import DesktopShortcutModal from "../common/DesktopShortcutModal";
 
 export default function Header({
   onMobileMenuClick,
@@ -16,6 +18,7 @@ export default function Header({
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isDesktopModalOpen, setIsDesktopModalOpen] = useState(false);
 
   return (
     <>
@@ -99,6 +102,16 @@ export default function Header({
                   <div className="p-1">
                     <button
                       onClick={() => {
+                        setIsDesktopModalOpen(true);
+                        setIsMenuOpen(false);
+                      }}
+                      className="w-full flex items-center space-x-2 px-3 py-2 text-[#9BA3AF] hover:bg-[#161B22] hover:text-white rounded-md transition-colors text-left"
+                    >
+                      <BsLaptop className="text-sm text-teal-400" />
+                      <span className="text-sm">Add Desktop Icon</span>
+                    </button>
+                    <button
+                      onClick={() => {
                         navigate("/dashboard/settings");
                         setIsMenuOpen(false);
                       }}
@@ -124,6 +137,12 @@ export default function Header({
           </div>
         </div>
       </div>
+
+      {/* Desktop Shortcut / PWA Modal */}
+      <DesktopShortcutModal
+        isOpen={isDesktopModalOpen}
+        onClose={() => setIsDesktopModalOpen(false)}
+      />
     </>
   );
 }

@@ -3,7 +3,7 @@ import { BsX, BsTag, BsPlus, BsCheck2, BsClipboard, BsCheckCircleFill, BsShieldC
 import { toast } from "react-hot-toast";
 import { getStoredDiscountTags, saveDiscountTag } from "./generatorStore";
 
-export default function DiscountCouponModal({ isOpen, onClose }) {
+export default function DiscountCouponModal({ isOpen, onClose, isPage = false }) {
   const [tags, setTags] = useState([]);
   const [code, setCode] = useState("");
   const [type, setType] = useState("percentage"); // 'percentage' or 'flat'
@@ -49,11 +49,12 @@ export default function DiscountCouponModal({ isOpen, onClose }) {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !isPage) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-dm-sans">
-      <div className="bg-[#121212] border border-white/10 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+  const content = (
+    <div className={`bg-[#121212] border border-white/10 rounded-2xl w-full overflow-hidden shadow-2xl flex flex-col ${
+      isPage ? "max-w-6xl mx-auto my-6 border border-white/10" : "max-w-3xl max-h-[90vh]"
+    }`}>
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#181818]">
@@ -219,6 +220,19 @@ export default function DiscountCouponModal({ isOpen, onClose }) {
         </div>
 
       </div>
+  );
+
+  if (isPage) {
+    return (
+      <div className="flex-1 w-full bg-[#111111] overflow-y-auto p-4 sm:p-6 lg:p-8 font-dm-sans">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-dm-sans overflow-y-auto">
+      {content}
     </div>
   );
 }

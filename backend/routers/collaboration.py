@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional, Dict
 from pydantic import BaseModel
 from supabase_client import supabase
@@ -86,6 +86,13 @@ class RoleInvite(BaseModel):
 
 class JoinToken(BaseModel):
     token: str
+
+class AccessByLicense(BaseModel):
+    license_key: str
+    access_password: str
+
+class PasswordUpdate(BaseModel):
+    access_password: str
 
 class RoleUpdate(BaseModel):
     role: str
@@ -217,6 +224,122 @@ def join_workbench(payload: JoinToken, user = Depends(get_current_user_no_waitli
         raise HTTPException(status_code=400, detail="Invite link has expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=400, detail="Invalid invite link")
+
+@router.post("/access-by-license")
+def access_by_license(payload: AccessByLicense, user = Depends(get_current_user_no_waitlist)):
+    clean_key = payload.license_key.strip().upper()
+    clean_pass = payload.access_password.strip()
+    
+    if not clean_key or not clean_pass:
+        raise HTTPException(status_code=400, detail="Both License Key and Password are required.")
+        
+    # Query workbench by license_key
+    wb_res = supabase.table("workbenches").select("*").eq("license_key", clean_key).execute()
+    if not wb_res.data:
+        raise HTTPException(status_code=404, detail="Invalid License Key or Workbench not found.")
+        
+    wb = wb_res.data[0]
+    
+    # Check access_password
+    stored_password = (wb.get("access_password") or "").strip()
+    if not stored_password or stored_password != clean_pass:
+        raise HTTPException(status_code=401, detail="Incorrect Access Password for this Workbench.")
+        
+    workbench_id = wb["id"]
+    user_id = user["id"]
+    
+    # Check if user is already a member
+    existing = supabase.table("workbench_members").select("*").eq("workbench_id", workbench_id).eq("user_id", user_id).execute()
+    if existing.data:
+        return {
+            "status": "already_member",
+            "workbench": wb,
+            "membership": existing.data[0]
+        }
+        
+    # Insert new active member into workbench_members
+    res = supabase.table("workbench_members").insert({
+        "workbench_id": workbench_id,
+        "user_id": user_id,
+        "role": "admin",
+        "status": "active"
+    }).execute()
+    
+    # Best-effort insert into user_members table
+    try:
+        supabase.table("user_members").insert({
+            "user_id": user_id,
+            "workbench_id": workbench_id,
+            "role": "admin"
+        }).execute()
+    except Exception:
+        pass
+
+    # Log activity
+    try:
+        supabase.table("activity_logs").insert({
+            "workbench_id": workbench_id,
+            "user_id": user_id,
+            "action_type": "member_joined_via_license",
+            "entity_type": "member",
+            "entity_id": user_id,
+            "description": "User joined workbench via License Key and Password"
+        }).execute()
+    except Exception:
+        pass
+        
+    return {
+        "status": "success",
+        "workbench": wb,
+        "membership": res.data[0] if res.data else {}
+    }
+
+@router.patch("/{workbench_id}/password")
+def update_workbench_password(workbench_id: str, payload: PasswordUpdate, user = Depends(get_current_user_no_waitlist)):
+    new_pass = payload.access_password.strip()
+    if not new_pass:
+        raise HTTPException(status_code=400, detail="Password cannot be empty.")
+
+    # 1. Verify workbench exists
+    wb_res = supabase.table("workbenches").select("*").eq("id", workbench_id).execute()
+    if not wb_res.data:
+        raise HTTPException(status_code=404, detail="Workbench not found.")
+
+    wb = wb_res.data[0]
+
+    # 2. Strict owner verification
+    is_creator = wb.get("created_by") == user["id"]
+    is_owner_member = False
+    if not is_creator:
+        mem_res = supabase.table("workbench_members").select("role").eq("workbench_id", workbench_id).eq("user_id", user["id"]).execute()
+        if mem_res.data and mem_res.data[0].get("role") == "owner":
+            is_owner_member = True
+
+    if not is_creator and not is_owner_member:
+        raise HTTPException(status_code=403, detail="Only the owner of this workbench is allowed to edit its access password.")
+
+    # 3. Update password in workbenches table
+    res = supabase.table("workbenches").update({"access_password": new_pass}).eq("id", workbench_id).execute()
+    
+    # Log activity
+    try:
+        supabase.table("activity_logs").insert({
+            "workbench_id": workbench_id,
+            "user_id": user["id"],
+            "action_type": "workbench_password_updated",
+            "entity_type": "workbench",
+            "entity_id": workbench_id,
+            "description": "Owner updated workbench access password"
+        }).execute()
+    except Exception:
+        pass
+
+    return {
+        "status": "success",
+        "message": "Access password updated successfully.",
+        "access_password": new_pass,
+        "workbench": res.data[0] if res.data else wb
+    }
 
 @router.put("/{workbench_id}/members/{target_user_id}/role")
 def update_member_role(workbench_id: str, target_user_id: str, payload: RoleUpdate, user = Depends(get_current_user)):
@@ -365,9 +488,12 @@ def get_activity_logs(workbench_id: str, user = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/user/notifications")
-def get_notifications(user = Depends(get_current_user)):
+def get_notifications(workbench_id: Optional[str] = Query(None), user = Depends(get_current_user)):
     try:
-        res = supabase.table("notifications").select("*").eq("user_id", user["id"]).order("created_at", desc=True).limit(20).execute()
+        query = supabase.table("notifications").select("*").eq("user_id", user["id"])
+        if workbench_id:
+            query = query.eq("workbench_id", workbench_id)
+        res = query.order("created_at", desc=True).limit(20).execute()
         return res.data or []
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -626,5 +752,70 @@ def update_claim_status(workbench_id: str, claim_id: str, payload: ClaimStatusUp
             print("[WARNING] Event creation on claim approval:", event_err)
 
     return target_claim or {"id": claim_id, "status": payload.status}
+
+
+@router.delete("/{workbench_id}")
+def delete_workbench(workbench_id: str, current_user: dict = Depends(get_current_user_no_waitlist)):
+    # 1. Clean up di_ledger_transactions (triggers ON DELETE CASCADE on di_ledger_entries in Postgres)
+    try:
+        supabase.table("di_ledger_transactions").delete().eq("workbench_id", workbench_id).execute()
+    except Exception as e:
+        print("[WARNING] di_ledger_transactions delete:", e)
+
+    # 2. Clean up di_workbench_labels
+    try:
+        supabase.table("di_workbench_labels").delete().eq("workbench_id", workbench_id).execute()
+    except Exception as e:
+        pass
+
+    # 3. Clean up di_accounts (safe now that di_ledger_entries are removed)
+    try:
+        supabase.table("di_accounts").delete().eq("workbench_id", workbench_id).execute()
+    except Exception as e:
+        pass
+
+    # 4. Clean up di_documents and child notes/logs
+    try:
+        res = supabase.table("di_documents").select("id").eq("workbench_id", workbench_id).execute()
+        if res.data and len(res.data) > 0:
+            doc_ids = [d["id"] for d in res.data]
+            try:
+                supabase.table("di_analysis_notes").delete().in_("document_id", doc_ids).execute()
+            except Exception as e:
+                pass
+            try:
+                supabase.table("di_document_processing_logs").delete().in_("document_id", doc_ids).execute()
+            except Exception as e:
+                pass
+        supabase.table("di_documents").delete().eq("workbench_id", workbench_id).execute()
+    except Exception as e:
+        pass
+
+    # 5. Clean up parties
+    try:
+        supabase.table("parties").delete().eq("workbench_id", workbench_id).execute()
+    except Exception as e:
+        pass
+
+    # 6. Clean up workbench_accounts
+    try:
+        supabase.table("workbench_accounts").delete().eq("workbench_id", workbench_id).execute()
+    except Exception as e:
+        pass
+
+    # 7. Clean up workbench_members
+    try:
+        supabase.table("workbench_members").delete().eq("workbench_id", workbench_id).execute()
+    except Exception as e:
+        pass
+
+    # 8. Delete parent workbench record (bypasses RLS using Service Role key)
+    try:
+        del_res = supabase.table("workbenches").delete().eq("id", workbench_id).execute()
+        return {"success": True, "message": "Workbench deleted successfully", "data": del_res.data}
+    except Exception as e:
+        print("[ERROR] Failed to delete workbench row:", e)
+        raise HTTPException(status_code=500, detail=f"Failed to delete workbench: {str(e)}")
+
 
 

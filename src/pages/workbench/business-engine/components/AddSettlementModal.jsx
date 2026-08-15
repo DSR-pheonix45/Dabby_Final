@@ -60,10 +60,10 @@ export default function AddSettlementModal({ isOpen, onClose, data }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-      <div className="bg-[#0E1117] border border-[#1F242C] rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-[#181818] border border-white/10 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10 bg-black/20">
+        <div className="flex items-center justify-between p-4 border-b border-white/10 bg-[#181818]">
           <div>
             <h2 className="text-xl font-bold bg-gradient-to-r from-teal-400 to-cyan-500 bg-clip-text text-transparent">
               Payment Snippet & Settlement Engine

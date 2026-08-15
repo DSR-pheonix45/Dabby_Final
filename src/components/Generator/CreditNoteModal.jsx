@@ -4,14 +4,23 @@ import { toast } from "react-hot-toast";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { getStoredInvoices, saveCreditNote } from "./generatorStore";
+import PartySelector from "./PartySelector";
+import { useWorkbench } from "../../context/WorkbenchContext";
+import { getWorkbenchCompanyDetails } from "../../utils/workbenchCompanyHelper";
+import { diService } from "../../services/diService";
 
-export default function CreditNoteModal({ isOpen, onClose }) {
+export default function CreditNoteModal({ isOpen, onClose, isPage = false }) {
+  const { activeWorkbench } = useWorkbench();
+  const company = getWorkbenchCompanyDetails(activeWorkbench);
+
   const [cnNumber, setCnNumber] = useState(`CN-${Math.floor(1000 + Math.random() * 9000)}`);
   const [cnDate, setCnDate] = useState(new Date().toISOString().split("T")[0]);
 
   const [invoices, setInvoices] = useState([]);
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState("custom");
   const [manualInvoiceRef, setManualInvoiceRef] = useState("");
+  const [selectedParty, setSelectedParty] = useState({ name: "", gstin: "", address: "" });
+  const [manualInvoiceAmount, setManualInvoiceAmount] = useState(0);
 
   const [reason, setReason] = useState("Settlement Discount / Volume Adjustment");
   const [settlementType, setSettlementType] = useState("flat"); // 'flat' or 'percent'
@@ -19,18 +28,107 @@ export default function CreditNoteModal({ isOpen, onClose }) {
   const [remarks, setRemarks] = useState("Settlement add-on value discount applied per mutual agreement.");
 
   useEffect(() => {
-    const list = getStoredInvoices();
-    setInvoices(list);
-    if (list.length > 0) {
-      setSelectedInvoiceId(list[0].id);
+    // Purge legacy demo invoices from localStorage
+    const rawList = getStoredInvoices();
+    const cleanList = rawList.filter(i => 
+      i.partyName !== "Apex Logistics Ltd" && 
+      i.partyName !== "Zenith Tech Solutions" && 
+      !i.id?.includes("2026-001") && 
+      !i.id?.includes("2026-002") &&
+      !i.id?.includes("2983")
+    );
+    if (cleanList.length !== rawList.length) {
+      try {
+        localStorage.setItem('dabby_generator_invoices', JSON.stringify(cleanList));
+      } catch (e) {}
     }
-  }, [isOpen]);
+
+    let allInv = [...cleanList];
+
+    // Fetch Doc Vault documents if activeWorkbench exists
+    if (activeWorkbench?.id) {
+      diService.getDocuments(activeWorkbench.id).then(docs => {
+        if (Array.isArray(docs)) {
+          const vaultInvoices = docs.map(doc => {
+            const note = doc.di_analysis_notes?.[0] || {};
+            const recipientName = note.parties?.recipient?.name || note.parties?.issuer?.name || note.party_name || "";
+            const invNo = note.document_number || doc.doc_number || doc.file_name?.replace('.pdf', '') || `DOC-${doc.id?.slice(0, 6)}`;
+            const amount = note.money?.total_amount || 0;
+            const docDate = note.dates?.document_date || doc.created_at?.split('T')[0] || '';
+
+            return {
+              id: doc.id || invNo,
+              invoiceNumber: invNo,
+              partyName: recipientName,
+              amount: amount,
+              date: docDate,
+              source: 'doc_vault'
+            };
+          });
+
+          const existingIds = new Set(cleanList.map(i => i.id));
+          const newVaultItems = vaultInvoices.filter(i => !existingIds.has(i.id) && i.partyName);
+          allInv = [...cleanList, ...newVaultItems];
+          setInvoices(allInv);
+        }
+      }).catch(err => {
+        console.warn("Doc Vault invoices fetch notice:", err);
+      });
+    }
+
+    setInvoices(allInv);
+  }, [activeWorkbench?.id, isOpen]);
+
+  // Filter invoices belonging to selected party
+  const partyInvoices = selectedParty.name
+    ? invoices.filter(inv => 
+        inv.partyName && inv.partyName.trim().toLowerCase().includes(selectedParty.name.trim().toLowerCase())
+      )
+    : invoices;
+
+  const handleSelectParty = (p) => {
+    const partyObj = { name: p.name || "", gstin: p.gstin || "", address: p.address || "" };
+    setSelectedParty(partyObj);
+
+    if (p.name) {
+      const matching = invoices.filter(inv => 
+        inv.partyName && inv.partyName.trim().toLowerCase().includes(p.name.trim().toLowerCase())
+      );
+      if (matching.length > 0) {
+        const topInv = matching[0];
+        setSelectedInvoiceId(topInv.id);
+        setManualInvoiceRef(topInv.invoiceNumber || topInv.id);
+        setManualInvoiceAmount(Number(topInv.amount) || 0);
+      } else {
+        setSelectedInvoiceId("custom");
+        setManualInvoiceAmount(0);
+      }
+    }
+  };
+
+  const handleInvoiceChange = (invId) => {
+    setSelectedInvoiceId(invId);
+    if (invId === "custom") {
+      // Keep manual reference mode
+    } else {
+      const match = invoices.find(i => i.id === invId);
+      if (match) {
+        setManualInvoiceRef(match.invoiceNumber || match.id);
+        setManualInvoiceAmount(Number(match.amount) || 0);
+        if (match.partyName && !selectedParty.name) {
+          setSelectedParty(prev => ({ ...prev, name: match.partyName, gstin: match.partyGstin || prev.gstin }));
+        }
+      }
+    }
+  };
 
   const activeInvoice = invoices.find(i => i.id === selectedInvoiceId);
-  const targetInvoiceNo = activeInvoice ? activeInvoice.invoiceNumber : (manualInvoiceRef || "INV-2026-001");
-  const targetPartyName = activeInvoice ? activeInvoice.partyName : "Apex Logistics Ltd";
-  const targetPartyGstin = activeInvoice ? activeInvoice.partyGstin : "27AABCU9603R1ZM";
-  const originalInvoiceAmount = activeInvoice ? activeInvoice.amount : 145000;
+  const isCustomRef = selectedInvoiceId === "custom" || !activeInvoice;
+
+  const targetInvoiceNo = isCustomRef ? (manualInvoiceRef || "INV-REF") : (activeInvoice.invoiceNumber || activeInvoice.id);
+  const targetPartyName = selectedParty.name || (activeInvoice ? activeInvoice.partyName : "Customer");
+  const targetPartyGstin = selectedParty.gstin || (activeInvoice ? activeInvoice.partyGstin : "");
+  const originalInvoiceAmount = isCustomRef ? (Number(manualInvoiceAmount) || 0) : (Number(activeInvoice.amount) || 0);
 
   // Settlement Discount calculation
   let creditAmount = 0;
@@ -50,7 +148,7 @@ export default function CreditNoteModal({ isOpen, onClose }) {
       const doc = new jsPDF();
       doc.setFontSize(20);
       doc.setTextColor(239, 68, 68);
-      doc.text("DABBY ENTERPRISE PVT LTD", 14, 20);
+      doc.text(company.legalName || company.name || activeWorkbench?.name || "WORKBENCH COMPANY", 14, 20);
 
       doc.setFontSize(14);
       doc.setTextColor(40, 40, 40);
@@ -122,11 +220,12 @@ export default function CreditNoteModal({ isOpen, onClose }) {
     onClose();
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !isPage) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-dm-sans">
-      <div className="bg-[#121212] border border-white/10 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+  const content = (
+    <div className={`bg-[#121212] border border-white/10 rounded-2xl w-full overflow-hidden shadow-2xl flex flex-col ${
+      isPage ? "max-w-6xl mx-auto my-6 border border-white/10" : "max-w-3xl max-h-[90vh]"
+    }`}>
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#181818]">
@@ -169,31 +268,66 @@ export default function CreditNoteModal({ isOpen, onClose }) {
             </div>
           </div>
 
-          {/* Invoice Linking Section */}
+          {/* Invoice Linking & Party Selection */}
           <div className="p-5 rounded-xl bg-white/5 border border-white/5 space-y-4">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-white/10 pb-3">
               <BsLink45Deg className="text-red-400 text-lg" />
-              1. Link to Target Invoice
+              1. Party Selection & System Invoice Linking
             </h3>
 
+            {/* Row 1: Party Selector & Invoice Dropdown */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-gray-400 mb-1">Select Existing System Invoice</label>
-                <select
-                  value={selectedInvoiceId}
-                  onChange={(e) => setSelectedInvoiceId(e.target.value)}
-                  className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none"
-                >
-                  {invoices.map(inv => (
-                    <option key={inv.id} value={inv.id}>
-                      {inv.invoiceNumber} - {inv.partyName} (₹{inv.amount.toLocaleString('en-IN')})
-                    </option>
-                  ))}
-                  <option value="custom">-- Custom Reference --</option>
-                </select>
+                <label className="block text-gray-400 mb-1 font-semibold">Select Customer / Workbench Party</label>
+                <PartySelector
+                  value={selectedParty.name}
+                  placeholder="Select or Search Client..."
+                  filterType="customer"
+                  onSelectParty={handleSelectParty}
+                />
               </div>
 
-              {selectedInvoiceId === "custom" && (
+              <div>
+                <label className="block text-gray-400 mb-1 font-semibold">
+                  Select System Invoice {selectedParty.name ? `for ${selectedParty.name}` : ""}
+                </label>
+                <select
+                  value={selectedInvoiceId}
+                  onChange={(e) => handleInvoiceChange(e.target.value)}
+                  className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none"
+                >
+                  <option value="custom">-- Enter Custom / External Invoice Reference --</option>
+                  {partyInvoices.map(inv => (
+                    <option key={inv.id} value={inv.id}>
+                      {inv.invoiceNumber || inv.id} — ₹{Number(inv.amount || 0).toLocaleString('en-IN')} ({inv.date || 'Issued'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Status notification when invoices found for party */}
+            {selectedParty.name && partyInvoices.length > 0 && selectedInvoiceId !== "custom" && (
+              <div className="p-3 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-300 text-xs flex items-center justify-between">
+                <span>
+                  ✓ Auto-linked to invoice <strong>{targetInvoiceNo}</strong> (Original Value: ₹{originalInvoiceAmount.toLocaleString("en-IN")})
+                </span>
+                <span className="text-[11px] bg-teal-500/20 px-2.5 py-0.5 rounded-full text-teal-200 font-semibold">
+                  {partyInvoices.length} Invoice(s) Found
+                </span>
+              </div>
+            )}
+
+            {/* Status notification when no invoices found for party */}
+            {selectedParty.name && partyInvoices.length === 0 && (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
+                ℹ No recorded system invoices found for <strong>{selectedParty.name}</strong>. You can enter a custom invoice reference below.
+              </div>
+            )}
+
+            {/* Custom reference inputs */}
+            {(selectedInvoiceId === "custom" || partyInvoices.length === 0) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-white/5">
                 <div>
                   <label className="block text-gray-400 mb-1">Custom Reference Invoice #</label>
                   <input
@@ -201,32 +335,45 @@ export default function CreditNoteModal({ isOpen, onClose }) {
                     value={manualInvoiceRef}
                     onChange={(e) => setManualInvoiceRef(e.target.value)}
                     placeholder="e.g. INV-9982"
-                    className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none"
+                    className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none font-mono"
                   />
                 </div>
-              )}
-            </div>
+                <div>
+                  <label className="block text-gray-400 mb-1">Original Invoice Value (₹)</label>
+                  <input
+                    type="number"
+                    value={manualInvoiceAmount}
+                    onChange={(e) => setManualInvoiceAmount(parseFloat(e.target.value) || 0)}
+                    placeholder="e.g. 50000"
+                    className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+            )}
 
-            <div className="p-3 rounded-lg bg-[#181818] border border-white/5 text-gray-300 flex justify-between items-center">
+            {/* Summary card */}
+            <div className="p-3.5 rounded-xl bg-[#181818] border border-white/5 text-gray-300 flex justify-between items-center">
               <div>
                 <span className="font-semibold text-white">Linked Target: {targetInvoiceNo}</span>
-                <span className="block text-gray-400 text-[11px]">Party: {targetPartyName} | GSTIN: {targetPartyGstin}</span>
+                <span className="block text-gray-400 text-[11px]">
+                  Party: {targetPartyName} {targetPartyGstin ? `| GSTIN: ${targetPartyGstin}` : ""}
+                </span>
               </div>
               <div className="text-right">
-                <span className="text-[11px] text-gray-400">Original Invoice Value</span>
-                <span className="block font-bold text-white text-sm">₹{originalInvoiceAmount.toLocaleString('en-IN')}</span>
+                <span className="text-[11px] text-gray-400 block">Original Invoice Value</span>
+                <span className="font-bold text-white text-base">₹{originalInvoiceAmount.toLocaleString('en-IN')}</span>
               </div>
             </div>
           </div>
 
-          {/* Settlement & Discount Adjustment */}
+          {/* Settlement & Discount Details */}
           <div className="p-5 rounded-xl bg-white/5 border border-white/5 space-y-4">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-white/10 pb-3">
-              <BsCalculator className="text-red-400" />
-              2. Settlement & Add-on Value Discount
+              <BsCalculator className="text-red-400 text-lg" />
+              2. Settlement & Add-On Value Discount
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-gray-400 mb-1">Adjustment Reason</label>
                 <select
@@ -234,10 +381,10 @@ export default function CreditNoteModal({ isOpen, onClose }) {
                   onChange={(e) => setReason(e.target.value)}
                   className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none"
                 >
-                  <option value="Settlement Discount / Volume Adjustment">Settlement Discount</option>
-                  <option value="Goods Return / Material Defect">Goods Return</option>
-                  <option value="Price Difference Correction">Price Difference</option>
-                  <option value="Post-Sales Quality Incentive">Quality Incentive</option>
+                  <option value="Settlement Discount">Settlement Discount</option>
+                  <option value="Volume / Add-on Value Rebate">Volume / Add-on Value Rebate</option>
+                  <option value="Price Difference Adjustment">Price Difference Adjustment</option>
+                  <option value="Goods Return / Damage Offset">Goods Return / Damage Offset</option>
                 </select>
               </div>
 
@@ -255,40 +402,42 @@ export default function CreditNoteModal({ isOpen, onClose }) {
 
               <div>
                 <label className="block text-gray-400 mb-1">
-                  Settlement Value ({settlementType === 'flat' ? '₹' : '%'})
+                  Settlement Value {settlementType === "percent" ? "(%)" : "(₹)"}
                 </label>
                 <input
                   type="number"
                   value={settlementValue}
-                  onChange={(e) => setSettlementValue(e.target.value)}
-                  className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none"
+                  onChange={(e) => setSettlementValue(parseFloat(e.target.value) || 0)}
+                  className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none font-bold"
                 />
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/20 space-y-1">
-              <div className="flex justify-between text-gray-300">
-                <span>Credit Amount Offset</span>
-                <span className="font-bold text-red-400">- ₹{creditAmount.toLocaleString('en-IN')}</span>
+            {/* Calculations Breakdown Box */}
+            <div className="p-4 rounded-xl bg-red-950/20 border border-red-500/20 space-y-2">
+              <div className="flex justify-between items-center font-bold text-red-400 text-sm">
+                <span>Credit Amount Offset:</span>
+                <span>- ₹{creditAmount.toLocaleString('en-IN')}</span>
               </div>
-              <div className="flex justify-between text-gray-400 text-[11px]">
-                <span>Estimated GST Reversal (18%)</span>
+              <div className="flex justify-between items-center text-gray-400 text-[11px]">
+                <span>Estimated GST Reversal (18% Portion):</span>
                 <span>₹{gstReversal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
               </div>
-              <div className="border-t border-white/10 pt-2 flex justify-between font-semibold text-white">
-                <span>Revised Balance Receivable</span>
-                <span className="text-emerald-400">₹{revisedInvoiceValue.toLocaleString('en-IN')}</span>
+              <div className="border-t border-white/10 pt-2 flex justify-between items-center font-bold text-white text-xs">
+                <span>Revised Balance Receivable:</span>
+                <span className="text-teal-400 text-sm font-mono">₹{revisedInvoiceValue.toLocaleString('en-IN')}</span>
               </div>
             </div>
           </div>
 
+          {/* Remarks */}
           <div>
-            <label className="block font-semibold text-gray-400 mb-1">Remarks & Settlement Agreement</label>
+            <label className="block text-gray-400 mb-1">Remarks & Notes</label>
             <textarea
               rows={2}
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
-              className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-2 text-white focus:outline-none"
+              className="w-full bg-[#1e1e1e] border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-red-500"
             />
           </div>
 
@@ -298,30 +447,42 @@ export default function CreditNoteModal({ isOpen, onClose }) {
         <div className="flex items-center justify-between px-6 py-4 border-t border-white/10 bg-[#181818]">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+            className="px-4 py-2 border border-white/10 rounded-xl text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
           >
             Cancel
           </button>
-
           <div className="flex items-center space-x-3">
             <button
               onClick={handleExportPDF}
               className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-xs font-semibold transition-colors"
             >
-              <BsFileEarmarkPdf className="text-red-400 text-base" />
-              <span>Export PDF</span>
+              <BsFileEarmarkPdf className="text-red-400 text-sm" />
+              <span>Export PDF Proof</span>
             </button>
             <button
               onClick={handleSaveCreditNote}
-              className="flex items-center space-x-2 bg-red-500 hover:bg-red-400 text-white font-bold px-5 py-2 rounded-xl text-xs shadow-lg shadow-red-500/20 transition-all"
+              className="flex items-center space-x-2 bg-red-600 hover:bg-red-500 text-white font-bold px-5 py-2 rounded-xl text-xs shadow-lg shadow-red-600/20 transition-all"
             >
-              <BsCheckCircleFill className="text-base" />
-              <span>Issue Credit Note</span>
+              <BsCheckCircleFill className="text-sm" />
+              <span>Save & Issue Credit Note</span>
             </button>
           </div>
         </div>
 
       </div>
+  );
+
+  if (isPage) {
+    return (
+      <div className="flex-1 w-full bg-[#111111] overflow-y-auto p-4 sm:p-6 lg:p-8 font-dm-sans">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md font-dm-sans overflow-y-auto">
+      {content}
     </div>
   );
 }

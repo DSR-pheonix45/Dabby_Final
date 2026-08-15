@@ -28,7 +28,7 @@ export default function PipelineCard({
       draggable
       onDragStart={(e) => onDragStart(e, card.id)}
       onClick={() => onClick(card)}
-      className="bg-[#161820] border border-white/10 hover:border-teal-500/50 rounded-xl p-4 mb-3 cursor-pointer shadow-sm hover:shadow-lg transition-all group relative overflow-hidden"
+      className="bg-[#181818] border border-white/10 hover:border-teal-500/50 rounded-xl p-4 mb-3 cursor-pointer shadow-sm hover:shadow-lg transition-all group relative overflow-hidden"
     >
       {/* Top Header */}
       <div className="flex justify-between items-start mb-2">

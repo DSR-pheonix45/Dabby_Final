@@ -49,6 +49,35 @@ export const collaborationService = {
     return res.json();
   },
 
+  async accessByLicense(licenseKey, accessPassword) {
+    const res = await apiFetch(`/api/collaboration/access-by-license`, {
+      method: "POST",
+      body: JSON.stringify({
+        license_key: licenseKey,
+        access_password: accessPassword,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || "Failed to access workbench with provided credentials");
+    }
+    return data;
+  },
+
+  async updatePassword(workbenchId, accessPassword) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/password`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        access_password: accessPassword,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || "Failed to update workbench password");
+    }
+    return data;
+  },
+
   async addTradeVessel(workbenchId, partyId, vesselData) {
     const res = await apiFetch(`/api/collaboration/${workbenchId}/parties/${partyId}/vessels`, {
       method: "POST",
@@ -118,6 +147,17 @@ export const collaborationService = {
       body: JSON.stringify({ status }),
     });
     if (!res.ok) throw new Error("Failed to update claim status");
+    return res.json();
+  },
+
+  async deleteWorkbench(workbenchId) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to delete workbench");
+    }
     return res.json();
   }
 };

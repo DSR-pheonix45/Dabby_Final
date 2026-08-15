@@ -274,10 +274,10 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
   return (
     <>
       <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-        <div className="bg-[#12141F] border border-white/10 rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col font-sans">
+        <div className="bg-[#181818] border border-white/10 rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col font-sans">
           
           {/* Top Bar Header */}
-          <div className="px-6 py-4 border-b border-white/10 bg-[#171A29] flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-white/10 bg-[#181818] flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg ${
                 tradeType === "receivable" ? "bg-teal-500/20 text-teal-400 border border-teal-500/30" : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30"
@@ -314,7 +314,7 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
           </div>
 
           {/* Scrollable Content Body */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-[#11131C]">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-[#111111]">
             
             {/* Trade Info & Counterparty Header */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white/5 p-4 rounded-2xl border border-white/10">
@@ -326,7 +326,7 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
                 <select 
                   value={tradeType}
                   onChange={(e) => setTradeType(e.target.value)}
-                  className="w-full bg-[#1A1D2B] border border-white/10 rounded-xl px-3 py-2 text-sm text-white font-semibold focus:outline-none focus:border-teal-500/50"
+                  className="w-full bg-[#222222] border border-white/10 rounded-xl px-3 py-2 text-sm text-white font-semibold focus:outline-none focus:border-teal-500/50"
                 >
                   <option value="receivable">Sales Trade (Receivables)</option>
                   <option value="payable">Purchase Trade (Payables)</option>
@@ -342,7 +342,7 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
                   placeholder="e.g. Acme Corp / Steel Suppliers"
                   value={partyName}
                   onChange={(e) => setPartyName(e.target.value)}
-                  className="w-full bg-[#1A1D2B] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 font-semibold focus:outline-none focus:border-teal-500/50"
+                  className="w-full bg-[#222222] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 font-semibold focus:outline-none focus:border-teal-500/50"
                 />
               </div>
 
@@ -355,14 +355,14 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
                   placeholder="e.g. Q3 Software Services Order"
                   value={tradeTitle}
                   onChange={(e) => setTradeTitle(e.target.value)}
-                  className="w-full bg-[#1A1D2B] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 font-semibold focus:outline-none focus:border-teal-500/50"
+                  className="w-full bg-[#222222] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 font-semibold focus:outline-none focus:border-teal-500/50"
                 />
               </div>
 
             </div>
 
             {/* SECTION 1: INITIATOR VOUCHER */}
-            <div className="bg-[#171A27] border border-white/10 rounded-2xl p-5 shadow-lg">
+            <div className="bg-[#181818] border border-white/10 rounded-2xl p-5 shadow-lg">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-2.5">
                   <div className="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
@@ -383,7 +383,7 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
                   className="flex items-center space-x-2 px-3.5 py-1.5 bg-teal-500 hover:bg-teal-400 text-black font-extrabold text-xs rounded-xl transition-all shadow-md"
                 >
                   <BsPlusLg size={12} />
-                  <span>📥 Pull Voucher from Doc Vault</span>
+                  <span>Pull Voucher from Doc Vault</span>
                 </button>
               </div>
 
@@ -435,7 +435,7 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
             </div>
 
             {/* SECTION 2: SETTLEMENT & FULFILLMENT VOUCHERS */}
-            <div className="bg-[#171A27] border border-white/10 rounded-2xl p-5 shadow-lg">
+            <div className="bg-[#181818] border border-white/10 rounded-2xl p-5 shadow-lg">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-2.5">
                   <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
@@ -498,14 +498,14 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
                   placeholder="Payment Amount"
                   value={newPaymentAmt}
                   onChange={(e) => setNewPaymentAmt(e.target.value)}
-                  className="bg-[#1A1D2B] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none"
+                  className="bg-[#222222] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none"
                 />
                 <input 
                   type="text"
                   placeholder="Reference (e.g. Bank Ref / Cheque #)"
                   value={newPaymentRef}
                   onChange={(e) => setNewPaymentRef(e.target.value)}
-                  className="bg-[#1A1D2B] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none sm:col-span-2"
+                  className="bg-[#222222] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none sm:col-span-2"
                 />
                 <button
                   type="submit"
@@ -517,7 +517,7 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
             </div>
 
             {/* SECTION 3: ADJUSTMENT NOTES (CREDIT / DEBIT NOTES) */}
-            <div className="bg-[#171A27] border border-white/10 rounded-2xl p-5 shadow-lg">
+            <div className="bg-[#181818] border border-white/10 rounded-2xl p-5 shadow-lg">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-2.5">
                   <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
@@ -578,7 +578,7 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
                 <select
                   value={newAdjType}
                   onChange={(e) => setNewAdjType(e.target.value)}
-                  className="bg-[#1A1D2B] border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-white font-semibold focus:outline-none"
+                  className="bg-[#222222] border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-white font-semibold focus:outline-none"
                 >
                   <option value="credit_note">Credit Note (- Amt)</option>
                   <option value="debit_note">Debit Note (+ Amt)</option>
@@ -588,14 +588,14 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
                   placeholder="Amount"
                   value={newAdjAmt}
                   onChange={(e) => setNewAdjAmt(e.target.value)}
-                  className="bg-[#1A1D2B] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none"
+                  className="bg-[#222222] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none"
                 />
                 <input 
                   type="text"
                   placeholder="Reason / Note"
                   value={newAdjReason}
                   onChange={(e) => setNewAdjReason(e.target.value)}
-                  className="bg-[#1A1D2B] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none sm:col-span-2"
+                  className="bg-[#222222] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none sm:col-span-2"
                 />
                 <button
                   type="submit"
@@ -607,7 +607,7 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
             </div>
 
             {/* REAL-TIME SETTLEMENT SUMMARY CALCULATOR & PROGRESS */}
-            <div className="bg-[#1A1E2D] border border-teal-500/30 rounded-2xl p-5 shadow-xl">
+            <div className="bg-[#181818] border border-teal-500/30 rounded-2xl p-5 shadow-xl">
               <h4 className="text-xs font-extrabold text-teal-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                 <BsDiagram3 /> Trade Settlement Summary & Balance
               </h4>
@@ -660,7 +660,7 @@ export default function TradeModal({ isOpen, onClose, trade, onSaveTrade, onPost
           </div>
 
           {/* Footer Action Controls */}
-          <div className="px-6 py-4 border-t border-white/10 bg-[#171A29] flex items-center justify-between">
+          <div className="px-6 py-4 border-t border-white/10 bg-[#181818] flex items-center justify-between">
             <button
               onClick={handlePostToCOA}
               disabled={posting || !initiatorVoucher}

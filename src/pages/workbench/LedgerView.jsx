@@ -117,7 +117,7 @@ export default function LedgerView() {
       </div>
 
       <div className="flex-1 overflow-auto px-6 lg:px-10 py-6">
-        <div className="max-w-[1100px] mx-auto">
+        <div className="w-full">
           {loading ? (
             <div className="flex items-center justify-center py-24 text-gray-500"><BsArrowRepeat className="animate-spin mr-2" /> Loading…</div>
           ) : tab === 'trial' ? (
