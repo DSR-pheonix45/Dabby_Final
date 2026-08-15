@@ -48,7 +48,7 @@ export default function SalesFlow() {
     if (!workbenchId) return;
     setLoading(true);
     try {
-      const data = salesService.getSales(workbenchId);
+      const data = await salesService.getSalesWithDocVault(workbenchId, activeWorkbench);
       setSales(data);
 
       try {

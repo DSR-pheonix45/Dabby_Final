@@ -1,5 +1,8 @@
 // salesService.js - Complete Sales Module Data & Lifecycle Management Engine
 
+import { diService } from './diService';
+import { classifyDocumentParties } from '../utils/docPartyClassifier';
+
 export const SALE_TYPES = [
   { id: 'pos', label: 'POS / Cash Sale', description: 'Walk-in / Immediate cash payment. Customer optional.' },
   { id: 'one_time_invoice', label: 'One-Time Invoice', description: 'Credit invoice issued to customer with payment due date.' },
@@ -27,108 +30,11 @@ export const SALE_STATUSES = [
 const getStorageKey = (workbenchId) => `dabby_sales_${workbenchId}`;
 const getArStorageKey = (workbenchId) => `dabby_ar_items_${workbenchId}`;
 
-// Initial demo seed data if local storage is empty
-const INITIAL_DEMO_SALES = (workbenchId) => [
-  {
-    id: `SAL-1001`,
-    workbench_id: workbenchId,
-    sale_type: 'one_time_invoice',
-    status: 'Invoiced',
-    payment_status: 'Unpaid',
-    fulfillment_status: 'Fulfilled',
-    customer: { id: 'cust_01', name: 'Datalis Technologies Pvt Ltd', gstin: '27AABCD1234E1Z5' },
-    date: '2026-08-10',
-    due_date: '2026-09-10',
-    reference_number: 'INV-2026-001',
-    items: [
-      { name: 'Enterprise SaaS Software License', quantity: 1, rate: 50000, discount: 5000, tax: 8100, total: 53100, is_inventory: false }
-    ],
-    subtotal: 45000,
-    discount_total: 5000,
-    tax_total: 8100,
-    grand_total: 53100,
-    amount_paid: 0,
-    amount_due: 53100,
-    payments: [],
-    documents: [{ id: 'doc_1', original_filename: 'Sales_Invoice_INV-001.pdf' }],
-    accounting_entries: [
-      { debit_account: 'Accounts Receivable', credit_account: 'Sales Revenue', amount: 45000 },
-      { debit_account: 'Accounts Receivable', credit_account: 'GST Tax Payable', amount: 8100 }
-    ],
-    created_at: new Date(Date.now() - 5 * 86400000).toISOString()
-  },
-  {
-    id: `SAL-1002`,
-    workbench_id: workbenchId,
-    sale_type: 'pos',
-    status: 'Completed',
-    payment_status: 'Paid',
-    fulfillment_status: 'Fulfilled',
-    customer: { id: 'anonymous', name: 'Walk-in / Anonymous Customer' },
-    date: '2026-08-14',
-    reference_number: 'POS-2026-089',
-    items: [
-      { name: 'Custom Apparel - Suit Outfit', quantity: 1, rate: 4000, discount: 0, tax: 720, total: 4720, is_inventory: true }
-    ],
-    subtotal: 4000,
-    discount_total: 0,
-    tax_total: 720,
-    grand_total: 4720,
-    amount_paid: 4720,
-    amount_due: 0,
-    payments: [
-      { id: 'pay_pos_1', date: '2026-08-14', amount: 4720, method: 'UPI / Cash', account: 'HDFC Bank Main', reference: 'UPI-9821038' }
-    ],
-    documents: [],
-    accounting_entries: [
-      { debit_account: 'HDFC Bank Main Account', credit_account: 'Sales Revenue', amount: 4000 },
-      { debit_account: 'HDFC Bank Main Account', credit_account: 'GST Tax Payable', amount: 720 },
-      { debit_account: 'Cost of Goods Sold (COGS)', credit_account: 'Finished Goods Inventory', amount: 2200 }
-    ],
-    created_at: new Date(Date.now() - 1 * 86400000).toISOString()
-  },
-  {
-    id: `SAL-1003`,
-    workbench_id: workbenchId,
-    sale_type: 'marketplace',
-    status: 'Pending Settlement',
-    payment_status: 'Partially Paid',
-    fulfillment_status: 'Fulfilled',
-    customer: { id: 'mkt_amazon', name: 'Amazon Marketplace' },
-    date: '2026-08-12',
-    reference_number: 'AMZ-SETTLE-882',
-    items: [
-      { name: 'Bulk Product Batch Sales (Gross)', quantity: 20, rate: 2500, discount: 0, tax: 9000, total: 59000, is_inventory: true }
-    ],
-    subtotal: 50000,
-    discount_total: 0,
-    tax_total: 9000,
-    grand_total: 59000,
-    marketplace_details: {
-      gross_sales: 59000,
-      returns: 2000,
-      commission: 5900,
-      platform_fees: 1500,
-      shipping_charges: 1200,
-      net_settlement: 48400
-    },
-    amount_paid: 30000,
-    amount_due: 18400,
-    payments: [
-      { id: 'pay_amz_1', date: '2026-08-13', amount: 30000, method: 'Bank Transfer', account: 'Axis Bank Corp', reference: 'NEFT-AMZ-001' }
-    ],
-    documents: [],
-    accounting_entries: [
-      { debit_account: 'Amazon Marketplace Clearing', credit_account: 'Gross Sales Revenue', amount: 50000 },
-      { debit_account: 'Marketplace Commission Expense', credit_account: 'Amazon Marketplace Clearing', amount: 5900 },
-      { debit_account: 'Axis Bank Corp', credit_account: 'Amazon Marketplace Clearing', amount: 30000 }
-    ],
-    created_at: new Date(Date.now() - 3 * 86400000).toISOString()
-  }
-];
+// Legacy demo sales IDs to purge completely
+const DEMO_IDS_TO_PURGE = ['SAL-1001', 'SAL-1002', 'SAL-1003'];
 
 export const salesService = {
-  // Fetch all sales for a workbench
+  // Fetch all user-recorded sales for a workbench (WITHOUT demo items)
   getSales(workbenchId) {
     if (!workbenchId) return [];
     if (typeof window === 'undefined') return [];
@@ -137,14 +43,18 @@ export const salesService = {
     const stored = localStorage.getItem(key);
     
     if (!stored) {
-      const initial = INITIAL_DEMO_SALES(workbenchId);
-      localStorage.setItem(key, JSON.stringify(initial));
-      this.syncAllToAR(workbenchId, initial);
-      return initial;
+      localStorage.setItem(key, JSON.stringify([]));
+      return [];
     }
     
     try {
-      return JSON.parse(stored) || [];
+      const parsed = JSON.parse(stored) || [];
+      // Clean out any legacy hardcoded demo entries
+      const cleaned = parsed.filter(s => !DEMO_IDS_TO_PURGE.includes(s.id));
+      if (cleaned.length !== parsed.length) {
+        localStorage.setItem(key, JSON.stringify(cleaned));
+      }
+      return cleaned;
     } catch (e) {
       console.error("Error parsing sales storage:", e);
       return [];
@@ -160,6 +70,115 @@ export const salesService = {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent("sales:updated", { detail: { workbenchId } }));
       window.dispatchEvent(new CustomEvent("ledger:updated"));
+    }
+  },
+
+  // Auto-pull ALL sales documents from Doc Vault and merge with recorded sales
+  async getSalesWithDocVault(workbenchId, activeWorkbench) {
+    const recordedSales = this.getSales(workbenchId);
+
+    if (!workbenchId || !activeWorkbench) return recordedSales;
+
+    try {
+      const allDocs = await diService.getDocuments(workbenchId).catch(() => []);
+      
+      // Filter sales-related documents from Doc Vault
+      const salesDocs = allDocs.filter(doc => {
+        const classified = classifyDocumentParties(doc, activeWorkbench);
+        const note = doc.di_analysis_notes?.[0] || {};
+        const rawType = (note.document_type || note.extracted_data?.document_type || '').toLowerCase();
+        
+        return (
+          classified.classification === 'sales_invoice' ||
+          rawType.includes('sales') ||
+          rawType.includes('customer') ||
+          rawType.includes('credit_note')
+        );
+      });
+
+      // Map Doc Vault documents into dynamic Sale transaction objects
+      const docVaultSales = salesDocs.map(doc => {
+        const note = doc.di_analysis_notes?.[0] || {};
+        const data = note.extracted_data || {};
+        const classified = classifyDocumentParties(doc, activeWorkbench);
+        
+        const customerName = classified.externalParty?.name || note.parties?.customer?.name || data.parties?.customer?.value || "Customer";
+        const refNo = data.document?.reference_number?.value || doc.original_filename;
+        const totalAmt = note.money?.total_amount !== undefined ? Number(note.money?.total_amount) : (Number(data.financials?.total_amount?.value) || 0);
+        const taxAmt = note.taxes?.total_tax !== undefined ? Number(note.taxes?.total_tax) : (Number(data.financials?.total_tax?.value) || 0);
+        const subtotalAmt = totalAmt - taxAmt;
+
+        const logs = doc.di_document_processing_logs || [];
+        const isSettled = logs.some(l => l.stage === 'post' && l.status === 'success');
+
+        const derivedStatus = isSettled ? 'Completed' : 'Invoiced';
+        const derivedPaymentStatus = isSettled ? 'Paid' : 'Unpaid';
+        const amountPaid = isSettled ? totalAmt : 0;
+        const amountDue = isSettled ? 0 : totalAmt;
+
+        return {
+          id: `DV-${doc.id.slice(0, 8)}`,
+          doc_id: doc.id,
+          workbench_id: workbenchId,
+          sale_type: 'one_time_invoice',
+          status: derivedStatus,
+          payment_status: derivedPaymentStatus,
+          fulfillment_status: 'Fulfilled',
+          customer: { id: `cust_${doc.id}`, name: customerName },
+          date: doc.created_at ? doc.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+          due_date: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+          reference_number: refNo,
+          items: [
+            { name: `Doc Vault Voucher (${doc.original_filename})`, quantity: 1, rate: subtotalAmt, discount: 0, tax: taxAmt, total: totalAmt }
+          ],
+          subtotal: subtotalAmt,
+          discount_total: 0,
+          tax_total: taxAmt,
+          grand_total: totalAmt,
+          amount_paid: amountPaid,
+          amount_due: amountDue,
+          payments: isSettled ? [
+            {
+              id: `pay_dv_${doc.id}`,
+              date: doc.created_at ? doc.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+              amount: totalAmt,
+              method: 'Bank / Direct Settlement',
+              account: 'HDFC Bank Main',
+              reference: refNo
+            }
+          ] : [],
+          documents: [{ id: doc.id, original_filename: doc.original_filename, storage_path: doc.storage_path }],
+          accounting_entries: [
+            { debit_account: `Accounts Receivable — ${customerName}`, credit_account: 'Sales Revenue', amount: subtotalAmt },
+            { debit_account: `Accounts Receivable — ${customerName}`, credit_account: 'GST Tax Payable', amount: taxAmt }
+          ],
+          isFromDocVault: true,
+          created_at: doc.created_at || new Date().toISOString(),
+          updated_at: doc.created_at || new Date().toISOString()
+        };
+      });
+
+      // Merge user recorded sales with Doc Vault sales, skipping duplicates
+      const mergedSales = [...recordedSales];
+
+      docVaultSales.forEach(dvSale => {
+        const exists = mergedSales.some(s => 
+          s.documents?.some(d => d.id === dvSale.doc_id) || 
+          s.reference_number === dvSale.reference_number
+        );
+        if (!exists) {
+          mergedSales.push(dvSale);
+        }
+      });
+
+      mergedSales.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      // Sync combined unpaid receivables to AR
+      this.syncAllToAR(workbenchId, mergedSales);
+      return mergedSales;
+    } catch (err) {
+      console.error("Error building sales from Doc Vault:", err);
+      return recordedSales;
     }
   },
 
@@ -212,10 +231,8 @@ export const salesService = {
       derivedStatus = 'Invoiced';
     }
 
-    // Default Customer fallback for POS
     const customer = salePayload.customer || (isPos ? { id: 'anonymous', name: 'Walk-in / Anonymous Customer' } : { id: 'unknown', name: 'Standard Customer' });
 
-    // Generate Double Entry Accounting Impact
     const accountingEntries = salePayload.accounting_entries || [];
     if (accountingEntries.length === 0) {
       if (isPos) {
@@ -277,7 +294,29 @@ export const salesService = {
   recordPayment(workbenchId, saleId, paymentData) {
     const sales = this.getSales(workbenchId);
     const index = sales.findIndex(s => s.id === saleId);
-    if (index === -1) throw new Error("Sale transaction not found");
+
+    if (index === -1) {
+      // If payment is being recorded against a Doc Vault sale that hasn't been saved in localStorage yet, create local record
+      const payAmt = Number(paymentData.amount) || 0;
+      const newSale = this.recordSale(workbenchId, {
+        id: saleId,
+        sale_type: 'one_time_invoice',
+        status: 'Partially Paid',
+        customer: { id: `cust_${Date.now()}`, name: paymentData.customerName || 'Customer' },
+        reference_number: saleId,
+        grand_total: payAmt,
+        amount_paid: payAmt,
+        payments: [{
+          id: `pay_${Date.now()}`,
+          date: paymentData.date || new Date().toISOString().split('T')[0],
+          amount: payAmt,
+          method: paymentData.method || 'Bank Transfer',
+          account: paymentData.account || 'HDFC Bank Main',
+          reference: paymentData.reference || `SETTLE-${Date.now().toString().slice(-6)}`
+        }]
+      });
+      return newSale;
+    }
 
     const sale = sales[index];
     const payAmt = Number(paymentData.amount) || 0;
@@ -372,10 +411,9 @@ export const salesService = {
     
     const partyName = note.parties?.customer?.name || data.parties?.customer?.value || "Extracted Customer";
     const refNo = data.document?.reference_number?.value || docObj.original_filename;
-    const totalAmt = note.money?.total_amount !== undefined ? note.money?.total_amount : (data.financials?.total_amount?.value || 0);
-    const taxAmt = note.taxes?.total_tax !== undefined ? note.taxes?.total_tax : (data.financials?.total_tax?.value || 0);
+    const totalAmt = note.money?.total_amount !== undefined ? Number(note.money?.total_amount) : (Number(data.financials?.total_amount?.value) || 0);
+    const taxAmt = note.taxes?.total_tax !== undefined ? Number(note.taxes?.total_tax) : (Number(data.financials?.total_tax?.value) || 0);
 
-    // Duplicate prevention check (Rule 25)
     const existing = this.getSales(workbenchId);
     const isDuplicate = existing.some(s => 
       s.reference_number === refNo || 
@@ -391,7 +429,7 @@ export const salesService = {
       status: 'Invoiced',
       customer: { id: `cust_${Date.now()}`, name: partyName },
       reference_number: refNo,
-      date: note.dates?.document_date || new Date().toISOString().split('T')[0],
+      date: docObj.created_at ? docObj.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
       items: [
         { name: `Sales Voucher (${docObj.original_filename})`, quantity: 1, rate: totalAmt - taxAmt, discount: 0, tax: taxAmt, total: totalAmt }
       ],
