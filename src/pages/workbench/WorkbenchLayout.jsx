@@ -164,7 +164,7 @@ export default function WorkbenchLayout() {
       </div>
 
       {/* Page Content */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <Outlet context={{ workbench: activeWorkbench }} />
       </div>
 

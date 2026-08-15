@@ -674,7 +674,7 @@ Based on the Profit & Loss statement provided, the business shows stable operati
         />
 
         {/* Main Dashboard Content */}
-        <div className="flex-1 min-h-0 overflow-auto pb-[120px] sm:pb-[100px] lg:pb-0 relative">
+        <div className={`flex-1 min-h-0 relative ${location.pathname.includes('/workbench/') ? 'overflow-hidden flex flex-col' : 'overflow-auto pb-[120px] sm:pb-[100px] lg:pb-0'}`}>
           <Routes>
             <Route
               index

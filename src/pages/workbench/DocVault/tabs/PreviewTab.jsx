@@ -75,8 +75,8 @@ export default function PreviewTab({ doc, onDelete, onScan }) {
   const isImage = doc.mime_type?.startsWith('image/');
 
   return (
-    <div className="flex flex-col h-full bg-[#111111]">
-      <div className="p-3 border-b border-white/5 flex justify-between items-center bg-[#0A0A0A]">
+    <div className="flex flex-col h-full min-h-0 bg-[#111111]">
+      <div className="p-3 border-b border-white/5 flex justify-between items-center bg-[#0A0A0A] shrink-0">
         <div className="flex items-center gap-2 text-xs font-semibold text-gray-400">
           {isPdf ? <BsFileEarmarkPdf /> : isImage ? <BsImage /> : <BsFileEarmarkText />}
           {doc.original_filename}
@@ -112,7 +112,7 @@ export default function PreviewTab({ doc, onDelete, onScan }) {
         </div>
       </div>
       
-      <div className="flex-1 overflow-auto flex items-center justify-center p-4">
+      <div className="flex-1 min-h-0 overflow-hidden flex items-center justify-center p-3 bg-[#0D0D0D]">
         {isPdf ? (
           <iframe 
             src={`${url}#toolbar=0&view=FitH`} 

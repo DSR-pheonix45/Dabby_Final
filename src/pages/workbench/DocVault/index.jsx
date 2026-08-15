@@ -262,7 +262,7 @@ export default function DocVaultIndex() {
   if (!activeWorkbench) return null;
 
   return (
-    <div className="flex flex-col flex-1 h-full bg-[#0D0D0D] overflow-hidden text-gray-200 font-sans" {...getRootProps()}>
+    <div className="flex flex-col flex-1 h-full min-h-0 bg-[#0D0D0D] overflow-hidden text-gray-200 font-sans" {...getRootProps()}>
       <input {...getInputProps()} />
       
       {/* Dynamic View: If no document selected, show full Workbenches-style Explorer Grid; otherwise show Document Viewer */}
@@ -283,7 +283,7 @@ export default function DocVaultIndex() {
           uploading={uploading}
         />
       ) : (
-        <div className="flex flex-col flex-1 h-full overflow-hidden">
+        <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden">
           {/* Header Bar in Document Viewer Mode */}
           <div className="px-6 py-3 border-b border-white/5 bg-[#121214] flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
