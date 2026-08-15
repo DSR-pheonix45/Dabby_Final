@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useWorkbench } from '../../../context/WorkbenchContext';
-import { diService } from '../../../services/diService';
-import { classifyDocumentParties } from '../../../utils/docPartyClassifier';
+import { salesService, SALE_STATUSES, SALE_TYPES } from '../../../services/salesService';
 import { formatCurrency } from '../../../utils/currency';
+import { collaborationService } from '../../../services/collaborationService';
 import { 
   BsCartCheck, 
   BsGraphUpArrow, 
@@ -14,104 +14,143 @@ import {
   BsFileEarmarkText, 
   BsSearch,
   BsFunnel,
-  BsBuilding
+  BsBuilding,
+  BsPlusLg,
+  BsArrowDownLeftSquare,
+  BsReceipt,
+  BsCheck2Circle
 } from 'react-icons/bs';
 import { toast } from 'react-hot-toast';
+import RecordSaleModal from '../sales/components/RecordSaleModal';
+import ImportDocVaultSalesModal from '../sales/components/ImportDocVaultSalesModal';
+import RecordPaymentModal from '../sales/components/RecordPaymentModal';
+import SaleDetailModal from '../sales/components/SaleDetailModal';
 
 export default function SalesFlow() {
   const { activeWorkbench } = useWorkbench();
   const navigate = useNavigate();
-  const [documents, setDocuments] = useState([]);
+  const workbenchId = activeWorkbench?.id;
+
+  const [sales, setSales] = useState([]);
+  const [savedParties, setSavedParties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [stageFilter, setStageFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [typeFilter, setTypeFilter] = useState('all');
 
-  const loadSalesData = async () => {
-    if (!activeWorkbench) return;
+  // Modals state
+  const [showRecordModal, setShowRecordModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedSaleForDetail, setSelectedSaleForDetail] = useState(null);
+
+  const loadSalesModuleData = async () => {
+    if (!workbenchId) return;
     setLoading(true);
     try {
-      const allDocs = await diService.getDocuments(activeWorkbench.id);
-      
-      // Filter & categorize documents belonging to Sales Flow
-      const salesDocs = allDocs.filter(doc => {
-        const classified = classifyDocumentParties(doc, activeWorkbench);
-        return classified.classification === 'sales_invoice';
-      });
+      const data = salesService.getSales(workbenchId);
+      setSales(data);
 
-      salesDocs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      setDocuments(salesDocs);
+      try {
+        const parties = await collaborationService.getParties(workbenchId);
+        setSavedParties(parties || []);
+      } catch (err) {
+        console.warn("Parties fetch notice:", err);
+      }
     } catch (err) {
-      console.error("Failed to load Sales Flow documents:", err);
-      toast.error("Failed to load Sales Flow data");
+      console.error("Failed to load Sales data:", err);
+      toast.error("Failed to load Sales data");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadSalesData();
-  }, [activeWorkbench]);
+    loadSalesModuleData();
+    const handleSalesUpdate = () => loadSalesModuleData();
+    window.addEventListener("sales:updated", handleSalesUpdate);
+    return () => window.removeEventListener("sales:updated", handleSalesUpdate);
+  }, [workbenchId]);
 
   // Derive metrics
-  const totalSalesRevenue = documents.reduce((sum, doc) => {
-    const note = doc.di_analysis_notes?.[0] || {};
-    const amt = note.money?.total_amount !== undefined ? note.money?.total_amount : note.extracted_data?.financials?.total_amount?.value;
-    return sum + (Number(amt) || 0);
-  }, 0);
+  const totalSalesRevenue = sales.reduce((sum, s) => sum + (s.grand_total || 0), 0);
+  const totalARCreated = sales.filter(s => s.sale_type !== 'pos').reduce((sum, s) => sum + (s.amount_due || 0), 0);
+  const settledSalesCount = sales.filter(s => s.status === 'Completed' || s.payment_status === 'Paid').length;
+  const pendingSettlementCount = sales.filter(s => s.amount_due > 0 && s.status !== 'Cancelled').length;
 
-  const settledDocs = documents.filter(d => {
-    const logs = d.di_document_processing_logs || [];
-    return logs.some(l => l.stage === 'post' && l.status === 'success');
-  });
-
-  const pendingDocs = documents.filter(d => !settledDocs.some(s => s.id === d.id));
-
-  // Filtered documents list
-  const filteredDocs = documents.filter(doc => {
+  // Filtered sales list
+  const filteredSales = sales.filter(s => {
     const term = search.toLowerCase();
-    const note = doc.di_analysis_notes?.[0] || {};
-    const data = note.extracted_data || {};
-    const classified = classifyDocumentParties(doc, activeWorkbench);
-    const partyName = classified.externalParty?.name || data.parties?.customer?.value || "Customer";
-    const ref = data.document?.reference_number?.value || doc.original_filename || "";
+    const custName = (s.customer?.name || '').toLowerCase();
+    const refNo = (s.reference_number || '').toLowerCase();
+    const saleId = (s.id || '').toLowerCase();
 
-    const matchesSearch = partyName.toLowerCase().includes(term) || ref.toLowerCase().includes(term);
-
+    const matchesSearch = custName.includes(term) || refNo.includes(term) || saleId.includes(term);
     if (!matchesSearch) return false;
-    if (stageFilter === 'settled') return settledDocs.some(s => s.id === doc.id);
-    if (stageFilter === 'pending') return pendingDocs.some(p => p.id === doc.id);
+
+    if (statusFilter !== 'All' && s.status !== statusFilter) return false;
+    if (typeFilter !== 'all' && s.sale_type !== typeFilter) return false;
+
     return true;
   });
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#111111] overflow-hidden font-dm-sans">
-      {/* Header Banner */}
-      <div className="px-6 lg:px-10 py-6 border-b border-white/10 bg-[#181818]/60 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="flex-1 flex flex-col h-full bg-[#111111] overflow-hidden font-dm-sans text-gray-200">
+      {/* Module Header & Action Bar */}
+      <div className="px-6 lg:px-10 py-5 border-b border-white/10 bg-[#181818]/60 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shrink-0">
         <div>
           <div className="flex items-center space-x-2 text-teal-400 text-xs font-bold uppercase tracking-wider mb-1">
             <BsCartCheck className="text-base" />
-            <span>Process Flow</span>
+            <span>Commercial Operational Engine</span>
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-            Sales & Revenue Flow
+            Sales & Commercial Module
           </h1>
-          <p className="text-xs text-gray-400 mt-1">
-            Track customer sales documents, quotes, invoices, receipts, and link directly to Accounts Receivable (AR).
+          <p className="text-xs text-gray-400 mt-0.5">
+            Record sales, import Doc Vault invoices, settle receivables, and auto-post to Chart of Accounts (COA).
           </p>
         </div>
 
-        <button
-          onClick={() => navigate('/dashboard/workbench/ops', { state: { tab: 'ar' } })}
-          className="flex items-center space-x-2 px-4 py-2.5 bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 rounded-xl text-xs font-bold transition-all shadow-lg shadow-teal-500/5 group shrink-0"
-        >
-          <span>View Accounts Receivable (AR) in OPS</span>
-          <BsArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-        </button>
+        {/* Primary Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <button
+            onClick={() => setShowRecordModal(true)}
+            className="flex items-center space-x-2 px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-black rounded-xl text-xs font-extrabold transition-all shadow-lg shadow-teal-500/20"
+          >
+            <BsPlusLg className="text-xs" />
+            <span>Record Sale</span>
+          </button>
+
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center space-x-2 px-3.5 py-2.5 bg-white/5 hover:bg-white/10 text-teal-400 border border-white/10 rounded-xl text-xs font-bold transition-colors"
+          >
+            <BsFileEarmarkText />
+            <span>Import / Pull from Documents</span>
+          </button>
+
+          <button
+            onClick={() => setShowPaymentModal(true)}
+            className="flex items-center space-x-2 px-3.5 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-xl text-xs font-bold transition-colors"
+          >
+            <BsCashCoin />
+            <span>Record Payment / Settlement</span>
+          </button>
+
+          <button
+            onClick={() => navigate('/dashboard/workbench/ops', { state: { tab: 'ar' } })}
+            className="flex items-center space-x-2 px-3.5 py-2.5 bg-[#222] hover:bg-[#333] text-gray-300 border border-white/10 rounded-xl text-xs font-bold transition-colors"
+            title="Open Accounts Receivable in OPS"
+          >
+            <BsGraphUpArrow />
+            <span>OPS → AR</span>
+          </button>
+        </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto px-6 lg:px-10 py-6 space-y-6">
-        {/* KPI Cards */}
+      {/* Main Container Area */}
+      <div className="flex-1 overflow-y-auto px-6 lg:px-10 py-6 space-y-6 custom-scrollbar">
+        {/* KPI Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="p-4 rounded-xl bg-[#181818] border border-white/5 shadow-sm">
             <div className="flex items-center justify-between text-gray-400 text-xs font-semibold mb-2">
@@ -122,7 +161,20 @@ export default function SalesFlow() {
               {formatCurrency(totalSalesRevenue, activeWorkbench?.country)}
             </div>
             <div className="text-[11px] text-gray-500 mt-1">
-              From {documents.length} sales document(s)
+              From {sales.length} recorded sale event(s)
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-[#181818] border border-white/5 shadow-sm">
+            <div className="flex items-center justify-between text-gray-400 text-xs font-semibold mb-2">
+              <span>Receivables (OPS → AR)</span>
+              <BsClockHistory className="text-amber-400 text-lg" />
+            </div>
+            <div className="text-xl font-bold text-amber-400">
+              {formatCurrency(totalARCreated, activeWorkbench?.country)}
+            </div>
+            <div className="text-[11px] text-gray-500 mt-1">
+              {pendingSettlementCount} sale(s) awaiting collection
             </div>
           </div>
 
@@ -132,23 +184,10 @@ export default function SalesFlow() {
               <BsCheckCircle className="text-emerald-400 text-lg" />
             </div>
             <div className="text-xl font-bold text-emerald-400">
-              {settledDocs.length} Documents
+              {settledSalesCount} Transactions
             </div>
             <div className="text-[11px] text-gray-500 mt-1">
-              Fully posted to general ledger
-            </div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-[#181818] border border-white/5 shadow-sm">
-            <div className="flex items-center justify-between text-gray-400 text-xs font-semibold mb-2">
-              <span>Pending Action</span>
-              <BsClockHistory className="text-amber-400 text-lg" />
-            </div>
-            <div className="text-xl font-bold text-amber-400">
-              {pendingDocs.length} Documents
-            </div>
-            <div className="text-[11px] text-gray-500 mt-1">
-              Awaiting review or payment posting
+              Fully collected & posted to COA
             </div>
           </div>
 
@@ -157,140 +196,182 @@ export default function SalesFlow() {
             className="p-4 rounded-xl bg-teal-500/10 border border-teal-500/20 hover:border-teal-500/40 cursor-pointer transition-all shadow-sm group"
           >
             <div className="flex items-center justify-between text-teal-400 text-xs font-semibold mb-2">
-              <span>OPS Integration</span>
+              <span>OPS → AR Integration</span>
               <BsGraphUpArrow className="text-teal-300 text-lg group-hover:scale-110 transition-transform" />
             </div>
             <div className="text-sm font-bold text-white group-hover:text-teal-300 transition-colors">
               Manage AR & Aging →
             </div>
             <div className="text-[11px] text-teal-400/70 mt-1">
-              Open Accounts Receivable in OPS
+              Synced with Accounts Receivable
             </div>
           </div>
         </div>
 
-        {/* Filter & Search Controls */}
+        {/* Status Lifecycle Tabs */}
+        <div className="flex items-center space-x-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          {SALE_STATUSES.map(st => (
+            <button
+              key={st}
+              onClick={() => setStatusFilter(st)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                statusFilter === st 
+                  ? 'bg-teal-500 text-black shadow-md shadow-teal-500/20' 
+                  : 'bg-[#181818] text-gray-400 hover:text-white border border-white/5'
+              }`}
+            >
+              {st}
+            </button>
+          ))}
+        </div>
+
+        {/* Filter & Search Bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-[#181818] border border-white/5">
           <div className="relative w-full sm:w-80">
-            <BsSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
+            <BsSearch className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-gray-500 text-xs" />
             <input 
               type="text"
-              placeholder="Search customer, invoice ref..."
+              placeholder="Search customer, invoice #, sale ID..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-[#111111] border border-white/10 rounded-lg pl-9 pr-4 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-teal-500/50"
+              className="w-full bg-[#111111] border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-teal-500/50"
             />
           </div>
 
-          <div className="flex items-center space-x-2 w-full sm:w-auto">
-            <BsFunnel className="text-gray-400 text-xs" />
-            <button
-              onClick={() => setStageFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                stageFilter === 'all' ? 'bg-teal-500 text-black' : 'bg-white/5 text-gray-400 hover:text-white'
-              }`}
+          <div className="flex items-center space-x-3 w-full sm:w-auto">
+            <span className="text-xs text-gray-400 font-semibold flex items-center gap-1">
+              <BsFunnel /> Model Filter:
+            </span>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="bg-[#111111] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500/50"
             >
-              All Sales ({documents.length})
-            </button>
-            <button
-              onClick={() => setStageFilter('pending')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                stageFilter === 'pending' ? 'bg-amber-500 text-black' : 'bg-white/5 text-gray-400 hover:text-white'
-              }`}
-            >
-              Pending ({pendingDocs.length})
-            </button>
-            <button
-              onClick={() => setStageFilter('settled')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                stageFilter === 'settled' ? 'bg-emerald-500 text-black' : 'bg-white/5 text-gray-400 hover:text-white'
-              }`}
-            >
-              Settled ({settledDocs.length})
-            </button>
+              <option value="all">All Models ({sales.length})</option>
+              {SALE_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
           </div>
         </div>
 
-        {/* Sales Documents Pipeline Table / Cards */}
+        {/* Sales Transactions Grid / Table */}
         <div className="rounded-xl bg-[#181818] border border-white/5 overflow-hidden">
           <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white tracking-wide uppercase flex items-center gap-2">
-              <BsFileEarmarkText className="text-teal-400" />
-              Sales Flow Documents ({filteredDocs.length})
+            <h3 className="text-xs font-bold text-white tracking-wider uppercase flex items-center gap-2">
+              <BsReceipt className="text-teal-400 text-sm" />
+              Sales Transactions ({filteredSales.length})
             </h3>
-            <button
-              onClick={() => navigate('/dashboard/workbench/doc-vault')}
-              className="text-xs text-teal-400 hover:text-teal-300 font-semibold"
-            >
-              Go to Doc Vault →
-            </button>
+            <span className="text-[10px] text-gray-500 font-mono">
+              Click any transaction to open details
+            </span>
           </div>
 
           {loading ? (
             <div className="p-12 text-center text-gray-500 text-xs animate-pulse">
-              Loading sales flow data from Doc Vault...
+              Loading Sales Module data...
             </div>
-          ) : filteredDocs.length === 0 ? (
+          ) : filteredSales.length === 0 ? (
             <div className="p-12 text-center text-gray-500 text-xs">
-              No sales documents found. Upload sales invoices or receipts in Doc Vault to populate this flow.
+              No sales transactions found matching your criteria. Click "+ Record Sale" to start.
             </div>
           ) : (
             <div className="divide-y divide-white/5">
-              {filteredDocs.map((doc) => {
-                const note = doc.di_analysis_notes?.[0] || {};
-                const data = note.extracted_data || {};
-                const classified = classifyDocumentParties(doc, activeWorkbench);
-                const customerName = classified.externalParty?.name || data.parties?.customer?.value || "Customer";
-                const refNo = data.document?.reference_number?.value || doc.original_filename;
-                const amt = note.money?.total_amount !== undefined ? note.money?.total_amount : data.financials?.total_amount?.value;
-                const isSettled = settledDocs.some(s => s.id === doc.id);
-
-                return (
-                  <div 
-                    key={doc.id}
-                    className="p-4 hover:bg-white/[0.02] transition-colors flex items-center justify-between gap-4"
-                  >
-                    <div className="flex items-center space-x-4 min-w-0">
-                      <div className="p-2.5 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-400 shrink-0">
-                        <BsBuilding className="w-5 h-5" />
+              {filteredSales.map((s) => (
+                <div 
+                  key={s.id}
+                  onClick={() => setSelectedSaleForDetail(s)}
+                  className="p-4 hover:bg-white/[0.02] cursor-pointer transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+                >
+                  <div className="flex items-center space-x-4 min-w-0">
+                    <div className="p-3 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-400 shrink-0 group-hover:scale-105 transition-transform">
+                      <BsBuilding className="text-lg" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-bold text-white group-hover:text-teal-300 transition-colors truncate">
+                          {s.customer?.name}
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-white/5 text-gray-400 border border-white/10">
+                          {s.sale_type.replace(/_/g, ' ')}
+                        </span>
                       </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-bold text-white truncate">
-                          {customerName}
-                        </div>
-                        <div className="flex items-center space-x-2 text-xs text-gray-400 mt-0.5">
-                          <span className="font-mono">{refNo}</span>
-                          <span>•</span>
-                          <span>{new Date(doc.created_at).toLocaleDateString()}</span>
-                        </div>
+
+                      <div className="flex items-center space-x-2 text-xs text-gray-400 mt-1">
+                        <span className="font-mono text-teal-400/90 font-semibold">#{s.id}</span>
+                        <span>•</span>
+                        <span className="font-mono">{s.reference_number}</span>
+                        <span>•</span>
+                        <span>{s.date}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-6 text-right shrink-0">
+                    <div>
+                      <div className="text-base font-extrabold text-white">
+                        {formatCurrency(s.grand_total, activeWorkbench?.country)}
+                      </div>
+                      <div className="text-[10px] text-gray-500 mt-0.5">
+                        {s.amount_due > 0 ? (
+                          <span className="text-amber-400 font-semibold">Due: ₹{s.amount_due.toLocaleString()}</span>
+                        ) : (
+                          <span className="text-emerald-400 font-semibold">Fully Settled</span>
+                        )}
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-6 text-right shrink-0">
-                      <div>
-                        <div className="text-sm font-bold text-white">
-                          {amt !== undefined ? formatCurrency(amt, activeWorkbench?.country) : '-'}
-                        </div>
-                        <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">
-                          Sales Invoice
-                        </div>
-                      </div>
-
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                        isSettled 
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                          : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${
+                        s.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                        s.status === 'Returned' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
+                        'bg-amber-500/10 text-amber-400 border-amber-500/20'
                       }`}>
-                        {isSettled ? 'Settled' : 'Pending AR'}
+                        {s.status}
                       </span>
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           )}
         </div>
       </div>
+
+      {/* Modals */}
+      <RecordSaleModal
+        isOpen={showRecordModal}
+        onClose={() => setShowRecordModal(false)}
+        workbenchId={workbenchId}
+        savedParties={savedParties}
+        onSaleRecorded={loadSalesModuleData}
+      />
+
+      <ImportDocVaultSalesModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        workbenchId={workbenchId}
+        onImportSuccess={loadSalesModuleData}
+      />
+
+      <RecordPaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        workbenchId={workbenchId}
+        onPaymentRecorded={loadSalesModuleData}
+      />
+
+      <SaleDetailModal
+        isOpen={!!selectedSaleForDetail}
+        onClose={() => setSelectedSaleForDetail(null)}
+        workbenchId={workbenchId}
+        sale={selectedSaleForDetail}
+        onUpdate={() => {
+          loadSalesModuleData();
+          if (selectedSaleForDetail) {
+            const updated = salesService.getSales(workbenchId).find(s => s.id === selectedSaleForDetail.id);
+            setSelectedSaleForDetail(updated || null);
+          }
+        }}
+      />
     </div>
   );
 }
