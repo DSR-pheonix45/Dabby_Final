@@ -204,20 +204,44 @@ class BusinessEventRegistry:
         event_type: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
+        workbench_id: Optional[str] = None,
     ) -> list:
         q = (
             supabase.table("business_events")
                     .select("*")
-                    .eq("user_id", user_id)
                     .eq("is_superseded", False)
                     .order("event_date", desc=True, nullsfirst=False)
                     .limit(limit)
                     .offset(offset)
         )
+        if user_id:
+            q = q.eq("user_id", user_id)
         if event_status: q = q.eq("event_status", event_status)
         if event_type:   q = q.eq("event_type",   event_type)
+
         result = q.execute()
-        return result.data or []
+        events = result.data or []
+
+        if workbench_id and events:
+            try:
+                doc_res = (
+                    supabase.table("di_documents")
+                            .select("id")
+                            .eq("workbench_id", workbench_id)
+                            .execute()
+                )
+                wb_doc_ids = set(r["id"] for r in (doc_res.data or []))
+                
+                events = [
+                    ev for ev in events
+                    if (ev.get("document_id") in wb_doc_ids) or 
+                       (ev.get("event_metadata", {}).get("workbench_id") == workbench_id) or
+                       (not ev.get("document_id") and not ev.get("event_metadata", {}).get("workbench_id"))
+                ]
+            except Exception as filter_err:
+                print(f"[BusinessEventRegistry WARNING] Error filtering events by workbench_id: {filter_err}")
+
+        return events
 
     async def cancel_event(self, event_id: str, reason: Optional[str] = None) -> Dict:
         """
