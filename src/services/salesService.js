@@ -466,5 +466,26 @@ export const salesService = {
 
     localStorage.setItem(arKey, JSON.stringify(arItems));
     window.dispatchEvent(new CustomEvent("ar:updated", { detail: { workbenchId, count: arItems.length } }));
+  },
+
+  markAsPosted(workbenchId, saleId) {
+    if (!workbenchId || !saleId) return null;
+    const key = getStorageKey(workbenchId);
+    const stored = localStorage.getItem(key);
+    if (!stored) return null;
+    try {
+      const sales = JSON.parse(stored);
+      const updated = sales.map(s => {
+        if (s.id === saleId) {
+          return { ...s, is_posted: true, status: 'Posted' };
+        }
+        return s;
+      });
+      localStorage.setItem(key, JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent("ledger:updated", { detail: { workbenchId, saleId } }));
+      return updated.find(s => s.id === saleId);
+    } catch (e) {
+      return null;
+    }
   }
 };

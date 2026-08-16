@@ -17,6 +17,7 @@ import {
 import RecordPaymentModal from './RecordPaymentModal';
 import CreateReturnModal from './CreateReturnModal';
 import { diService } from '../../../../services/diService';
+import { salesService } from '../../../../services/salesService';
 import { toast } from 'react-hot-toast';
 
 export default function SaleDetailModal({ isOpen, onClose, workbenchId, sale, onUpdate }) {
@@ -33,14 +34,16 @@ export default function SaleDetailModal({ isOpen, onClose, workbenchId, sale, on
     if (isPostedToCoa || isPostingToCoa) return;
     setIsPostingToCoa(true);
     try {
+      salesService.markAsPosted(workbenchId, sale.id);
+
       if (sale.document_id) {
         await diService.postDocumentToLedger(sale.document_id);
       } else {
-        const narration = `Sales Invoice #${sale.id} issued to ${sale.customer?.name || 'Customer'} for ₹${Number(sale.grand_total || sale.amount || 0).toLocaleString()} [Dr Accounts Receivable (AR) / Cr Sales Revenue]`;
+        const narration = `Sales Invoice #${sale.id} issued to ${sale.customer?.name || 'Customer'} for ₹${Number(sale.grand_total || sale.amount || 0).toLocaleString()} [Dr Trade Debtors (AR) / Cr Sales Revenue]`;
         await diService.createTransfer(workbenchId, {
           transfer_type: 'bank_to_bank',
           from_account: `Sales Revenue (${sale.customer?.name || 'Customer'})`,
-          to_account: 'Accounts Receivable (AR)',
+          to_account: 'Trade Debtors (Accounts Receivable)',
           amount: Number(sale.grand_total || sale.amount || 0),
           transfer_date: sale.date || new Date().toISOString().split('T')[0],
           reference_number: `SALE-INV-${sale.id}`,
