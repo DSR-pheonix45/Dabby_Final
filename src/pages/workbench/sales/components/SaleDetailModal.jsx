@@ -16,14 +16,49 @@ import {
 } from 'react-icons/bs';
 import RecordPaymentModal from './RecordPaymentModal';
 import CreateReturnModal from './CreateReturnModal';
+import { diService } from '../../../../services/diService';
+import { toast } from 'react-hot-toast';
 
 export default function SaleDetailModal({ isOpen, onClose, workbenchId, sale, onUpdate }) {
   const navigate = useNavigate();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [isPostingToCoa, setIsPostingToCoa] = useState(false);
+  const [isPostedToCoa, setIsPostedToCoa] = useState(sale?.status === 'Posted' || sale?.is_posted);
 
   if (!isOpen || !sale) return null;
+
+  const handlePushToCoa = async () => {
+    if (isPostedToCoa || isPostingToCoa) return;
+    setIsPostingToCoa(true);
+    try {
+      if (sale.document_id) {
+        await diService.postDocumentToLedger(sale.document_id);
+      } else {
+        const narration = `Sales Invoice #${sale.id} issued to ${sale.customer?.name || 'Customer'} for ₹${Number(sale.grand_total || sale.amount || 0).toLocaleString()} [Dr Accounts Receivable (AR) / Cr Sales Revenue]`;
+        await diService.createTransfer(workbenchId, {
+          transfer_type: 'bank_to_bank',
+          from_account: `Sales Revenue (${sale.customer?.name || 'Customer'})`,
+          to_account: 'Accounts Receivable (AR)',
+          amount: Number(sale.grand_total || sale.amount || 0),
+          transfer_date: sale.date || new Date().toISOString().split('T')[0],
+          reference_number: `SALE-INV-${sale.id}`,
+          narration
+        });
+      }
+      setIsPostedToCoa(true);
+      toast.success(`Posted Sale #${sale.id} to COA Ledger!`, { icon: '⚡' });
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ledger:updated'));
+      }
+      if (onUpdate) onUpdate();
+    } catch (err) {
+      toast.error(err.message || 'Failed to post sale to COA ledger');
+    } finally {
+      setIsPostingToCoa(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/70 backdrop-blur-sm transition-opacity">
@@ -85,13 +120,31 @@ export default function SaleDetailModal({ isOpen, onClose, workbenchId, sale, on
               <span>View AR in OPS</span>
             </button>
 
-            <button
-              onClick={() => navigate('/dashboard/workbench/ledger')}
-              className="flex items-center space-x-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 rounded-lg text-xs font-semibold transition-colors"
-            >
-              <BsJournalText />
-              <span>View COA Ledger</span>
-            </button>
+            {isPostedToCoa ? (
+              <div className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-bold shadow-sm">
+                <BsCheckCircleFill className="text-emerald-400" />
+                <span>Posted to COA Ledger</span>
+              </div>
+            ) : (
+              <button
+                onClick={handlePushToCoa}
+                disabled={isPostingToCoa}
+                title="Post double-entry financial transaction to COA Ledger"
+                className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-gradient-to-r from-teal-500/20 to-emerald-500/20 hover:from-teal-500/30 hover:to-emerald-500/30 text-teal-300 border border-teal-500/40 rounded-lg text-xs font-extrabold transition-all shadow-md shadow-teal-500/10 cursor-pointer active:scale-95"
+              >
+                {isPostingToCoa ? (
+                  <>
+                    <BsClockHistory className="animate-spin text-teal-400" />
+                    <span>Posting to COA...</span>
+                  </>
+                ) : (
+                  <>
+                    <BsLightningCharge className="text-teal-400 text-sm animate-pulse" />
+                    <span>Push to COA Ledger</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
