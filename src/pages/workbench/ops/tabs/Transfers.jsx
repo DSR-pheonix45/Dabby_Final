@@ -206,8 +206,10 @@ export default function Transfers({ workbenchId }) {
       {/* Filter Bar */}
       <OpsFilterBar
         searchQuery={searchQuery}
+        onSearch={setSearchQuery}
         onSearchChange={setSearchQuery}
         searchPlaceholder="Search narration, account name, reference..."
+        filters={filtersConfig}
         filtersConfig={filtersConfig}
         activeFilters={activeFilters}
         onFilterChange={(key, val) => setFilters(prev => ({ ...prev, [key]: val }))}
