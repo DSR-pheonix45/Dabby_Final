@@ -333,4 +333,23 @@ export const diService = {
     if (!res.ok) throw new Error(await this._err(res, 'Failed to add manual settlement'));
     return res.json();
   },
+
+  async getTransfers(workbenchId) {
+    const res = await apiFetch(`/api/ops/${workbenchId}/transfers`);
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async createTransfer(workbenchId, transferData) {
+    const res = await apiFetch(`/api/ops/${workbenchId}/transfers`, {
+      method: 'POST',
+      body: JSON.stringify(transferData)
+    });
+    if (!res.ok) throw new Error(await this._err(res, 'Failed to record transfer'));
+    const data = await res.json();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ledger:updated', { detail: { transfer: data } }));
+    }
+    return data;
+  },
 };

@@ -37,6 +37,7 @@ export default function COA() {
   const { activeWorkbench } = useWorkbench();
   const [accounts, setAccounts] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [transfers, setTransfers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [masterRows, setMasterRows] = useState([]);
 
@@ -49,9 +50,10 @@ export default function COA() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [accountsData, docs] = await Promise.all([
+      const [accountsData, docs, trfs] = await Promise.all([
         accountService.getAccounts(activeWorkbench.id),
-        diService.getDocuments(activeWorkbench.id)
+        diService.getDocuments(activeWorkbench.id),
+        diService.getTransfers(activeWorkbench.id)
       ]);
       
       const rows = accountsData || [];
@@ -68,6 +70,7 @@ export default function COA() {
       );
       
       setDocuments(docs || []);
+      setTransfers(trfs || []);
     } catch (err) {
       toast.error("Failed to load COA data");
     } finally {
@@ -84,8 +87,21 @@ export default function COA() {
     { type: 'Expense', net: 0, gross: 0, color: { textTitle: 'text-orange-400' } },
   ];
 
-  // Extract all proposed journal entries from the documents' analysis notes
+  // Extract all proposed journal entries from the documents' analysis notes and transfers
   const proposedJournals = [];
+  
+  transfers.forEach(t => {
+    proposedJournals.push({
+      documentName: `Transfer: ${t.reference_number || 'TRF-POST'}`,
+      date: t.transfer_date,
+      narration: t.narration,
+      entries: [
+        { account: t.to_account, type: 'debit', amount: Number(t.amount || 0) },
+        { account: t.from_account, type: 'credit', amount: Number(t.amount || 0) }
+      ]
+    });
+  });
+
   documents.forEach(doc => {
     if (doc.di_analysis_notes && doc.di_analysis_notes.length > 0) {
       const note = doc.di_analysis_notes[0];

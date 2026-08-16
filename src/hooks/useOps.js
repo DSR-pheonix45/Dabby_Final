@@ -141,3 +141,54 @@ export function useBudgets(workbenchId) {
     setSearchQuery: setSearch
   };
 }
+
+export function useTransfers(workbenchId) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [filters, setFilters] = useState({});
+  const [search, setSearch] = useState('');
+  const refreshKey = useLedgerRefreshKey();
+
+  useEffect(() => {
+    if (!workbenchId) { setRows([]); setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    diService.getTransfers(workbenchId)
+      .then((res) => { if (!cancelled) setRows(res || []); })
+      .catch((e) => { if (!cancelled) { setError(e.message); setRows([]); } })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [workbenchId, refreshKey]);
+
+  const data = rows.filter((item) => {
+    if (search) {
+      const q = search.toLowerCase();
+      if (!(item.narration || '').toLowerCase().includes(q) && 
+          !(item.from_account || '').toLowerCase().includes(q) &&
+          !(item.to_account || '').toLowerCase().includes(q) &&
+          !(item.reference_number || '').toLowerCase().includes(q)) return false;
+    }
+    if (filters.transfer_type && item.transfer_type !== filters.transfer_type) return false;
+    return true;
+  });
+
+  const kpis = {
+    totalVolume: rows.reduce((sum, r) => sum + Number(r.amount || 0), 0),
+    contraCount: rows.filter(r => ['bank_to_bank', 'petty_cash_deposit', 'petty_cash_withdrawal'].includes(r.transfer_type)).length,
+    equityCount: rows.filter(r => ['founder_capital_infusion', 'initial_funding', 'founder_drawings'].includes(r.transfer_type)).length,
+    postedCount: rows.filter(r => r.status === 'posted').length
+  };
+
+  const refetch = () => {
+    setLoading(true);
+    diService.getTransfers(workbenchId)
+      .then(res => setRows(res || []))
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
+  };
+
+  return { data, kpis, loading, error, setFilters, activeFilters: filters, searchQuery: search, setSearchQuery: setSearch, refetch };
+}
+

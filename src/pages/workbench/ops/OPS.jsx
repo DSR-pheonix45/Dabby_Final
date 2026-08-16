@@ -4,6 +4,7 @@ import AccountsReceivable from './tabs/AccountsReceivable';
 import AccountsPayable from './tabs/AccountsPayable';
 import Budgeting from './tabs/Budgeting';
 import ExpenseClaimsReview from './tabs/ExpenseClaimsReview';
+import Transfers from './tabs/Transfers';
 import { BsArrowRepeat } from 'react-icons/bs';
 import { toast } from 'react-hot-toast';
 
@@ -24,7 +25,8 @@ export default function OPS() {
     { id: 'ar', label: 'Accounts Receivable' },
     { id: 'ap', label: 'Accounts Payable' },
     { id: 'budgeting', label: 'Budgeting' },
-    { id: 'claims', label: 'Employee Claims & Approvals' }
+    { id: 'claims', label: 'Employee Claims & Approvals' },
+    { id: 'transfers', label: 'Transfers & Capital' }
   ];
 
   const handleRefresh = () => {
@@ -79,6 +81,7 @@ export default function OPS() {
           {activeTab === 'ap' && <AccountsPayable key={refreshKey} workbenchId={workbenchId} />}
           {activeTab === 'budgeting' && <Budgeting key={refreshKey} workbenchId={workbenchId} />}
           {activeTab === 'claims' && <ExpenseClaimsReview key={refreshKey} workbenchId={workbenchId} />}
+          {activeTab === 'transfers' && <Transfers key={refreshKey} workbenchId={workbenchId} />}
         </div>
       </div>
       

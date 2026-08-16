@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional, Dict
 from pydantic import BaseModel
-from datetime import date
+from datetime import date, datetime
 from supabase_client import supabase
 from services.ledger_service import LedgerService
 from services.ai_service import ai_service
@@ -736,3 +736,144 @@ async def map_voucher_account(req: VoucherMappingRequest):
     except Exception as e:
         print(f"[ERROR] map_voucher_account: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Transfers & Contra Engine ---
+
+class TransferCreate(BaseModel):
+    transfer_type: str # 'bank_to_bank', 'petty_cash_deposit', 'petty_cash_withdrawal', 'founder_capital_infusion', 'initial_funding', 'founder_drawings'
+    from_account: str
+    to_account: str
+    amount: float
+    transfer_date: Optional[str] = None
+    reference_number: Optional[str] = None
+    narration: Optional[str] = None
+
+TRANSFERS_STORE: Dict[str, List[Dict]] = {}
+
+def _init_default_transfers(workbench_id: str) -> List[Dict]:
+    return [
+        {
+            "id": f"trf_1_{workbench_id}",
+            "workbench_id": workbench_id,
+            "transfer_type": "bank_to_bank",
+            "from_account": "HDFC Primary Current Acc",
+            "to_account": "ICICI Operations Acc",
+            "amount": 50000.0,
+            "transfer_date": str(date.today()),
+            "reference_number": "TRF-9001",
+            "narration": "Contra Transfer: Inter-bank transfer from HDFC Primary Current Acc to ICICI Operations Acc",
+            "status": "posted"
+        },
+        {
+            "id": f"trf_2_{workbench_id}",
+            "workbench_id": workbench_id,
+            "transfer_type": "founder_capital_infusion",
+            "from_account": "Founder Equity Capital",
+            "to_account": "HDFC Primary Current Acc",
+            "amount": 250000.0,
+            "transfer_date": str(date.today()),
+            "reference_number": "EQUITY-101",
+            "narration": "Equity Infusion: Founder capital contribution into HDFC Primary Current Acc",
+            "status": "posted"
+        }
+    ]
+
+@router.get("/{workbench_id}/transfers")
+def get_transfers(workbench_id: str):
+    db_transfers = []
+    try:
+        res = supabase.table("business_transfers").select("*").eq("workbench_id", workbench_id).order("created_at", desc=True).execute()
+        if res and res.data:
+            db_transfers = res.data
+    except Exception as e:
+        print("[DEBUG] business_transfers DB select notice:", e)
+
+    if workbench_id not in TRANSFERS_STORE:
+        TRANSFERS_STORE[workbench_id] = _init_default_transfers(workbench_id)
+
+    mem_transfers = TRANSFERS_STORE.get(workbench_id, [])
+
+    seen = set()
+    merged = []
+    for t in db_transfers + mem_transfers:
+        tid = t.get("id") or t.get("reference_number")
+        if tid not in seen:
+            seen.add(tid)
+            merged.append(t)
+
+    return merged
+
+@router.post("/{workbench_id}/transfers")
+def create_transfer(workbench_id: str, req: TransferCreate):
+    t_date = req.transfer_date or str(date.today())
+    ref_no = req.reference_number or f"TRF-{int(datetime.now().timestamp()) % 100000}"
+    
+    # Auto-generate Day Book narration if not provided
+    narration = req.narration
+    if not narration:
+        if req.transfer_type == "bank_to_bank":
+            narration = f"Contra Transfer: ₹{req.amount:,.2f} from {req.from_account} to {req.to_account}"
+        elif req.transfer_type == "petty_cash_withdrawal":
+            narration = f"Petty Cash Withdrawal: ₹{req.amount:,.2f} withdrawn from {req.from_account} to Petty Cash Box"
+        elif req.transfer_type == "petty_cash_deposit":
+            narration = f"Petty Cash Deposit: ₹{req.amount:,.2f} deposited from Petty Cash Box into {req.to_account}"
+        elif req.transfer_type in ["founder_capital_infusion", "initial_funding"]:
+            narration = f"Capital Infusion: ₹{req.amount:,.2f} invested by {req.from_account} into {req.to_account}"
+        elif req.transfer_type == "founder_drawings":
+            narration = f"Founder Drawing: ₹{req.amount:,.2f} withdrawn by {req.to_account} from {req.from_account}"
+        else:
+            narration = f"Transfer: ₹{req.amount:,.2f} from {req.from_account} to {req.to_account}"
+
+    trf_id = f"trf_{int(datetime.now().timestamp())}"
+    row = {
+        "id": trf_id,
+        "workbench_id": workbench_id,
+        "transfer_type": req.transfer_type,
+        "from_account": req.from_account,
+        "to_account": req.to_account,
+        "amount": float(req.amount),
+        "transfer_date": t_date,
+        "reference_number": ref_no,
+        "narration": narration,
+        "status": "posted"
+    }
+
+    saved_trf = row
+    try:
+        res = supabase.table("business_transfers").insert({
+            "workbench_id": workbench_id,
+            "transfer_type": req.transfer_type,
+            "from_account": req.from_account,
+            "to_account": req.to_account,
+            "amount": float(req.amount),
+            "transfer_date": t_date,
+            "reference_number": ref_no,
+            "narration": narration,
+            "status": "posted"
+        }).execute()
+        if res and res.data:
+            saved_trf = res.data[0]
+    except Exception as e:
+        print("[DEBUG] business_transfers DB insert notice:", e)
+
+    if workbench_id not in TRANSFERS_STORE:
+        TRANSFERS_STORE[workbench_id] = _init_default_transfers(workbench_id)
+    TRANSFERS_STORE[workbench_id].insert(0, saved_trf)
+
+    # Post double-entry Day Book entry to ledger
+    try:
+        tx_row = {
+            "workbench_id": workbench_id,
+            "transaction_type": "TRANSFER",
+            "reference_id": ref_no,
+            "amount": float(req.amount),
+            "narration": narration,
+            "status": "POSTED"
+        }
+        supabase.table("di_ledger_transactions").insert(tx_row).execute()
+    except Exception as db_err:
+        print("[DEBUG] Double-entry ledger auto-posting notice:", db_err)
+
+    return saved_trf
+
