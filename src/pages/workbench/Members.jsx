@@ -213,15 +213,6 @@ export default function Members() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            onClick={handleCopyPublicLink}
-            className="flex items-center space-x-2 px-3.5 py-2 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/30 rounded-xl text-xs font-bold transition-all shadow-sm"
-            title="Copy Public Link for Employees to submit Expense Claims"
-          >
-            {copiedLink ? <BsCheck2 className="text-emerald-400 text-sm" /> : <BsLink45Deg className="text-sm" />}
-            <span>{copiedLink ? "Link Copied!" : "🔗 Public Expense Portal Link"}</span>
-          </button>
-
           {activeSubTab === "members" && (
             <button
               onClick={() => setIsAddMemberOpen(true)}
