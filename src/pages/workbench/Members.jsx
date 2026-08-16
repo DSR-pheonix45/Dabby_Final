@@ -38,6 +38,7 @@ export default function Members() {
   const [selectedMember, setSelectedMember] = useState(null);
   const [isRoleChangeOpen, setIsRoleChangeOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedEmpId, setCopiedEmpId] = useState(null);
 
   // Department Modal State
   const [isAddDeptOpen, setIsAddDeptOpen] = useState(false);
@@ -99,7 +100,9 @@ export default function Members() {
   const handleCopyPersonalLink = (emp) => {
     const link = `${window.location.origin}/expense-claim/${activeWorkbench?.id}?empId=${emp.id}`;
     navigator.clipboard.writeText(link);
+    setCopiedEmpId(emp.id);
     toast.success(`Personal OPEX Logger link copied for ${emp.name}!`);
+    setTimeout(() => setCopiedEmpId(null), 2500);
   };
 
   const handleCreateDepartment = async (e) => {
@@ -475,9 +478,23 @@ export default function Members() {
                       {/* Copy Personal OPEX Logger Link Button */}
                       <button
                         onClick={() => handleCopyPersonalLink(emp)}
-                        className="w-full py-2 px-3 bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/20 hover:border-teal-500/40 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all text-xs"
+                        className={`w-full py-2 px-3 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all text-xs border ${
+                          copiedEmpId === emp.id
+                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                            : "bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border-teal-500/20 hover:border-teal-500/40"
+                        }`}
                       >
-                        <BsLink45Deg className="w-4 h-4" /> Copy Personal OPEX Link
+                        {copiedEmpId === emp.id ? (
+                          <>
+                            <BsCheck2 className="w-4 h-4 text-emerald-400" />
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <BsLink45Deg className="w-4 h-4" />
+                            <span>Copy Personal OPEX Link</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>

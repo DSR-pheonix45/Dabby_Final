@@ -47,23 +47,25 @@ export default function EmployeeExpensePortal() {
           .single();
         if (wb) setWorkbenchInfo(wb);
 
-        // Fetch depts & employees
-        const deptsRes = await apiFetch(`/api/collaboration/${workbenchId}/departments`);
-        if (deptsRes.ok) setDepartments(await deptsRes.json());
+        // Fetch depts & employees using collaborationService
+        const depts = await collaborationService.getDepartments(workbenchId);
+        setDepartments(depts || []);
 
-        const empsRes = await apiFetch(`/api/collaboration/${workbenchId}/employees`);
-        if (empsRes.ok) {
-          const empList = await empsRes.json();
-          setEmployees(empList || []);
+        const empList = await collaborationService.getEmployees(workbenchId);
+        setEmployees(empList || []);
 
-          if (empIdParam && empList) {
-            const matched = empList.find(e => e.id === empIdParam || e.name.toLowerCase() === empIdParam.toLowerCase());
-            if (matched) {
-              setActiveEmp(matched);
-              setEmployeeName(matched.name);
-              if (matched.email) setEmployeeEmail(matched.email);
-              if (matched.department_name) setDepartmentName(matched.department_name);
-            }
+        if (empIdParam && empList && empList.length > 0) {
+          const matched = empList.find(e => 
+            e.id === empIdParam || 
+            (e.id && e.id.toLowerCase() === empIdParam.toLowerCase()) ||
+            (e.id && empIdParam.toLowerCase().includes(e.id.toLowerCase())) ||
+            (e.name && e.name.toLowerCase() === empIdParam.toLowerCase())
+          );
+          if (matched) {
+            setActiveEmp(matched);
+            setEmployeeName(matched.name);
+            if (matched.email) setEmployeeEmail(matched.email);
+            if (matched.department_name) setDepartmentName(matched.department_name);
           }
         }
       }
@@ -302,15 +304,17 @@ export default function EmployeeExpensePortal() {
             {/* Employee Information */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
-                  <BsPerson className="text-teal-400" /> Employee Name
+                <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5"><BsPerson className="text-teal-400" /> Employee Name</span>
+                  {(activeEmp || empIdParam) && <span className="text-[10px] text-teal-400 font-bold">🔒 Locked</span>}
                 </label>
-                {activeEmp ? (
+                {(activeEmp || empIdParam) ? (
                   <input
                     type="text"
                     readOnly
-                    value={employeeName}
-                    className="w-full bg-black/60 border border-teal-500/30 rounded-xl px-3.5 py-2.5 text-xs text-teal-300 font-bold focus:outline-none"
+                    disabled
+                    value={employeeName || "Verified Employee"}
+                    className="w-full bg-black/70 border border-teal-500/40 rounded-xl px-3.5 py-2.5 text-xs text-teal-300 font-extrabold focus:outline-none cursor-not-allowed shadow-inner"
                   />
                 ) : employees.length > 0 ? (
                   <select
@@ -336,15 +340,17 @@ export default function EmployeeExpensePortal() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
-                  <BsBuilding className="text-teal-400" /> Department
+                <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5"><BsBuilding className="text-teal-400" /> Department</span>
+                  {(activeEmp || empIdParam) && <span className="text-[10px] text-purple-400 font-bold">🔒 Locked</span>}
                 </label>
-                {activeEmp ? (
+                {(activeEmp || empIdParam) ? (
                   <input
                     type="text"
                     readOnly
-                    value={departmentName}
-                    className="w-full bg-black/60 border border-teal-500/30 rounded-xl px-3.5 py-2.5 text-xs text-purple-300 font-bold focus:outline-none"
+                    disabled
+                    value={departmentName || "General Operations"}
+                    className="w-full bg-black/70 border border-purple-500/40 rounded-xl px-3.5 py-2.5 text-xs text-purple-300 font-extrabold focus:outline-none cursor-not-allowed shadow-inner"
                   />
                 ) : (
                   <select
