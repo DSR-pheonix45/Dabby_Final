@@ -64,6 +64,7 @@ app.include_router(di_documents.router, prefix="/api/di/documents", tags=["Docum
 app.include_router(di_ledger.router, prefix="/api/di/ledger", tags=["Universal Ledger"])
 app.include_router(settlements.router, prefix="/api/settlements", tags=["Settlements"])
 app.include_router(business_events.router, prefix="/api/events", tags=["Business Events"])
+app.include_router(ops.router, prefix="/api/ops", tags=["Operations"])
 app.include_router(workbench_accounts.router, prefix="/api/workbench-accounts", tags=["Workbench Accounts"])
 app.include_router(petty_cash.router, prefix="/api/petty-cash", tags=["Petty Cash"])
 

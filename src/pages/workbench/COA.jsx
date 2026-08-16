@@ -202,14 +202,19 @@ export default function COA() {
     proposedJournals.forEach(j => {
       (j.entries || []).forEach(e => {
         const eAccLower = (e.account || '').toLowerCase();
-        if (
-          eAccLower.includes(labelLower) || 
-          eAccLower.includes(ledgerLower) || 
-          (ledgerLower.includes('receivable') && eAccLower.includes('receivable')) ||
-          (ledgerLower.includes('debtor') && eAccLower.includes('debtor')) ||
-          (ledgerLower.includes('revenue') && eAccLower.includes('revenue')) ||
-          (ledgerLower.includes('bank') && eAccLower.includes('bank'))
-        ) {
+        
+        const isAr = (ledgerLower.includes('receivable') || ledgerLower.includes('debtor') || acc.groupCode === 'AAR') &&
+                     (eAccLower.includes('receivable') || eAccLower.includes('debtor') || eAccLower.includes('ar'));
+        
+        const isRev = (ledgerLower.includes('revenue') || ledgerLower.includes('sale') || acc.groupCode === 'REV') &&
+                      (eAccLower.includes('revenue') || eAccLower.includes('sale'));
+        
+        const isBank = (ledgerLower.includes('bank') || ledgerLower.includes('cash') || acc.groupCode === 'ACO') &&
+                       (eAccLower.includes('bank') || eAccLower.includes('cash'));
+
+        const isDirect = (labelLower && eAccLower.includes(labelLower)) || (ledgerLower && eAccLower.includes(ledgerLower));
+
+        if (isAr || isRev || isBank || isDirect) {
           if (e.type === 'debit') balance += Number(e.amount || 0);
           else balance -= Number(e.amount || 0);
         }
