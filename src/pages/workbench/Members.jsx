@@ -43,6 +43,12 @@ export default function Members() {
   const [isAddDeptOpen, setIsAddDeptOpen] = useState(false);
   const [newDeptName, setNewDeptName] = useState("");
   const [newDeptBudget, setNewDeptBudget] = useState("");
+  const [selectedEmpIdsForDept, setSelectedEmpIdsForDept] = useState([]);
+
+  // Link Employees Modal State
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [linkTargetDept, setLinkTargetDept] = useState(null);
+  const [linkEmpIds, setLinkEmpIds] = useState([]);
 
   // Employee Modal State
   const [isAddEmpOpen, setIsAddEmpOpen] = useState(false);
@@ -50,6 +56,7 @@ export default function Members() {
   const [newEmpEmail, setNewEmpEmail] = useState("");
   const [newEmpDept, setNewEmpDept] = useState("Site Operations");
   const [newEmpDesignation, setNewEmpDesignation] = useState("Staff");
+  const [newEmpSalary, setNewEmpSalary] = useState("");
   const [newEmpAllowance, setNewEmpAllowance] = useState("");
 
   useEffect(() => {
@@ -85,8 +92,14 @@ export default function Members() {
     const link = `${window.location.origin}/expense-claim/${activeWorkbench?.id}`;
     navigator.clipboard.writeText(link);
     setCopiedLink(true);
-    toast.success("Employee Expense Claim Portal link copied!");
+    toast.success("General Expense Claim Portal link copied!");
     setTimeout(() => setCopiedLink(false), 3000);
+  };
+
+  const handleCopyPersonalLink = (emp) => {
+    const link = `${window.location.origin}/expense-claim/${activeWorkbench?.id}?empId=${emp.id}`;
+    navigator.clipboard.writeText(link);
+    toast.success(`Personal OPEX Logger link copied for ${emp.name}!`);
   };
 
   const handleCreateDepartment = async (e) => {
@@ -95,11 +108,13 @@ export default function Members() {
     try {
       await collaborationService.createDepartment(activeWorkbench.id, {
         name: newDeptName.trim(),
-        monthly_budget: Number(newDeptBudget) || 0
+        monthly_budget: Number(newDeptBudget) || 0,
+        employee_ids: selectedEmpIdsForDept
       });
-      toast.success(`Department "${newDeptName}" created!`);
+      toast.success(`Department "${newDeptName}" stored in DB!`);
       setNewDeptName("");
       setNewDeptBudget("");
+      setSelectedEmpIdsForDept([]);
       setIsAddDeptOpen(false);
       fetchDeptsAndEmployees();
     } catch (err) {
@@ -107,20 +122,51 @@ export default function Members() {
     }
   };
 
+  const handleOpenLinkModal = (dept) => {
+    setLinkTargetDept(dept);
+    // Find currently linked employees for this department
+    const linked = employees.filter(e => e.department_id === dept.id || e.department_name === dept.name).map(e => e.id);
+    setLinkEmpIds(linked);
+    setIsLinkModalOpen(true);
+  };
+
+  const handleSaveDeptEmployeeLinks = async (e) => {
+    e.preventDefault();
+    if (!linkTargetDept) return;
+    try {
+      await collaborationService.linkEmployeesToDepartment(
+        activeWorkbench.id,
+        linkTargetDept.id,
+        linkTargetDept.name,
+        linkEmpIds
+      );
+      toast.success(`Linked ${linkEmpIds.length} employee(s) to ${linkTargetDept.name}!`);
+      setIsLinkModalOpen(false);
+      setLinkTargetDept(null);
+      fetchDeptsAndEmployees();
+    } catch (err) {
+      toast.error("Failed to link employees to department");
+    }
+  };
+
   const handleCreateEmployee = async (e) => {
     e.preventDefault();
     if (!newEmpName.trim()) return;
+    const targetDept = departments.find(d => d.name === newEmpDept || d.id === newEmpDept);
     try {
       await collaborationService.createEmployee(activeWorkbench.id, {
         name: newEmpName.trim(),
         email: newEmpEmail.trim(),
-        department_name: newEmpDept,
+        department_id: targetDept?.id || null,
+        department_name: targetDept?.name || newEmpDept,
         designation: newEmpDesignation,
+        salary: Number(newEmpSalary) || 0,
         monthly_allowance: Number(newEmpAllowance) || 0
       });
-      toast.success(`Employee "${newEmpName}" added!`);
+      toast.success(`Employee "${newEmpName}" added and stored in DB!`);
       setNewEmpName("");
       setNewEmpEmail("");
+      setNewEmpSalary("");
       setNewEmpAllowance("");
       setIsAddEmpOpen(false);
       fetchDeptsAndEmployees();
@@ -303,29 +349,66 @@ export default function Members() {
           {/* TAB 2: Departments & Budget Caps */}
           {activeSubTab === "departments" && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredDepartments.map((d) => (
-                <div
-                  key={d.id}
-                  className="bg-[#181818] border border-white/10 hover:border-teal-500/30 rounded-2xl p-5 space-y-3 transition-all"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
-                        <BsBuilding />
+              {filteredDepartments.map((d) => {
+                const linkedEmps = employees.filter(e => e.department_id === d.id || e.department_name === d.name);
+
+                return (
+                  <div
+                    key={d.id}
+                    className="bg-[#181818] border border-white/10 hover:border-teal-500/30 rounded-2xl p-5 space-y-4 transition-all flex flex-col justify-between"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
+                            <BsBuilding />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-bold text-white">{d.name}</h3>
+                            <p className="text-[11px] text-gray-400">Code: {d.code || (d.name ? d.name.slice(0, 3).toUpperCase() : "DEP")}</p>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-white">{d.name}</h3>
-                        <p className="text-[11px] text-gray-400">Department Code: {d.code || (d.name ? d.name.slice(0, 3).toUpperCase() : "DEP")}</p>
+
+                      {/* Linked Employees Section */}
+                      <div className="bg-black/30 rounded-xl p-3 border border-white/5 space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-400 font-medium flex items-center gap-1.5">
+                            <BsPeople className="text-teal-400" /> Linked Employees ({linkedEmps.length})
+                          </span>
+                          <button
+                            onClick={() => handleOpenLinkModal(d)}
+                            className="text-[11px] text-teal-400 hover:text-teal-300 font-semibold flex items-center gap-1"
+                          >
+                            <BsPlusLg className="w-2.5 h-2.5" /> Link Staff
+                          </button>
+                        </div>
+
+                        {linkedEmps.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {linkedEmps.map(emp => (
+                              <span
+                                key={emp.id}
+                                className="px-2 py-0.5 text-[11px] bg-teal-500/10 border border-teal-500/20 text-teal-300 rounded-md truncate max-w-[140px]"
+                                title={emp.name}
+                              >
+                                {emp.name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-gray-500 italic">No employees linked yet.</p>
+                        )}
                       </div>
                     </div>
-                  </div>
 
-                  <div className="pt-3 border-t border-white/5 flex items-center justify-between text-xs">
-                    <span className="text-gray-400">Monthly Budget Cap:</span>
-                    <span className="font-extrabold text-teal-400">₹{(d.monthly_budget || 0).toLocaleString()}</span>
+                    <div className="pt-3 border-t border-white/5 flex items-center justify-between text-xs">
+                      <span className="text-gray-400">Monthly Budget Cap:</span>
+                      <span className="font-extrabold text-teal-400">₹{(d.monthly_budget || 0).toLocaleString()}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {filteredDepartments.length === 0 && (
                 <div className="col-span-full py-10 text-center text-xs text-gray-500">
@@ -343,41 +426,68 @@ export default function Members() {
                 const spent = Number(emp.spent_allowance || 0);
                 const remaining = Math.max(0, allowance - spent);
                 const usedPct = Math.min(100, Math.round((spent / (allowance || 1)) * 100));
+                const salary = Number(emp.salary || 0);
 
                 return (
                   <div
                     key={emp.id}
-                    className="bg-[#181818] border border-white/10 hover:border-teal-500/30 rounded-2xl p-5 space-y-3 transition-all"
+                    className="bg-[#181818] border border-white/10 hover:border-teal-500/30 rounded-2xl p-5 space-y-3.5 transition-all flex flex-col justify-between"
                   >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-11 h-11 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-base">
-                        {emp.name.charAt(0)}
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-11 h-11 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-base">
+                          {emp.name.charAt(0)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-sm font-bold text-white truncate">{emp.name}</h3>
+                          <p className="text-xs text-gray-400 truncate">{emp.designation || "Staff"} • <span className="text-purple-400 font-medium">{emp.department_name}</span></p>
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-bold text-white truncate">{emp.name}</h3>
-                        <p className="text-xs text-gray-400 truncate">{emp.designation || "Staff"} • {emp.department_name}</p>
+
+                      {/* Salary & Context Info */}
+                      <div className="grid grid-cols-2 gap-2 bg-black/30 p-2.5 rounded-xl border border-white/5 text-xs">
+                        <div>
+                          <p className="text-[10px] text-gray-400 uppercase font-semibold">Base Salary</p>
+                          <p className="font-bold text-emerald-400 mt-0.5">
+                            {salary > 0 ? `₹${salary.toLocaleString()}/mo` : "Not set"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-gray-400 uppercase font-semibold">Expense Limit</p>
+                          <p className="font-bold text-teal-400 mt-0.5">₹{allowance.toLocaleString()}/mo</p>
+                        </div>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="space-y-1 pt-1">
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-gray-400">Allowance Used ({usedPct}%)</span>
+                          <span className="font-bold text-white">₹{spent.toLocaleString()} / ₹{allowance.toLocaleString()}</span>
+                        </div>
+                        <div className="w-full bg-black/50 h-2 rounded-full overflow-hidden border border-white/5">
+                          <div 
+                            className={`h-full transition-all duration-500 ${
+                              usedPct > 90 ? 'bg-red-500' : usedPct > 70 ? 'bg-amber-500' : 'bg-teal-400'
+                            }`}
+                            style={{ width: `${usedPct}%` }}
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    {/* Progress Bar */}
-                    <div className="space-y-1 pt-1">
-                      <div className="flex justify-between text-[11px]">
-                        <span className="text-gray-400">Allowance Used ({usedPct}%)</span>
-                        <span className="font-bold text-white">₹{spent.toLocaleString()} / ₹{allowance.toLocaleString()}</span>
+                    <div className="pt-3 border-t border-white/5 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400">Remaining Allowance:</span>
+                        <span className="font-extrabold text-emerald-400">₹{remaining.toLocaleString()}</span>
                       </div>
-                      <div className="w-full bg-black/50 h-2 rounded-full overflow-hidden border border-white/5">
-                        <div 
-                          className={`h-full transition-all duration-500 ${
-                            usedPct > 90 ? 'bg-red-500' : usedPct > 70 ? 'bg-amber-500' : 'bg-teal-400'
-                          }`}
-                          style={{ width: `${usedPct}%` }}
-                        />
-                      </div>
-                    </div>
 
-                    <div className="pt-3 border-t border-white/5 flex items-center justify-between text-xs">
-                      <span className="text-gray-400">Remaining Allowance:</span>
-                      <span className="font-extrabold text-emerald-400">₹{remaining.toLocaleString()}</span>
+                      {/* Copy Personal OPEX Logger Link Button */}
+                      <button
+                        onClick={() => handleCopyPersonalLink(emp)}
+                        className="w-full py-2 px-3 bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/20 hover:border-teal-500/40 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all text-xs"
+                      >
+                        <BsLink45Deg className="w-4 h-4" /> Copy Personal OPEX Link
+                      </button>
                     </div>
                   </div>
                 );
@@ -385,7 +495,7 @@ export default function Members() {
 
               {filteredEmployees.length === 0 && (
                 <div className="col-span-full py-10 text-center text-xs text-gray-500">
-                  No non-login employees added yet. Click <strong>"+ Add Employee"</strong> or send them the <strong>Public Expense Link</strong> to log claims.
+                  No non-login employees added yet. Click <strong>"+ Add Employee"</strong> to record staff and issue personalized OPEX links.
                 </div>
               )}
             </div>
@@ -424,6 +534,35 @@ export default function Members() {
                 />
               </div>
 
+              {/* Multi-select employees to link */}
+              {employees.length > 0 && (
+                <div>
+                  <label className="block text-gray-300 font-semibold mb-1">Assign Employees to Department</label>
+                  <div className="max-h-32 overflow-y-auto space-y-1 bg-black/40 p-2.5 rounded-xl border border-white/10">
+                    {employees.map((emp) => {
+                      const checked = selectedEmpIdsForDept.includes(emp.id);
+                      return (
+                        <label key={emp.id} className="flex items-center space-x-2 text-gray-300 hover:text-white cursor-pointer py-1">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedEmpIdsForDept([...selectedEmpIdsForDept, emp.id]);
+                              } else {
+                                setSelectedEmpIdsForDept(selectedEmpIdsForDept.filter(id => id !== emp.id));
+                              }
+                            }}
+                            className="rounded border-white/20 text-teal-500 focus:ring-0 bg-black/50"
+                          />
+                          <span className="truncate">{emp.name} ({emp.designation || 'Staff'})</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-end space-x-3 pt-2">
                 <button
                   type="button"
@@ -437,6 +576,64 @@ export default function Members() {
                   className="px-5 py-2 bg-teal-500 hover:bg-teal-400 text-black font-bold rounded-xl"
                 >
                   Save Department
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Link Employees to Department Modal */}
+      {isLinkModalOpen && linkTargetDept && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-4">
+            <h2 className="text-lg font-bold text-white">Link Employees to {linkTargetDept.name}</h2>
+            <p className="text-xs text-gray-400">Select employees to include in this department:</p>
+
+            <form onSubmit={handleSaveDeptEmployeeLinks} className="space-y-4 text-xs">
+              <div className="max-h-60 overflow-y-auto space-y-1.5 bg-black/40 p-3 rounded-xl border border-white/10">
+                {employees.length > 0 ? (
+                  employees.map((emp) => {
+                    const checked = linkEmpIds.includes(emp.id);
+                    return (
+                      <label key={emp.id} className="flex items-center space-x-2.5 text-gray-300 hover:text-white cursor-pointer py-1 border-b border-white/5 last:border-0">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setLinkEmpIds([...linkEmpIds, emp.id]);
+                            } else {
+                              setLinkEmpIds(linkEmpIds.filter(id => id !== emp.id));
+                            }
+                          }}
+                          className="rounded border-white/20 text-teal-500 focus:ring-0 bg-black/50"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-white truncate">{emp.name}</p>
+                          <p className="text-[10px] text-gray-400">{emp.designation || 'Staff'} • Current Dept: {emp.department_name || 'None'}</p>
+                        </div>
+                      </label>
+                    );
+                  })
+                ) : (
+                  <p className="text-gray-500 italic py-2">No employees created yet.</p>
+                )}
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsLinkModalOpen(false)}
+                  className="px-4 py-2 text-gray-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-teal-500 hover:bg-teal-400 text-black font-bold rounded-xl"
+                >
+                  Save Links
                 </button>
               </div>
             </form>
@@ -507,15 +704,28 @@ export default function Members() {
                 />
               </div>
 
-              <div>
-                <label className="block text-gray-300 font-semibold mb-1">Monthly Budget Allowance (₹)</label>
-                <input
-                  type="number"
-                  value={newEmpAllowance}
-                  onChange={(e) => setNewEmpAllowance(e.target.value)}
-                  placeholder="15000"
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-gray-300 font-semibold mb-1">Monthly Base Salary (₹)</label>
+                  <input
+                    type="number"
+                    value={newEmpSalary}
+                    onChange={(e) => setNewEmpSalary(e.target.value)}
+                    placeholder="65000"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 font-semibold mb-1">Monthly OPEX Limit (₹)</label>
+                  <input
+                    type="number"
+                    value={newEmpAllowance}
+                    onChange={(e) => setNewEmpAllowance(e.target.value)}
+                    placeholder="15000"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500"
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end space-x-3 pt-2">

@@ -111,6 +111,18 @@ export const collaborationService = {
     return res.json();
   },
 
+  async linkEmployeesToDepartment(workbenchId, departmentId, departmentName, employeeIds) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/departments/${departmentId}/link-employees`, {
+      method: "PUT",
+      body: JSON.stringify({
+        department_name: departmentName,
+        employee_ids: employeeIds
+      }),
+    });
+    if (!res.ok) throw new Error("Failed to link employees to department");
+    return res.json();
+  },
+
   async getEmployees(workbenchId) {
     const res = await apiFetch(`/api/collaboration/${workbenchId}/employees`);
     if (!res.ok) return [];

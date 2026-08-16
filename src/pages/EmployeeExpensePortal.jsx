@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { 
   BsReceipt, BsUpload, BsCheckCircleFill, BsBuilding, BsPerson, 
-  BsTag, BsCashCoin, BsCalendar3, BsFileEarmarkText, BsShieldCheck 
+  BsTag, BsCashCoin, BsCalendar3, BsFileEarmarkText, BsShieldCheck, BsFillPersonCheckFill 
 } from 'react-icons/bs';
 import { toast, Toaster } from 'react-hot-toast';
 import { diService } from '../services/diService';
@@ -11,11 +11,14 @@ import { supabase } from '../lib/supabase';
 
 export default function EmployeeExpensePortal() {
   const { workbenchId } = useParams();
+  const [searchParams] = useSearchParams();
+  const empIdParam = searchParams.get('empId');
 
   const [loadingWorkbench, setLoadingWorkbench] = useState(true);
   const [workbenchInfo, setWorkbenchInfo] = useState(null);
   const [departments, setDepartments] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [activeEmp, setActiveEmp] = useState(null);
 
   // Form State
   const [employeeName, setEmployeeName] = useState('');
@@ -49,7 +52,20 @@ export default function EmployeeExpensePortal() {
         if (deptsRes.ok) setDepartments(await deptsRes.json());
 
         const empsRes = await apiFetch(`/api/collaboration/${workbenchId}/employees`);
-        if (empsRes.ok) setEmployees(await empsRes.json());
+        if (empsRes.ok) {
+          const empList = await empsRes.json();
+          setEmployees(empList || []);
+
+          if (empIdParam && empList) {
+            const matched = empList.find(e => e.id === empIdParam || e.name.toLowerCase() === empIdParam.toLowerCase());
+            if (matched) {
+              setActiveEmp(matched);
+              setEmployeeName(matched.name);
+              if (matched.email) setEmployeeEmail(matched.email);
+              if (matched.department_name) setDepartmentName(matched.department_name);
+            }
+          }
+        }
       }
     } catch (err) {
       console.warn("Notice loading portal meta:", err);
@@ -236,10 +252,52 @@ export default function EmployeeExpensePortal() {
         ) : (
           /* Form Screen */
           <form onSubmit={handleSubmit} className="space-y-5 text-xs">
-            <div className="border-b border-white/10 pb-4 mb-2">
-              <h2 className="text-lg font-bold text-white">Log Operational Expense</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Submit site visits, petrol, meals, or software receipts for approval</p>
+            <div className="border-b border-white/10 pb-4 mb-2 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  {activeEmp ? (
+                    <>
+                      <BsFillPersonCheckFill className="text-teal-400" />
+                      Personalized OPEX Logger
+                    </>
+                  ) : (
+                    "Log Operational Expense"
+                  )}
+                </h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {activeEmp 
+                    ? `Logging expenses on behalf of ${activeEmp.name} (${activeEmp.department_name})`
+                    : "Submit site visits, petrol, meals, or software receipts for record"
+                  }
+                </p>
+              </div>
+
+              {activeEmp && (
+                <div className="hidden sm:block text-right">
+                  <span className="px-2.5 py-1 bg-teal-500/10 text-teal-300 border border-teal-500/20 rounded-full text-[10px] font-bold uppercase">
+                    Verified Staff Link
+                  </span>
+                </div>
+              )}
             </div>
+
+            {/* Personalized Employee Budget Badge if activeEmp */}
+            {activeEmp && (
+              <div className="bg-teal-500/10 border border-teal-500/20 rounded-2xl p-4 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-300 font-semibold flex items-center gap-1.5">
+                    <BsPerson className="text-teal-400" /> {activeEmp.name} ({activeEmp.designation || 'Staff'})
+                  </span>
+                  <span className="text-emerald-400 font-bold">
+                    Salary: ₹{Number(activeEmp.salary || 0).toLocaleString()}/mo
+                  </span>
+                </div>
+                <div className="flex justify-between text-[11px] text-gray-400 pt-1 border-t border-teal-500/10">
+                  <span>Department: <strong className="text-white">{activeEmp.department_name}</strong></span>
+                  <span>Remaining Allowance: <strong className="text-emerald-400">₹{Number(activeEmp.remaining_allowance || 0).toLocaleString()}</strong></span>
+                </div>
+              </div>
+            )}
 
             {/* Employee Information */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -247,7 +305,14 @@ export default function EmployeeExpensePortal() {
                 <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
                   <BsPerson className="text-teal-400" /> Employee Name
                 </label>
-                {employees.length > 0 ? (
+                {activeEmp ? (
+                  <input
+                    type="text"
+                    readOnly
+                    value={employeeName}
+                    className="w-full bg-black/60 border border-teal-500/30 rounded-xl px-3.5 py-2.5 text-xs text-teal-300 font-bold focus:outline-none"
+                  />
+                ) : employees.length > 0 ? (
                   <select
                     value={employeeName}
                     onChange={(e) => handleEmployeeSelect(e.target.value)}
@@ -274,24 +339,33 @@ export default function EmployeeExpensePortal() {
                 <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
                   <BsBuilding className="text-teal-400" /> Department
                 </label>
-                <select
-                  value={departmentName}
-                  onChange={(e) => setDepartmentName(e.target.value)}
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500"
-                >
-                  {departments.length > 0 ? (
-                    departments.map(d => (
-                      <option key={d.id} value={d.name}>{d.name}</option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="Site Operations">Site Operations</option>
-                      <option value="Sales & Business Development">Sales & Business Development</option>
-                      <option value="Engineering & IT">Engineering & IT</option>
-                      <option value="Administration & HR">Administration & HR</option>
-                    </>
-                  )}
-                </select>
+                {activeEmp ? (
+                  <input
+                    type="text"
+                    readOnly
+                    value={departmentName}
+                    className="w-full bg-black/60 border border-teal-500/30 rounded-xl px-3.5 py-2.5 text-xs text-purple-300 font-bold focus:outline-none"
+                  />
+                ) : (
+                  <select
+                    value={departmentName}
+                    onChange={(e) => setDepartmentName(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500"
+                  >
+                    {departments.length > 0 ? (
+                      departments.map(d => (
+                        <option key={d.id} value={d.name}>{d.name}</option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="Site Operations">Site Operations</option>
+                        <option value="Sales & Business Development">Sales & Business Development</option>
+                        <option value="Engineering & IT">Engineering & IT</option>
+                        <option value="Administration & HR">Administration & HR</option>
+                      </>
+                    )}
+                  </select>
+                )}
               </div>
             </div>
 

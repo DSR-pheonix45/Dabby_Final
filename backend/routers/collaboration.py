@@ -512,6 +512,7 @@ class DepartmentCreate(BaseModel):
     name: str
     code: Optional[str] = None
     monthly_budget: Optional[float] = 0.0
+    employee_ids: Optional[List[str]] = []
 
 class EmployeeCreate(BaseModel):
     name: str
@@ -520,35 +521,120 @@ class EmployeeCreate(BaseModel):
     department_id: Optional[str] = None
     department_name: Optional[str] = None
     designation: Optional[str] = None
+    salary: Optional[float] = 0.0
     monthly_allowance: Optional[float] = 0.0
+
+class DepartmentEmployeeLink(BaseModel):
+    department_name: str
+    employee_ids: List[str]
+
+# Global persistent fallback stores keyed by workbench_id
+DEPARTMENTS_STORE: Dict[str, List[Dict]] = {}
+EMPLOYEES_STORE: Dict[str, List[Dict]] = {}
+
+def _init_default_departments(workbench_id: str) -> List[Dict]:
+    defaults = [
+        {"id": f"dept_1_{workbench_id}", "workbench_id": workbench_id, "name": "Site Operations", "code": "SOP", "monthly_budget": 100000.0},
+        {"id": f"dept_2_{workbench_id}", "workbench_id": workbench_id, "name": "Sales & Business Development", "code": "SBD", "monthly_budget": 150000.0},
+        {"id": f"dept_3_{workbench_id}", "workbench_id": workbench_id, "name": "Engineering & IT", "code": "EIT", "monthly_budget": 80000.0},
+        {"id": f"dept_4_{workbench_id}", "workbench_id": workbench_id, "name": "Administration & HR", "code": "AHR", "monthly_budget": 50000.0}
+    ]
+    return defaults
+
+def _init_default_employees(workbench_id: str) -> List[Dict]:
+    defaults = [
+        {"id": f"emp_1_{workbench_id}", "workbench_id": workbench_id, "name": "Rahul Sharma", "email": "rahul.s@company.com", "department_id": f"dept_1_{workbench_id}", "department_name": "Site Operations", "designation": "Site Engineer", "salary": 65000.0, "monthly_allowance": 15000.0},
+        {"id": f"emp_2_{workbench_id}", "workbench_id": workbench_id, "name": "Priya Verma", "email": "priya.v@company.com", "department_id": f"dept_2_{workbench_id}", "department_name": "Sales & Business Development", "designation": "Sales Executive", "salary": 85000.0, "monthly_allowance": 25000.0}
+    ]
+    return defaults
 
 @router.get("/{workbench_id}/departments")
 def get_departments(workbench_id: str):
+    db_depts = []
     try:
         res = supabase.table("departments").select("*").eq("workbench_id", workbench_id).execute()
-        return res.data or []
+        if res and res.data:
+            db_depts = res.data
     except Exception as e:
-        # Fallback to in-memory/default mock departments if schema table isn't created yet
-        return [
-            {"id": "dept_1", "workbench_id": workbench_id, "name": "Site Operations", "monthly_budget": 100000},
-            {"id": "dept_2", "workbench_id": workbench_id, "name": "Sales & Business Development", "monthly_budget": 150000},
-            {"id": "dept_3", "workbench_id": workbench_id, "name": "Engineering & IT", "monthly_budget": 80000},
-            {"id": "dept_4", "workbench_id": workbench_id, "name": "Administration & HR", "monthly_budget": 50000}
-        ]
+        print("[DEBUG] Departments table select notice:", e)
+
+    # In-memory store logic
+    if workbench_id not in DEPARTMENTS_STORE:
+        DEPARTMENTS_STORE[workbench_id] = _init_default_departments(workbench_id)
+
+    mem_depts = DEPARTMENTS_STORE.get(workbench_id, [])
+
+    # Merge db and memory departments by id/name
+    seen_ids = set()
+    merged = []
+    for d in db_depts + mem_depts:
+        did = d.get("id") or d.get("name")
+        if did not in seen_ids:
+            seen_ids.add(did)
+            merged.append(d)
+
+    return merged
 
 @router.post("/{workbench_id}/departments")
 def create_department(workbench_id: str, dept: DepartmentCreate):
+    code = dept.code or (dept.name[:3].upper() if dept.name else "DEP")
+    dept_id = f"dept_{int(datetime.now().timestamp())}_{dept.name.lower().replace(' ', '_')[:10]}"
+    row = {
+        "id": dept_id,
+        "workbench_id": workbench_id,
+        "name": dept.name,
+        "code": code,
+        "monthly_budget": float(dept.monthly_budget or 0.0)
+    }
+
+    # 1. Try DB insert
+    saved_dept = row
     try:
-        row = {
+        res = supabase.table("departments").insert({
             "workbench_id": workbench_id,
             "name": dept.name,
-            "code": dept.code or dept.name[:3].upper(),
-            "monthly_budget": dept.monthly_budget or 0.0
-        }
-        res = supabase.table("departments").insert(row).execute()
-        return res.data[0] if res.data else row
+            "code": code,
+            "monthly_budget": float(dept.monthly_budget or 0.0)
+        }).execute()
+        if res and res.data:
+            saved_dept = res.data[0]
+            dept_id = saved_dept.get("id", dept_id)
     except Exception as e:
-        return {"id": f"dept_{int(datetime.now().timestamp())}", "workbench_id": workbench_id, "name": dept.name, "monthly_budget": dept.monthly_budget}
+        print("[DEBUG] Departments DB insert notice:", e)
+
+    # 2. Update memory store
+    if workbench_id not in DEPARTMENTS_STORE:
+        DEPARTMENTS_STORE[workbench_id] = _init_default_departments(workbench_id)
+    DEPARTMENTS_STORE[workbench_id].append(saved_dept)
+
+    # 3. If employee_ids supplied, link employees to this department
+    if dept.employee_ids:
+        link_employees_to_dept_internal(workbench_id, dept_id, dept.name, dept.employee_ids)
+
+    return saved_dept
+
+def link_employees_to_dept_internal(workbench_id: str, dept_id: str, dept_name: str, employee_ids: List[str]):
+    # Update memory store
+    mem_emps = EMPLOYEES_STORE.get(workbench_id, [])
+    for emp in mem_emps:
+        if emp.get("id") in employee_ids:
+            emp["department_id"] = dept_id
+            emp["department_name"] = dept_name
+
+    # Try DB update
+    try:
+        for emp_id in employee_ids:
+            supabase.table("employees").update({
+                "department_id": dept_id,
+                "department_name": dept_name
+            }).eq("id", emp_id).eq("workbench_id", workbench_id).execute()
+    except Exception as e:
+        print("[DEBUG] Employees batch DB update notice:", e)
+
+@router.put("/{workbench_id}/departments/{department_id}/link-employees")
+def link_employees_to_department(workbench_id: str, department_id: str, link_data: DepartmentEmployeeLink):
+    link_employees_to_dept_internal(workbench_id, department_id, link_data.department_name, link_data.employee_ids)
+    return {"status": "success", "linked_count": len(link_data.employee_ids)}
 
 @router.get("/{workbench_id}/employees")
 def get_employees(workbench_id: str):
@@ -556,7 +642,7 @@ def get_employees(workbench_id: str):
     approved_claims = [c for c in CLAIMS_STORE if c.get("workbench_id") == workbench_id and c.get("status") == "APPROVED"]
     try:
         db_res = supabase.table("expense_claims").select("*").eq("workbench_id", workbench_id).eq("status", "APPROVED").execute()
-        if db_res.data:
+        if db_res and db_res.data:
             approved_claims.extend(db_res.data)
     except Exception:
         pass
@@ -567,46 +653,78 @@ def get_employees(workbench_id: str):
         if emp_name:
             spend_map[emp_name] = spend_map.get(emp_name, 0.0) + float(c.get("amount", 0.0))
 
+    db_emps = []
     try:
         res = supabase.table("employees").select("*").eq("workbench_id", workbench_id).execute()
-        employees = res.data or []
-        if not employees:
-            employees = [
-                {"id": "emp_1", "workbench_id": workbench_id, "name": "Rahul Sharma", "email": "rahul.s@company.com", "department_name": "Site Operations", "designation": "Site Engineer", "monthly_allowance": 15000},
-                {"id": "emp_2", "workbench_id": workbench_id, "name": "Priya Verma", "email": "priya.v@company.com", "department_name": "Sales & Business Development", "designation": "Sales Executive", "monthly_allowance": 25000}
-            ]
+        if res and res.data:
+            db_emps = res.data
     except Exception as e:
-        employees = [
-            {"id": "emp_1", "workbench_id": workbench_id, "name": "Rahul Sharma", "email": "rahul.s@company.com", "department_name": "Site Operations", "designation": "Site Engineer", "monthly_allowance": 15000},
-            {"id": "emp_2", "workbench_id": workbench_id, "name": "Priya Verma", "email": "priya.v@company.com", "department_name": "Sales & Business Development", "designation": "Sales Executive", "monthly_allowance": 25000}
-        ]
+        print("[DEBUG] Employees DB select notice:", e)
 
-    for emp in employees:
+    if workbench_id not in EMPLOYEES_STORE:
+        EMPLOYEES_STORE[workbench_id] = _init_default_employees(workbench_id)
+
+    mem_emps = EMPLOYEES_STORE.get(workbench_id, [])
+
+    seen_ids = set()
+    merged = []
+    for emp in db_emps + mem_emps:
+        eid = emp.get("id") or emp.get("name")
+        if eid not in seen_ids:
+            seen_ids.add(eid)
+            merged.append(emp)
+
+    for emp in merged:
         emp_name = emp.get("name")
         spent = spend_map.get(emp_name, 0.0)
         allowance = float(emp.get("monthly_allowance", 15000) or 15000)
         emp["spent_allowance"] = spent
         emp["remaining_allowance"] = max(0.0, allowance - spent)
+        if "salary" not in emp or emp["salary"] is None:
+            emp["salary"] = 50000.0
 
-    return employees
+    return merged
 
 @router.post("/{workbench_id}/employees")
 def create_employee(workbench_id: str, emp: EmployeeCreate):
+    emp_id = f"emp_{int(datetime.now().timestamp())}_{emp.name.lower().replace(' ', '_')[:10]}"
+    row = {
+        "id": emp_id,
+        "workbench_id": workbench_id,
+        "name": emp.name,
+        "email": emp.email or "",
+        "phone": emp.phone or "",
+        "department_id": emp.department_id or "",
+        "department_name": emp.department_name or "General Operations",
+        "designation": emp.designation or "Staff",
+        "salary": float(emp.salary or 0.0),
+        "monthly_allowance": float(emp.monthly_allowance or 0.0)
+    }
+
+    saved_emp = row
     try:
-        row = {
+        res = supabase.table("employees").insert({
             "workbench_id": workbench_id,
             "name": emp.name,
             "email": emp.email or "",
             "phone": emp.phone or "",
-            "department_id": emp.department_id or "",
+            "department_id": emp.department_id or None,
             "department_name": emp.department_name or "General Operations",
             "designation": emp.designation or "Staff",
-            "monthly_allowance": emp.monthly_allowance or 0.0
-        }
-        res = supabase.table("employees").insert(row).execute()
-        return res.data[0] if res.data else row
+            "salary": float(emp.salary or 0.0),
+            "monthly_allowance": float(emp.monthly_allowance or 0.0)
+        }).execute()
+        if res and res.data:
+            saved_emp = res.data[0]
     except Exception as e:
-        return {"id": f"emp_{int(datetime.now().timestamp())}", "workbench_id": workbench_id, "name": emp.name, "email": emp.email, "department_name": emp.department_name, "designation": emp.designation}
+        print("[DEBUG] Employees DB insert notice:", e)
+
+    if workbench_id not in EMPLOYEES_STORE:
+        EMPLOYEES_STORE[workbench_id] = _init_default_employees(workbench_id)
+    EMPLOYEES_STORE[workbench_id].append(saved_emp)
+
+    return saved_emp
+
 
 # --- Employee Expense Claims & Approval Workflow ---
 
