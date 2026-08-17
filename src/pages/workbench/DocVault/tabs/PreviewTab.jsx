@@ -12,7 +12,7 @@ export default function PreviewTab({ doc, onDelete, onScan }) {
   const { activeWorkbench } = useWorkbench();
   const [url, setUrl] = useState(null);
 
-  const handleSendToBusinessEngine = () => {
+  const handleSendToFlow = () => {
     if (!doc) return;
 
     if (activeWorkbench) {
@@ -30,8 +30,6 @@ export default function PreviewTab({ doc, onDelete, onScan }) {
     toast.success(`Opening ${isSales ? 'Sales' : 'Purchases & Expenses'} Flow...`);
     navigate(targetPath);
   };
-
-  const handleSendToFlow = handleSendToBusinessEngine;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
