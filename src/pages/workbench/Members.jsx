@@ -10,6 +10,7 @@ import { collaborationService } from "../../services/collaborationService";
 import AddMemberModal from "./AddMemberModal";
 import MemberDetail from "./MemberDetail";
 import RoleChangeModal from "./RoleChangeModal";
+import EmployeeClaimsModal from "./EmployeeClaimsModal";
 import { toast } from "react-hot-toast";
 
 export default function Members() {
@@ -36,6 +37,7 @@ export default function Members() {
   // Modals & Selected items
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [selectedEmpForClaims, setSelectedEmpForClaims] = useState(null);
   const [isRoleChangeOpen, setIsRoleChangeOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedEmpId, setCopiedEmpId] = useState(null);
@@ -425,17 +427,23 @@ export default function Members() {
                 return (
                   <div
                     key={emp.id}
-                    className="bg-[#181818] border border-white/10 hover:border-teal-500/30 rounded-2xl p-5 space-y-3.5 transition-all flex flex-col justify-between"
+                    onClick={() => setSelectedEmpForClaims(emp)}
+                    className="bg-[#181818] border border-white/10 hover:border-teal-500/50 hover:shadow-xl hover:shadow-teal-500/5 rounded-2xl p-5 space-y-3.5 transition-all flex flex-col justify-between cursor-pointer group hover:scale-[1.01]"
                   >
                     <div className="space-y-3">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-11 h-11 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-base">
-                          {emp.name.charAt(0)}
+                      <div className="flex items-center justify-between space-x-3">
+                        <div className="flex items-center space-x-3 min-w-0">
+                          <div className="w-11 h-11 rounded-2xl bg-teal-500/10 border border-teal-500/30 text-teal-400 flex items-center justify-center font-bold text-base group-hover:bg-teal-500 group-hover:text-black transition-all">
+                            {emp.name.charAt(0)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-sm font-bold text-white truncate group-hover:text-teal-300 transition-colors">{emp.name}</h3>
+                            <p className="text-xs text-gray-400 truncate">{emp.designation || "Staff"} • <span className="text-purple-400 font-medium">{emp.department_name}</span></p>
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="text-sm font-bold text-white truncate">{emp.name}</h3>
-                          <p className="text-xs text-gray-400 truncate">{emp.designation || "Staff"} • <span className="text-purple-400 font-medium">{emp.department_name}</span></p>
-                        </div>
+                        <span className="text-[10px] text-teal-400 bg-teal-500/10 group-hover:bg-teal-500/20 px-2.5 py-1 rounded-full font-extrabold border border-teal-500/20 whitespace-nowrap">
+                          View Claims →
+                        </span>
                       </div>
 
                       {/* Salary & Context Info */}
@@ -477,7 +485,10 @@ export default function Members() {
 
                       {/* Copy Personal OPEX Logger Link Button */}
                       <button
-                        onClick={() => handleCopyPersonalLink(emp)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopyPersonalLink(emp);
+                        }}
                         className={`w-full py-2 px-3 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all text-xs border ${
                           copiedEmpId === emp.id
                             ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
@@ -770,6 +781,15 @@ export default function Members() {
         member={selectedMember}
         workbenchId={activeWorkbench.id}
         onRoleChanged={loadMembers}
+      />
+
+      {/* Employee Claims Modal */}
+      <EmployeeClaimsModal
+        employee={selectedEmpForClaims}
+        workbenchId={activeWorkbench?.id}
+        isOpen={!!selectedEmpForClaims}
+        onClose={() => setSelectedEmpForClaims(null)}
+        onUpdate={fetchDeptsAndEmployees}
       />
 
     </div>
