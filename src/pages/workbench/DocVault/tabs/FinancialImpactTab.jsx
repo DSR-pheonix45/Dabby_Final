@@ -3,6 +3,7 @@ import { BsLightningCharge, BsArrowRightShort } from 'react-icons/bs';
 import { useWorkbench } from '../../../../context/WorkbenchContext';
 import { formatCurrency } from '../../../../utils/currency';
 import { financialRouting, ROUTING_TONE } from '../../../../utils/financialRouting';
+import { classifyDocumentParties } from '../../../../utils/docPartyClassifier';
 
 export default function FinancialImpactTab({ doc, onUpdate }) {
   const { activeWorkbench } = useWorkbench();
@@ -14,7 +15,6 @@ export default function FinancialImpactTab({ doc, onUpdate }) {
 
   // Canonical UFO (flattened columns) with legacy extracted_data fallback
   const legacy = note.extracted_data || {};
-  const rawDocType = (note.document_type || note.classification_type || legacy.document_type || 'vendor_invoice').toLowerCase();
   
   const money = note.money || {};
   const taxes = note.taxes || {};
@@ -22,17 +22,19 @@ export default function FinancialImpactTab({ doc, onUpdate }) {
   const tax = Number(taxes.total_tax ?? legacy.tax_amount ?? 0);
   const net = Number(money.subtotal ?? legacy.subtotal ?? (total > tax ? total - tax : total));
   
-  const parties = note.parties || {};
-  const vendorName = parties.issuer?.name || legacy.parties?.vendor?.value || legacy.parties?.vendor_name || 'Vendor';
-  const customerName = parties.recipient?.name || legacy.parties?.customer?.value || legacy.parties?.customer_name || activeWorkbench?.name || 'Customer';
+  // Enforce Letterhead vs Billed-To Party Classification Rule
+  const partyInfo = classifyDocumentParties(doc, activeWorkbench);
   
-  const routing = financialRouting(rawDocType, null, vendorName);
+  const vendorName = partyInfo.externalParty.name || 'Vendor';
+  const customerName = partyInfo.externalParty.name || 'Customer';
+  
+  const routing = financialRouting(partyInfo.classification, null, vendorName);
 
   // Accounting Classification Logic
-  const isVendorDoc = rawDocType.includes('vendor') || rawDocType.includes('purchase') || rawDocType.includes('bill') || rawDocType.includes('opex') || rawDocType.includes('cogs');
-  const isSalesDoc = rawDocType.includes('sales') || rawDocType.includes('tax_invoice') || rawDocType.includes('customer_billed');
-  const isCustomerPayment = rawDocType.includes('customer_payment') || rawDocType.includes('receipt');
-  const isVendorPayment = rawDocType.includes('vendor_payment') || rawDocType.includes('payment_advice');
+  const isVendorDoc = partyInfo.isBuyer;
+  const isSalesDoc = partyInfo.isSeller;
+  const isCustomerPayment = partyInfo.classification.includes('customer_payment') || partyInfo.classification.includes('receipt');
+  const isVendorPayment = partyInfo.classification.includes('vendor_payment');
 
   // Compute Dynamic Financial Impact
   const computedImpact = [];

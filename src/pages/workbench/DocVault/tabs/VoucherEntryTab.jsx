@@ -11,6 +11,7 @@ import {
 } from 'react-icons/bs';
 import { useWorkbench } from '../../../../context/WorkbenchContext';
 import { formatCurrency } from '../../../../utils/currency';
+import { classifyDocumentParties } from '../../../../utils/docPartyClassifier';
 
 export default function VoucherEntryTab({ doc }) {
   const { activeWorkbench } = useWorkbench();
@@ -18,23 +19,24 @@ export default function VoucherEntryTab({ doc }) {
   const ext = note.extracted_data || {};
   const country = activeWorkbench?.country || 'INR';
 
-  const docType = (note.document_type || ext.document_type || 'VOUCHER').toUpperCase();
-  const isVendorDoc = docType.includes('VENDOR') || docType.includes('PURCHASE') || docType.includes('BILL') || docType.includes('EXPENSE');
+  // Use Letterhead vs Billed-To Party Classification
+  const partyInfo = classifyDocumentParties(doc, activeWorkbench);
+  const isVendorDoc = partyInfo.isBuyer;
 
   // Parties
   const parties = note.parties || ext.parties || {};
   const seller = {
-    name: parties.issuer?.name || ext.vendor_name || ext.supplier_name || 'Vendor / Seller',
-    gstin: parties.issuer?.gstin || ext.vendor_gstin || 'N/A',
-    pan: parties.issuer?.pan || ext.vendor_pan || 'N/A',
-    address: parties.issuer?.address || ext.vendor_address || 'N/A'
+    name: partyInfo.isSeller ? (activeWorkbench?.name || 'Company') : (parties.issuer?.name || ext.vendor_name || partyInfo.externalParty.name || 'Vendor / Seller'),
+    gstin: partyInfo.isSeller ? (activeWorkbench?.gstin || 'N/A') : (parties.issuer?.gstin || ext.vendor_gstin || 'N/A'),
+    pan: partyInfo.isSeller ? (activeWorkbench?.pan || 'N/A') : (parties.issuer?.pan || ext.vendor_pan || 'N/A'),
+    address: partyInfo.isSeller ? (activeWorkbench?.address || 'N/A') : (parties.issuer?.address || ext.vendor_address || 'N/A')
   };
 
   const customer = {
-    name: parties.recipient?.name || ext.customer_name || activeWorkbench?.name || 'Customer / Billed-To',
-    gstin: parties.recipient?.gstin || ext.customer_gstin || 'N/A',
-    pan: parties.recipient?.pan || ext.customer_pan || 'N/A',
-    address: parties.recipient?.address || ext.customer_address || 'N/A',
+    name: partyInfo.isBuyer ? (activeWorkbench?.name || 'Company') : (parties.recipient?.name || ext.customer_name || partyInfo.externalParty.name || 'Customer / Billed-To'),
+    gstin: partyInfo.isBuyer ? (activeWorkbench?.gstin || 'N/A') : (parties.recipient?.gstin || ext.customer_gstin || 'N/A'),
+    pan: partyInfo.isBuyer ? (activeWorkbench?.pan || 'N/A') : (parties.recipient?.pan || ext.customer_pan || 'N/A'),
+    address: partyInfo.isBuyer ? (activeWorkbench?.address || 'N/A') : (parties.recipient?.address || ext.customer_address || 'N/A'),
     customer_code: 'CUST-001'
   };
 
