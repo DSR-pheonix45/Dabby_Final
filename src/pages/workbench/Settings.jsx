@@ -221,7 +221,7 @@ export default function WorkbenchSettings() {
   };
 
   return (
-    <div className="p-6 lg:p-10 font-dm-sans">
+    <div className="flex-1 h-full overflow-y-auto p-6 lg:p-10 font-dm-sans custom-scrollbar">
       <div className="max-w-4xl mx-auto space-y-8">
         
         {/* Header Section */}
