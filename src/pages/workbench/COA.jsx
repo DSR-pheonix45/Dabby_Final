@@ -167,63 +167,80 @@ export default function COA() {
     (j.entries || []).forEach(e => {
       const accName = (e.account || '').toLowerCase();
       const amt = Number(e.amount || 0);
+
+      const isAssetAcc = accName.includes('receivable') || accName.includes('debtor') || accName.includes('bank') || accName.includes('cash') || accName.includes('petty') || accName.includes('asset');
+      const isLiabilityAcc = accName.includes('payable') || accName.includes('vendor') || accName.includes('liability') || accName.includes('tax');
+      const isEquityAcc = accName.includes('equity') || accName.includes('capital') || accName.includes('retained');
+      const isRevenueAcc = accName.includes('revenue') || accName.includes('sale') || accName.includes('income');
+      const isExpenseAcc = accName.includes('expense') || accName.includes('cogs') || accName.includes('cost');
+
       if (e.type === 'debit') {
-        if (accName.includes('receivable') || accName.includes('debtor') || accName.includes('bank') || accName.includes('cash') || accName.includes('asset')) {
-          totalAsset += amt;
-        } else if (accName.includes('expense') || accName.includes('cogs') || accName.includes('cost')) {
-          totalExpense += amt;
-        }
+        if (isAssetAcc) totalAsset += amt;
+        else if (isExpenseAcc) totalExpense += amt;
+        else if (isLiabilityAcc) totalLiability -= amt;
+        else if (isEquityAcc) totalEquity -= amt;
+        else if (isRevenueAcc) totalRevenue -= amt;
       } else if (e.type === 'credit') {
-        if (accName.includes('revenue') || accName.includes('sale') || accName.includes('income')) {
-          totalRevenue += amt;
-        } else if (accName.includes('payable') || accName.includes('vendor') || accName.includes('liability')) {
-          totalLiability += amt;
-        } else if (accName.includes('equity') || accName.includes('capital')) {
-          totalEquity += amt;
-        }
+        if (isAssetAcc) totalAsset -= amt; // Deducts settled receivables/bank payouts!
+        else if (isRevenueAcc) totalRevenue += amt;
+        else if (isLiabilityAcc) totalLiability += amt;
+        else if (isEquityAcc) totalEquity += amt;
+        else if (isExpenseAcc) totalExpense -= amt;
       }
     });
   });
 
   const kpis = [
-    { type: 'Asset', net: totalAsset, gross: totalAsset, color: { textTitle: 'text-emerald-400' } },
-    { type: 'Liability', net: totalLiability, gross: totalLiability, color: { textTitle: 'text-rose-400' } },
-    { type: 'Equity', net: totalEquity, gross: totalEquity, color: { textTitle: 'text-blue-400' } },
-    { type: 'Revenue', net: totalRevenue, gross: totalRevenue, color: { textTitle: 'text-violet-400' } },
-    { type: 'Expense', net: totalExpense, gross: totalExpense, color: { textTitle: 'text-orange-400' } },
+    { type: 'Asset', net: Math.max(0, totalAsset), gross: Math.max(0, totalAsset), color: { textTitle: 'text-emerald-400' } },
+    { type: 'Liability', net: Math.max(0, totalLiability), gross: Math.max(0, totalLiability), color: { textTitle: 'text-rose-400' } },
+    { type: 'Equity', net: Math.max(0, totalEquity), gross: Math.max(0, totalEquity), color: { textTitle: 'text-blue-400' } },
+    { type: 'Revenue', net: Math.max(0, totalRevenue), gross: Math.max(0, totalRevenue), color: { textTitle: 'text-violet-400' } },
+    { type: 'Expense', net: Math.max(0, totalExpense), gross: Math.max(0, totalExpense), color: { textTitle: 'text-orange-400' } },
   ];
 
   // Update master accounts current balances based on double-entry journal postings
   const computedMasterRows = masterRows.map(acc => {
     const labelLower = (acc.label || acc.ledger || '').toLowerCase();
     const ledgerLower = (acc.ledger || '').toLowerCase();
+    const isAssetClass = acc.accountClass === 'Assets' || acc.accountClass === 'AST' || ['AAR', 'ACO', 'AIN', 'ATX', 'AFA'].includes(acc.groupCode);
     let balance = Number(acc.currentBalance || 0);
 
     proposedJournals.forEach(j => {
       (j.entries || []).forEach(e => {
         const eAccLower = (e.account || '').toLowerCase();
         
-        const isAr = (ledgerLower.includes('receivable') || ledgerLower.includes('debtor') || acc.groupCode === 'AAR') &&
-                     (eAccLower.includes('receivable') || eAccLower.includes('debtor') || eAccLower.includes('ar'));
-        
-        const isRev = (ledgerLower.includes('revenue') || ledgerLower.includes('sale') || acc.groupCode === 'REV') &&
-                      (eAccLower.includes('revenue') || eAccLower.includes('sale'));
-        
-        const isBank = (ledgerLower.includes('bank') || ledgerLower.includes('cash') || acc.groupCode === 'ACO') &&
-                       (eAccLower.includes('bank') || eAccLower.includes('cash'));
+        let isMatch = false;
 
-        const isDirect = (labelLower && eAccLower.includes(labelLower)) || (ledgerLower && eAccLower.includes(ledgerLower));
+        // Specific Account Matches
+        if (ledgerLower.includes('petty') || labelLower.includes('petty')) {
+          isMatch = eAccLower.includes('petty');
+        } else if (ledgerLower.includes('bank') || labelLower.includes('bank')) {
+          isMatch = (eAccLower.includes('bank') || eAccLower.includes('operating bank')) && !eAccLower.includes('petty');
+        } else if (acc.groupCode === 'AAR' || ledgerLower.includes('debtor') || ledgerLower.includes('receivable')) {
+          isMatch = eAccLower.includes('debtor') || eAccLower.includes('receivable') || eAccLower.includes('ar');
+        } else if (acc.groupCode === 'REV' || ledgerLower.includes('revenue') || ledgerLower.includes('sale')) {
+          isMatch = eAccLower.includes('revenue') || eAccLower.includes('sale');
+        } else {
+          isMatch = (labelLower && eAccLower.includes(labelLower)) || (ledgerLower && eAccLower.includes(ledgerLower));
+        }
 
-        if (isAr || isRev || isBank || isDirect) {
-          if (e.type === 'debit') balance += Number(e.amount || 0);
-          else balance -= Number(e.amount || 0);
+        if (isMatch) {
+          if (isAssetClass) {
+            // Assets: Debit increases (+), Credit decreases (-)
+            if (e.type === 'debit') balance += Number(e.amount || 0);
+            else balance -= Number(e.amount || 0);
+          } else {
+            // Liabilities/Equity/Revenue: Credit increases (+), Debit decreases (-)
+            if (e.type === 'credit') balance += Number(e.amount || 0);
+            else balance -= Number(e.amount || 0);
+          }
         }
       });
     });
 
     return {
       ...acc,
-      computedBalance: Math.abs(balance)
+      computedBalance: Math.max(0, balance)
     };
   });
 
