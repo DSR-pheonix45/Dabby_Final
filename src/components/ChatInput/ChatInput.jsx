@@ -243,8 +243,8 @@ const ChatInput = forwardRef(function ChatInput(
               }
             `}
           >
-            {/* Left Actions Pool (Data Input) - Collapsed on mobile */}
-            <div className="flex items-center gap-0.5 sm:gap-1 pl-2 sm:pl-3 pr-1 sm:pr-2 border-r border-white/5">
+            {/* Left Actions Toolbar */}
+            <div className="flex items-center gap-1 pl-2 sm:pl-3 pr-2 border-r border-white/10">
               <input
                 type="file"
                 ref={fileInputRef}
@@ -256,17 +256,15 @@ const ChatInput = forwardRef(function ChatInput(
               />
               <button
                 type="button"
-                className="group/btn relative p-2 sm:p-2.5 rounded-lg sm:rounded-xl text-gray-400 hover:text-teal-400 hover:bg-teal-500/10 transition-all duration-200"
+                className="group/btn relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-gray-400 bg-transparent border border-transparent hover:text-gray-200 hover:bg-white/10 hover:border-white/10 transition-all duration-200"
                 title="Attach Files"
                 disabled={disabled || isLoading}
                 onClick={() => fileInputRef.current?.click()}
               >
-                <BsPaperclip className="text-base sm:text-lg" />
+                <BsPaperclip className="text-lg sm:text-xl" />
               </button>
-            </div>
 
-            {/* Workbench Context Toggle */}
-            <div className="flex items-center gap-1 px-1">
+              {/* Workbench Context Toggle */}
               <button
                 type="button"
                 onClick={() => toggleWorkbenchContext()}
@@ -276,21 +274,19 @@ const ChatInput = forwardRef(function ChatInput(
                     ? `Workbench Context: ON (${activeWorkbench.name}) — Click to turn OFF` 
                     : "Workbench Context: OFF — Click to turn ON"
                 }
-                className={`group/btn relative p-2 sm:p-2.5 rounded-lg sm:rounded-xl transition-all duration-200 border ${
+                className={`group/btn relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all duration-200 border ${
                   isWorkbenchContextEnabled && activeWorkbench
-                    ? "text-teal-400 bg-teal-500/10 border-teal-500/30 shadow-[0_0_10px_rgba(20,184,166,0.15)]"
-                    : "text-gray-500 bg-white/5 border-white/5 opacity-60 hover:opacity-100 hover:text-teal-400"
+                    ? "text-teal-400 bg-teal-500/15 border-teal-500/30 shadow-[0_0_12px_rgba(20,184,166,0.2)]"
+                    : "text-gray-400 bg-transparent border-transparent hover:text-gray-200 hover:bg-white/10 hover:border-white/10"
                 }`}
               >
-                <BsBuilding className="text-base sm:text-lg" />
+                <BsBuilding className="text-lg sm:text-xl" />
                 {isWorkbenchContextEnabled && activeWorkbench && (
                   <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-teal-400 rounded-full border-2 border-[#161B22] animate-pulse" />
                 )}
               </button>
-            </div>
 
-            {/* Web Search Toggle */}
-            <div className="flex items-center gap-1 px-1">
+              {/* Web Search Toggle */}
               <button
                 type="button"
                 onClick={() => {
@@ -300,21 +296,20 @@ const ChatInput = forwardRef(function ChatInput(
                 }}
                 disabled={disabled || isLoading}
                 title={webEnabled ? "Web Search: ON" : "Web Search: OFF"}
-                className={`group/btn relative p-2 sm:p-2.5 rounded-lg sm:rounded-xl transition-all duration-200 ${webEnabled
-                  ? "text-blue-400 bg-blue-500/10 shadow-[0_0_10px_rgba(59,130,246,0.1)]"
-                  : "text-gray-400 hover:text-blue-400 hover:bg-blue-500/10"
-                  }`}
+                className={`group/btn relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all duration-200 border ${
+                  webEnabled
+                    ? "text-blue-400 bg-blue-500/15 border-blue-500/30 shadow-[0_0_12px_rgba(59,130,246,0.2)]"
+                    : "text-gray-400 bg-transparent border-transparent hover:text-gray-200 hover:bg-white/10 hover:border-white/10"
+                }`}
               >
-                <BsGlobe2 className="text-base sm:text-lg" />
+                <BsGlobe2 className="text-lg sm:text-xl" />
               </button>
             </div>
 
-
-
             {/* Main Text Input Area */}
-            <div className="flex-1 relative py-2.5 sm:py-3 px-1 sm:px-2 min-w-0">
+            <div className="flex-1 relative py-2.5 sm:py-3 px-2 sm:px-3 min-w-0">
               {!message && !isFocused && attachedFiles.length === 0 && (
-                <span className="absolute left-1 sm:left-2 top-1/2 -translate-y-1/2 text-gray-500/50 pointer-events-none text-sm sm:text-[15px] animate-fade-in truncate max-w-[calc(100%-1rem)]">
+                <span className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 text-gray-500/50 pointer-events-none text-sm sm:text-[15px] animate-fade-in truncate max-w-[calc(100%-1rem)]">
                   {currentPlaceholder}
                 </span>
               )}
@@ -335,14 +330,15 @@ const ChatInput = forwardRef(function ChatInput(
             </div>
 
             {/* Right Actions (Send) */}
-            <div className="flex items-center gap-1 sm:gap-2 pr-2 sm:pr-3 pl-1 sm:pl-2 border-l border-white/5">
+            <div className="flex items-center pl-1 sm:pl-2 pr-2 sm:pr-3 border-l border-white/10">
               <button
                 type="submit"
                 disabled={(!message.trim() && attachedFiles.length === 0) || disabled || isLoading}
-                className={`p-2.5 sm:p-3 rounded-lg sm:rounded-xl transition-all duration-300 flex items-center justify-center min-w-[40px] sm:min-w-[44px] ${(message.trim() || attachedFiles.length > 0) && !disabled && !isLoading
-                  ? "bg-teal-500 text-black hover:bg-teal-400 shadow-[0_0_15px_rgba(20,184,166,0.3)] hover:shadow-[0_0_20px_rgba(20,184,166,0.5)] transform hover:-translate-y-0.5"
-                  : "bg-white/5 text-gray-600 cursor-not-allowed"
-                  }`}
+                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all duration-300 border ${
+                  (message.trim() || attachedFiles.length > 0) && !disabled && !isLoading
+                    ? "bg-teal-500 text-black border-teal-400 hover:bg-teal-400 shadow-[0_0_15px_rgba(20,184,166,0.3)] hover:shadow-[0_0_20px_rgba(20,184,166,0.5)] transform hover:-translate-y-0.5"
+                    : "bg-white/5 text-gray-500 border-white/5 opacity-40 cursor-not-allowed"
+                }`}
               >
                 {isLoading ? (
                   <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-black/50 border-t-transparent rounded-full animate-spin"></div>
