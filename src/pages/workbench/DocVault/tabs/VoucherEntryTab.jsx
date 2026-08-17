@@ -22,6 +22,7 @@ export default function VoucherEntryTab({ doc }) {
   // Use Letterhead vs Billed-To Party Classification
   const partyInfo = classifyDocumentParties(doc, activeWorkbench);
   const isVendorDoc = partyInfo.isBuyer;
+  const docType = (note.document_type || ext.document_type || partyInfo.classification || 'VOUCHER').toUpperCase();
 
   // Parties
   const parties = note.parties || ext.parties || {};

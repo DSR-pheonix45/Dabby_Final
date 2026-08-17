@@ -98,6 +98,21 @@ async def create_folder(req: CreateFolderRequest):
     _save_json(FOLDERS_FILE, folders)
     return folder_row
 
+@router.get("/folders/{folder_id}")
+async def get_folder(folder_id: str):
+    try:
+        res = supabase.table("di_folders").select("*").eq("id", folder_id).single().execute()
+        if res.data:
+            return res.data
+    except Exception:
+        pass
+    
+    folders = _load_json(FOLDERS_FILE, [])
+    for f in folders:
+        if f.get("id") == folder_id:
+            return f
+    return {"id": folder_id, "name": "Folder", "workbench_id": None}
+
 @router.put("/folders/{folder_id}")
 async def update_folder(folder_id: str, req: UpdateFolderRequest):
     updates = {k: v for k, v in req.dict().items() if v is not None}
