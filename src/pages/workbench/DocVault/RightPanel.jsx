@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { BsX, BsBraces, BsClockHistory } from 'react-icons/bs';
+import { BsX, BsBraces, BsReceipt, BsGraphUp, BsClockHistory } from 'react-icons/bs';
 import ExtractedDataTab from './tabs/ExtractedDataTab';
+import VoucherEntryTab from './tabs/VoucherEntryTab';
+import FinancialImpactTab from './tabs/FinancialImpactTab';
 import TimelineTab from './tabs/TimelineTab';
 
 export default function RightPanel({ doc, onUpdate, onClose }) {
@@ -8,6 +10,8 @@ export default function RightPanel({ doc, onUpdate, onClose }) {
 
   const tabs = [
     { id: 'EXTRACTED DATA', label: 'Extracted Data', icon: BsBraces },
+    { id: 'VOUCHER ENTRY', label: 'Voucher Entry', icon: BsReceipt },
+    { id: 'FINANCIAL IMPACT', label: 'Financial Impact', icon: BsGraphUp },
     { id: 'TIMELINE', label: 'Timeline', icon: BsClockHistory },
   ];
 
@@ -42,6 +46,8 @@ export default function RightPanel({ doc, onUpdate, onClose }) {
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto relative">
         {activeTab === 'EXTRACTED DATA' && <ExtractedDataTab doc={doc} onUpdate={onUpdate} />}
+        {activeTab === 'VOUCHER ENTRY' && <VoucherEntryTab doc={doc} />}
+        {activeTab === 'FINANCIAL IMPACT' && <FinancialImpactTab doc={doc} onUpdate={onUpdate} />}
         {activeTab === 'TIMELINE' && <TimelineTab doc={doc} />}
       </div>
     </div>
