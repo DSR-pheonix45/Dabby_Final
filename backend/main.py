@@ -17,7 +17,7 @@ else:
 
 
 import auth
-from routers import ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, assets, rulesets, plans, superadmin, ingestion, settlements, collaboration, di_coa, di_documents, di_ledger, workbench_accounts, petty_cash, coa_translation, business_events
+from routers import ai, coa, ledger, ops, context, inventory, investor, tasks, budgets, assets, plans, superadmin, ingestion, settlements, collaboration, di_coa, di_documents, di_ledger, workbench_accounts, petty_cash, coa_translation, business_events
 
 app = FastAPI(title="Datalis API", description="FastAPI Backend for Datalis", version="1.0.0")
 
@@ -55,7 +55,6 @@ app.include_router(superadmin.router, prefix="/api/superadmin", tags=["Superadmi
 app.include_router(tasks.router, prefix="/api/tasks", tags=["Tasks"])
 app.include_router(plans.router, prefix="/api/plans", tags=["Plans"])
 app.include_router(investor.router, prefix="/api/investor", tags=["Investor"])
-app.include_router(rulesets.router, prefix="/api/rulesets", tags=["Rulesets"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["Inventory"])
 app.include_router(collaboration.router, prefix="/api/collaboration", tags=["Collaboration"])
 app.include_router(context.router, prefix="/api/context", tags=["Context Analysis"])

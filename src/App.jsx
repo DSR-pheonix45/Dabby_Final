@@ -58,7 +58,6 @@ const Settings = lazy(() => import("./components/Settings/Settings"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const DataIngestionPage = lazy(() => import("./pages/DataIngestion"));
 const EmployeeExpensePortal = lazy(() => import("./pages/EmployeeExpensePortal"));
-const RulesetEditor = lazy(() => import("./pages/RulesetEditor"));
 
 
 // Loading Component
@@ -183,11 +182,6 @@ function App() {
                 </Route>
                 <Route path="/oauth/callback" element={<OAuthCallback />} />
                 <Route path="/auth/callback" element={<OAuthCallback />} />
-                <Route path="/ruleset/editor/:id" element={
-                  <ProtectedRoute>
-                    <RulesetEditor />
-                  </ProtectedRoute>
-                } />
                 <Route path="/superadmin" element={
                   <ProtectedRoute>
                     <SuperadminDashboard />
