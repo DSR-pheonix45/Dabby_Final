@@ -1,18 +1,13 @@
 import React, { useState } from 'react';
-import { BsX, BsFileText, BsBraces, BsGraphUp, BsClockHistory, BsReceipt } from 'react-icons/bs';
-import PreviewTab from './tabs/PreviewTab';
+import { BsX, BsBraces, BsClockHistory } from 'react-icons/bs';
 import ExtractedDataTab from './tabs/ExtractedDataTab';
-import FinancialImpactTab from './tabs/FinancialImpactTab';
 import TimelineTab from './tabs/TimelineTab';
-import VoucherEntryTab from './tabs/VoucherEntryTab';
 
 export default function RightPanel({ doc, onUpdate, onClose }) {
   const [activeTab, setActiveTab] = useState('EXTRACTED DATA');
 
   const tabs = [
     { id: 'EXTRACTED DATA', label: 'Extracted Data', icon: BsBraces },
-    { id: 'VOUCHER ENTRY', label: 'Voucher Entry', icon: BsReceipt },
-    { id: 'FINANCIAL IMPACT', label: 'Financial Impact', icon: BsGraphUp },
     { id: 'TIMELINE', label: 'Timeline', icon: BsClockHistory },
   ];
 
@@ -47,8 +42,6 @@ export default function RightPanel({ doc, onUpdate, onClose }) {
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto relative">
         {activeTab === 'EXTRACTED DATA' && <ExtractedDataTab doc={doc} onUpdate={onUpdate} />}
-        {activeTab === 'VOUCHER ENTRY' && <VoucherEntryTab doc={doc} />}
-        {activeTab === 'FINANCIAL IMPACT' && <FinancialImpactTab doc={doc} onUpdate={onUpdate} />}
         {activeTab === 'TIMELINE' && <TimelineTab doc={doc} />}
       </div>
     </div>

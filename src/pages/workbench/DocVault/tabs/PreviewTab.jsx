@@ -81,11 +81,11 @@ export default function PreviewTab({ doc, onDelete, onScan }) {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={handleSendToBusinessEngine}
+            onClick={handleSendToFlow}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-400 to-emerald-400 text-black text-xs font-extrabold transition-all shadow-md hover:opacity-95"
-            title="Create a Trade Transaction in Business Engine using this voucher"
+            title="Open in Sales or Purchases Workflow Flow"
           >
-            🚀 Send to Business Engine
+            🚀 Open in Workflow
           </button>
 
           <a 
