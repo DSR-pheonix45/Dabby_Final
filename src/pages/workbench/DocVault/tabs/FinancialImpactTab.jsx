@@ -1,15 +1,12 @@
-import React, { useState } from 'react';
-import { BsLightningCharge, BsArrowRightCircle, BsCheck2All, BsArrowRightShort } from 'react-icons/bs';
-import { diService } from '../../../../services/diService';
-import { toast } from 'react-hot-toast';
+import React from 'react';
+import { BsLightningCharge, BsArrowRightShort } from 'react-icons/bs';
 import { useWorkbench } from '../../../../context/WorkbenchContext';
 import { formatCurrency } from '../../../../utils/currency';
 import { financialRouting, ROUTING_TONE } from '../../../../utils/financialRouting';
 
 export default function FinancialImpactTab({ doc, onUpdate }) {
-  const [approving, setApproving] = useState(false);
   const { activeWorkbench } = useWorkbench();
-  const note = doc.di_analysis_notes?.[0];
+  const note = doc?.di_analysis_notes?.[0] || doc?.analysis_notes?.[0];
 
   if (!note) {
     return <div className="p-8 text-center text-gray-500 text-sm">No analysis available. Run the document through analysis first.</div>;
@@ -17,32 +14,95 @@ export default function FinancialImpactTab({ doc, onUpdate }) {
 
   // Canonical UFO (flattened columns) with legacy extracted_data fallback
   const legacy = note.extracted_data || {};
-  const docType = note.document_type || note.classification_type || legacy.document_type || '';
+  const rawDocType = (note.document_type || note.classification_type || legacy.document_type || 'vendor_invoice').toLowerCase();
+  
   const money = note.money || {};
   const taxes = note.taxes || {};
-  const total = Number(money.total_amount ?? money.subtotal ?? 0);
-  const tax = Number(taxes.total_tax ?? 0);
-  const net = Number(money.subtotal ?? (total > tax ? total - tax : 0));
+  const total = Number(money.total_amount ?? money.subtotal ?? legacy.total_amount ?? 0);
+  const tax = Number(taxes.total_tax ?? legacy.tax_amount ?? 0);
+  const net = Number(money.subtotal ?? legacy.subtotal ?? (total > tax ? total - tax : total));
+  
   const parties = note.parties || {};
-  const partyName = parties.issuer?.name || legacy.parties?.vendor?.value || legacy.parties?.vendor_name || '';
-  const routing = financialRouting(docType, null, partyName);
+  const vendorName = parties.issuer?.name || legacy.parties?.vendor?.value || legacy.parties?.vendor_name || 'Vendor';
+  const customerName = parties.recipient?.name || legacy.parties?.customer?.value || legacy.parties?.customer_name || activeWorkbench?.name || 'Customer';
+  
+  const routing = financialRouting(rawDocType, null, vendorName);
 
-  const legacyImpact = legacy.financial_impact || [];
-  const legacyEvents = legacy.business_events || [];
-  const legacyJournal = legacy.expected_journal || [];
+  // Accounting Classification Logic
+  const isVendorDoc = rawDocType.includes('vendor') || rawDocType.includes('purchase') || rawDocType.includes('bill') || rawDocType.includes('opex') || rawDocType.includes('cogs');
+  const isSalesDoc = rawDocType.includes('sales') || rawDocType.includes('tax_invoice') || rawDocType.includes('customer_billed');
+  const isCustomerPayment = rawDocType.includes('customer_payment') || rawDocType.includes('receipt');
+  const isVendorPayment = rawDocType.includes('vendor_payment') || rawDocType.includes('payment_advice');
 
-  const isPosted = doc.derivedStatus === 'Posted';
+  // Compute Dynamic Financial Impact
+  const computedImpact = [];
+  const computedEvents = [];
+  const computedJournal = [];
+
+  if (isVendorDoc) {
+    computedEvents.push('Vendor Invoice Received', 'Expense / Purchase Incurred');
+    computedImpact.push(
+      { account: 'Operating Expense / Purchases', amount: net, type: 'increase' },
+      { account: `Accounts Payable (${vendorName})`, amount: total, type: 'increase' }
+    );
+    computedJournal.push(
+      { account: 'Operating Expense / Purchase Account', type: 'debit', amount: net },
+      ...(tax > 0 ? [{ account: 'Input GST Tax Credit', type: 'debit', amount: tax }] : []),
+      { account: `Trade Creditors / Accounts Payable (${vendorName})`, type: 'credit', amount: total }
+    );
+  } else if (isSalesDoc) {
+    computedEvents.push('Sales Invoice Issued', 'Revenue Earned');
+    computedImpact.push(
+      { account: `Accounts Receivable (${customerName})`, amount: total, type: 'increase' },
+      { account: 'Sales Revenue', amount: net, type: 'increase' }
+    );
+    computedJournal.push(
+      { account: `Trade Debtors / Accounts Receivable (${customerName})`, type: 'debit', amount: total },
+      { account: 'Sales Operating Revenue', type: 'credit', amount: net },
+      ...(tax > 0 ? [{ account: 'Output GST Tax Payable', type: 'credit', amount: tax }] : [])
+    );
+  } else if (isCustomerPayment) {
+    computedEvents.push('Customer Payment Received');
+    computedImpact.push(
+      { account: 'Operating Bank Account', amount: total, type: 'increase' },
+      { account: 'Accounts Receivable (Customer)', amount: total, type: 'decrease' }
+    );
+    computedJournal.push(
+      { account: 'Operating Bank Account', type: 'debit', amount: total },
+      { account: 'Trade Debtors / Accounts Receivable', type: 'credit', amount: total }
+    );
+  } else if (isVendorPayment) {
+    computedEvents.push('Vendor Payment Made');
+    computedImpact.push(
+      { account: 'Accounts Payable (Vendor)', amount: total, type: 'decrease' },
+      { account: 'Operating Bank Account', amount: total, type: 'decrease' }
+    );
+    computedJournal.push(
+      { account: 'Trade Creditors / Accounts Payable', type: 'debit', amount: total },
+      { account: 'Operating Bank Account', type: 'credit', amount: total }
+    );
+  } else {
+    // Fallback
+    computedEvents.push('Document Event Recorded');
+    computedImpact.push({ account: 'Financial Amount', amount: total, type: 'increase' });
+    computedJournal.push(
+      { account: 'Document Entry', type: 'debit', amount: total },
+      { account: 'Clearing Entry', type: 'credit', amount: total }
+    );
+  }
+
+  const country = activeWorkbench?.country || 'INR';
 
   return (
-    <div className="flex flex-col h-full bg-[#111111]">
-      <div className="flex-1 overflow-y-auto p-8 space-y-8">
+    <div className="flex flex-col h-full bg-[#111111] text-white">
+      <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
 
-        {/* Where this document lands in OPS / the ledger */}
+        {/* 1. ROUTING OVERVIEW */}
         <section>
-          <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">Routing Overview</h3>
+          <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">Target Workflow Routing</h3>
           <div className={`flex items-center justify-between rounded-xl border p-5 ${ROUTING_TONE[routing.tone]}`}>
             <div>
-              <p className="text-[10px] uppercase tracking-wider opacity-70 font-bold mb-1">Target Workflow</p>
+              <p className="text-[10px] uppercase tracking-wider opacity-70 font-bold mb-1">Posts To Workflow</p>
               <p className="text-lg font-bold flex items-center gap-1">
                 <BsArrowRightShort className="text-xl -ml-1" />
                 {routing.where}
@@ -51,88 +111,94 @@ export default function FinancialImpactTab({ doc, onUpdate }) {
             </div>
             <div className="text-right">
               <span className="px-2.5 py-1 rounded-lg text-xs font-bold border border-current/30">{routing.label}</span>
-              <p className="text-lg font-bold mt-2">{formatCurrency(total, activeWorkbench?.country)}</p>
+              <p className="text-lg font-bold mt-2">{formatCurrency(total, country)}</p>
             </div>
           </div>
         </section>
 
-        {/* GST breakdown when present */}
+        {/* 2. TAX & AMOUNT BREAKDOWN */}
         {tax > 0 && (
           <section>
-            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">Amount Breakdown</h3>
+            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">Amount & Tax Breakdown</h3>
             <div className="bg-[#161616] border border-white/5 rounded-xl divide-y divide-white/5">
               <div className="flex justify-between px-5 py-3 text-sm">
-                <span className="text-gray-400">Taxable value</span>
-                <span className="text-gray-200 font-semibold">{formatCurrency(net, activeWorkbench?.country)}</span>
+                <span className="text-gray-400">Taxable Value</span>
+                <span className="text-gray-200 font-semibold font-mono">{formatCurrency(net, country)}</span>
               </div>
               <div className="flex justify-between px-5 py-3 text-sm">
                 <span className="text-gray-400">Tax (GST)</span>
-                <span className="text-gray-200 font-semibold">{formatCurrency(tax, activeWorkbench?.country)}</span>
+                <span className="text-amber-400 font-semibold font-mono">{formatCurrency(tax, country)}</span>
               </div>
               <div className="flex justify-between px-5 py-3 text-sm bg-white/[0.02]">
-                <span className="text-gray-300 font-bold">Total</span>
-                <span className="text-white font-bold">{formatCurrency(total, activeWorkbench?.country)}</span>
+                <span className="text-gray-300 font-bold">Grand Total</span>
+                <span className="text-teal-400 font-bold font-mono">{formatCurrency(total, country)}</span>
               </div>
             </div>
           </section>
         )}
 
-        {/* Legacy analysis (only for older extracted_data docs) */}
-        {legacyImpact.length > 0 && (
-          <section>
-            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">Financial Impact</h3>
-            <div className="grid grid-cols-2 gap-4">
-              {legacyImpact.map((impact, idx) => (
-                <div key={idx} className="bg-[#161616] border border-white/5 rounded-xl p-4 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-gray-300">{impact.account}</span>
-                  <div className={`text-sm font-bold ${impact.type === 'increase' ? 'text-teal-400' : 'text-rose-400'}`}>
-                    {impact.type === 'increase' ? '+' : '-'} {formatCurrency(impact.amount, activeWorkbench?.country)}
-                  </div>
+        {/* 3. DYNAMIC FINANCIAL IMPACT */}
+        <section>
+          <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">Financial Impact Analysis</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {computedImpact.map((impact, idx) => (
+              <div key={idx} className="bg-[#161616] border border-white/5 rounded-xl p-4 flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-300">{impact.account}</span>
+                <div className={`text-sm font-bold font-mono ${impact.type === 'increase' ? 'text-teal-400' : 'text-rose-400'}`}>
+                  {impact.type === 'increase' ? '+ ' : '- '}{formatCurrency(impact.amount, country)}
                 </div>
-              ))}
-            </div>
-          </section>
-        )}
+              </div>
+            ))}
+          </div>
+        </section>
 
-        {legacyEvents.length > 0 && (
-          <section>
-            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">Business Events Triggered</h3>
-            <div className="flex flex-wrap gap-2">
-              {legacyEvents.map((event, idx) => (
-                <div key={idx} className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 text-blue-400 px-3 py-1.5 rounded-lg text-xs font-bold">
-                  <BsLightningCharge />
-                  {event}
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+        {/* 4. BUSINESS EVENTS TRIGGERED */}
+        <section>
+          <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">Business Events Triggered</h3>
+          <div className="flex flex-wrap gap-2">
+            {computedEvents.map((event, idx) => (
+              <div key={idx} className="flex items-center gap-2 bg-teal-500/10 border border-teal-500/20 text-teal-400 px-3 py-1.5 rounded-lg text-xs font-bold">
+                <BsLightningCharge />
+                {event}
+              </div>
+            ))}
+          </div>
+        </section>
 
-        {legacyJournal.length > 0 && (
-          <section>
-            <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">Expected Journal Entry</h3>
-            <div className="bg-[#161616] border border-white/5 rounded-xl overflow-hidden">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-white/5 text-[10px] font-bold text-gray-500 uppercase tracking-widest bg-white/[0.02]">
-                    <th className="p-3">Account</th>
-                    <th className="p-3 text-right">Debit</th>
-                    <th className="p-3 text-right">Credit</th>
+        {/* 5. EXPECTED JOURNAL ENTRY */}
+        <section>
+          <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">Expected Journal Entry Preview</h3>
+          <div className="bg-[#161616] border border-white/5 rounded-xl overflow-hidden">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-white/5 text-[10px] font-bold text-gray-500 uppercase tracking-widest bg-white/[0.02]">
+                  <th className="p-3">Account</th>
+                  <th className="p-3 text-right">Debit ({country})</th>
+                  <th className="p-3 text-right">Credit ({country})</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {computedJournal.map((entry, idx) => (
+                  <tr key={idx} className="text-gray-300">
+                    <td className={`p-3 text-xs font-medium ${entry.type === 'credit' ? 'pl-8 text-gray-400' : 'text-white'}`}>
+                      <span className={`text-[10px] font-mono font-bold mr-2 px-1.5 py-0.5 rounded ${entry.type === 'debit' ? 'bg-teal-500/10 text-teal-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                        {entry.type === 'debit' ? 'Dr' : 'Cr'}
+                      </span>
+                      {entry.account}
+                    </td>
+                    <td className="p-3 text-right font-mono text-xs font-bold text-emerald-400">
+                      {entry.type === 'debit' ? formatCurrency(entry.amount, country) : '-'}
+                    </td>
+                    <td className="p-3 text-right font-mono text-xs font-bold text-purple-300">
+                      {entry.type === 'credit' ? formatCurrency(entry.amount, country) : '-'}
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {legacyJournal.map((entry, idx) => (
-                    <tr key={idx} className="text-gray-300">
-                      <td className={`p-3 font-medium ${entry.type === 'credit' ? 'pl-8 text-gray-400' : ''}`}>{entry.account}</td>
-                      <td className="p-3 text-right font-mono">{entry.type === 'debit' ? formatCurrency(entry.amount, activeWorkbench?.country) : ''}</td>
-                      <td className="p-3 text-right font-mono">{entry.type === 'credit' ? formatCurrency(entry.amount, activeWorkbench?.country) : ''}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
       </div>
     </div>
   );

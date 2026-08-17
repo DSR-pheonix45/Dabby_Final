@@ -413,13 +413,15 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
         }}
     ],
     "financial_impact": [
-        {{ "account": "Expense", "amount": 1400.00, "type": "increase" }}
+        {{ "account": "Expense / COGS (if vendor invoice) OR Revenue (if sales invoice)", "amount": 1400.00, "type": "increase" }},
+        {{ "account": "Accounts Payable (if vendor invoice) OR Accounts Receivable (if sales invoice)", "amount": 1400.00, "type": "increase" }}
     ],
     "business_events": [
-        "Expense Incurred"
+        "Vendor Invoice Received (if bill/purchase) OR Sale Made (if sales invoice)"
     ],
     "expected_journal": [
-        {{ "account": "Expense", "type": "debit", "amount": 1400.00 }}
+        {{ "account": "Expense / COGS", "type": "debit", "amount": 1400.00 }},
+        {{ "account": "Accounts Payable", "type": "credit", "amount": 1400.00 }}
     ],
     "analysis": "Human-readable interpretation of the financial impact (2-3 sentences)."
 }}
@@ -568,13 +570,15 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
         }}
     ],
     "financial_impact": [
-        {{ "account": "Expense", "amount": 1400.00, "type": "increase" }}
+        {{ "account": "Expense / COGS (if vendor invoice) OR Revenue (if sales invoice)", "amount": 1400.00, "type": "increase" }},
+        {{ "account": "Accounts Payable (if vendor invoice) OR Accounts Receivable (if sales invoice)", "amount": 1400.00, "type": "increase" }}
     ],
     "business_events": [
-        "Expense Incurred"
+        "Vendor Invoice Received (if bill/purchase) OR Sale Made (if sales invoice)"
     ],
     "expected_journal": [
-        {{ "account": "Expense", "type": "debit", "amount": 1400.00 }}
+        {{ "account": "Expense / COGS", "type": "debit", "amount": 1400.00 }},
+        {{ "account": "Accounts Payable", "type": "credit", "amount": 1400.00 }}
     ],
     "analysis": "Human-readable interpretation of the financial impact (2-3 sentences)."
 }}
