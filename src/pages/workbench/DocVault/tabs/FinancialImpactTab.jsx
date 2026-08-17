@@ -42,8 +42,8 @@ export default function FinancialImpactTab({ doc, onUpdate }) {
   if (isVendorDoc) {
     computedEvents.push('Vendor Invoice Received', 'Expense / Purchase Incurred');
     computedImpact.push(
-      { account: 'Operating Expense / Purchases', amount: net, type: 'increase' },
-      { account: `Accounts Payable (${vendorName})`, amount: total, type: 'increase' }
+      { account: 'Operating Expense / Purchases', amount: net, category: 'expense', displayType: 'Expense Incurred' },
+      { account: `Accounts Payable (${vendorName})`, amount: total, category: 'liability', displayType: 'Payable (Owed to Vendor)' }
     );
     computedJournal.push(
       { account: 'Operating Expense / Purchase Account', type: 'debit', amount: net },
@@ -53,8 +53,8 @@ export default function FinancialImpactTab({ doc, onUpdate }) {
   } else if (isSalesDoc) {
     computedEvents.push('Sales Invoice Issued', 'Revenue Earned');
     computedImpact.push(
-      { account: `Accounts Receivable (${customerName})`, amount: total, type: 'increase' },
-      { account: 'Sales Revenue', amount: net, type: 'increase' }
+      { account: `Accounts Receivable (${customerName})`, amount: total, category: 'asset', displayType: 'Receivable (Owed by Customer)' },
+      { account: 'Sales Revenue', amount: net, category: 'revenue', displayType: 'Revenue Earned' }
     );
     computedJournal.push(
       { account: `Trade Debtors / Accounts Receivable (${customerName})`, type: 'debit', amount: total },
@@ -64,8 +64,8 @@ export default function FinancialImpactTab({ doc, onUpdate }) {
   } else if (isCustomerPayment) {
     computedEvents.push('Customer Payment Received');
     computedImpact.push(
-      { account: 'Operating Bank Account', amount: total, type: 'increase' },
-      { account: 'Accounts Receivable (Customer)', amount: total, type: 'decrease' }
+      { account: 'Operating Bank Account', amount: total, category: 'asset', displayType: 'Cash Inflow' },
+      { account: 'Accounts Receivable (Customer)', amount: total, category: 'settlement', displayType: 'Receivable Settled' }
     );
     computedJournal.push(
       { account: 'Operating Bank Account', type: 'debit', amount: total },
@@ -74,8 +74,8 @@ export default function FinancialImpactTab({ doc, onUpdate }) {
   } else if (isVendorPayment) {
     computedEvents.push('Vendor Payment Made');
     computedImpact.push(
-      { account: 'Accounts Payable (Vendor)', amount: total, type: 'decrease' },
-      { account: 'Operating Bank Account', amount: total, type: 'decrease' }
+      { account: 'Accounts Payable (Vendor)', amount: total, category: 'settlement', displayType: 'Liability Settled' },
+      { account: 'Operating Bank Account', amount: total, category: 'liability', displayType: 'Cash Outflow' }
     );
     computedJournal.push(
       { account: 'Trade Creditors / Accounts Payable', type: 'debit', amount: total },
@@ -84,7 +84,7 @@ export default function FinancialImpactTab({ doc, onUpdate }) {
   } else {
     // Fallback
     computedEvents.push('Document Event Recorded');
-    computedImpact.push({ account: 'Financial Amount', amount: total, type: 'increase' });
+    computedImpact.push({ account: 'Financial Amount', amount: total, category: 'expense', displayType: 'Document Entry' });
     computedJournal.push(
       { account: 'Document Entry', type: 'debit', amount: total },
       { account: 'Clearing Entry', type: 'credit', amount: total }
@@ -141,14 +141,34 @@ export default function FinancialImpactTab({ doc, onUpdate }) {
         <section>
           <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">Financial Impact Analysis</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {computedImpact.map((impact, idx) => (
-              <div key={idx} className="bg-[#161616] border border-white/5 rounded-xl p-4 flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-300">{impact.account}</span>
-                <div className={`text-sm font-bold font-mono ${impact.type === 'increase' ? 'text-teal-400' : 'text-rose-400'}`}>
-                  {impact.type === 'increase' ? '+ ' : '- '}{formatCurrency(impact.amount, country)}
+            {computedImpact.map((impact, idx) => {
+              let colorStyle = 'text-teal-400';
+              let signPrefix = '+ ';
+              let badgeText = impact.displayType;
+
+              if (impact.category === 'liability') {
+                colorStyle = 'text-amber-400';
+                signPrefix = '- '; // Debt / Owed
+              } else if (impact.category === 'expense') {
+                colorStyle = 'text-rose-400';
+                signPrefix = 'Cost: ';
+              } else if (impact.category === 'settlement') {
+                colorStyle = 'text-blue-400';
+                signPrefix = 'Settled: ';
+              }
+
+              return (
+                <div key={idx} className="bg-[#161616] border border-white/5 rounded-xl p-4 flex flex-col justify-between space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-200 truncate">{impact.account}</span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-white/5 text-gray-400 border border-white/5">{badgeText}</span>
+                  </div>
+                  <div className={`text-base font-extrabold font-mono ${colorStyle}`}>
+                    {signPrefix}{formatCurrency(impact.amount, country)}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
