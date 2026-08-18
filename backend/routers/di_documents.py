@@ -321,149 +321,21 @@ async def process_document(document_id: str, hint: Optional[str] = None, passwor
         labels_res = supabase.table("di_workbench_labels").select("name").eq("workbench_id", doc_data['workbench_id']).execute()
         valid_labels = [l['name'] for l in labels_res.data] if labels_res.data else ["Purchase", "Sales"]
 
-        import google.generativeai as genai
         import os
         from services.groq_pool import GroqPool
         from services.bank_statement_parser import BankStatementParser
         import json
         
-        # Candidate Gemini models for automatic fallback on 429 quota, 404 deprecation, or rate limit errors
-        gemini_models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp", "gemini-1.5-flash-8b", "gemini-2.0-flash"]
-
-        def call_gemini_with_fallback(prompt_arg, system_prompt=None, response_json=False):
-            last_err = None
-            for m_name in gemini_models:
-                try:
-                    kwargs = {}
-                    if system_prompt:
-                        kwargs["system_instruction"] = system_prompt
-                    if response_json:
-                        kwargs["generation_config"] = {"response_mime_type": "application/json", "temperature": 0.1}
-                    model = genai.GenerativeModel(m_name, **kwargs)
-                    return model.generate_content(prompt_arg), m_name
-                except Exception as e_m:
-                    last_err = e_m
-                    print(f"[GEMINI FALLBACK] Model '{m_name}' failed ({e_m}). Trying next fallback model...")
-                    continue
-            if last_err:
-                raise last_err
-            raise Exception("All Gemini fallback models failed.")
-
-        # We will define the extraction pipelines as nested async functions for clarity
-        async def run_gemini_pipeline():
-            gemini_key = os.environ.get("GEMINI_API_KEY")
-            if not gemini_key:
-                raise Exception("GEMINI_API_KEY is missing")
-            genai.configure(api_key=gemini_key)
-            
-            raw_mime = doc_data.get('mime_type')
-            if not raw_mime or raw_mime in ['application/octet-stream', 'binary/octet-stream']:
-                fname = doc_data.get('original_filename', '').lower()
-                if fname.endswith('.pdf'): raw_mime = 'application/pdf'
-                elif fname.endswith('.png'): raw_mime = 'image/png'
-                elif fname.endswith(('.jpg', '.jpeg')): raw_mime = 'image/jpeg'
-                else: raw_mime = 'application/pdf'
-
-            document_part = {"mime_type": raw_mime, "data": file_bytes}
-            
-            # Fast Classification
-            doc_type = "unknown"
-            if hint and hint in ["customer_payment_receipt", "vendor_payment_receipt", "expense_receipt"]:
-                doc_type = hint
-                print(f"[DEBUG] Using manual classification hint: {doc_type}")
-            else:
-                class_prompt = """
-                You are a document classification specialist. Identify the type of this financial document.
-                Return ONLY a JSON object with this exact schema:
-                {
-                  "document_type": "bank_statement", // One of: sales_invoice, vendor_invoice, receipt, bank_statement, unknown
-                  "confidence": 0.99
-                }
-                """
-                class_res, _ = call_gemini_with_fallback([document_part, "Classify this document."], system_prompt=class_prompt, response_json=True)
-                try:
-                    class_text = class_res.text.strip()
-                    if class_text.startswith("```json"): class_text = class_text[7:-3].strip()
-                    elif class_text.startswith("```"): class_text = class_text[3:-3].strip()
-                    class_data = json.loads(class_text)
-                    doc_type = class_data.get("document_type", "unknown").lower()
-                except:
-                    doc_type = "unknown"
-                    
-            print(f"[DEBUG] Gemini classified as: {doc_type}")
-            
-            # Extraction
-            if doc_type == "bank_statement":
-                print("[DEBUG] Using dedicated BankStatementParser with Gemini Vision")
-                gemini_model = genai.GenerativeModel(GEMINI_MODEL)
-                parser = BankStatementParser(gemini_model, GroqPool.execute)
-                analysis_data = await parser.parse_vision(file_bytes, raw_mime, doc_data['original_filename'])
-                predicted_label = "bank_statement"
-                analysis_data["analysis"] = "Bank Statement parsed successfully using dedicated extraction module."
-                analysis_data["document_type"] = "bank_statement"
-            else:
-                system_prompt = f"""
-You are an expert AI accounting agent. Analyze the invoice/receipt and extract detailed financial insights.
-You MUST classify this document into exactly one of these labels: {valid_labels}.
-
-Return ONLY valid JSON matching this exact schema. For every value, provide a "value" and a "confidence" score (0.0 to 1.0).
-
-{{
-    "predicted_label": "String (Must be one of the provided labels)",
-    "document_type": "Invoice / Receipt / etc",
-    "parties": {{
-        "vendor": {{"value": "String", "confidence": 0.99}},
-        "customer": {{"value": "String", "confidence": 0.99}}
-    }},
-    "document": {{
-        "reference_number": {{"value": "String", "confidence": 0.99}},
-        "date": {{"value": "YYYY-MM-DD", "confidence": 0.99}}
-    }},
-    "financials": {{
-        "total_amount": {{"value": 1500.00, "confidence": 0.99}},
-        "tax_amount": {{"value": 100.00, "confidence": 0.99}},
-        "currency": {{"value": "USD", "confidence": 0.99}}
-    }},
-    "line_items": [
-        {{
-            "description": {{"value": "String", "confidence": 0.99}},
-            "quantity": {{"value": 1, "confidence": 0.99}},
-            "unit_price": {{"value": 100.00, "confidence": 0.99}},
-            "total": {{"value": 100.00, "confidence": 0.99}}
-        }}
-    ],
-    "financial_impact": [
-        {{ "account": "Expense / COGS (if vendor invoice) OR Revenue (if sales invoice)", "amount": 1400.00, "type": "increase" }},
-        {{ "account": "Accounts Payable (if vendor invoice) OR Accounts Receivable (if sales invoice)", "amount": 1400.00, "type": "increase" }}
-    ],
-    "business_events": [
-        "Vendor Invoice Received (if bill/purchase) OR Sale Made (if sales invoice)"
-    ],
-    "expected_journal": [
-        {{ "account": "Expense / COGS", "type": "debit", "amount": 1400.00 }},
-        {{ "account": "Accounts Payable", "type": "credit", "amount": 1400.00 }}
-    ],
-    "analysis": "Human-readable interpretation of the financial impact (2-3 sentences)."
-}}
-"""
-                response, _ = call_gemini_with_fallback([document_part, "Extract the financial details from this document."], system_prompt=system_prompt, response_json=True)
-                analysis_text = response.text.strip()
-                if analysis_text.startswith("```json"): analysis_text = analysis_text[7:-3].strip()
-                elif analysis_text.startswith("```"): analysis_text = analysis_text[3:-3].strip()
-                analysis_data = json.loads(analysis_text)
-                predicted_label = analysis_data.get("predicted_label", "Purchase")
-                
-            return "gemini", "", predicted_label, analysis_data
-
-        async def run_sarvam_groq_pipeline():
+        # Sarvam AI Direct Pipeline (Gemini dependency removed)
+        async def run_sarvam_pipeline():
             from sarvamai.client import SarvamAI
             import time, requests, io, zipfile, asyncio
             
-            # 1. OCR with Sarvam
+            # 1. OCR with Sarvam AI Document Intelligence
             extracted_text = ""
             api_key = os.getenv("SARVAM_API_KEY")
             if not api_key:
-                raise Exception("SARVAM_API_KEY missing")
+                raise Exception("SARVAM_API_KEY is missing from environment variables")
                 
             print(f"[DEBUG] Attempting Sarvam AI Document OCR for {doc_data['original_filename']}")
             sarvam_client = SarvamAI(api_subscription_key=api_key)
@@ -523,12 +395,12 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
             if not extracted_text:
                 if is_pdf:
                     import fitz
-                    print("[DEBUG] Sarvam returned empty, using PyMuPDF")
+                    print("[DEBUG] Sarvam returned empty text, using PyMuPDF fallback")
                     pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
                     extracted_text = "".join(page.get_text() for page in pdf_doc)
                     pdf_doc.close()
                 if not extracted_text:
-                    raise Exception("Sarvam/PyMuPDF could not extract text")
+                    raise Exception("Sarvam/PyMuPDF could not extract text from the document")
                     
             # 2. Fast Classification
             doc_type = "unknown"
@@ -560,7 +432,7 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
                 except:
                     doc_type = "unknown"
             
-            # 3. Extraction
+            # 3. Financial Field Extraction
             if doc_type == "bank_statement":
                 gemini_model = None
                 parser = BankStatementParser(gemini_model, GroqPool.execute)
@@ -636,17 +508,13 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
             "status": "started"
         }).execute()
 
-        # EITHER OR LOGIC
+        # DIRECT SARVAM PIPELINE EXECUTION
         try:
-            print("[DEBUG] Attempting Sarvam+Groq pipeline...")
-            ocr_provider, extracted_text, predicted_label, analysis_data = await run_sarvam_groq_pipeline()
+            print("[DEBUG] Running Sarvam AI pipeline directly...")
+            ocr_provider, extracted_text, predicted_label, analysis_data = await run_sarvam_pipeline()
         except Exception as e_sarvam:
-            print(f"[DEBUG] Sarvam+Groq pipeline failed: {e_sarvam}. Falling back to Gemini pipeline...")
-            try:
-                ocr_provider, extracted_text, predicted_label, analysis_data = await run_gemini_pipeline()
-            except Exception as e_gem:
-                print(f"[DEBUG] Gemini pipeline failed: {e_gem}")
-                raise Exception(f"Both Sarvam and Gemini pipelines failed. Sarvam error: {e_sarvam} | Gemini error: {e_gem}")
+            print(f"[DEBUG] Sarvam AI pipeline failed: {e_sarvam}")
+            raise Exception(f"Sarvam AI document extraction failed: {e_sarvam}")
 
         # Save OCR raw text
         supabase.table("di_document_ocr").insert({
