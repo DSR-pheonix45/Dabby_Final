@@ -130,7 +130,7 @@ class GroqPool:
                     status = "active"
                     if "rate limit" in err_str or "429" in err_str or "limit_exceeded" in err_str:
                         status = "rate_limited"
-                    elif "unauthorized" in err_str or "invalid api key" in err_str or "401" in err_str:
+                    elif any(x in err_str for x in ["unauthorized", "invalid api key", "401", "404", "model_not_found", "does not exist", "access"]):
                         status = "invalid"
                     
                     cls.update_key_status(cand["id"], status, failure_increment=1)
