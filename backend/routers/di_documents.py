@@ -327,8 +327,8 @@ async def process_document(document_id: str, hint: Optional[str] = None, passwor
         from services.bank_statement_parser import BankStatementParser
         import json
         
-        # Candidate Gemini models for automatic fallback on 429 quota errors
-        gemini_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite"]
+        # Candidate Gemini models for automatic fallback on 429 quota, 404 deprecation, or rate limit errors
+        gemini_models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp", "gemini-1.5-flash-8b", "gemini-2.0-flash"]
 
         def call_gemini_with_fallback(prompt_arg, system_prompt=None, response_json=False):
             last_err = None
@@ -343,14 +343,11 @@ async def process_document(document_id: str, hint: Optional[str] = None, passwor
                     return model.generate_content(prompt_arg), m_name
                 except Exception as e_m:
                     last_err = e_m
-                    err_s = str(e_m).lower()
-                    if any(x in err_s for x in ["429", "quota", "resource_exhausted", "rate_limit"]):
-                        print(f"[GEMINI FALLBACK] Model '{m_name}' quota/rate limit hit: {e_m}. Trying next fallback model...")
-                        continue
-                    raise e_m
+                    print(f"[GEMINI FALLBACK] Model '{m_name}' failed ({e_m}). Trying next fallback model...")
+                    continue
             if last_err:
                 raise last_err
-            raise Exception("All Gemini fallback models failed due to quota/rate limits.")
+            raise Exception("All Gemini fallback models failed.")
 
         # We will define the extraction pipelines as nested async functions for clarity
         async def run_gemini_pipeline():

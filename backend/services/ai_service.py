@@ -5,7 +5,7 @@ from groq import Groq
 import google.generativeai as genai
 from services.groq_pool import GroqPool
 
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
 
 class AIService:
     def __init__(self):
@@ -17,7 +17,7 @@ class AIService:
             try:
                 self.gemini_model = genai.GenerativeModel(GEMINI_MODEL)
             except Exception:
-                self.gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+                self.gemini_model = genai.GenerativeModel("gemini-1.5-flash")
         else:
             self.gemini_model = None
 

@@ -150,11 +150,11 @@ class GroqPool:
         models: List[str] = None
     ) -> Any:
         """
-        Tries executing a request with primary model. If a 429 rate limit or token quota error occurs,
-        automatically falls back to secondary models (e.g. llama-3.1-8b-instant, mixtral-8x7b-32768).
+        Tries executing a request with primary model. If a rate limit, quota, 404, or model access error occurs,
+        automatically falls back to secondary models.
         """
         if not models:
-            models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
+            models = ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192", "mixtral-8x7b-32768", "gemma2-9b-it"]
             
         last_error = None
         for m in models:
@@ -163,11 +163,8 @@ class GroqPool:
                 return cls.execute(fn)
             except Exception as e:
                 last_error = e
-                err_str = str(e).lower()
-                if any(x in err_str for x in ["rate limit", "429", "limit_exceeded", "tpd", "tokens per day"]):
-                    print(f"[GROQ_POOL] Model '{m}' rate limited. Falling back to next model in fallback list...")
-                    continue
-                raise e
+                print(f"[GROQ_POOL] Model '{m}' failed ({e}). Falling back to next model in list...")
+                continue
         if last_error:
             raise last_error
         raise Exception("All Groq fallback models failed.")
