@@ -359,7 +359,15 @@ async def process_document(document_id: str, hint: Optional[str] = None, passwor
                 raise Exception("GEMINI_API_KEY is missing")
             genai.configure(api_key=gemini_key)
             
-            document_part = {"mime_type": doc_data['mime_type'], "data": file_bytes}
+            raw_mime = doc_data.get('mime_type')
+            if not raw_mime or raw_mime in ['application/octet-stream', 'binary/octet-stream']:
+                fname = doc_data.get('original_filename', '').lower()
+                if fname.endswith('.pdf'): raw_mime = 'application/pdf'
+                elif fname.endswith('.png'): raw_mime = 'image/png'
+                elif fname.endswith(('.jpg', '.jpeg')): raw_mime = 'image/jpeg'
+                else: raw_mime = 'application/pdf'
+
+            document_part = {"mime_type": raw_mime, "data": file_bytes}
             
             # Fast Classification
             doc_type = "unknown"
@@ -392,7 +400,7 @@ async def process_document(document_id: str, hint: Optional[str] = None, passwor
                 print("[DEBUG] Using dedicated BankStatementParser with Gemini Vision")
                 gemini_model = genai.GenerativeModel(GEMINI_MODEL)
                 parser = BankStatementParser(gemini_model, GroqPool.execute)
-                analysis_data = await parser.parse_vision(file_bytes, doc_data['mime_type'], doc_data['original_filename'])
+                analysis_data = await parser.parse_vision(file_bytes, raw_mime, doc_data['original_filename'])
                 predicted_label = "bank_statement"
                 analysis_data["analysis"] = "Bank Statement parsed successfully using dedicated extraction module."
                 analysis_data["document_type"] = "bank_statement"
@@ -468,17 +476,21 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
             job_id = job.id if hasattr(job, "id") else getattr(job, "job_id", getattr(job, "jobId", None))
             
             upload_resp = sarvam_client.document_intelligence.get_upload_links(job_id=job_id, files=[file_name])
-            if hasattr(upload_resp, "upload_urls"):
-                urls_dict = upload_resp.upload_urls
-                upload_url = urls_dict[file_name].file_url if hasattr(urls_dict[file_name], "file_url") else urls_dict[file_name]["file_url"]
+            urls_dict = getattr(upload_resp, "upload_urls", upload_resp.get("upload_urls", {}) if isinstance(upload_resp, dict) else {})
+            
+            if file_name in urls_dict:
+                item = urls_dict[file_name]
+            elif isinstance(urls_dict, dict) and len(urls_dict) > 0:
+                item = next(iter(urls_dict.values()))
             else:
-                urls_dict = upload_resp["upload_urls"]
-                upload_url = urls_dict[file_name]["file_url"]
+                item = urls_dict[0]
+                
+            upload_url = getattr(item, "file_url", item.get("file_url") if isinstance(item, dict) else item)
                 
             headers = {"x-ms-blob-type": "BlockBlob"}
             res = requests.put(upload_url, data=file_bytes, headers=headers)
             if res.status_code not in [200, 201]:
-                raise Exception("Failed to upload to Sarvam")
+                raise Exception(f"Failed to upload to Sarvam storage: status {res.status_code}")
                 
             sarvam_client.document_intelligence.start(job_id=job_id)
             attempts = 0
@@ -493,10 +505,16 @@ Return ONLY valid JSON matching this exact schema. For every value, provide a "v
                 
             if state in ["Completed", "Completed_with_errors"]:
                 download = sarvam_client.document_intelligence.get_download_links(job_id=job_id)
-                if hasattr(download, "download_urls"):
-                    zip_url = download.download_urls['document.zip'].file_url if hasattr(download.download_urls['document.zip'], "file_url") else download.download_urls['document.zip']["file_url"]
+                download_dict = getattr(download, "download_urls", download.get("download_urls", {}) if isinstance(download, dict) else {})
+                
+                if 'document.zip' in download_dict:
+                    zip_item = download_dict['document.zip']
+                elif isinstance(download_dict, dict) and len(download_dict) > 0:
+                    zip_item = next(iter(download_dict.values()))
                 else:
-                    zip_url = download["download_urls"]['document.zip']["file_url"]
+                    zip_item = download_dict[0]
+                    
+                zip_url = getattr(zip_item, "file_url", zip_item.get("file_url") if isinstance(zip_item, dict) else zip_item)
                     
                 zip_res = requests.get(zip_url)
                 with zipfile.ZipFile(io.BytesIO(zip_res.content)) as z:
