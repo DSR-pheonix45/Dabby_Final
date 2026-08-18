@@ -12,6 +12,7 @@ const statusConfig = {
   open: { label: "Open", class: "text-blue-400 bg-blue-400/10" },
   in_progress: { label: "In Progress", class: "text-yellow-400 bg-yellow-400/10" },
   waiting: { label: "Waiting", class: "text-orange-400 bg-orange-400/10" },
+  blocked: { label: "Blocked", class: "text-red-400 bg-red-400/10" },
   completed: { label: "Completed", class: "text-green-400 bg-green-400/10" },
   cancelled: { label: "Cancelled", class: "text-gray-400 bg-gray-400/10" },
 };

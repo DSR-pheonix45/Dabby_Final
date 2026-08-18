@@ -133,6 +133,44 @@ async def update_task(workbench_id: str, task_id: str, task: TaskUpdate, user = 
         print(f"[ERROR] update_task: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+class TaskComment(BaseModel):
+    comment: str
+
+@router.post("/{workbench_id}/{task_id}/comments")
+async def add_task_comment(workbench_id: str, task_id: str, payload: TaskComment, user = Depends(get_current_user)):
+    try:
+        task_res = supabase.table("workbench_tasks").select("metadata, title").eq("workbench_id", workbench_id).eq("id", task_id).execute()
+        if not task_res.data:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        task = task_res.data[0]
+        meta = task.get("metadata") or {}
+        comments = meta.get("comments") or []
+        
+        new_comment = {
+            "user_id": user["id"],
+            "comment": payload.comment,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        comments.append(new_comment)
+        meta["comments"] = comments
+
+        res = supabase.table("workbench_tasks").update({"metadata": meta}).eq("workbench_id", workbench_id).eq("id", task_id).execute()
+        
+        supabase.table("activity_logs").insert({
+            "workbench_id": workbench_id,
+            "user_id": user["id"],
+            "action_type": "task_comment_added",
+            "entity_type": "task",
+            "entity_id": task_id,
+            "description": f"Added comment on task: {task['title']}"
+        }).execute()
+        
+        return res.data[0] if res.data else {"status": "added", "comment": new_comment}
+    except Exception as e:
+        print(f"[ERROR] add_task_comment: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.delete("/{workbench_id}/{task_id}")
 async def delete_task(workbench_id: str, task_id: str, user = Depends(get_current_user)):
     try:
@@ -141,3 +179,4 @@ async def delete_task(workbench_id: str, task_id: str, user = Depends(get_curren
     except Exception as e:
         print(f"[ERROR] delete_task: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+

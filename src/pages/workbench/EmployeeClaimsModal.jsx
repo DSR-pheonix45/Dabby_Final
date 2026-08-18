@@ -27,6 +27,7 @@ export default function EmployeeClaimsModal({ employee, workbenchId, isOpen, onC
   const [newClaimTitle, setNewClaimTitle] = useState('');
   const [newClaimAmount, setNewClaimAmount] = useState('');
   const [newClaimCategory, setNewClaimCategory] = useState('Travel & Conveyance');
+  const [newClaimPaymentType, setNewClaimPaymentType] = useState('REIMBURSEMENT');
   const [newClaimNotes, setNewClaimNotes] = useState('');
 
   useEffect(() => {
@@ -125,6 +126,17 @@ export default function EmployeeClaimsModal({ employee, workbenchId, isOpen, onC
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
+  const handleReimburseClaim = async (claim) => {
+    try {
+      await collaborationService.reimburseClaim(workbenchId, claim.id);
+      toast.success(`Reimbursement payment of ₹${Number(claim.amount).toLocaleString()} processed for ${claim.employee_name || employee.name}!`);
+      loadEmployeeClaims();
+      if (onUpdate) onUpdate();
+    } catch (err) {
+      toast.error(err.message || "Failed to process reimbursement payment");
+    }
+  };
+
   const handleCreateClaim = async (e) => {
     e.preventDefault();
     if (!newClaimAmount || Number(newClaimAmount) <= 0) {
@@ -134,19 +146,21 @@ export default function EmployeeClaimsModal({ employee, workbenchId, isOpen, onC
 
     try {
       const claimPayload = {
+        claim_number: `CLM-${Math.floor(1000 + Math.random() * 9000)}`,
         employee_id: employee.id,
         employee_name: employee.name,
-        department_name: employee.department_name || "General",
+        department_name: employee.department_name || "General Operations",
         category: newClaimCategory,
         description: newClaimTitle || "Out-of-pocket Business Expense",
         amount: Number(newClaimAmount),
+        payment_type: newClaimPaymentType,
         notes: newClaimNotes,
         date: new Date().toISOString().split('T')[0],
         status: 'PENDING'
       };
 
       await collaborationService.submitClaim(workbenchId, claimPayload);
-      toast.success(`Submitted claim of ₹${Number(newClaimAmount).toLocaleString()} for ${employee.name}!`);
+      toast.success(`Submitted ${newClaimPaymentType === 'DIRECT_COMPANY_PAYMENT' ? 'Direct OPEX request' : 'reimbursement claim'} of ₹${Number(newClaimAmount).toLocaleString()}!`);
       setNewClaimTitle('');
       setNewClaimAmount('');
       setNewClaimNotes('');
@@ -246,7 +260,7 @@ export default function EmployeeClaimsModal({ employee, workbenchId, isOpen, onC
             className="w-full sm:w-auto px-4 py-2 bg-teal-500 hover:bg-teal-400 text-black font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md shadow-teal-500/20"
           >
             <BsPlusLg className="w-3.5 h-3.5" />
-            <span>Log Claim for {employee.name.split(' ')[0]}</span>
+            <span>Log Spend / Claim for {employee.name.split(' ')[0]}</span>
           </button>
         </div>
 
@@ -267,6 +281,8 @@ export default function EmployeeClaimsModal({ employee, workbenchId, isOpen, onC
               const isPending = claim.status === 'PENDING';
               const isApproved = claim.status === 'APPROVED' || claim.status === 'REIMBURSED';
               const isRejected = claim.status === 'REJECTED';
+              const isDirectCompany = (claim.payment_type || 'REIMBURSEMENT').toUpperCase() === 'DIRECT_COMPANY_PAYMENT';
+              const isReimbursed = claim.reimbursement_status === 'REIMBURSED';
 
               return (
                 <div
@@ -283,6 +299,13 @@ export default function EmployeeClaimsModal({ employee, workbenchId, isOpen, onC
                           <h4 className="text-xs font-bold text-white">{claim.description || claim.category}</h4>
                           <span className="text-[10px] text-gray-400 font-mono">
                             {claim.claim_number || `#${claim.id.substring(0, 8)}`}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border ${
+                            isDirectCompany
+                              ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                              : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                          }`}>
+                            {isDirectCompany ? 'Direct OPEX' : 'Reimbursement'}
                           </span>
                         </div>
                         <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-2">
@@ -320,25 +343,56 @@ export default function EmployeeClaimsModal({ employee, workbenchId, isOpen, onC
                     </p>
                   )}
 
-                  {/* Manager Actions */}
-                  {isPending && (
-                    <div className="pt-2 border-t border-white/5 flex items-center justify-end space-x-2 text-xs">
-                      <button
-                        onClick={() => handleStatusChange(claim, 'REJECTED')}
-                        className="px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 font-bold transition-all flex items-center gap-1"
-                      >
-                        <BsXCircleFill className="w-3 h-3 text-red-400" />
-                        <span>Reject</span>
-                      </button>
-                      <button
-                        onClick={() => handleStatusChange(claim, 'APPROVED')}
-                        className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold transition-all flex items-center gap-1 shadow-md shadow-emerald-500/20"
-                      >
-                        <BsCheckCircleFill className="w-3.5 h-3.5" />
-                        <span>Approve Claim</span>
-                      </button>
+                  {/* Accounting Ledger Info if Approved */}
+                  {isApproved && (
+                    <div className="bg-black/30 p-2.5 rounded-xl border border-white/5 text-[11px] text-gray-300 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-emerald-400 font-semibold">
+                        <BsCashCoin />
+                        <span>Double-Entry Voucher Posted to Ledger ({isDirectCompany ? 'Dr Expense / Cr Bank' : 'Dr Expense / Cr Reimbursement Payable'})</span>
+                      </div>
+                      {!isDirectCompany && (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                          isReimbursed
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                            : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                        }`}>
+                          {isReimbursed ? 'Paid & Settled' : 'Unpaid Obligation'}
+                        </span>
+                      )}
                     </div>
                   )}
+
+                  {/* Actions Bar */}
+                  <div className="pt-2 border-t border-white/5 flex items-center justify-end space-x-2 text-xs">
+                    {isPending && (
+                      <>
+                        <button
+                          onClick={() => handleStatusChange(claim, 'REJECTED')}
+                          className="px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 font-bold transition-all flex items-center gap-1"
+                        >
+                          <BsXCircleFill className="w-3 h-3 text-red-400" />
+                          <span>Reject</span>
+                        </button>
+                        <button
+                          onClick={() => handleStatusChange(claim, 'APPROVED')}
+                          className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold transition-all flex items-center gap-1 shadow-md shadow-emerald-500/20"
+                        >
+                          <BsCheckCircleFill className="w-3.5 h-3.5" />
+                          <span>Approve Spend</span>
+                        </button>
+                      </>
+                    )}
+
+                    {isApproved && !isDirectCompany && !isReimbursed && (
+                      <button
+                        onClick={() => handleReimburseClaim(claim)}
+                        className="px-3.5 py-1.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-black font-extrabold transition-all flex items-center gap-1.5 shadow-md shadow-teal-500/20"
+                      >
+                        <BsCashCoin className="w-3.5 h-3.5" />
+                        <span>Process Reimbursement Payment</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })
@@ -347,14 +401,14 @@ export default function EmployeeClaimsModal({ employee, workbenchId, isOpen, onC
 
       </div>
 
-      {/* Sub-modal: Manual Submit Claim on behalf of Employee */}
+      {/* Sub-modal: Manual Submit Claim / OPEX Request */}
       {showSubmitModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] flex items-center justify-center p-4">
           <div className="bg-[#181818] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <BsReceipt className="text-teal-400 text-base" />
-                Submit Claim for {employee.name}
+                Log Spend / Claim for {employee.name}
               </h3>
               <button onClick={() => setShowSubmitModal(false)} className="text-gray-400 hover:text-white">
                 <BsX className="w-5 h-5" />
@@ -367,7 +421,7 @@ export default function EmployeeClaimsModal({ employee, workbenchId, isOpen, onC
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Travel & Taxi to Client Office"
+                  placeholder="e.g. Company Event Venue & Catering"
                   value={newClaimTitle}
                   onChange={(e) => setNewClaimTitle(e.target.value)}
                   className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500"
@@ -380,7 +434,7 @@ export default function EmployeeClaimsModal({ employee, workbenchId, isOpen, onC
                   <input
                     type="number"
                     required
-                    placeholder="1500"
+                    placeholder="50000"
                     value={newClaimAmount}
                     onChange={(e) => setNewClaimAmount(e.target.value)}
                     className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500 font-bold"
@@ -393,6 +447,7 @@ export default function EmployeeClaimsModal({ employee, workbenchId, isOpen, onC
                     onChange={(e) => setNewClaimCategory(e.target.value)}
                     className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-500"
                   >
+                    <option value="Event & Advertising Expense">Event & Advertising Expense</option>
                     <option value="Travel & Conveyance">Travel & Conveyance</option>
                     <option value="Meals & Hospitality">Meals & Hospitality</option>
                     <option value="Field & Operations Expense">Field & Operations Expense</option>
@@ -404,10 +459,22 @@ export default function EmployeeClaimsModal({ employee, workbenchId, isOpen, onC
               </div>
 
               <div>
+                <label className="block text-gray-300 font-semibold mb-1">Payment Mode / Workflow</label>
+                <select
+                  value={newClaimPaymentType}
+                  onChange={(e) => setNewClaimPaymentType(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-500 font-semibold"
+                >
+                  <option value="DIRECT_COMPANY_PAYMENT">Direct Company OPEX (Paid from Company Funds)</option>
+                  <option value="REIMBURSEMENT">Employee Out-of-Pocket (Personal Funds Reimbursement)</option>
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-gray-300 font-semibold mb-1">Notes / Voucher Context</label>
                 <textarea
                   rows={2}
-                  placeholder="Attach receipt notes, vehicle mileage, or vendor reference..."
+                  placeholder="Attach vendor details, quote reference, or voucher context..."
                   value={newClaimNotes}
                   onChange={(e) => setNewClaimNotes(e.target.value)}
                   className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500"
@@ -426,7 +493,7 @@ export default function EmployeeClaimsModal({ employee, workbenchId, isOpen, onC
                   type="submit"
                   className="px-5 py-2 bg-teal-500 hover:bg-teal-400 text-black font-bold rounded-xl"
                 >
-                  Submit Expense Claim
+                  Submit OPEX Request
                 </button>
               </div>
             </form>

@@ -5,6 +5,7 @@ from supabase_client import supabase
 from auth import get_current_user, get_current_user_no_waitlist
 import jwt
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 
 router = APIRouter()
@@ -587,13 +588,13 @@ def get_departments(workbench_id: str):
 @router.post("/{workbench_id}/departments")
 def create_department(workbench_id: str, dept: DepartmentCreate):
     code = dept.code or (dept.name[:3].upper() if dept.name else "DEP")
-    dept_id = f"dept_{int(datetime.now().timestamp())}_{dept.name.lower().replace(' ', '_')[:10]}"
+    dept_id = str(uuid.uuid4())
     monthly_b = float(dept.monthly_budget or 0.0)
     annual_b = float(dept.annual_budget or (monthly_b * 12))
 
     row = {
         "id": dept_id,
-        "workbench_id": workbench_id,
+        "workbench_id": workbench_id if len(workbench_id) == 36 and "-" in workbench_id else None,
         "name": dept.name,
         "code": code,
         "description": dept.description or "",
@@ -606,17 +607,30 @@ def create_department(workbench_id: str, dept: DepartmentCreate):
         "annual_budget": annual_b
     }
 
-    # 1. Try DB insert
-    saved_dept = row
+    # 1. Try DB insert (full payload first, fallback to basic schema columns)
+    saved_dept = dict(row)
     try:
         res = supabase.table("departments").insert(row).execute()
         if res and res.data:
             saved_dept = res.data[0]
             dept_id = saved_dept.get("id", dept_id)
     except Exception as e:
-        print("[DEBUG] Departments DB insert notice:", e)
+        try:
+            db_row = {
+                "id": dept_id,
+                "workbench_id": workbench_id,
+                "name": dept.name,
+                "code": code,
+                "monthly_budget": monthly_b
+            }
+            res = supabase.table("departments").insert(db_row).execute()
+            if res and res.data:
+                saved_dept.update(res.data[0])
+                dept_id = saved_dept.get("id", dept_id)
+        except Exception as db_err2:
+            print("[DEBUG] Departments DB insert notice:", db_err2)
 
-    # 2. Update memory store
+    # 2. Update memory store with full rich department attributes
     if workbench_id not in DEPARTMENTS_STORE:
         DEPARTMENTS_STORE[workbench_id] = _init_default_departments(workbench_id)
     DEPARTMENTS_STORE[workbench_id].append(saved_dept)
@@ -732,7 +746,8 @@ def get_employees(workbench_id: str):
 
 @router.post("/{workbench_id}/employees")
 def create_employee(workbench_id: str, emp: EmployeeCreate):
-    emp_id = f"emp_{int(datetime.now().timestamp())}_{emp.name.lower().replace(' ', '_')[:10]}"
+    emp_id = str(uuid.uuid4())
+    clean_wb_id = workbench_id if (len(workbench_id) == 36 and "-" in workbench_id) else None
     row = {
         "id": emp_id,
         "workbench_id": workbench_id,
@@ -747,22 +762,24 @@ def create_employee(workbench_id: str, emp: EmployeeCreate):
     }
 
     saved_emp = row
-    try:
-        res = supabase.table("employees").insert({
-            "workbench_id": workbench_id,
-            "name": emp.name,
-            "email": emp.email or "",
-            "phone": emp.phone or "",
-            "department_id": emp.department_id or None,
-            "department_name": emp.department_name or "General Operations",
-            "designation": emp.designation or "Staff",
-            "salary": float(emp.salary or 0.0),
-            "monthly_allowance": float(emp.monthly_allowance or 0.0)
-        }).execute()
-        if res and res.data:
-            saved_emp = res.data[0]
-    except Exception as e:
-        print("[DEBUG] Employees DB insert notice:", e)
+    if clean_wb_id:
+        try:
+            res = supabase.table("employees").insert({
+                "id": emp_id,
+                "workbench_id": clean_wb_id,
+                "name": emp.name,
+                "email": emp.email or "",
+                "phone": emp.phone or "",
+                "department_id": emp.department_id if (emp.department_id and len(emp.department_id) == 36) else None,
+                "department_name": emp.department_name or "General Operations",
+                "designation": emp.designation or "Staff",
+                "salary": float(emp.salary or 0.0),
+                "monthly_allowance": float(emp.monthly_allowance or 0.0)
+            }).execute()
+            if res and res.data:
+                saved_emp = res.data[0]
+        except Exception as e:
+            print("[DEBUG] Employees DB insert notice:", e)
 
     if workbench_id not in EMPLOYEES_STORE:
         EMPLOYEES_STORE[workbench_id] = _init_default_employees(workbench_id)
@@ -790,26 +807,32 @@ CLAIMS_STORE: List[Dict] = []
 
 @router.get("/{workbench_id}/claims")
 def get_expense_claims(workbench_id: str):
-    try:
-        res = supabase.table("expense_claims").select("*").eq("workbench_id", workbench_id).order("created_at", desc=True).execute()
-        db_claims = res.data or []
-        local_claims = [c for c in CLAIMS_STORE if c.get("workbench_id") == workbench_id]
-        # Merge local and db claims (avoid duplicates by claim_number)
-        seen = set()
-        merged = []
-        for c in local_claims + db_claims:
-            cn = c.get("claim_number") or c.get("id")
-            if cn not in seen:
-                seen.add(cn)
-                merged.append(c)
-        return merged
-    except Exception as e:
-        return [c for c in CLAIMS_STORE if c.get("workbench_id") == workbench_id]
+    clean_wb_id = workbench_id if (len(workbench_id) == 36 and "-" in workbench_id) else None
+    db_claims = []
+    if clean_wb_id:
+        try:
+            res = supabase.table("expense_claims").select("*").eq("workbench_id", clean_wb_id).order("created_at", desc=True).execute()
+            db_claims = res.data or []
+        except Exception as e:
+            pass
+
+    local_claims = [c for c in CLAIMS_STORE if c.get("workbench_id") == workbench_id]
+    seen = set()
+    merged = []
+    for c in local_claims + db_claims:
+        cn = c.get("claim_number") or c.get("id")
+        if cn not in seen:
+            seen.add(cn)
+            merged.append(c)
+    return merged
 
 @router.post("/{workbench_id}/claims")
 def create_expense_claim(workbench_id: str, claim: ExpenseClaimCreate):
+    claim_id = str(uuid.uuid4())
+    clean_wb_id = workbench_id if (len(workbench_id) == 36 and "-" in workbench_id) else None
+
     claim_row = {
-        "id": f"claim_{int(datetime.now().timestamp())}",
+        "id": claim_id,
         "workbench_id": workbench_id,
         "claim_number": claim.claim_number,
         "employee_name": claim.employee_name,
@@ -828,11 +851,16 @@ def create_expense_claim(workbench_id: str, claim: ExpenseClaimCreate):
     # Save to local store fallback
     CLAIMS_STORE.insert(0, claim_row)
 
-    # Try database insert
-    try:
-        supabase.table("expense_claims").insert(claim_row).execute()
-    except Exception as db_err:
-        print("[WARNING] Could not save claim to database, fallback stored in memory:", db_err)
+    # Try database insert if UUID workbench
+    if clean_wb_id:
+        try:
+            db_payload = dict(claim_row)
+            db_payload["workbench_id"] = clean_wb_id
+            if claim.document_id and (len(claim.document_id) != 36 or "-" not in claim.document_id):
+                db_payload["document_id"] = None
+            supabase.table("expense_claims").insert(db_payload).execute()
+        except Exception as db_err:
+            print("[WARNING] Could not save claim to database, fallback stored in memory:", db_err)
 
     # Broadcast Notification to Workbench Members / Owners
     try:
@@ -859,12 +887,98 @@ def create_expense_claim(workbench_id: str, claim: ExpenseClaimCreate):
 
     return claim_row
 
+def _get_or_create_account(workbench_id: str, account_name: str, category_code: str = "EXP", normal_balance: str = "debit") -> str:
+    """Helper to resolve or auto-provision an account in di_accounts (COA)."""
+    clean_wb_id = workbench_id if (len(workbench_id) == 36 and "-" in workbench_id) else None
+    if clean_wb_id:
+        try:
+            res = supabase.table("di_accounts").select("id").eq("workbench_id", clean_wb_id).ilike("name", account_name).execute()
+            if res.data and len(res.data) > 0:
+                return res.data[0]["id"]
+        except Exception:
+            pass
+
+    account_id = str(uuid.uuid4())
+    if clean_wb_id:
+        try:
+            res = supabase.table("di_accounts").insert({
+                "id": account_id,
+                "workbench_id": clean_wb_id,
+                "code": f"{category_code}-{int(datetime.now().timestamp()) % 10000}",
+                "name": account_name,
+                "category_code": category_code,
+                "normal_balance": normal_balance
+            }).execute()
+            if res.data:
+                return res.data[0]["id"]
+        except Exception as err:
+            print(f"[DEBUG] _get_or_create_account fallback: {err}")
+    return account_id
+
+def _post_double_entry_voucher(
+    workbench_id: str,
+    description: str,
+    date_str: str,
+    debit_account_name: str,
+    credit_account_name: str,
+    amount: float,
+    department_id: Optional[str] = None,
+    department_name: Optional[str] = None
+) -> Dict:
+    """Compiles and posts double-entry transaction into di_ledger_transactions & di_ledger_entries."""
+    dr_acct_id = _get_or_create_account(workbench_id, debit_account_name, "EXP", "debit")
+    cr_acct_id = _get_or_create_account(
+        workbench_id,
+        credit_account_name,
+        "LIA" if "Payable" in credit_account_name else "AST",
+        "credit"
+    )
+
+    tx_data = {
+        "workbench_id": workbench_id,
+        "description": description,
+        "transaction_date": date_str or datetime.now().strftime("%Y-%m-%d"),
+        "currency": "INR",
+        "total_amount": float(amount),
+        "department_id": department_id,
+        "department_name": department_name
+    }
+
+    try:
+        tx_res = supabase.table("di_ledger_transactions").insert(tx_data).execute()
+        if tx_res.data and len(tx_res.data) > 0:
+            tx_id = tx_res.data[0]["id"]
+            supabase.table("di_ledger_entries").insert([
+                {
+                    "transaction_id": tx_id,
+                    "account_id": dr_acct_id,
+                    "direction": "debit",
+                    "amount": float(amount),
+                    "memo": f"Dr {debit_account_name} [{department_name or 'General'}]",
+                    "department_id": department_id,
+                    "department_name": department_name
+                },
+                {
+                    "transaction_id": tx_id,
+                    "account_id": cr_acct_id,
+                    "direction": "credit",
+                    "amount": float(amount),
+                    "memo": f"Cr {credit_account_name} [{department_name or 'General'}]",
+                    "department_id": department_id,
+                    "department_name": department_name
+                }
+            ]).execute()
+            return tx_res.data[0]
+    except Exception as db_err:
+        print("[WARNING] Universal Ledger double-entry posting notice:", db_err)
+
+    return {"status": "posted_in_memory", "description": description, "amount": amount}
+
 class ClaimStatusUpdate(BaseModel):
-    status: str # APPROVED | REJECTED
+    status: str # APPROVED | REJECTED | RETURNED
 
 @router.patch("/{workbench_id}/claims/{claim_id}")
 def update_claim_status(workbench_id: str, claim_id: str, payload: ClaimStatusUpdate):
-    # Update local store
     target_claim = None
     for c in CLAIMS_STORE:
         if c.get("id") == claim_id or c.get("claim_number") == claim_id:
@@ -877,44 +991,196 @@ def update_claim_status(workbench_id: str, claim_id: str, payload: ClaimStatusUp
         if res.data and len(res.data) > 0:
             target_claim = res.data[0]
     except Exception as e:
-        print("[WARNING] DB update for claim status fallback:", e)
+        print("[WARNING] DB update for claim status notice:", e)
 
-    # If APPROVED, automatically log draft document event in financial ledger
-    if payload.status == "APPROVED" and target_claim:
+    if not target_claim:
+        target_claim = {"id": claim_id, "workbench_id": workbench_id, "status": payload.status}
+
+    # If APPROVED: execute double-entry accounting voucher compiler
+    if payload.status == "APPROVED":
+        dept_name = target_claim.get("department_name") or "General Operations"
+        dept_id = target_claim.get("department_id")
+        payment_type = (target_claim.get("payment_type") or "REIMBURSEMENT").upper()
+        amount = float(target_claim.get("amount", 0.0))
+        category = target_claim.get("category") or "Operating Expenses"
+        employee_name = target_claim.get("employee_name") or "Staff"
+        claim_no = target_claim.get("claim_number") or claim_id
+
+        if payment_type == "DIRECT_COMPANY_PAYMENT":
+            # Direct OPEX Spend (Company-paid from department budget)
+            # Dr Expense Account, Cr Bank Account
+            voucher = _post_double_entry_voucher(
+                workbench_id=workbench_id,
+                description=f"Direct Department OPEX: {category} ({claim_no})",
+                date_str=target_claim.get("date"),
+                debit_account_name=category,
+                credit_account_name="Bank Account",
+                amount=amount,
+                department_id=dept_id,
+                department_name=dept_name
+            )
+            target_claim["reimbursement_status"] = "N/A"
+            target_claim["settlement_status"] = "SETTLED"
+            target_claim["voucher_id"] = voucher.get("id")
+        else:
+            # Employee Out-of-Pocket Claim Approval
+            # Dr Expense Account, Cr Employee Reimbursement Payable
+            voucher = _post_double_entry_voucher(
+                workbench_id=workbench_id,
+                description=f"Employee Claim Approval: {claim_no} ({employee_name})",
+                date_str=target_claim.get("date"),
+                debit_account_name=category,
+                credit_account_name="Employee Reimbursement Payable",
+                amount=amount,
+                department_id=dept_id,
+                department_name=dept_name
+            )
+            target_claim["reimbursement_status"] = "UNPAID"
+            target_claim["settlement_status"] = "UNSETTLED"
+            target_claim["voucher_id"] = voucher.get("id")
+
+        # Update status fields in DB if supported
         try:
-            event_payload = {
-                "document_type": "expense_receipt",
-                "party": f"{target_claim.get('employee_name')} ({target_claim.get('department_name')})",
-                "total_amount": target_claim.get("amount", 0.0),
-                "date": target_claim.get("date"),
-                "currency": "INR",
-                "metadata": {
-                    "claim_number": target_claim.get("claim_number"),
-                    "category": target_claim.get("category"),
-                    "payment_type": target_claim.get("payment_type"),
-                    "employee_name": target_claim.get("employee_name"),
-                    "department_name": target_claim.get("department_name"),
-                    "status": "APPROVED"
-                }
-            }
-            supabase.table("di_analysis_notes").insert({
-                "document_type": "expense_receipt",
-                "confidence": 0.99,
-                "parties": {
-                    "issuer": {"name": target_claim.get("employee_name"), "department": target_claim.get("department_name")},
-                    "recipient": {"name": "Company"}
-                },
-                "money": {
-                    "total_amount": target_claim.get("amount", 0.0),
-                    "currency": "INR"
-                },
-                "dates": {"document_date": target_claim.get("date")},
-                "raw_text": f"Approved Claim #{target_claim.get('claim_number')} by {target_claim.get('employee_name')}"
-            }).execute()
-        except Exception as event_err:
-            print("[WARNING] Event creation on claim approval:", event_err)
+            supabase.table("expense_claims").update({
+                "reimbursement_status": target_claim.get("reimbursement_status"),
+                "settlement_status": target_claim.get("settlement_status"),
+                "voucher_id": target_claim.get("voucher_id")
+            }).or_(f"id.eq.{claim_id},claim_number.eq.{claim_id}").execute()
+        except Exception:
+            pass
 
-    return target_claim or {"id": claim_id, "status": payload.status}
+    return target_claim
+
+@router.post("/{workbench_id}/claims/{claim_id}/reimburse")
+def reimburse_expense_claim(workbench_id: str, claim_id: str):
+    """Processes bank/cash reimbursement payment for an approved employee out-of-pocket claim."""
+    target_claim = None
+    for c in CLAIMS_STORE:
+        if c.get("id") == claim_id or c.get("claim_number") == claim_id:
+            target_claim = c
+            break
+
+    try:
+        res = supabase.table("expense_claims").select("*").or_(f"id.eq.{claim_id},claim_number.eq.{claim_id}").execute()
+        if res.data and len(res.data) > 0:
+            target_claim = res.data[0]
+    except Exception:
+        pass
+
+    if not target_claim:
+        raise HTTPException(status_code=404, detail="Claim not found")
+
+    amount = float(target_claim.get("amount", 0.0))
+    dept_name = target_claim.get("department_name") or "General Operations"
+    dept_id = target_claim.get("department_id")
+    employee_name = target_claim.get("employee_name") or "Staff"
+    claim_no = target_claim.get("claim_number") or claim_id
+
+    # Post payment voucher: Dr Employee Reimbursement Payable, Cr Bank Account
+    payment_voucher = _post_double_entry_voucher(
+        workbench_id=workbench_id,
+        description=f"Reimbursement Payment for Claim {claim_no} ({employee_name})",
+        date_str=datetime.now().strftime("%Y-%m-%d"),
+        debit_account_name="Employee Reimbursement Payable",
+        credit_account_name="Bank Account",
+        amount=amount,
+        department_id=dept_id,
+        department_name=dept_name
+    )
+
+    target_claim["reimbursement_status"] = "REIMBURSED"
+    target_claim["settlement_status"] = "SETTLED"
+    target_claim["payment_voucher_id"] = payment_voucher.get("id")
+    target_claim["reimbursed_at"] = datetime.now(timezone.utc).isoformat()
+
+    try:
+        supabase.table("expense_claims").update({
+            "reimbursement_status": "REIMBURSED",
+            "settlement_status": "SETTLED",
+            "payment_voucher_id": payment_voucher.get("id"),
+            "reimbursed_at": target_claim["reimbursed_at"]
+        }).or_(f"id.eq.{claim_id},claim_number.eq.{claim_id}").execute()
+    except Exception as db_err:
+        print("[WARNING] Could not update claim reimbursement status in DB:", db_err)
+
+    return target_claim
+
+@router.get("/{workbench_id}/departments/{department_id}/budget-vs-actual")
+def get_department_budget_vs_actual(workbench_id: str, department_id: str):
+    """Computes real Department Budget vs Actual from double-entry transactions and approved spend."""
+    dept = None
+    depts = get_departments(workbench_id)
+    for d in depts:
+        if d.get("id") == department_id or d.get("name") == department_id:
+            dept = d
+            break
+
+    if not dept:
+        dept = {"id": department_id, "name": department_id, "monthly_budget": 0.0, "annual_budget": 0.0}
+
+    dept_name = dept.get("name")
+    monthly_budget = float(dept.get("monthly_budget", 0.0) or 0.0)
+    annual_budget = float(dept.get("annual_budget", monthly_budget * 12) or 0.0)
+
+    # Compute Actual from double-entry ledger transactions
+    actual = 0.0
+    try:
+        tx_res = supabase.table("di_ledger_transactions").select("id, total_amount").eq("workbench_id", workbench_id).or_(f"department_id.eq.{department_id},department_name.eq.{dept_name}").execute()
+        if tx_res.data:
+            actual += sum(float(t.get("total_amount", 0.0)) for t in tx_res.data)
+    except Exception:
+        pass
+
+    # Include approved claims in actual if not already linked to transaction
+    claims = get_expense_claims(workbench_id)
+    for c in claims:
+        c_dept = c.get("department_id") or c.get("department_name")
+        if (c_dept == department_id or c_dept == dept_name) and c.get("status") == "APPROVED" and not c.get("voucher_id"):
+            actual += float(c.get("amount", 0.0))
+
+    # Compute Committed (pending claim requests under review)
+    committed = 0.0
+    for c in claims:
+        c_dept = c.get("department_id") or c.get("department_name")
+        if (c_dept == department_id or c_dept == dept_name) and c.get("status") in ["PENDING", "UNDER_REVIEW"]:
+            committed += float(c.get("amount", 0.0))
+
+    remaining_monthly = max(0.0, monthly_budget - actual)
+    remaining_annual = max(0.0, annual_budget - actual)
+    utilization_pct = round((actual / (monthly_budget or 1.0)) * 100, 1) if monthly_budget > 0 else 0.0
+
+    return {
+        "department_id": department_id,
+        "department_name": dept_name,
+        "monthly_budget": monthly_budget,
+        "annual_budget": annual_budget,
+        "actual": actual,
+        "remaining_monthly": remaining_monthly,
+        "remaining_annual": remaining_annual,
+        "utilization_pct": utilization_pct,
+        "committed": committed
+    }
+
+@router.patch("/{workbench_id}/departments/{department_id}/status")
+def update_department_status(workbench_id: str, department_id: str, payload: Dict[str, str]):
+    """Soft deactivates or reactivates a department without hard deleting historical accounting references."""
+    new_status = payload.get("status", "active").lower()
+    mem_depts = DEPARTMENTS_STORE.get(workbench_id, [])
+    target = None
+    for d in mem_depts:
+        if d.get("id") == department_id or d.get("name") == department_id:
+            d["status"] = new_status
+            target = d
+            break
+
+    try:
+        res = supabase.table("departments").update({"status": new_status}).eq("id", department_id).eq("workbench_id", workbench_id).execute()
+        if res.data and len(res.data) > 0:
+            target = res.data[0]
+    except Exception as e:
+        print("[WARNING] DB department status update notice:", e)
+
+    return target or {"id": department_id, "status": new_status}
 
 
 @router.delete("/{workbench_id}")

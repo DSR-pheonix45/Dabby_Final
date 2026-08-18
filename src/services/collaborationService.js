@@ -171,6 +171,20 @@ export const collaborationService = {
     return res.json();
   },
 
+  async reimburseClaim(workbenchId, claimId) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/claims/${claimId}/reimburse`, {
+      method: "POST",
+    });
+    if (!res.ok) throw new Error("Failed to process reimbursement payment");
+    return res.json();
+  },
+
+  async getDepartmentBudgetVsActual(workbenchId, departmentId) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/departments/${departmentId}/budget-vs-actual`);
+    if (!res.ok) return null;
+    return res.json();
+  },
+
   async deleteWorkbench(workbenchId) {
     const res = await apiFetch(`/api/collaboration/${workbenchId}`, {
       method: "DELETE",
