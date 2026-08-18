@@ -641,8 +641,7 @@ def create_department(workbench_id: str, dept: DepartmentCreate):
 
     return saved_dept
 
-@router.put("/{workbench_id}/departments/{department_id}")
-@router.patch("/{workbench_id}/departments/{department_id}")
+@router.api_route("/{workbench_id}/departments/{department_id}", methods=["PUT", "PATCH"])
 def update_department(workbench_id: str, department_id: str, dept: DepartmentUpdate):
     update_data = {k: v for k, v in dept.dict(exclude_unset=True).items() if v is not None}
     if not update_data:

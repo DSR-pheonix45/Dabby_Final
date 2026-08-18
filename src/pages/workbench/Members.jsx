@@ -389,10 +389,11 @@ export default function Members() {
               {filteredMembers.map((m) => (
                 <div
                   key={m.id}
-                  className="bg-[#181818] border border-white/10 hover:border-teal-500/30 rounded-2xl p-5 flex items-start justify-between transition-all"
+                  onClick={() => setSelectedMember(m)}
+                  className="bg-[#181818] border border-white/10 hover:border-teal-500/50 hover:bg-[#1F1F1F] rounded-2xl p-5 flex items-start justify-between transition-all cursor-pointer shadow-md hover:shadow-teal-500/5"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="h-11 w-11 shrink-0 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-teal-400 flex items-center justify-center font-bold text-base">
+                    <div className="h-11 w-11 shrink-0 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-teal-400 flex items-center justify-center font-bold text-base shadow-inner">
                       {m.users?.name?.charAt(0)?.toUpperCase() || "M"}
                     </div>
                     <div>
@@ -401,10 +402,11 @@ export default function Members() {
                         {m.user_id === user?.id && <span className="text-[10px] bg-white/10 text-gray-400 px-1.5 py-0.5 rounded-full font-normal">(You)</span>}
                       </h3>
                       <p className="text-xs text-gray-400 mt-0.5">{m.users?.email || "No email"}</p>
-                      <div className="mt-2">
+                      <div className="mt-2 flex items-center gap-2">
                         <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-teal-500/10 text-teal-300 border border-teal-500/20 rounded-full">
                           Role: {m.role}
                         </span>
+                        <span className="text-[10px] text-gray-500 font-semibold group-hover:text-teal-400">View Details & Tasks &rarr;</span>
                       </div>
                     </div>
                   </div>
@@ -1020,6 +1022,22 @@ export default function Members() {
         onClose={() => setSelectedEmpForClaims(null)}
         onUpdate={fetchDeptsAndEmployees}
       />
+
+      {/* Platform Member Detail Drawer */}
+      {selectedMember && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex justify-end animate-in fade-in duration-200">
+          <div className="w-full max-w-2xl bg-[#141414] h-full shadow-2xl flex flex-col border-l border-white/10">
+            <MemberDetail
+              member={selectedMember}
+              workbenchId={activeWorkbench?.id}
+              onClose={() => setSelectedMember(null)}
+              onRoleChangeClick={(m) => {
+                setIsRoleChangeOpen(true);
+              }}
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   );
