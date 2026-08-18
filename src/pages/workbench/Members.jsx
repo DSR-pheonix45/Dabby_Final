@@ -1025,8 +1025,14 @@ export default function Members() {
 
       {/* Platform Member Detail Drawer */}
       {selectedMember && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex justify-end animate-in fade-in duration-200">
-          <div className="w-full max-w-2xl bg-[#141414] h-full shadow-2xl flex flex-col border-l border-white/10">
+        <div 
+          onClick={() => setSelectedMember(null)}
+          className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex justify-end animate-in fade-in duration-200"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-2xl bg-[#141414] h-full shadow-2xl flex flex-col border-l border-white/10"
+          >
             <MemberDetail
               member={selectedMember}
               workbenchId={activeWorkbench?.id}

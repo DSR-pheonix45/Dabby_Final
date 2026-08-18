@@ -8,7 +8,8 @@ import {
   BsKey, 
   BsCashCoin,
   BsPersonCheck,
-  BsArrowRightShort
+  BsArrowRightShort,
+  BsX
 } from "react-icons/bs";
 import TaskCard from "./TaskCard";
 import AssignTaskModal from "./AssignTaskModal";
@@ -182,12 +183,22 @@ export default function MemberDetail({ member, workbenchId, onClose, onRoleChang
             </div>
           </div>
           
-          <button 
-            onClick={() => onRoleChangeClick(member)}
-            className="px-4 py-2 bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 text-xs font-bold rounded-xl transition-all shadow-sm"
-          >
-            Change Role
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => onRoleChangeClick(member)}
+              className="px-4 py-2 bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 text-xs font-bold rounded-xl transition-all shadow-sm"
+            >
+              Change Role
+            </button>
+
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10 transition-all flex items-center justify-center"
+              title="Close Drawer"
+            >
+              <BsX className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
 
