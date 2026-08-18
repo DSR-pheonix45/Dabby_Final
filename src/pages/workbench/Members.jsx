@@ -4,7 +4,8 @@ import { useAuth } from "../../hooks/useAuth";
 import { useDataCache } from "../../hooks/useDataCache";
 import { 
   BsPersonPlus, BsSearch, BsBuilding, BsPeople, BsLink45Deg, 
-  BsPlusLg, BsCashCoin, BsBuildingCheck, BsCheck2, BsBriefcase 
+  BsPlusLg, BsCashCoin, BsBuildingCheck, BsCheck2, BsBriefcase,
+  BsPencilSquare, BsPersonBadge, BsDiagram3, BsXCircle
 } from "react-icons/bs";
 import { collaborationService } from "../../services/collaborationService";
 import AddMemberModal from "./AddMemberModal";
@@ -44,8 +45,17 @@ export default function Members() {
 
   // Department Modal State
   const [isAddDeptOpen, setIsAddDeptOpen] = useState(false);
-  const [newDeptName, setNewDeptName] = useState("");
-  const [newDeptBudget, setNewDeptBudget] = useState("");
+  const [editingDept, setEditingDept] = useState(null);
+  const [deptFormName, setDeptFormName] = useState("");
+  const [deptFormCode, setDeptFormCode] = useState("");
+  const [deptFormDescription, setDeptFormDescription] = useState("");
+  const [deptFormHeadId, setDeptFormHeadId] = useState("");
+  const [deptFormHeadName, setDeptFormHeadName] = useState("");
+  const [deptFormParentId, setDeptFormParentId] = useState("");
+  const [deptFormParentName, setDeptFormParentName] = useState("");
+  const [deptFormStatus, setDeptFormStatus] = useState("active");
+  const [deptFormMonthlyBudget, setDeptFormMonthlyBudget] = useState("");
+  const [deptFormAnnualBudget, setDeptFormAnnualBudget] = useState("");
   const [selectedEmpIdsForDept, setSelectedEmpIdsForDept] = useState([]);
 
   // Link Employees Modal State
@@ -107,23 +117,89 @@ export default function Members() {
     setTimeout(() => setCopiedEmpId(null), 2500);
   };
 
-  const handleCreateDepartment = async (e) => {
+  const handleOpenAddDept = () => {
+    setEditingDept(null);
+    setDeptFormName("");
+    setDeptFormCode("");
+    setDeptFormDescription("");
+    setDeptFormHeadId("");
+    setDeptFormHeadName("");
+    setDeptFormParentId("");
+    setDeptFormParentName("");
+    setDeptFormStatus("active");
+    setDeptFormMonthlyBudget("");
+    setDeptFormAnnualBudget("");
+    setSelectedEmpIdsForDept([]);
+    setIsAddDeptOpen(true);
+  };
+
+  const handleOpenEditDept = (dept) => {
+    setEditingDept(dept);
+    setDeptFormName(dept.name || "");
+    setDeptFormCode(dept.code || "");
+    setDeptFormDescription(dept.description || "");
+    setDeptFormHeadId(dept.head_id || "");
+    setDeptFormHeadName(dept.head_name || "");
+    setDeptFormParentId(dept.parent_department_id || "");
+    setDeptFormParentName(dept.parent_department_name || "");
+    setDeptFormStatus(dept.status || "active");
+    setDeptFormMonthlyBudget(dept.monthly_budget ? String(dept.monthly_budget) : "");
+    setDeptFormAnnualBudget(dept.annual_budget ? String(dept.annual_budget) : "");
+
+    const linked = employees.filter(e => e.department_id === dept.id || e.department_name === dept.name).map(e => e.id);
+    setSelectedEmpIdsForDept(linked);
+    setIsAddDeptOpen(true);
+  };
+
+  const handleSaveDepartment = async (e) => {
     e.preventDefault();
-    if (!newDeptName.trim()) return;
+    if (!deptFormName.trim()) return;
+
+    let headName = deptFormHeadName;
+    if (deptFormHeadId) {
+      const emp = employees.find(e => e.id === deptFormHeadId);
+      if (emp) headName = emp.name;
+      else {
+        const mem = members.find(m => m.user_id === deptFormHeadId);
+        if (mem && mem.users) headName = mem.users.name || mem.users.email;
+      }
+    }
+
+    let parentName = deptFormParentName;
+    if (deptFormParentId) {
+      const pDept = departments.find(d => d.id === deptFormParentId);
+      if (pDept) parentName = pDept.name;
+    }
+
+    const mb = Number(deptFormMonthlyBudget) || 0;
+    const ab = Number(deptFormAnnualBudget) || (mb * 12);
+
+    const payload = {
+      name: deptFormName.trim(),
+      code: deptFormCode.trim() || undefined,
+      description: deptFormDescription.trim(),
+      head_id: deptFormHeadId || undefined,
+      head_name: headName || "",
+      parent_department_id: deptFormParentId || undefined,
+      parent_department_name: parentName || "",
+      status: deptFormStatus || "active",
+      monthly_budget: mb,
+      annual_budget: ab,
+      employee_ids: selectedEmpIdsForDept
+    };
+
     try {
-      await collaborationService.createDepartment(activeWorkbench.id, {
-        name: newDeptName.trim(),
-        monthly_budget: Number(newDeptBudget) || 0,
-        employee_ids: selectedEmpIdsForDept
-      });
-      toast.success(`Department "${newDeptName}" stored in DB!`);
-      setNewDeptName("");
-      setNewDeptBudget("");
-      setSelectedEmpIdsForDept([]);
+      if (editingDept) {
+        await collaborationService.updateDepartment(activeWorkbench.id, editingDept.id, payload);
+        toast.success(`Department "${deptFormName}" updated!`);
+      } else {
+        await collaborationService.createDepartment(activeWorkbench.id, payload);
+        toast.success(`Department "${deptFormName}" created!`);
+      }
       setIsAddDeptOpen(false);
       fetchDeptsAndEmployees();
     } catch (err) {
-      toast.error("Failed to create department");
+      toast.error(editingDept ? "Failed to update department" : "Failed to create department");
     }
   };
 
@@ -230,7 +306,7 @@ export default function Members() {
 
           {activeSubTab === "departments" && (
             <button
-              onClick={() => setIsAddDeptOpen(true)}
+              onClick={handleOpenAddDept}
               className="flex items-center space-x-2 px-3.5 py-2 bg-teal-500 hover:bg-teal-400 text-black rounded-xl text-xs font-extrabold transition-all"
             >
               <BsPlusLg size={13} />
@@ -347,6 +423,7 @@ export default function Members() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredDepartments.map((d) => {
                 const linkedEmps = employees.filter(e => e.department_id === d.id || e.department_name === d.name);
+                const isActive = (d.status || 'active').toLowerCase() === 'active';
 
                 return (
                   <div
@@ -354,23 +431,69 @@ export default function Members() {
                     className="bg-[#181818] border border-white/10 hover:border-teal-500/30 rounded-2xl p-5 space-y-4 transition-all flex flex-col justify-between"
                   >
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
+                      {/* Top Header */}
+                      <div className="flex items-start justify-between">
                         <div className="flex items-center space-x-3">
                           <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
                             <BsBuilding />
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-white">{d.name}</h3>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-sm font-bold text-white">{d.name}</h3>
+                              <span className={`px-2 py-0.5 text-[10px] font-extrabold rounded-md border uppercase ${
+                                isActive 
+                                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                                  : 'bg-gray-500/10 border-gray-500/20 text-gray-400'
+                              }`}>
+                                {d.status || 'Active'}
+                              </span>
+                            </div>
                             <p className="text-[11px] text-gray-400">Code: {d.code || (d.name ? d.name.slice(0, 3).toUpperCase() : "DEP")}</p>
                           </div>
                         </div>
+
+                        <button
+                          onClick={() => handleOpenEditDept(d)}
+                          className="p-1.5 hover:bg-white/10 text-gray-400 hover:text-white rounded-lg transition-colors flex items-center gap-1 text-xs"
+                          title="Edit Department"
+                        >
+                          <BsPencilSquare className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Description */}
+                      {d.description && (
+                        <p className="text-xs text-gray-300 bg-black/20 p-2.5 rounded-xl border border-white/5 leading-relaxed">
+                          {d.description}
+                        </p>
+                      )}
+
+                      {/* Head & Parent Hierarchy */}
+                      <div className="grid grid-cols-1 gap-1.5 text-xs text-gray-300 pt-1">
+                        <div className="flex items-center justify-between bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
+                          <span className="text-gray-400 text-[11px] flex items-center gap-1.5">
+                            <BsPersonBadge className="text-purple-400" /> Dept Head:
+                          </span>
+                          <span className="font-semibold text-white">
+                            {d.head_name || <span className="text-gray-500 italic">Unassigned (Assign later)</span>}
+                          </span>
+                        </div>
+
+                        {d.parent_department_name && (
+                          <div className="flex items-center justify-between bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
+                            <span className="text-gray-400 text-[11px] flex items-center gap-1.5">
+                              <BsDiagram3 className="text-blue-400" /> Parent Dept:
+                            </span>
+                            <span className="font-semibold text-blue-300">{d.parent_department_name}</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Linked Employees Section */}
                       <div className="bg-black/30 rounded-xl p-3 border border-white/5 space-y-2">
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-gray-400 font-medium flex items-center gap-1.5">
-                            <BsPeople className="text-teal-400" /> Linked Employees ({linkedEmps.length})
+                            <BsPeople className="text-teal-400" /> Linked Staff ({linkedEmps.length})
                           </span>
                           <button
                             onClick={() => handleOpenLinkModal(d)}
@@ -398,9 +521,16 @@ export default function Members() {
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-white/5 flex items-center justify-between text-xs">
-                      <span className="text-gray-400">Monthly Budget Cap:</span>
-                      <span className="font-extrabold text-teal-400">₹{(d.monthly_budget || 0).toLocaleString()}</span>
+                    {/* Budgets Footer */}
+                    <div className="pt-3 border-t border-white/5 space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400">Monthly Budget Cap:</span>
+                        <span className="font-extrabold text-teal-400">₹{(d.monthly_budget || 0).toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-gray-500">Annual Budget:</span>
+                        <span className="font-semibold text-gray-300">₹{(d.annual_budget || ((d.monthly_budget || 0) * 12)).toLocaleString()}</span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -523,41 +653,145 @@ export default function Members() {
         </div>
       </div>
 
-      {/* Add Department Modal */}
+      {/* Add / Edit Department Modal */}
       {isAddDeptOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-4">
-            <h2 className="text-lg font-bold text-white">Add New Department</h2>
-            <form onSubmit={handleCreateDepartment} className="space-y-4 text-xs">
+          <div className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h2 className="text-base font-bold text-white">
+                {editingDept ? `Edit Department: ${editingDept.name}` : "Add New Department"}
+              </h2>
+              <button onClick={() => setIsAddDeptOpen(false)} className="text-gray-400 hover:text-white">
+                <BsXCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDepartment} className="space-y-4 text-xs">
+              {/* Dept Name & Code */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-gray-300 font-semibold mb-1">Department Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={deptFormName}
+                    onChange={(e) => setDeptFormName(e.target.value)}
+                    placeholder="e.g. Sales, Operations, Finance"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-300 font-semibold mb-1">Code</label>
+                  <input
+                    type="text"
+                    value={deptFormCode}
+                    onChange={(e) => setDeptFormCode(e.target.value)}
+                    placeholder="e.g. SAL"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500 uppercase"
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
               <div>
-                <label className="block text-gray-300 font-semibold mb-1">Department Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={newDeptName}
-                  onChange={(e) => setNewDeptName(e.target.value)}
-                  placeholder="e.g. Site Operations, Sales, Marketing"
+                <label className="block text-gray-300 font-semibold mb-1">Description</label>
+                <textarea
+                  rows={2}
+                  value={deptFormDescription}
+                  onChange={(e) => setDeptFormDescription(e.target.value)}
+                  placeholder="Describe department function and responsibilities..."
                   className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500"
-                  autoFocus
                 />
               </div>
 
-              <div>
-                <label className="block text-gray-300 font-semibold mb-1">Monthly OPEX Budget Cap (₹)</label>
-                <input
-                  type="number"
-                  value={newDeptBudget}
-                  onChange={(e) => setNewDeptBudget(e.target.value)}
-                  placeholder="100000"
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500"
-                />
+              {/* Head & Parent Hierarchy */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-gray-300 font-semibold mb-1">Department Head / Responsible Person</label>
+                  <select
+                    value={deptFormHeadId}
+                    onChange={(e) => setDeptFormHeadId(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-500"
+                  >
+                    <option value="">Unassigned (Assign later)</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.name} ({emp.designation || 'Employee'})</option>
+                    ))}
+                    {members.map(m => (
+                      <option key={m.user_id} value={m.user_id}>
+                        {m.users?.name || m.users?.email || m.user_id} ({m.role || 'Member'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 font-semibold mb-1">Parent Department (Hierarchy)</label>
+                  <select
+                    value={deptFormParentId}
+                    onChange={(e) => setDeptFormParentId(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-500"
+                  >
+                    <option value="">None (Top-Level Department)</option>
+                    {departments
+                      .filter(d => !editingDept || d.id !== editingDept.id)
+                      .map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))
+                    }
+                  </select>
+                </div>
+              </div>
+
+              {/* Status & Budgets */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-gray-300 font-semibold mb-1">Status</label>
+                  <select
+                    value={deptFormStatus}
+                    onChange={(e) => setDeptFormStatus(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-500"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 font-semibold mb-1">Monthly Budget (₹)</label>
+                  <input
+                    type="number"
+                    value={deptFormMonthlyBudget}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDeptFormMonthlyBudget(val);
+                      if (val && !deptFormAnnualBudget) {
+                        setDeptFormAnnualBudget(String(Number(val) * 12));
+                      }
+                    }}
+                    placeholder="100000"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 font-semibold mb-1">Annual Budget (₹)</label>
+                  <input
+                    type="number"
+                    value={deptFormAnnualBudget}
+                    onChange={(e) => setDeptFormAnnualBudget(e.target.value)}
+                    placeholder="1200000"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500"
+                  />
+                </div>
               </div>
 
               {/* Multi-select employees to link */}
               {employees.length > 0 && (
                 <div>
                   <label className="block text-gray-300 font-semibold mb-1">Assign Employees to Department</label>
-                  <div className="max-h-32 overflow-y-auto space-y-1 bg-black/40 p-2.5 rounded-xl border border-white/10">
+                  <div className="max-h-28 overflow-y-auto space-y-1 bg-black/40 p-2.5 rounded-xl border border-white/10">
                     {employees.map((emp) => {
                       const checked = selectedEmpIdsForDept.includes(emp.id);
                       return (
@@ -582,19 +816,19 @@ export default function Members() {
                 </div>
               )}
 
-              <div className="flex justify-end space-x-3 pt-2">
+              <div className="flex justify-end space-x-3 pt-3 border-t border-white/10">
                 <button
                   type="button"
                   onClick={() => setIsAddDeptOpen(false)}
-                  className="px-4 py-2 text-gray-400 hover:text-white"
+                  className="px-4 py-2 text-gray-400 hover:text-white font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-teal-500 hover:bg-teal-400 text-black font-bold rounded-xl"
+                  className="px-5 py-2 bg-teal-500 hover:bg-teal-400 text-black font-extrabold rounded-xl transition-colors shadow-lg shadow-teal-500/20"
                 >
-                  Save Department
+                  {editingDept ? "Update Department" : "Save Department"}
                 </button>
               </div>
             </form>

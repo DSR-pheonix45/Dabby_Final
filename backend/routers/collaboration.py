@@ -511,8 +511,27 @@ def mark_notification_read(notification_id: str, user = Depends(get_current_user
 class DepartmentCreate(BaseModel):
     name: str
     code: Optional[str] = None
+    description: Optional[str] = ""
+    head_id: Optional[str] = None
+    head_name: Optional[str] = ""
+    parent_department_id: Optional[str] = None
+    parent_department_name: Optional[str] = ""
+    status: Optional[str] = "active"
     monthly_budget: Optional[float] = 0.0
+    annual_budget: Optional[float] = 0.0
     employee_ids: Optional[List[str]] = []
+
+class DepartmentUpdate(BaseModel):
+    name: Optional[str] = None
+    code: Optional[str] = None
+    description: Optional[str] = None
+    head_id: Optional[str] = None
+    head_name: Optional[str] = None
+    parent_department_id: Optional[str] = None
+    parent_department_name: Optional[str] = None
+    status: Optional[str] = None
+    monthly_budget: Optional[float] = None
+    annual_budget: Optional[float] = None
 
 class EmployeeCreate(BaseModel):
     name: str
@@ -569,23 +588,28 @@ def get_departments(workbench_id: str):
 def create_department(workbench_id: str, dept: DepartmentCreate):
     code = dept.code or (dept.name[:3].upper() if dept.name else "DEP")
     dept_id = f"dept_{int(datetime.now().timestamp())}_{dept.name.lower().replace(' ', '_')[:10]}"
+    monthly_b = float(dept.monthly_budget or 0.0)
+    annual_b = float(dept.annual_budget or (monthly_b * 12))
+
     row = {
         "id": dept_id,
         "workbench_id": workbench_id,
         "name": dept.name,
         "code": code,
-        "monthly_budget": float(dept.monthly_budget or 0.0)
+        "description": dept.description or "",
+        "head_id": dept.head_id,
+        "head_name": dept.head_name or "",
+        "parent_department_id": dept.parent_department_id,
+        "parent_department_name": dept.parent_department_name or "",
+        "status": dept.status or "active",
+        "monthly_budget": monthly_b,
+        "annual_budget": annual_b
     }
 
     # 1. Try DB insert
     saved_dept = row
     try:
-        res = supabase.table("departments").insert({
-            "workbench_id": workbench_id,
-            "name": dept.name,
-            "code": code,
-            "monthly_budget": float(dept.monthly_budget or 0.0)
-        }).execute()
+        res = supabase.table("departments").insert(row).execute()
         if res and res.data:
             saved_dept = res.data[0]
             dept_id = saved_dept.get("id", dept_id)
@@ -600,6 +624,37 @@ def create_department(workbench_id: str, dept: DepartmentCreate):
     # 3. If employee_ids supplied, link employees to this department
     if dept.employee_ids:
         link_employees_to_dept_internal(workbench_id, dept_id, dept.name, dept.employee_ids)
+
+    return saved_dept
+
+@router.put("/{workbench_id}/departments/{department_id}")
+def update_department(workbench_id: str, department_id: str, dept: DepartmentUpdate):
+    update_data = {k: v for k, v in dept.dict(exclude_unset=True).items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    saved_dept = None
+    try:
+        res = supabase.table("departments").update(update_data).eq("id", department_id).eq("workbench_id", workbench_id).execute()
+        if res and res.data:
+            saved_dept = res.data[0]
+    except Exception as e:
+        print("[DEBUG] Departments DB update notice:", e)
+
+    mem_depts = DEPARTMENTS_STORE.get(workbench_id, [])
+    found = False
+    for i, d in enumerate(mem_depts):
+        if d.get("id") == department_id or d.get("name") == department_id:
+            mem_depts[i].update(update_data)
+            saved_dept = mem_depts[i]
+            found = True
+            break
+
+    if not found and not saved_dept:
+        saved_dept = {"id": department_id, "workbench_id": workbench_id, **update_data}
+        if workbench_id not in DEPARTMENTS_STORE:
+            DEPARTMENTS_STORE[workbench_id] = []
+        DEPARTMENTS_STORE[workbench_id].append(saved_dept)
 
     return saved_dept
 

@@ -111,6 +111,15 @@ export const collaborationService = {
     return res.json();
   },
 
+  async updateDepartment(workbenchId, departmentId, deptData) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/departments/${departmentId}`, {
+      method: "PUT",
+      body: JSON.stringify(deptData),
+    });
+    if (!res.ok) throw new Error("Failed to update department");
+    return res.json();
+  },
+
   async linkEmployeesToDepartment(workbenchId, departmentId, departmentName, employeeIds) {
     const res = await apiFetch(`/api/collaboration/${workbenchId}/departments/${departmentId}/link-employees`, {
       method: "PUT",
