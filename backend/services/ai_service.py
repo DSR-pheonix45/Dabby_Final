@@ -115,7 +115,7 @@ class AIService:
         try:
             completion = GroqPool.execute(
                 lambda client: client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model="llama-3.1-8b-instant",
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_msg}
@@ -617,7 +617,7 @@ class AIService:
         try:
             completion = GroqPool.execute(
                 lambda client: client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model="llama-3.1-8b-instant",
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_msg}
@@ -1175,7 +1175,7 @@ class AIService:
             user_msg = f"Document Page Content:\n{page_text or ''}"
             completion = GroqPool.execute(
                 lambda client: client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model="llama-3.1-8b-instant",
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_msg}
@@ -1670,7 +1670,7 @@ class AIService:
                 user_msg = f"Document Filename: {filename}\nContent (Respond in JSON format):\n{text_content[:80000]}"
                 completion = GroqPool.execute(
                     lambda client: client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
+                        model="llama-3.1-8b-instant",
                         messages=[
                             {"role": "system", "content": prompt},
                             {"role": "user", "content": user_msg}

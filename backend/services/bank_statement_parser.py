@@ -212,7 +212,7 @@ class BankStatementParser:
             try:
                 completion = self._groq_execute(
                     lambda client: client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
+                        model="llama-3.1-8b-instant",
                         messages=[
                             {"role": "system", "content": BANK_STATEMENT_TEXT_PROMPT},
                             {"role": "user",   "content": user_msg},
@@ -245,7 +245,7 @@ class BankStatementParser:
             user_msg = f"Document Page Content:\n{page_text[:80000] if page_text else ''}"
             completion = self._groq_execute(
                 lambda client: client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model="llama-3.1-8b-instant",
                     messages=[
                         {"role": "system", "content": BANK_STATEMENT_TEXT_PROMPT},
                         {"role": "user",   "content": user_msg},
