@@ -642,33 +642,55 @@ def create_department(workbench_id: str, dept: DepartmentCreate):
     return saved_dept
 
 @router.put("/{workbench_id}/departments/{department_id}")
+@router.patch("/{workbench_id}/departments/{department_id}")
 def update_department(workbench_id: str, department_id: str, dept: DepartmentUpdate):
     update_data = {k: v for k, v in dept.dict(exclude_unset=True).items() if v is not None}
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
 
+    clean_wb_id = workbench_id if (len(workbench_id) == 36 and "-" in workbench_id) else None
     saved_dept = None
-    try:
-        res = supabase.table("departments").update(update_data).eq("id", department_id).eq("workbench_id", workbench_id).execute()
-        if res and res.data:
-            saved_dept = res.data[0]
-    except Exception as e:
-        print("[DEBUG] Departments DB update notice:", e)
+
+    if clean_wb_id:
+        try:
+            # Try updating full dataset
+            res = supabase.table("departments").update(update_data).eq("id", department_id).eq("workbench_id", clean_wb_id).execute()
+            if res and res.data:
+                saved_dept = res.data[0]
+            else:
+                # Try by name if id didn't match
+                res2 = supabase.table("departments").update(update_data).eq("name", department_id).eq("workbench_id", clean_wb_id).execute()
+                if res2 and res2.data:
+                    saved_dept = res2.data[0]
+        except Exception as e:
+            # Fallback to sanitized basic schema fields
+            try:
+                basic_keys = {"name", "code", "monthly_budget"}
+                db_data = {k: v for k, v in update_data.items() if k in basic_keys}
+                if db_data:
+                    res3 = supabase.table("departments").update(db_data).eq("id", department_id).eq("workbench_id", clean_wb_id).execute()
+                    if res3 and res3.data:
+                        saved_dept = res3.data[0]
+            except Exception as db_err2:
+                print("[DEBUG] Departments DB update notice:", db_err2)
 
     mem_depts = DEPARTMENTS_STORE.get(workbench_id, [])
     found = False
     for i, d in enumerate(mem_depts):
         if d.get("id") == department_id or d.get("name") == department_id:
             mem_depts[i].update(update_data)
-            saved_dept = mem_depts[i]
+            if not saved_dept:
+                saved_dept = mem_depts[i]
             found = True
             break
 
-    if not found and not saved_dept:
-        saved_dept = {"id": department_id, "workbench_id": workbench_id, **update_data}
+    if not found:
+        new_entry = {"id": department_id, "workbench_id": workbench_id, **update_data}
         if workbench_id not in DEPARTMENTS_STORE:
             DEPARTMENTS_STORE[workbench_id] = []
-        DEPARTMENTS_STORE[workbench_id].append(saved_dept)
+        DEPARTMENTS_STORE[workbench_id].append(new_entry)
+        if not saved_dept:
+            saved_dept = new_entry
 
     return saved_dept
 

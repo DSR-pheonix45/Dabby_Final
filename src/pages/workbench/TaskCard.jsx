@@ -79,11 +79,19 @@ export default function TaskCard({ task, onStatusChange }) {
                 </div>
               )}
               
-              {/* Status Badge */}
-              <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${sConfig.class}`}>
-                {sConfig.label}
-              </span>
-              
+              {/* Interactive Status Selector Dropdown */}
+              <select
+                value={task.status || 'open'}
+                onChange={(e) => onStatusChange(task.id, e.target.value)}
+                className={`px-2 py-0.5 text-[10px] font-bold rounded-full border border-white/10 bg-[#141414] focus:outline-none cursor-pointer ${sConfig.class}`}
+              >
+                <option value="open">Pending / Open</option>
+                <option value="in_progress">Ongoing (In Progress)</option>
+                <option value="completed">Completed</option>
+                <option value="blocked">Blocked</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+
               {/* Source Tag (if AI/Workflow) */}
               {task.source && task.source !== 'manual' && (
                 <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-purple-500/10 text-purple-400 capitalize">
