@@ -78,11 +78,7 @@ export default function Members() {
     }
   }, [activeWorkbench]);
 
-  useEffect(() => {
-    if (members.length > 0 && !selectedMember) {
-      setSelectedMember(members[0]);
-    }
-  }, [members, selectedMember]);
+
 
   const fetchDeptsAndEmployees = async () => {
     if (!activeWorkbench) return;
