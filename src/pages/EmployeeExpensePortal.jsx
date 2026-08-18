@@ -23,7 +23,7 @@ export default function EmployeeExpensePortal() {
   // Form State
   const [employeeName, setEmployeeName] = useState('');
   const [employeeEmail, setEmployeeEmail] = useState('');
-  const [departmentName, setDepartmentName] = useState('Site Operations');
+  const [departmentName, setDepartmentName] = useState('');
   const [category, setCategory] = useState('Travel Allowance & Petrol');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -363,12 +363,7 @@ export default function EmployeeExpensePortal() {
                         <option key={d.id} value={d.name}>{d.name}</option>
                       ))
                     ) : (
-                      <>
-                        <option value="Site Operations">Site Operations</option>
-                        <option value="Sales & Business Development">Sales & Business Development</option>
-                        <option value="Engineering & IT">Engineering & IT</option>
-                        <option value="Administration & HR">Administration & HR</option>
-                      </>
+                      <option value="">No departments available</option>
                     )}
                   </select>
                 )}

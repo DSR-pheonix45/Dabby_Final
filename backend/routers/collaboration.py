@@ -533,20 +533,10 @@ DEPARTMENTS_STORE: Dict[str, List[Dict]] = {}
 EMPLOYEES_STORE: Dict[str, List[Dict]] = {}
 
 def _init_default_departments(workbench_id: str) -> List[Dict]:
-    defaults = [
-        {"id": f"dept_1_{workbench_id}", "workbench_id": workbench_id, "name": "Site Operations", "code": "SOP", "monthly_budget": 100000.0},
-        {"id": f"dept_2_{workbench_id}", "workbench_id": workbench_id, "name": "Sales & Business Development", "code": "SBD", "monthly_budget": 150000.0},
-        {"id": f"dept_3_{workbench_id}", "workbench_id": workbench_id, "name": "Engineering & IT", "code": "EIT", "monthly_budget": 80000.0},
-        {"id": f"dept_4_{workbench_id}", "workbench_id": workbench_id, "name": "Administration & HR", "code": "AHR", "monthly_budget": 50000.0}
-    ]
-    return defaults
+    return []
 
 def _init_default_employees(workbench_id: str) -> List[Dict]:
-    defaults = [
-        {"id": f"emp_1_{workbench_id}", "workbench_id": workbench_id, "name": "Rahul Sharma", "email": "rahul.s@company.com", "department_id": f"dept_1_{workbench_id}", "department_name": "Site Operations", "designation": "Site Engineer", "salary": 65000.0, "monthly_allowance": 15000.0},
-        {"id": f"emp_2_{workbench_id}", "workbench_id": workbench_id, "name": "Priya Verma", "email": "priya.v@company.com", "department_id": f"dept_2_{workbench_id}", "department_name": "Sales & Business Development", "designation": "Sales Executive", "salary": 85000.0, "monthly_allowance": 25000.0}
-    ]
-    return defaults
+    return []
 
 @router.get("/{workbench_id}/departments")
 def get_departments(workbench_id: str):
@@ -732,7 +722,7 @@ class ExpenseClaimCreate(BaseModel):
     claim_number: str
     employee_name: str
     employee_email: Optional[str] = None
-    department_name: Optional[str] = "Site Operations"
+    department_name: Optional[str] = "General"
     category: str
     amount: float
     date: str

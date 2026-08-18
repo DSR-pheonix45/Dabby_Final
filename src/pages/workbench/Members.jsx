@@ -57,7 +57,7 @@ export default function Members() {
   const [isAddEmpOpen, setIsAddEmpOpen] = useState(false);
   const [newEmpName, setNewEmpName] = useState("");
   const [newEmpEmail, setNewEmpEmail] = useState("");
-  const [newEmpDept, setNewEmpDept] = useState("Site Operations");
+  const [newEmpDept, setNewEmpDept] = useState("");
   const [newEmpDesignation, setNewEmpDesignation] = useState("Staff");
   const [newEmpSalary, setNewEmpSalary] = useState("");
   const [newEmpAllowance, setNewEmpAllowance] = useState("");
@@ -702,12 +702,7 @@ export default function Members() {
                       <option key={d.id} value={d.name}>{d.name}</option>
                     ))
                   ) : (
-                    <>
-                      <option value="Site Operations">Site Operations</option>
-                      <option value="Sales & Business Development">Sales & Business Development</option>
-                      <option value="Engineering & IT">Engineering & IT</option>
-                      <option value="Administration & HR">Administration & HR</option>
-                    </>
+                    <option value="">No departments created yet</option>
                   )}
                 </select>
               </div>

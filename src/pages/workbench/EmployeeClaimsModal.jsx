@@ -136,7 +136,7 @@ export default function EmployeeClaimsModal({ employee, workbenchId, isOpen, onC
       const claimPayload = {
         employee_id: employee.id,
         employee_name: employee.name,
-        department_name: employee.department_name || "Site Operations",
+        department_name: employee.department_name || "General",
         category: newClaimCategory,
         description: newClaimTitle || "Out-of-pocket Business Expense",
         amount: Number(newClaimAmount),
@@ -395,7 +395,7 @@ export default function EmployeeClaimsModal({ employee, workbenchId, isOpen, onC
                   >
                     <option value="Travel & Conveyance">Travel & Conveyance</option>
                     <option value="Meals & Hospitality">Meals & Hospitality</option>
-                    <option value="Site Operations">Site Operations</option>
+                    <option value="Field & Operations Expense">Field & Operations Expense</option>
                     <option value="Software & Tools">Software & Tools</option>
                     <option value="Office Supplies">Office Supplies</option>
                     <option value="Other OPEX">Other OPEX</option>

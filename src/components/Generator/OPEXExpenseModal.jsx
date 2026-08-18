@@ -12,8 +12,8 @@ export default function OPEXExpenseModal({ isOpen, onClose, isPage = false }) {
   const [description, setDescription] = useState("Petrol reimbursement for site visit");
   const [amount, setAmount] = useState(550);
   const [paymentSource, setPaymentSource] = useState("petty_cash");
-  const [departmentName, setDepartmentName] = useState("Site Operations");
-  const [employeeName, setEmployeeName] = useState("Rahul Sharma");
+  const [departmentName, setDepartmentName] = useState("");
+  const [employeeName, setEmployeeName] = useState("");
   const [requiresParty, setRequiresParty] = useState(false);
   const [partyName, setPartyName] = useState("");
 
@@ -129,12 +129,7 @@ export default function OPEXExpenseModal({ isOpen, onClose, isPage = false }) {
                 {departments.length > 0 ? (
                   departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)
                 ) : (
-                  <>
-                    <option value="Site Operations">Site Operations</option>
-                    <option value="Sales & Business Development">Sales & BD</option>
-                    <option value="Engineering & IT">Engineering & IT</option>
-                    <option value="Administration & HR">Administration & HR</option>
-                  </>
+                  <option value="">No departments available</option>
                 )}
               </select>
             </div>
@@ -151,11 +146,7 @@ export default function OPEXExpenseModal({ isOpen, onClose, isPage = false }) {
                 {employees.length > 0 ? (
                   employees.map(e => <option key={e.id} value={e.name}>{e.name}</option>)
                 ) : (
-                  <>
-                    <option value="Rahul Sharma">Rahul Sharma</option>
-                    <option value="Priya Verma">Priya Verma</option>
-                    <option value="General Staff">General Staff</option>
-                  </>
+                  <option value="">No employees available</option>
                 )}
               </select>
             </div>
