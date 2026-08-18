@@ -908,33 +908,27 @@ def create_expense_claim(workbench_id: str, claim: ExpenseClaimCreate):
 
     return claim_row
 
-def _get_or_create_account(workbench_id: str, account_name: str, category_code: str = "EXP", normal_balance: str = "debit") -> str:
-    """Helper to resolve or auto-provision an account in di_accounts (COA)."""
+def _resolve_validated_account(workbench_id: str, account_name: str, category_code: str = "EXP", normal_balance: str = "debit") -> str:
+    """Helper to resolve and validate an existing account/ledger in di_accounts (COA).
+    POSTING VALIDATION INVARIANT:
+    No account auto-creation or fallback during voucher posting!
+    Posting requires a pre-existing valid postable account in di_accounts matching account_name.
+    """
     clean_wb_id = workbench_id if (len(workbench_id) == 36 and "-" in workbench_id) else None
     if clean_wb_id:
         try:
-            res = supabase.table("di_accounts").select("id").eq("workbench_id", clean_wb_id).ilike("name", account_name).execute()
+            res = supabase.table("di_accounts")\
+                .select("id, name, parent_account_id, is_postable")\
+                .eq("workbench_id", clean_wb_id)\
+                .ilike("name", account_name)\
+                .execute()
             if res.data and len(res.data) > 0:
-                return res.data[0]["id"]
-        except Exception:
-            pass
-
-    account_id = str(uuid.uuid4())
-    if clean_wb_id:
-        try:
-            res = supabase.table("di_accounts").insert({
-                "id": account_id,
-                "workbench_id": clean_wb_id,
-                "code": f"{category_code}-{int(datetime.now().timestamp()) % 10000}",
-                "name": account_name,
-                "category_code": category_code,
-                "normal_balance": normal_balance
-            }).execute()
-            if res.data:
+                # Valid existing account ID found
                 return res.data[0]["id"]
         except Exception as err:
-            print(f"[DEBUG] _get_or_create_account fallback: {err}")
-    return account_id
+            print(f"[DEBUG] _resolve_validated_account search error: {err}")
+
+    raise ValueError(f"[POSTING REJECTED] Referenced accounting object '{account_name}' does not exist in workbench {workbench_id}. Account creation belongs to COA Settings, not voucher posting.")
 
 def _post_double_entry_voucher(
     workbench_id: str,
@@ -946,9 +940,12 @@ def _post_double_entry_voucher(
     department_id: Optional[str] = None,
     department_name: Optional[str] = None
 ) -> Dict:
-    """Compiles and posts double-entry transaction into di_ledger_transactions & di_ledger_entries."""
-    dr_acct_id = _get_or_create_account(workbench_id, debit_account_name, "EXP", "debit")
-    cr_acct_id = _get_or_create_account(
+    """Compiles and posts double-entry transaction into di_ledger_transactions & di_ledger_entries.
+    IMMUTABILITY & VALIDATION INVARIANT:
+    Requires valid pre-existing accounts in di_accounts. Rejects missing accounts cleanly.
+    """
+    dr_acct_id = _resolve_validated_account(workbench_id, debit_account_name, "EXP", "debit")
+    cr_acct_id = _resolve_validated_account(
         workbench_id,
         credit_account_name,
         "LIA" if "Payable" in credit_account_name else "AST",
@@ -990,8 +987,9 @@ def _post_double_entry_voucher(
                 }
             ]).execute()
             return tx_res.data[0]
-    except Exception as db_err:
-        print("[WARNING] Universal Ledger double-entry posting notice:", db_err)
+    except Exception as err:
+        print(f"[ERROR] Failed to insert di_ledger_transaction: {err}")
+        raise ValueError(f"Database voucher posting failed: {err}")
 
     return {"status": "posted_in_memory", "description": description, "amount": amount}
 

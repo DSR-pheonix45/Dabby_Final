@@ -2,9 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useWorkbench } from "../../context/WorkbenchContext";
 import { diService } from "../../services/diService";
 import { accountService } from "../../services/accountService";
-import { salesService } from "../../services/salesService";
 import { toast } from "react-hot-toast";
-import { BsArrowRepeat, BsShieldCheck } from "react-icons/bs";
+import { BsArrowRepeat, BsShieldCheck, BsJournalText, BsCalendar3 } from "react-icons/bs";
 
 const KpiCard = ({ title, netValue, grossValue, color }) => {
   return (
@@ -27,7 +26,7 @@ const KpiCard = ({ title, netValue, grossValue, color }) => {
           <h3 className="text-2xl font-bold text-white mt-1">
             ₹{Number(grossValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h3>
-          <p className="text-xs text-gray-500 mt-2">Total cumulative value</p>
+          <p className="text-xs text-gray-500 mt-2">Total cumulative movement</p>
         </div>
       </div>
     </div>
@@ -36,42 +35,27 @@ const KpiCard = ({ title, netValue, grossValue, color }) => {
 
 export default function COA() {
   const { activeWorkbench } = useWorkbench();
-  const [documents, setDocuments] = useState([]);
-  const [transfers, setTransfers] = useState([]);
-  const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [masterRows, setMasterRows] = useState([]);
+  const [trialBalance, setTrialBalance] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+  const [masterAccounts, setMasterAccounts] = useState([]);
+  const [periodFilter, setPeriodFilter] = useState("all"); // all | month | quarter | year
 
   const loadData = async () => {
     if (!activeWorkbench?.id) return;
     setLoading(true);
     try {
-      const [accountsData, docs, trfs] = await Promise.all([
-        accountService.getAccounts(activeWorkbench.id).catch(() => []),
-        diService.getDocuments(activeWorkbench.id).catch(() => []),
-        diService.getTransfers(activeWorkbench.id).catch(() => [])
+      const [tb, txs, accts] = await Promise.all([
+        diService.getTrialBalance(activeWorkbench.id).catch(() => null),
+        diService.getLedgerTransactions(activeWorkbench.id).catch(() => []),
+        accountService.getAccounts(activeWorkbench.id).catch(() => [])
       ]);
-      
-      const salesData = salesService.getSales(activeWorkbench.id) || [];
 
-      const rows = accountsData || [];
-      setMasterRows(
-        rows.map(acc => ({
-          id: acc.id,
-          accountClass: acc.account_class,
-          groupCode: acc.group_code,
-          ledger: acc.ledger,
-          label: acc.label || '',
-          fullCode: acc.full_code,
-          currentBalance: acc.current_balance || 0,
-        }))
-      );
-      
-      setDocuments(docs || []);
-      setTransfers(trfs || []);
-      setSales(salesData);
+      setTrialBalance(tb);
+      setTransactions(Array.isArray(txs) ? txs : []);
+      setMasterAccounts(Array.isArray(accts) ? accts : []);
     } catch (err) {
-      toast.error("Failed to load COA data");
+      toast.error("Failed to load live COA state");
     } finally {
       setLoading(false);
     }
@@ -83,11 +67,9 @@ export default function COA() {
     }
   }, [activeWorkbench]);
 
-  // Listen to ledger:updated and window focus events for instant real-time sync
+  // Real-time listener on ledger updates
   useEffect(() => {
-    const handleUpdate = () => {
-      loadData();
-    };
+    const handleUpdate = () => loadData();
     window.addEventListener('ledger:updated', handleUpdate);
     window.addEventListener('ar:updated', handleUpdate);
     window.addEventListener('focus', handleUpdate);
@@ -98,97 +80,18 @@ export default function COA() {
     };
   }, [activeWorkbench]);
 
-  // Build complete list of Day Book Journal Entries across Transfers, Sales & Doc Vault
-  const proposedJournals = [];
+  // Derived Financial Statement totals from canonical backend trial balance
+  const groups = trialBalance?.groups || [];
+  const getCatTotal = (catCode) => {
+    const grp = groups.find(g => g.category === catCode);
+    return Number(grp?.total || 0);
+  };
 
-  // A. Transfers (Bank-to-bank, Petty Cash, Founder Equity, Pushed Sales)
-  (transfers || []).forEach(t => {
-    proposedJournals.push({
-      documentName: `Voucher: ${t.reference_number || 'TRF-POST'}`,
-      date: t.transfer_date,
-      narration: t.narration,
-      entries: [
-        { account: t.to_account, type: 'debit', amount: Number(t.amount || 0) },
-        { account: t.from_account, type: 'credit', amount: Number(t.amount || 0) }
-      ]
-    });
-  });
-
-  // B. Sales Invoices (Pushed / User recorded sales)
-  (sales || []).forEach(s => {
-    const amt = Number(s.grand_total || s.amount || 0);
-    if (amt > 0) {
-      const custName = s.customer?.name || s.customer_name || 'Customer';
-      proposedJournals.push({
-        documentName: `Sales Invoice #${s.id}`,
-        date: s.date || new Date().toISOString().split('T')[0],
-        narration: `Sales Invoice #${s.id} issued to ${custName} [Posted to COA AR & Revenue]`,
-        entries: [
-          { account: 'Trade Debtors (Accounts Receivable)', type: 'debit', amount: amt },
-          { account: 'Sales Revenue', type: 'credit', amount: amt }
-        ]
-      });
-      if (Number(s.amount_paid || 0) > 0) {
-        proposedJournals.push({
-          documentName: `Receipt Voucher #${s.id}`,
-          date: s.date || new Date().toISOString().split('T')[0],
-          narration: `Customer Payment received against Sale #${s.id}`,
-          entries: [
-            { account: 'Operating Bank Account', type: 'debit', amount: Number(s.amount_paid) },
-            { account: 'Trade Debtors (Accounts Receivable)', type: 'credit', amount: Number(s.amount_paid) }
-          ]
-        });
-      }
-    }
-  });
-
-  // C. Doc Vault Scanned Documents
-  (documents || []).forEach(doc => {
-    if (doc.di_analysis_notes && doc.di_analysis_notes.length > 0) {
-      const note = doc.di_analysis_notes[0];
-      if (note.extracted_data?.proposed_journal_entries) {
-        proposedJournals.push({
-          documentName: doc.original_filename,
-          date: note.extracted_data.date,
-          entries: note.extracted_data.proposed_journal_entries
-        });
-      }
-    }
-  });
-
-  // Calculate live dynamic Net & Gross totals for the 5 KPI cards
-  let totalAsset = 0;
-  let totalLiability = 0;
-  let totalEquity = 0;
-  let totalRevenue = 0;
-  let totalExpense = 0;
-
-  proposedJournals.forEach(j => {
-    (j.entries || []).forEach(e => {
-      const accName = (e.account || '').toLowerCase();
-      const amt = Number(e.amount || 0);
-
-      const isAssetAcc = accName.includes('receivable') || accName.includes('debtor') || accName.includes('bank') || accName.includes('cash') || accName.includes('petty') || accName.includes('asset');
-      const isLiabilityAcc = accName.includes('payable') || accName.includes('vendor') || accName.includes('liability') || accName.includes('tax');
-      const isEquityAcc = accName.includes('equity') || accName.includes('capital') || accName.includes('retained');
-      const isRevenueAcc = accName.includes('revenue') || accName.includes('sale') || accName.includes('income');
-      const isExpenseAcc = accName.includes('expense') || accName.includes('cogs') || accName.includes('cost');
-
-      if (e.type === 'debit') {
-        if (isAssetAcc) totalAsset += amt;
-        else if (isExpenseAcc) totalExpense += amt;
-        else if (isLiabilityAcc) totalLiability -= amt;
-        else if (isEquityAcc) totalEquity -= amt;
-        else if (isRevenueAcc) totalRevenue -= amt;
-      } else if (e.type === 'credit') {
-        if (isAssetAcc) totalAsset -= amt; // Deducts settled receivables/bank payouts!
-        else if (isRevenueAcc) totalRevenue += amt;
-        else if (isLiabilityAcc) totalLiability += amt;
-        else if (isEquityAcc) totalEquity += amt;
-        else if (isExpenseAcc) totalExpense -= amt;
-      }
-    });
-  });
+  const totalAsset = getCatTotal("AST");
+  const totalLiability = getCatTotal("LIA");
+  const totalEquity = getCatTotal("EQU");
+  const totalRevenue = getCatTotal("REV");
+  const totalExpense = getCatTotal("EXP");
 
   const kpis = [
     { type: 'Asset', net: Math.max(0, totalAsset), gross: Math.max(0, totalAsset), color: { textTitle: 'text-emerald-400' } },
@@ -198,76 +101,51 @@ export default function COA() {
     { type: 'Expense', net: Math.max(0, totalExpense), gross: Math.max(0, totalExpense), color: { textTitle: 'text-orange-400' } },
   ];
 
-  // Update master accounts current balances based on double-entry journal postings
-  const computedMasterRows = masterRows.map(acc => {
-    const labelLower = (acc.label || acc.ledger || '').toLowerCase();
-    const ledgerLower = (acc.ledger || '').toLowerCase();
-    const isAssetClass = acc.accountClass === 'Assets' || acc.accountClass === 'AST' || ['AAR', 'ACO', 'AIN', 'ATX', 'AFA'].includes(acc.groupCode);
-    let balance = Number(acc.currentBalance || 0);
-
-    proposedJournals.forEach(j => {
-      (j.entries || []).forEach(e => {
-        const eAccLower = (e.account || '').toLowerCase();
-        
-        let isMatch = false;
-
-        // Specific Account Matches
-        if (ledgerLower.includes('petty') || labelLower.includes('petty')) {
-          isMatch = eAccLower.includes('petty');
-        } else if (ledgerLower.includes('bank') || labelLower.includes('bank')) {
-          isMatch = (eAccLower.includes('bank') || eAccLower.includes('operating bank')) && !eAccLower.includes('petty');
-        } else if (acc.groupCode === 'AAR' || ledgerLower.includes('debtor') || ledgerLower.includes('receivable')) {
-          isMatch = eAccLower.includes('debtor') || eAccLower.includes('receivable') || eAccLower.includes('ar');
-        } else if (acc.groupCode === 'REV' || ledgerLower.includes('revenue') || ledgerLower.includes('sale')) {
-          isMatch = eAccLower.includes('revenue') || eAccLower.includes('sale');
-        } else {
-          isMatch = (labelLower && eAccLower.includes(labelLower)) || (ledgerLower && eAccLower.includes(ledgerLower));
-        }
-
-        if (isMatch) {
-          if (isAssetClass) {
-            // Assets: Debit increases (+), Credit decreases (-)
-            if (e.type === 'debit') balance += Number(e.amount || 0);
-            else balance -= Number(e.amount || 0);
-          } else {
-            // Liabilities/Equity/Revenue: Credit increases (+), Debit decreases (-)
-            if (e.type === 'credit') balance += Number(e.amount || 0);
-            else balance -= Number(e.amount || 0);
-          }
-        }
-      });
-    });
-
-    return {
-      ...acc,
-      computedBalance: Math.max(0, balance)
-    };
-  });
-
   return (
-    <div className="flex-1 h-full bg-[#111111] overflow-y-auto">
+    <div className="flex-1 h-full bg-[#111111] overflow-y-auto font-dm-sans">
       <div className="p-8 w-full space-y-8">
         
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between border-b border-white/10 pb-6">
           <div>
-            <h1 className="text-2xl font-semibold text-white">Chart of Accounts</h1>
-            <p className="text-sm text-gray-400 mt-1">Manage your financial DNA and view live double-entry Day Book transactions.</p>
+            <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+              <span>Workbench Chart of Accounts</span>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                Live Derived State
+              </span>
+            </h1>
+            <p className="text-sm text-gray-400 mt-1">
+              Real-time ALERX balances derived directly from posted double-entry ledger entries
+            </p>
           </div>
-          <button
-            onClick={loadData}
-            title="Refresh COA Data"
-            className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-gray-400 hover:text-white transition-all shadow-sm flex items-center justify-center"
-          >
-            <BsArrowRepeat className="text-base" />
-          </button>
+
+          <div className="flex items-center gap-3">
+            <select
+              value={periodFilter}
+              onChange={(e) => setPeriodFilter(e.target.value)}
+              className="bg-[#181818] border border-white/10 text-gray-300 text-xs font-semibold rounded-xl px-3 py-2 outline-none cursor-pointer"
+            >
+              <option value="all">Lifetime / Cumulative</option>
+              <option value="month">Current Month</option>
+              <option value="quarter">Current Quarter</option>
+              <option value="year">Financial Year</option>
+            </select>
+
+            <button
+              onClick={loadData}
+              className="p-2 bg-[#181818] hover:bg-[#222] border border-white/10 rounded-xl text-gray-400 hover:text-white transition-all"
+              title="Refresh Live Financials"
+            >
+              <BsArrowRepeat className={loading ? "animate-spin" : ""} />
+            </button>
+          </div>
         </div>
 
-        {/* 5 KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          {kpis.map((kpi) => (
-            <KpiCard 
-              key={kpi.type}
+        {/* 5 ALERX KPI Flip Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {kpis.map((kpi, idx) => (
+            <KpiCard
+              key={idx}
               title={kpi.type}
               netValue={kpi.net}
               grossValue={kpi.gross}
@@ -276,112 +154,107 @@ export default function COA() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
+        {/* Live Master Accounts & Day Book Split View */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* Left Side: Ledger and Labels */}
-          <div className="bg-[#181818] rounded-xl border border-white/10 p-6 flex flex-col h-[600px]">
-            <h2 className="text-lg font-medium text-white mb-4">Ledger & Labels</h2>
-            <div className="flex-1 overflow-y-auto border border-white/5 rounded-lg bg-[#111111] p-4 custom-scrollbar">
-              {loading ? (
-                <div className="animate-pulse flex space-x-4">
-                  <div className="flex-1 space-y-4 py-1">
-                    <div className="h-4 bg-white/10 rounded w-3/4"></div>
-                    <div className="h-4 bg-white/10 rounded w-1/2"></div>
-                  </div>
-                </div>
-              ) : computedMasterRows.length === 0 ? (
-                <div className="text-center text-gray-500 py-12">
-                  <p>No master accounts configured yet.</p>
-                  <p className="text-xs mt-2">Go to Settings &gt; Company Master to set up your Chart of Accounts.</p>
-                </div>
-              ) : (
-                <ul className="space-y-2">
-                  {computedMasterRows.map(row => (
-                    <li key={row.id} className="p-3 bg-[#181818] border border-white/5 rounded-md shadow-sm transition-colors hover:border-white/10">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium text-white">
-                          <span className="text-teal-400/70 mr-2 font-mono">{row.fullCode}</span>
-                          {row.ledger}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs font-mono font-bold ${(row.accountClass === 'Expenses' || row.accountClass === 'Liabilities' || row.groupCode?.startsWith('X') || row.groupCode?.startsWith('L')) ? 'text-rose-400' : 'text-emerald-400'}`}>
-                            ₹{(row.computedBalance || row.currentBalance || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">Label: <span className="capitalize">{row.label || "—"}</span> | Group: {row.groupCode}</div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-
-          {/* Right Side: Auto-generated Day Book & Journal Entries */}
-          <div className="bg-[#181818] rounded-xl border border-white/10 p-6 flex flex-col h-[600px]">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-medium text-white">Day Book & Journal Entries</h2>
-              <span className="text-xs text-teal-400 bg-teal-500/10 px-2.5 py-1 rounded-full border border-teal-500/20 font-bold flex items-center gap-1">
-                <BsShieldCheck /> Live Postings ({proposedJournals.length})
+          {/* Left Column: ALERX Chart Hierarchy */}
+          <div className="lg:col-span-7 bg-[#181818] border border-white/10 rounded-2xl p-6 space-y-6">
+            <div className="flex items-center justify-between border-b border-white/5 pb-4">
+              <h2 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <BsShieldCheck className="text-teal-400" />
+                <span>Canonical Account Balances</span>
+              </h2>
+              <span className="text-xs text-gray-400 font-mono">
+                {masterAccounts.length} Master Ledgers Configured
               </span>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-              {loading ? (
-                <div className="animate-pulse space-y-4">
-                  <div className="h-24 bg-white/5 rounded-xl"></div>
-                  <div className="h-24 bg-white/5 rounded-xl"></div>
-                </div>
-              ) : proposedJournals.length === 0 ? (
-                <div className="text-center text-gray-500 py-12 bg-[#111111] rounded-xl border border-dashed border-white/10">
-                  <p>No journal entries recorded yet.</p>
-                  <p className="text-xs mt-1">Click "Push to COA Ledger" on sales invoices or record transfers to populate this ledger.</p>
+            <div className="divide-y divide-white/5 overflow-hidden">
+              {masterAccounts.length === 0 ? (
+                <div className="py-12 text-center text-gray-500 text-sm">
+                  No COA ledgers configured. Configure your structure under Settings → COA Configuration.
                 </div>
               ) : (
-                proposedJournals.map((journal, i) => (
-                  <div key={i} className="border border-white/10 rounded-xl overflow-hidden shadow-sm">
-                    <div className="bg-[#111111] px-4 py-3 border-b border-white/10 flex justify-between items-center">
-                      <div>
-                        <span className="text-sm font-bold text-white truncate block max-w-[280px]" title={journal.documentName}>
-                          {journal.documentName}
+                masterAccounts.map((acc) => (
+                  <div key={acc.id} className="py-3 flex items-center justify-between hover:bg-white/[0.02] px-2 rounded-lg transition-colors">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-gray-500">{acc.full_code}</span>
+                        <span className="text-sm font-semibold text-white">{acc.ledger}</span>
+                        <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-white/5 text-gray-400 border border-white/10">
+                          {acc.account_class}
                         </span>
-                        {journal.narration && <span className="text-[10px] text-gray-400 italic block mt-0.5">{journal.narration}</span>}
                       </div>
-                      <span className="text-xs text-gray-500 font-mono">{journal.date}</span>
+                      <p className="text-xs text-gray-500 mt-0.5">{acc.label || acc.ledger}</p>
                     </div>
-                    <div className="p-4 bg-[#181818]">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-left text-gray-500 border-b border-white/5 text-xs">
-                            <th className="pb-2 font-medium">Account</th>
-                            <th className="pb-2 font-medium text-right">Debit (₹)</th>
-                            <th className="pb-2 font-medium text-right">Credit (₹)</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {journal.entries.map((entry, j) => (
-                            <tr key={j} className="border-b border-white/5 last:border-0">
-                              <td className={`py-2 text-xs ${entry.type === 'credit' ? 'pl-4 text-gray-400' : 'font-bold text-teal-300'}`}>
-                                {entry.type === 'credit' ? `Cr ${entry.account}` : `Dr ${entry.account}`}
-                              </td>
-                              <td className="py-2 text-right text-xs text-emerald-400 font-bold font-mono">
-                                {entry.type === 'debit' ? `₹${Number(entry.amount).toLocaleString(undefined, {minimumFractionDigits: 2})}` : '-'}
-                              </td>
-                              <td className="py-2 text-right text-xs text-purple-300 font-bold font-mono">
-                                {entry.type === 'credit' ? `₹${Number(entry.amount).toLocaleString(undefined, {minimumFractionDigits: 2})}` : '-'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+
+                    <div className="text-right">
+                      <p className="text-sm font-extrabold text-white">
+                        ₹{Number(acc.current_balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                      <span className="text-[10px] text-teal-400 font-semibold">Derived</span>
                     </div>
                   </div>
                 ))
               )}
             </div>
           </div>
-          
+
+          {/* Right Column: Day Book Posted Vouchers */}
+          <div className="lg:col-span-5 bg-[#181818] border border-white/10 rounded-2xl p-6 space-y-6">
+            <div className="flex items-center justify-between border-b border-white/5 pb-4">
+              <h2 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <BsJournalText className="text-teal-400" />
+                <span>Day Book (Posted Activity)</span>
+              </h2>
+              <span className="text-xs text-gray-400 font-mono">
+                {transactions.length} Posted Vouchers
+              </span>
+            </div>
+
+            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1 custom-scrollbar">
+              {transactions.length === 0 ? (
+                <div className="py-12 text-center text-gray-500 text-sm">
+                  No posted accounting entries recorded yet.
+                </div>
+              ) : (
+                transactions.map((tx) => (
+                  <div key={tx.id} className="bg-[#111111] border border-white/5 rounded-xl p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-teal-400 uppercase tracking-wider">
+                        {tx.business_events?.event_type || 'VOUCHER POSTED'}
+                      </span>
+                      <span className="text-xs text-gray-400 font-mono">{tx.transaction_date}</span>
+                    </div>
+
+                    <p className="text-sm font-semibold text-white">{tx.description}</p>
+
+                    <div className="pt-2 border-t border-white/5 space-y-1">
+                      {(tx.entries || []).map((e, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-xs">
+                          <span className="text-gray-400">
+                            <span className="font-mono text-gray-500 mr-2">{e.code || 'LEG'}</span>
+                            {e.account}
+                          </span>
+                          <span className={e.direction === 'debit' ? 'text-blue-400 font-bold' : 'text-amber-400 font-bold'}>
+                            {e.direction === 'debit' ? 'Dr' : 'Cr'} ₹{Number(e.amount || 0).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 text-[10px] text-gray-500">
+                      <span>Dept: {tx.department_name || 'General'}</span>
+                      <span className="text-emerald-400 font-semibold">Audited Immutable</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
         </div>
+
       </div>
     </div>
   );

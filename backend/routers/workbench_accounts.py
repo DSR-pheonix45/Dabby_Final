@@ -4,8 +4,18 @@ from pydantic import BaseModel
 from supabase_client import supabase
 from auth import get_current_user
 from services.ai_service import ai_service
+import uuid
 
 router = APIRouter()
+
+CLASS_TO_CATEGORY = {
+    "Assets": "AST", "Liabilities": "LIA", "Equity": "EQU", "Revenue": "REV", "Expenses": "EXP",
+    "Asset": "AST", "Liability": "LIA", "Income": "REV", "Expense": "EXP"
+}
+
+CATEGORY_TO_CLASS = {
+    "AST": "Assets", "LIA": "Liabilities", "EQU": "Equity", "REV": "Revenue", "EXP": "Expenses"
+}
 
 class AccountCreate(BaseModel):
     workbench_id: str
@@ -38,59 +48,87 @@ class AccountSyncPayload(BaseModel):
     accounts: List[AccountSyncItem]
     deleted_ids: Optional[List[str]] = []
 
-@router.post("")
-async def create_account(account: AccountCreate, user = Depends(get_current_user)):
+@router.get("/{workbench_id}")
+async def get_accounts(workbench_id: str, user = Depends(get_current_user)):
+    """
+    Reads canonical accounts from di_accounts and formats for Settings UI.
+    """
     try:
-        res = supabase.table("workbench_accounts").insert(account.dict()).execute()
-        if not res.data:
-            raise HTTPException(status_code=400, detail="Failed to create account")
-        return res.data[0]
+        res = supabase.table("di_accounts").select("*").eq("workbench_id", workbench_id).order("sort_order").execute()
+        accounts = res.data or []
+        
+        lbl_res = supabase.table("di_workbench_labels").select("*").eq("workbench_id", workbench_id).execute()
+        labels_by_ledger = {}
+        for l in (lbl_res.data or []):
+            lid = l.get("ledger_account_id")
+            if lid not in labels_by_ledger:
+                labels_by_ledger[lid] = []
+            labels_by_ledger[lid].append(l.get("name"))
+
+        rows = []
+        for a in accounts:
+            if not a.get("is_postable"):
+                continue
+            cat_code = a.get("category_code") or "EXP"
+            acc_class = CATEGORY_TO_CLASS.get(cat_code, "Expenses")
+            grp_code = a.get("metadata", {}).get("group_code") if isinstance(a.get("metadata"), dict) else "XAD"
+            lbl_text = a.get("metadata", {}).get("label_name") if isinstance(a.get("metadata"), dict) else a.get("name")
+            
+            rows.append({
+                "id": a["id"],
+                "workbench_id": a["workbench_id"],
+                "account_class": acc_class,
+                "group_code": grp_code,
+                "full_code": a.get("code"),
+                "ledger": a.get("name"),
+                "label": lbl_text,
+                "current_balance": 0.0
+            })
+        return rows
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/sync")
 async def sync_accounts(payload: AccountSyncPayload, user = Depends(get_current_user)):
+    """
+    Syncs Settings COA changes directly into canonical di_accounts.
+    """
     try:
-        # 1. Process deletions first to free up full_code constraints
         if payload.deleted_ids:
-            # Filter out non-UUID temporary IDs (e.g., 'row-123', 'imported-456')
             valid_uuids = [d_id for d_id in payload.deleted_ids if len(d_id) == 36 and "-" in d_id]
             if valid_uuids:
-                supabase.table("workbench_accounts").delete().in_("id", valid_uuids).execute()
+                supabase.table("di_accounts").delete().in_("id", valid_uuids).execute()
         
-        # 2. If no accounts left in payload, we are done
-        if not payload.accounts:
-            return {"status": "success", "accounts": []}
-
-        # 3. Process inserts and updates
-        saved_accounts = []
+        saved_rows = []
         for acc in payload.accounts:
+            cat_code = CLASS_TO_CATEGORY.get(acc.account_class, "EXP")
+            norm_bal = "credit" if cat_code in ["LIA", "EQU", "REV"] else "debit"
+            
             acc_data = {
                 "workbench_id": payload.workbench_id,
-                "account_class": acc.account_class,
-                "group_code": acc.group_code,
-                "full_code": acc.full_code,
-                "ledger": acc.ledger,
-                "label": acc.label or ""
+                "code": acc.full_code,
+                "name": acc.ledger.strip(),
+                "category_code": cat_code,
+                "normal_balance": norm_bal,
+                "is_postable": True,
+                "is_system": False,
+                "sort_order": 30,
+                "metadata": {
+                    "group_code": acc.group_code,
+                    "label_name": acc.label or acc.ledger
+                }
             }
+            
             if acc.is_new or not acc.id or not (len(acc.id) == 36 and "-" in acc.id):
-                res = supabase.table("workbench_accounts").insert(acc_data).execute()
+                res = supabase.table("di_accounts").insert(acc_data).execute()
                 if res.data:
-                    saved_accounts.append(res.data[0])
+                    saved_rows.append(res.data[0])
             else:
-                res = supabase.table("workbench_accounts").update(acc_data).eq("id", acc.id).execute()
+                res = supabase.table("di_accounts").update(acc_data).eq("id", acc.id).execute()
                 if res.data:
-                    saved_accounts.append(res.data[0])
+                    saved_rows.append(res.data[0])
 
-        return {"status": "success", "accounts": saved_accounts}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.delete("/workbench/{workbench_id}")
-async def clear_all_accounts(workbench_id: str, user = Depends(get_current_user)):
-    try:
-        res = supabase.table("workbench_accounts").delete().eq("workbench_id", workbench_id).execute()
-        return {"status": "success", "deleted_count": len(res.data) if res.data else 0}
+        return {"status": "success", "accounts": saved_rows}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -107,28 +145,10 @@ async def ai_import(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{workbench_id}")
-async def get_accounts(workbench_id: str, user = Depends(get_current_user)):
+@router.delete("/workbench/{workbench_id}")
+async def clear_all_accounts(workbench_id: str, user = Depends(get_current_user)):
     try:
-        res = supabase.table("workbench_accounts").select("*").eq("workbench_id", workbench_id).order("full_code").execute()
-        return res.data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.put("/{account_id}")
-async def update_account(account_id: str, payload: AccountUpdate, user = Depends(get_current_user)):
-    try:
-        res = supabase.table("workbench_accounts").update(payload.dict(exclude_unset=True)).eq("id", account_id).execute()
-        if not res.data:
-            raise HTTPException(status_code=404, detail="Account not found")
-        return res.data[0]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.delete("/{account_id}")
-async def delete_account(account_id: str, user = Depends(get_current_user)):
-    try:
-        res = supabase.table("workbench_accounts").delete().eq("id", account_id).execute()
-        return {"status": "success"}
+        res = supabase.table("di_accounts").delete().eq("workbench_id", workbench_id).eq("is_system", False).execute()
+        return {"status": "success", "deleted_count": len(res.data) if res.data else 0}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
