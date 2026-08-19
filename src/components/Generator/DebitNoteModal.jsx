@@ -121,12 +121,13 @@ export default function DebitNoteModal({ isOpen, onClose, isPage = false }) {
           </div>
         </div>
 
-        <div className="p-5 border-t border-white/10 bg-[#1a1a1a] flex justify-between">
-          <button onClick={handleExportPDF} className="px-4 py-2 border border-white/10 rounded-lg text-xs font-bold text-gray-300 hover:bg-white/5 flex items-center">
+        {/* Sticky Mobile-Friendly Footer */}
+        <div className="sticky bottom-0 z-30 p-4 sm:p-5 border-t border-white/10 bg-[#1a1a1a]/95 backdrop-blur-md shadow-2xl flex flex-col-reverse sm:flex-row justify-between gap-3 shrink-0">
+          <button onClick={handleExportPDF} className="w-full sm:w-auto px-4 py-2.5 border border-white/10 rounded-lg text-xs font-bold text-gray-300 hover:bg-white/5 flex items-center justify-center cursor-pointer">
             <BsFileEarmarkPdf className="mr-2 text-red-400" /> Export PDF Proof
           </button>
-          <button onClick={handleSendToTrade} className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-xs flex items-center">
-            <BsSend className="mr-2" /> Save to Doc Vault & Send to Business Engine
+          <button onClick={handleSendToTrade} className="w-full sm:w-auto px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-xs flex items-center justify-center cursor-pointer shadow-lg shadow-red-600/20">
+            <BsSend className="mr-2" /> Save to Doc Vault
           </button>
         </div>
       </div>

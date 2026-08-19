@@ -349,54 +349,122 @@ export default function PurchaseOrderModal({ isOpen, onClose, isPage = false }) 
             </div>
 
             <div className="space-y-3">
-              {items.map((item) => (
-                <div key={item.id} className="p-3 rounded-lg bg-[#181818] border border-white/5 grid grid-cols-12 gap-2 items-center">
-                  <div className="col-span-3">
-                    <label className="block text-[10px] text-gray-400 mb-0.5">SKU / Code</label>
-                    <input
-                      type="text"
-                      value={item.sku}
-                      onChange={(e) => updateItem(item.id, "sku", e.target.value)}
-                      placeholder="e.g. SKU-RAW-101"
-                      className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none"
-                    />
+              {items.map((item, idx) => (
+                <div key={item.id} className="p-3.5 sm:p-3 rounded-xl bg-[#181818] border border-white/10 text-xs space-y-3 md:space-y-0">
+                  
+                  {/* Desktop Grid Layout (md and up) */}
+                  <div className="hidden md:grid grid-cols-12 gap-2 items-center">
+                    <div className="col-span-3">
+                      <label className="block text-[10px] text-gray-400 mb-0.5">SKU / Code</label>
+                      <input
+                        type="text"
+                        value={item.sku}
+                        onChange={(e) => updateItem(item.id, "sku", e.target.value)}
+                        placeholder="e.g. SKU-RAW-101"
+                        className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-4">
+                      <label className="block text-[10px] text-gray-400 mb-0.5">Material Description</label>
+                      <input
+                        type="text"
+                        value={item.description}
+                        onChange={(e) => updateItem(item.id, "description", e.target.value)}
+                        placeholder="Required specification..."
+                        className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-[10px] text-gray-400 mb-0.5">Required Qty</label>
+                      <input
+                        type="number"
+                        value={item.qty}
+                        onChange={(e) => updateItem(item.id, "qty", parseInt(e.target.value) || 0)}
+                        className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-[10px] text-gray-400 mb-0.5">Target Rate (₹)</label>
+                      <input
+                        type="number"
+                        value={item.expectedRate}
+                        onChange={(e) => updateItem(item.id, "expectedRate", parseFloat(e.target.value) || 0)}
+                        className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-1 flex items-center justify-end">
+                      <button
+                        onClick={() => removeItem(item.id)}
+                        className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-500/10 cursor-pointer"
+                      >
+                        <BsTrash size={16} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="col-span-4">
-                    <label className="block text-[10px] text-gray-400 mb-0.5">Material Description</label>
-                    <input
-                      type="text"
-                      value={item.description}
-                      onChange={(e) => updateItem(item.id, "description", e.target.value)}
-                      placeholder="Required specification..."
-                      className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none"
-                    />
+
+                  {/* Mobile Touch Card Layout (< md) */}
+                  <div className="block md:hidden space-y-2.5">
+                    <div className="flex items-center justify-between text-xs font-bold text-gray-300 border-b border-white/5 pb-1.5">
+                      <span>Material Item #{idx + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.id)}
+                        className="text-rose-400 hover:text-rose-300 flex items-center gap-1 text-[11px]"
+                      >
+                        <BsTrash /> Delete
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] text-gray-400 mb-0.5">SKU / Code</label>
+                      <input
+                        type="text"
+                        value={item.sku}
+                        onChange={(e) => updateItem(item.id, "sku", e.target.value)}
+                        placeholder="SKU Code"
+                        className="w-full bg-[#222] border border-white/10 rounded px-2.5 py-1.5 text-white text-xs focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] text-gray-400 mb-0.5">Material Description</label>
+                      <input
+                        type="text"
+                        value={item.description}
+                        onChange={(e) => updateItem(item.id, "description", e.target.value)}
+                        placeholder="Required specification..."
+                        className="w-full bg-[#222] border border-white/10 rounded px-2.5 py-1.5 text-white text-xs focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-0.5">Required Qty</label>
+                        <input
+                          type="number"
+                          value={item.qty}
+                          onChange={(e) => updateItem(item.id, "qty", parseInt(e.target.value) || 0)}
+                          className="w-full bg-[#222] border border-white/10 rounded px-2 py-1.5 text-white text-xs focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-0.5">Target Rate (₹)</label>
+                        <input
+                          type="number"
+                          value={item.expectedRate}
+                          onChange={(e) => updateItem(item.id, "expectedRate", parseFloat(e.target.value) || 0)}
+                          className="w-full bg-[#222] border border-white/10 rounded px-2 py-1.5 text-white text-xs focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center bg-black/30 p-2 rounded-lg border border-white/5 font-bold text-xs">
+                      <span className="text-gray-400">Total Estimated:</span>
+                      <span className="text-teal-400">₹{(Number(item.qty || 0) * Number(item.expectedRate || 0)).toLocaleString("en-IN")}</span>
+                    </div>
+
                   </div>
-                  <div className="col-span-2">
-                    <label className="block text-[10px] text-gray-400 mb-0.5">Required Qty</label>
-                    <input
-                      type="number"
-                      value={item.qty}
-                      onChange={(e) => updateItem(item.id, "qty", parseInt(e.target.value) || 0)}
-                      className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-[10px] text-gray-400 mb-0.5">Target Rate (₹)</label>
-                    <input
-                      type="number"
-                      value={item.expectedRate}
-                      onChange={(e) => updateItem(item.id, "expectedRate", parseFloat(e.target.value) || 0)}
-                      className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none"
-                    />
-                  </div>
-                  <div className="col-span-1 flex items-center justify-end">
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-500/10"
-                    >
-                      <BsTrash size={16} />
-                    </button>
-                  </div>
+
                 </div>
               ))}
             </div>
@@ -415,25 +483,26 @@ export default function PurchaseOrderModal({ isOpen, onClose, isPage = false }) 
 
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-white/10 bg-[#181818]">
-          <div className="text-sm font-bold text-teal-400">
-            Total Requisition Estimated: ₹{totalAmount.toLocaleString('en-IN')}
+        {/* Sticky Mobile-Friendly Footer */}
+        <div className="sticky bottom-0 z-30 flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4 border-t border-white/10 bg-[#181818]/95 backdrop-blur-md shadow-2xl shrink-0">
+          <div className="text-xs sm:text-sm font-bold text-teal-400 text-center sm:text-left">
+            Total Requisition: ₹{totalAmount.toLocaleString('en-IN')}
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               onClick={handleExportPDF}
-              className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-xs font-semibold transition-colors"
+              className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
             >
               <BsFileEarmarkPdf className="text-red-400 text-base" />
               <span>Export PDF</span>
             </button>
             <button
+              disabled={isSavingDoc}
               onClick={handleSavePO}
-              className="flex items-center space-x-2 bg-teal-500 hover:bg-teal-400 text-black font-bold px-5 py-2 rounded-xl text-xs shadow-lg shadow-teal-500/20 transition-all"
+              className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-teal-500 hover:bg-teal-400 text-black font-bold px-5 py-2.5 rounded-xl text-xs shadow-lg shadow-teal-500/20 transition-all cursor-pointer disabled:opacity-50"
             >
               <BsCheckCircleFill className="text-base" />
-              <span>Issue Purchase Order</span>
+              <span>{isSavingDoc ? "Saving..." : "Issue Purchase Order"}</span>
             </button>
           </div>
         </div>

@@ -154,7 +154,7 @@ export default function DiscountCouponModal({ isOpen, onClose, isPage = false })
             <div className="flex justify-end pt-1">
               <button
                 type="submit"
-                className="flex items-center space-x-2 bg-amber-500 hover:bg-amber-400 text-black font-bold px-5 py-2 rounded-xl shadow-lg shadow-amber-500/20 transition-all"
+                className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-amber-500 hover:bg-amber-400 text-black font-bold px-5 py-2.5 rounded-xl shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
               >
                 <BsCheckCircleFill className="text-base" />
                 <span>Save Coupon Tag</span>
@@ -163,8 +163,8 @@ export default function DiscountCouponModal({ isOpen, onClose, isPage = false })
           </form>
 
           {/* Active Tags List */}
-          <div className="p-5 rounded-xl bg-white/5 border border-white/5 space-y-4">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center justify-between border-b border-white/10 pb-3">
+          <div className="p-4 sm:p-5 rounded-xl bg-white/5 border border-white/5 space-y-4">
+            <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-white/10 pb-3 gap-1">
               <span className="flex items-center gap-2">
                 <BsShieldCheck className="text-amber-400" />
                 Active Sales Pricing Tags ({tags.length})
@@ -182,14 +182,14 @@ export default function DiscountCouponModal({ isOpen, onClose, isPage = false })
                 >
                   <div className="space-y-1">
                     <div className="flex items-center space-x-2">
-                      <span className="font-bold text-amber-400 text-sm tracking-wider uppercase bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                      <span className="font-bold text-amber-400 text-xs tracking-wider uppercase bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
                         {tag.code}
                       </span>
                       <span className="text-[10px] text-gray-400">
                         Valid till {tag.validUntil}
                       </span>
                     </div>
-                    <p className="text-white font-medium">{tag.desc}</p>
+                    <p className="text-white text-xs font-medium">{tag.desc}</p>
                     <p className="text-[11px] text-gray-400">
                       Min Order: ₹{tag.minOrder.toLocaleString('en-IN')}
                     </p>
@@ -197,7 +197,7 @@ export default function DiscountCouponModal({ isOpen, onClose, isPage = false })
 
                   <button
                     onClick={() => handleCopyTag(tag)}
-                    className="p-2 rounded-lg bg-white/5 group-hover:bg-amber-500/20 text-gray-300 group-hover:text-amber-400 transition-colors shrink-0"
+                    className="p-2 rounded-lg bg-white/5 group-hover:bg-amber-500/20 text-gray-300 group-hover:text-amber-400 transition-colors shrink-0 cursor-pointer"
                     title="Copy Tag Code"
                   >
                     {copiedId === tag.id ? <BsCheck2 size={18} className="text-amber-400" /> : <BsClipboard size={18} />}
@@ -209,11 +209,11 @@ export default function DiscountCouponModal({ isOpen, onClose, isPage = false })
 
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end px-6 py-4 border-t border-white/10 bg-[#181818]">
+        {/* Sticky Mobile Footer */}
+        <div className="sticky bottom-0 z-30 flex items-center justify-end px-4 py-3 sm:px-6 sm:py-4 border-t border-white/10 bg-[#181818]/95 backdrop-blur-md shadow-2xl shrink-0">
           <button
             onClick={onClose}
-            className="px-5 py-2 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl transition-colors text-xs"
+            className="w-full sm:w-auto px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl transition-colors text-xs cursor-pointer text-center"
           >
             Close
           </button>

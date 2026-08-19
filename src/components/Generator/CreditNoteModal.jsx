@@ -443,28 +443,29 @@ export default function CreditNoteModal({ isOpen, onClose, isPage = false }) {
 
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-white/10 bg-[#181818]">
+        {/* Sticky Mobile Footer Actions */}
+        <div className="sticky bottom-0 z-30 flex flex-col-reverse sm:flex-row items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4 border-t border-white/10 bg-[#181818]/95 backdrop-blur-md shadow-2xl shrink-0">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-white/10 rounded-xl text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+            className="w-full sm:w-auto px-4 py-2.5 border border-white/10 rounded-xl text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer text-center"
           >
             Cancel
           </button>
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               onClick={handleExportPDF}
-              className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-xs font-semibold transition-colors"
+              className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
             >
               <BsFileEarmarkPdf className="text-red-400 text-sm" />
               <span>Export PDF Proof</span>
             </button>
             <button
+              disabled={isSavingDoc}
               onClick={handleSaveCreditNote}
-              className="flex items-center space-x-2 bg-red-600 hover:bg-red-500 text-white font-bold px-5 py-2 rounded-xl text-xs shadow-lg shadow-red-600/20 transition-all"
+              className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-500 text-white font-bold px-5 py-2.5 rounded-xl text-xs shadow-lg shadow-red-600/20 transition-all cursor-pointer disabled:opacity-50"
             >
               <BsCheckCircleFill className="text-sm" />
-              <span>Save & Issue Credit Note</span>
+              <span>{isSavingDoc ? "Saving..." : "Save & Issue Credit Note"}</span>
             </button>
           </div>
         </div>

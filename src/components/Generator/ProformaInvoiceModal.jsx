@@ -318,102 +318,106 @@ export default function ProformaInvoiceModal({ isOpen, onClose, isPage = false }
             )}
 
             {/* Dynamic Table Column Headers */}
-            <div className="flex items-center gap-2 px-1 text-[11px] font-bold text-gray-400 uppercase border-b border-white/10 pb-1.5 overflow-x-auto">
-              <div className="w-8 text-center flex-shrink-0">#</div>
-              {columns.map((col) => (
-                <div
-                  key={col.id}
-                  className={`flex items-center justify-between gap-1 flex-1 min-w-[90px] ${
-                    col.type === "number" || col.type === "amount" ? "text-right" : "text-left"
-                  }`}
-                >
-                  <span className="truncate flex items-center gap-1">
-                    <span>{col.label}</span>
-                    {col.id === "hsn" && (
-                      <button
-                        type="button"
-                        onClick={() => openHsnFinder(0)}
-                        className="text-teal-400 hover:text-teal-300 transition-colors p-0.5"
-                        title="Search GST HSN/SAC Code Directory"
-                      >
-                        <BsInfoCircle size={11} />
-                      </button>
-                    )}
-                  </span>
-                  {col.removable && (
-                    <button
-                      type="button"
-                      onClick={() => removeColumn(col.id)}
-                      className="text-red-400 hover:text-red-300 p-0.5 rounded hover:bg-red-500/20"
-                      title={`Remove Column: ${col.label}`}
+            <div className="overflow-x-auto custom-scrollbar">
+              <div className="min-w-[600px]">
+                <div className="flex items-center gap-2 px-1 text-[11px] font-bold text-gray-400 uppercase border-b border-white/10 pb-1.5">
+                  <div className="w-8 text-center flex-shrink-0">#</div>
+                  {columns.map((col) => (
+                    <div
+                      key={col.id}
+                      className={`flex items-center justify-between gap-1 flex-1 min-w-[90px] ${
+                        col.type === "number" || col.type === "amount" ? "text-right" : "text-left"
+                      }`}
                     >
-                      <BsTrash className="text-[10px]" />
-                    </button>
-                  )}
+                      <span className="truncate flex items-center gap-1">
+                        <span>{col.label}</span>
+                        {col.id === "hsn" && (
+                          <button
+                            type="button"
+                            onClick={() => openHsnFinder(0)}
+                            className="text-teal-400 hover:text-teal-300 transition-colors p-0.5"
+                            title="Search GST HSN/SAC Code Directory"
+                          >
+                            <BsInfoCircle size={11} />
+                          </button>
+                        )}
+                      </span>
+                      {col.removable && (
+                        <button
+                          type="button"
+                          onClick={() => removeColumn(col.id)}
+                          className="text-red-400 hover:text-red-300 p-0.5 rounded hover:bg-red-500/20"
+                          title={`Remove Column: ${col.label}`}
+                        >
+                          <BsTrash className="text-[10px]" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <div className="w-8 flex-shrink-0 text-center"></div>
                 </div>
-              ))}
-              <div className="w-8 flex-shrink-0 text-center"></div>
-            </div>
 
-            {/* Item Input Rows */}
-            <div className="space-y-2">
-              {items.map((it, idx) => (
-                <div key={idx} className="flex gap-2 items-center">
-                  <div className="w-8 text-center text-xs text-gray-400 font-bold flex-shrink-0">{idx + 1}</div>
-                  {columns.map((col) => {
-                    if (col.id === "amount") {
-                      const q = Number(it.qty) || 0;
-                      const r = Number(it.rate) || 0;
-                      return (
-                        <div key={col.id} className="flex-1 min-w-[90px] text-right text-xs text-purple-400 font-bold px-2 py-1.5">
-                          {formatCurrency(q * r, activeWorkbench?.country)}
-                        </div>
-                      );
-                    }
-                    if (col.id === "hsn") {
-                      return (
-                        <input
-                          key={col.id}
-                          type="text"
-                          value={it.hsn !== undefined ? it.hsn : ""}
-                          onChange={(e) => updateItem(idx, "hsn", e.target.value)}
-                          placeholder="HSN/SAC"
-                          className="flex-1 min-w-[90px] bg-[#1e1e1e] border border-white/10 rounded p-1.5 text-xs text-white text-left font-mono"
-                        />
-                      );
-                    }
-                    return (
-                      <input
-                        key={col.id}
-                        type={col.type === "number" ? "number" : "text"}
-                        value={it[col.id] !== undefined ? it[col.id] : ""}
-                        onChange={(e) => updateItem(idx, col.id, e.target.value)}
-                        placeholder={col.label}
-                        className={`flex-1 min-w-[90px] bg-[#1e1e1e] border border-white/10 rounded p-1.5 text-xs text-white ${
-                          col.type === "number" ? "text-center" : "text-left"
-                        }`}
-                      />
-                    );
-                  })}
-                  <button onClick={() => removeItem(idx)} className="w-8 text-red-400 hover:text-red-300 p-1 flex-shrink-0 flex justify-center">
-                    <BsX size={18} />
-                  </button>
+                {/* Item Input Rows */}
+                <div className="space-y-2 pt-2">
+                  {items.map((it, idx) => (
+                    <div key={idx} className="flex gap-2 items-center">
+                      <div className="w-8 text-center text-xs text-gray-400 font-bold flex-shrink-0">{idx + 1}</div>
+                      {columns.map((col) => {
+                        if (col.id === "amount") {
+                          const q = Number(it.qty) || 0;
+                          const r = Number(it.rate) || 0;
+                          return (
+                            <div key={col.id} className="flex-1 min-w-[90px] text-right text-xs text-purple-400 font-bold px-2 py-1.5">
+                              {formatCurrency(q * r, activeWorkbench?.country)}
+                            </div>
+                          );
+                        }
+                        if (col.id === "hsn") {
+                          return (
+                            <input
+                              key={col.id}
+                              type="text"
+                              value={it.hsn !== undefined ? it.hsn : ""}
+                              onChange={(e) => updateItem(idx, "hsn", e.target.value)}
+                              placeholder="HSN/SAC"
+                              className="flex-1 min-w-[90px] bg-[#1e1e1e] border border-white/10 rounded p-1.5 text-xs text-white text-left font-mono"
+                            />
+                          );
+                        }
+                        return (
+                          <input
+                            key={col.id}
+                            type={col.type === "number" ? "number" : "text"}
+                            value={it[col.id] !== undefined ? it[col.id] : ""}
+                            onChange={(e) => updateItem(idx, col.id, e.target.value)}
+                            placeholder={col.label}
+                            className={`flex-1 min-w-[90px] bg-[#1e1e1e] border border-white/10 rounded p-1.5 text-xs text-white ${
+                              col.type === "number" ? "text-center" : "text-left"
+                            }`}
+                          />
+                        );
+                      })}
+                      <button onClick={() => removeItem(idx)} className="w-8 text-red-400 hover:text-red-300 p-1 flex-shrink-0 flex justify-center cursor-pointer">
+                        <BsX size={18} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="bg-white/5 p-3 rounded-lg">
               <span className="text-xs text-gray-400 block mb-1">Total Estimated Cost</span>
-              <span className="text-lg font-bold text-purple-400">{formatCurrency(totalEstimate, activeWorkbench?.country)}</span>
+              <span className="text-base sm:text-lg font-bold text-purple-400">{formatCurrency(totalEstimate, activeWorkbench?.country)}</span>
             </div>
             <div className="bg-white/5 p-3 rounded-lg">
               <div className="flex justify-between items-center mb-1">
                 <span className="text-xs text-gray-400">Advance %</span>
                 <input type="number" value={advancePercent} onChange={e => setAdvancePercent(Number(e.target.value))} className="w-12 bg-black/40 border border-white/10 rounded text-center text-xs text-white" />
               </div>
-              <span className="text-lg font-bold text-amber-400">{formatCurrency(requiredAdvance, activeWorkbench?.country)}</span>
+              <span className="text-base sm:text-lg font-bold text-amber-400">{formatCurrency(requiredAdvance, activeWorkbench?.country)}</span>
             </div>
           </div>
 
@@ -442,11 +446,12 @@ export default function ProformaInvoiceModal({ isOpen, onClose, isPage = false }
           </div>
         </div>
 
-        <div className="p-5 border-t border-white/10 bg-[#1a1a1a] flex justify-between">
-          <button onClick={handleExportPDF} className="px-4 py-2 border border-white/10 rounded-lg text-xs font-bold text-gray-300 hover:bg-white/5 flex items-center">
+        {/* Sticky Mobile-Friendly Footer */}
+        <div className="sticky bottom-0 z-30 p-4 sm:p-5 border-t border-white/10 bg-[#1a1a1a]/95 backdrop-blur-md shadow-2xl flex flex-col-reverse sm:flex-row justify-between gap-3 shrink-0">
+          <button onClick={handleExportPDF} className="w-full sm:w-auto px-4 py-2.5 border border-white/10 rounded-lg text-xs font-bold text-gray-300 hover:bg-white/5 flex items-center justify-center cursor-pointer">
             <BsFileEarmarkPdf className="mr-2 text-red-400" /> Export PDF Proof
           </button>
-          <button onClick={handleSendToTrade} className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg text-xs flex items-center">
+          <button onClick={handleSendToTrade} className="w-full sm:w-auto px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg text-xs flex items-center justify-center cursor-pointer shadow-lg shadow-purple-600/20">
             <BsSend className="mr-2" /> Save to Doc Vault
           </button>
         </div>

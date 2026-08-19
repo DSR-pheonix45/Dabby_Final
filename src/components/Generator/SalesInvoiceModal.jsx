@@ -496,117 +496,221 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
               <DynamicColumnConfigurator columns={columns} setColumns={setColumns} />
             )}
 
-            {/* Line items table */}
+            {/* Line items table - Desktop Grid + Mobile Touch Cards */}
             <div className="space-y-3">
               {lineItems.map((item, idx) => (
-                <div key={item.id} className="p-3 rounded-lg bg-[#181818] border border-white/5 grid grid-cols-12 gap-2 items-center text-xs">
-                  <div className="col-span-12 md:col-span-3">
-                    <label className="block text-[10px] text-gray-400 mb-0.5">SKU / Item Code</label>
-                    <input
-                      type="text"
-                      value={item.sku || ""}
-                      onChange={(e) => updateLineItem(item.id, "sku", e.target.value)}
-                      placeholder="e.g. SKU-101 / Item Code"
-                      className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-teal-500"
-                    />
-                  </div>
-                  <div className="col-span-12 md:col-span-3">
-                    <label className="block text-[10px] text-gray-400 mb-0.5">Description</label>
-                    <input
-                      type="text"
-                      value={item.description}
-                      onChange={(e) => updateLineItem(item.id, "description", e.target.value)}
-                      placeholder="Item description"
-                      className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-teal-500"
-                    />
-                  </div>
-                  <div className="col-span-4 md:col-span-1">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <label className="block text-[10px] text-gray-400">HSN/SAC</label>
-                      <button
-                        type="button"
-                        onClick={() => openHsnFinder(item.id)}
-                        className="text-teal-400 hover:text-teal-300 transition-colors p-0.5"
-                        title="Search GST HSN/SAC Code Directory"
+                <div key={item.id} className="p-3.5 sm:p-3 rounded-xl bg-[#181818] border border-white/10 text-xs space-y-3 md:space-y-0">
+                  
+                  {/* Desktop Grid Layout (md and up) */}
+                  <div className="hidden md:grid grid-cols-12 gap-2 items-center">
+                    <div className="col-span-3">
+                      <label className="block text-[10px] text-gray-400 mb-0.5">SKU / Item Code</label>
+                      <input
+                        type="text"
+                        value={item.sku || ""}
+                        onChange={(e) => updateLineItem(item.id, "sku", e.target.value)}
+                        placeholder="e.g. SKU-101 / Item Code"
+                        className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <label className="block text-[10px] text-gray-400 mb-0.5">Description</label>
+                      <input
+                        type="text"
+                        value={item.description}
+                        onChange={(e) => updateLineItem(item.id, "description", e.target.value)}
+                        placeholder="Item description"
+                        className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+                    <div className="col-span-1">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <label className="block text-[10px] text-gray-400">HSN/SAC</label>
+                        <button
+                          type="button"
+                          onClick={() => openHsnFinder(item.id)}
+                          className="text-teal-400 hover:text-teal-300 transition-colors p-0.5"
+                          title="Search GST HSN/SAC Code Directory"
+                        >
+                          <BsInfoCircle size={11} />
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={item.hsnSac}
+                        onChange={(e) => updateLineItem(item.id, "hsnSac", e.target.value)}
+                        placeholder="8471"
+                        className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-teal-500 font-mono text-xs"
+                      />
+                    </div>
+                    <div className="col-span-1">
+                      <label className="block text-[10px] text-gray-400 mb-0.5">Qty</label>
+                      <input
+                        type="number"
+                        value={item.qty}
+                        onChange={(e) => updateLineItem(item.id, "qty", Math.max(1, parseInt(e.target.value) || 0))}
+                        className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-[10px] text-gray-400 mb-0.5">Rate (₹)</label>
+                      <input
+                        type="number"
+                        value={item.rate}
+                        onChange={(e) => updateLineItem(item.id, "rate", parseFloat(e.target.value) || 0)}
+                        className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+                    <div className="col-span-1">
+                      <label className="block text-[10px] text-gray-400 mb-0.5">Tax %</label>
+                      <select
+                        value={isGstRegistered ? item.taxRate : 0}
+                        disabled={!isGstRegistered}
+                        onChange={(e) => updateLineItem(item.id, "taxRate", Number(e.target.value))}
+                        className="w-full bg-[#222] border border-white/10 rounded px-1.5 py-1 text-white focus:outline-none disabled:opacity-50"
                       >
-                        <BsInfoCircle size={11} />
+                        <option value={0}>0%</option>
+                        <option value={5}>5%</option>
+                        <option value={12}>12%</option>
+                        <option value={18}>18%</option>
+                        <option value={28}>28%</option>
+                      </select>
+                    </div>
+                    <div className="col-span-1 flex items-center justify-between pt-3">
+                      <span className="font-bold text-teal-400 text-xs">
+                        ₹{(Number(item.qty || 0) * Number(item.rate || 0)).toLocaleString("en-IN")}
+                      </span>
+                      <button
+                        onClick={() => removeLineItem(item.id)}
+                        className="text-gray-500 hover:text-red-400 transition-colors p-1"
+                        title="Remove Item"
+                      >
+                        <BsTrash />
                       </button>
                     </div>
-                    <input
-                      type="text"
-                      value={item.hsnSac}
-                      onChange={(e) => updateLineItem(item.id, "hsnSac", e.target.value)}
-                      placeholder="e.g. 8471"
-                      className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-teal-500 font-mono text-xs"
-                    />
                   </div>
-                  <div className="col-span-4 md:col-span-1">
-                    <label className="block text-[10px] text-gray-400 mb-0.5">Qty</label>
-                    <input
-                      type="number"
-                      value={item.qty}
-                      onChange={(e) => updateLineItem(item.id, "qty", Math.max(1, parseInt(e.target.value) || 0))}
-                      className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-teal-500"
-                    />
+
+                  {/* Mobile Touch Card Layout (< md) */}
+                  <div className="block md:hidden space-y-2.5">
+                    <div className="flex items-center justify-between text-xs font-bold text-gray-300 border-b border-white/5 pb-1.5">
+                      <span>Line Item #{idx + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeLineItem(item.id)}
+                        className="text-rose-400 hover:text-rose-300 flex items-center gap-1 text-[11px]"
+                      >
+                        <BsTrash /> Delete
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-0.5">SKU / Item Code</label>
+                        <input
+                          type="text"
+                          value={item.sku || ""}
+                          onChange={(e) => updateLineItem(item.id, "sku", e.target.value)}
+                          placeholder="SKU Code"
+                          className="w-full bg-[#222] border border-white/10 rounded px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-teal-500"
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <label className="block text-[10px] text-gray-400">HSN/SAC</label>
+                          <button
+                            type="button"
+                            onClick={() => openHsnFinder(item.id)}
+                            className="text-teal-400 hover:text-teal-300 text-[10px] underline"
+                          >
+                            Find
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={item.hsnSac}
+                          onChange={(e) => updateLineItem(item.id, "hsnSac", e.target.value)}
+                          placeholder="8471"
+                          className="w-full bg-[#222] border border-white/10 rounded px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-teal-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] text-gray-400 mb-0.5">Description</label>
+                      <input
+                        type="text"
+                        value={item.description}
+                        onChange={(e) => updateLineItem(item.id, "description", e.target.value)}
+                        placeholder="Item description..."
+                        className="w-full bg-[#222] border border-white/10 rounded px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-0.5">Quantity</label>
+                        <input
+                          type="number"
+                          value={item.qty}
+                          onChange={(e) => updateLineItem(item.id, "qty", Math.max(1, parseInt(e.target.value) || 0))}
+                          className="w-full bg-[#222] border border-white/10 rounded px-2 py-1.5 text-white text-xs focus:outline-none focus:border-teal-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-0.5">Rate (₹)</label>
+                        <input
+                          type="number"
+                          value={item.rate}
+                          onChange={(e) => updateLineItem(item.id, "rate", parseFloat(e.target.value) || 0)}
+                          className="w-full bg-[#222] border border-white/10 rounded px-2 py-1.5 text-white text-xs focus:outline-none focus:border-teal-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-0.5">Tax %</label>
+                        <select
+                          value={isGstRegistered ? item.taxRate : 0}
+                          disabled={!isGstRegistered}
+                          onChange={(e) => updateLineItem(item.id, "taxRate", Number(e.target.value))}
+                          className="w-full bg-[#222] border border-white/10 rounded px-1 py-1.5 text-white text-xs focus:outline-none disabled:opacity-50"
+                        >
+                          <option value={0}>0%</option>
+                          <option value={5}>5%</option>
+                          <option value={12}>12%</option>
+                          <option value={18}>18%</option>
+                          <option value={28}>28%</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center bg-black/30 p-2 rounded-lg border border-white/5 font-bold text-xs">
+                      <span className="text-gray-400">Line Amount:</span>
+                      <span className="text-teal-400">₹{(Number(item.qty || 0) * Number(item.rate || 0)).toLocaleString("en-IN")}</span>
+                    </div>
+
                   </div>
-                  <div className="col-span-4 md:col-span-2">
-                    <label className="block text-[10px] text-gray-400 mb-0.5">Rate (₹)</label>
-                    <input
-                      type="number"
-                      value={item.rate}
-                      onChange={(e) => updateLineItem(item.id, "rate", parseFloat(e.target.value) || 0)}
-                      className="w-full bg-[#222] border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-teal-500"
-                    />
-                  </div>
-                  <div className="col-span-8 md:col-span-1">
-                    <label className="block text-[10px] text-gray-400 mb-0.5">Tax %</label>
-                    <select
-                      value={isGstRegistered ? item.taxRate : 0}
-                      disabled={!isGstRegistered}
-                      onChange={(e) => updateLineItem(item.id, "taxRate", Number(e.target.value))}
-                      className="w-full bg-[#222] border border-white/10 rounded px-1.5 py-1 text-white focus:outline-none disabled:opacity-50"
-                    >
-                      <option value={0}>0%</option>
-                      <option value={5}>5%</option>
-                      <option value={12}>12%</option>
-                      <option value={18}>18%</option>
-                      <option value={28}>28%</option>
-                    </select>
-                  </div>
-                  <div className="col-span-4 md:col-span-1 flex items-center justify-between pt-3">
-                    <span className="font-bold text-teal-400 text-xs">
-                      ₹{(Number(item.qty || 0) * Number(item.rate || 0)).toLocaleString("en-IN")}
-                    </span>
-                    <button
-                      onClick={() => removeLineItem(item.id)}
-                      className="text-gray-500 hover:text-red-400 transition-colors p-1"
-                      title="Remove Item"
-                    >
-                      <BsTrash />
-                    </button>
-                  </div>
+
                 </div>
               ))}
             </div>
           </div>
 
           {/* Step 4: GST Registration & Tax Levy Settings */}
-          <div className="p-5 rounded-xl bg-white/5 border border-white/5 space-y-4">
+          <div className="p-4 sm:p-5 rounded-xl bg-white/5 border border-white/5 space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                 <BsShieldCheck className="text-teal-400" />
                 3. GST Registration & Tax Levy Area
               </h3>
             </div>
 
             {/* Ask user: Is GST Registration done? */}
-            <div className="p-4 bg-[#181818] border border-white/10 rounded-xl space-y-3">
-              <div className="flex items-center justify-between">
+            <div className="p-3.5 sm:p-4 bg-[#181818] border border-white/10 rounded-xl space-y-3">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                   <span className="text-xs font-bold text-white block">Is your business GST Registered?</span>
                   <span className="text-[11px] text-gray-400">If registered, invoice will levy GST taxes. If unregistered, tax levy is exempt per GST rules.</span>
                 </div>
-                <div className="flex items-center space-x-2 bg-white/5 p-1 rounded-lg border border-white/10">
+                <div className="flex items-center space-x-2 bg-white/5 p-1 rounded-lg border border-white/10 shrink-0 w-full sm:w-auto justify-center">
                   <button
                     type="button"
                     onClick={() => {
@@ -629,7 +733,7 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
                       !isGstRegistered ? "bg-amber-500 text-black shadow" : "text-gray-400 hover:text-white"
                     }`}
                   >
-                    No (Unregistered / Exempt)
+                    No (Unregistered)
                   </button>
                 </div>
               </div>
@@ -642,7 +746,7 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
                   </span>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-2">
                   <div>
                     <label className="block text-gray-400 mb-1">Tax Calculation Schema</label>
                     <select
@@ -679,9 +783,9 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
           </div>
 
           {/* Step 5: Material Shipping & Delivery Details */}
-          <div className="p-5 rounded-xl bg-white/5 border border-white/5 space-y-4">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+          <div className="p-4 sm:p-5 rounded-xl bg-white/5 border border-white/5 space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-white/10 pb-3 gap-2">
+              <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                 <BsTruck className="text-teal-400" />
                 4. Material Shipping & Delivery Challan
               </h3>
@@ -697,7 +801,7 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
             </div>
 
             {includeShipping && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs p-4 bg-[#181818] border border-white/10 rounded-xl">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs p-3.5 bg-[#181818] border border-white/10 rounded-xl">
                 <div>
                   <label className="block text-gray-400 mb-1">Challan Number</label>
                   <input
@@ -741,10 +845,10 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
           </div>
 
           {/* Step 6: Payment Details, Terms & Totals Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             {/* Payment & Terms */}
-            <div className="p-5 rounded-xl bg-white/5 border border-white/5 space-y-4">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-white/10 pb-3">
+            <div className="p-4 sm:p-5 rounded-xl bg-white/5 border border-white/5 space-y-4">
+              <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-white/10 pb-3">
                 <BsReceipt className="text-teal-400" />
                 5. Payment Snippet & Terms
               </h3>
@@ -805,8 +909,8 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
             </div>
 
             {/* Summary & Totals Box */}
-            <div className="p-5 rounded-xl bg-white/5 border border-white/5 flex flex-col justify-between space-y-4">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider border-b border-white/10 pb-3">
+            <div className="p-4 sm:p-5 rounded-xl bg-white/5 border border-white/5 flex flex-col justify-between space-y-4">
+              <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider border-b border-white/10 pb-3">
                 Financial Summary Breakdown
               </h3>
 
@@ -868,7 +972,7 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
 
                 <div className="border-t border-white/10 pt-3 flex justify-between items-center">
                   <span className="text-sm font-bold text-white">Grand Total:</span>
-                  <span className="text-xl font-extrabold text-teal-400">₹{grandTotal.toLocaleString("en-IN")}</span>
+                  <span className="text-lg sm:text-xl font-extrabold text-teal-400">₹{grandTotal.toLocaleString("en-IN")}</span>
                 </div>
               </div>
 
@@ -880,18 +984,18 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
 
         </div>
 
-        {/* Footer Actions */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-white/10 bg-[#181818]">
+        {/* Sticky Mobile-Friendly Footer Actions */}
+        <div className="sticky bottom-0 z-30 flex flex-col-reverse sm:flex-row items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4 border-t border-white/10 bg-[#181818]/95 backdrop-blur-md shadow-2xl shrink-0">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-white/10 rounded-xl text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+            className="w-full sm:w-auto px-4 py-2.5 border border-white/10 rounded-xl text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer text-center"
           >
             Cancel
           </button>
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               onClick={handleExportPDF}
-              className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-xs font-semibold transition-colors"
+              className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
             >
               <BsFileEarmarkPdf className="text-red-400 text-sm" />
               <span>Export PDF Proof</span>
@@ -899,7 +1003,7 @@ export default function SalesInvoiceModal({ isOpen, onClose, isPage = false }) {
             <button
               disabled={isSavingDoc}
               onClick={handleSaveDocument}
-              className="flex items-center space-x-2 bg-teal-500 hover:bg-teal-400 text-black font-bold px-5 py-2 rounded-xl text-xs shadow-lg shadow-teal-500/20 transition-all disabled:opacity-50"
+              className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-teal-500 hover:bg-teal-400 text-black font-bold px-5 py-2.5 rounded-xl text-xs shadow-lg shadow-teal-500/20 transition-all disabled:opacity-50 cursor-pointer"
             >
               <BsSend className="text-sm" />
               <span>{isSavingDoc ? "Saving..." : "Save & Issue Tax Invoice"}</span>
