@@ -102,8 +102,8 @@ class PartyCreate(BaseModel):
     name: Optional[str] = None
     legal_name: Optional[str] = None
     display_name: Optional[str] = None
-    entity_type: str = "CORPORATION" # INDIVIDUAL, CORPORATION, OTHER
-    roles: List[str] = ["CUSTOMER"] # CUSTOMER, VENDOR, PARTNER, INVESTOR, BANK, OTHER
+    entity_type: Optional[str] = "CORPORATION" # INDIVIDUAL, CORPORATION, OTHER
+    roles: Optional[List[str]] = None # CUSTOMER, VENDOR, PARTNER, INVESTOR, BANK, OTHER
     party_type: Optional[str] = None # Legacy support fallback
     email: Optional[str] = None
     phone: Optional[str] = None
@@ -111,7 +111,7 @@ class PartyCreate(BaseModel):
     pan: Optional[str] = None
     address: Optional[str] = None
     notes: Optional[str] = None
-    is_self: bool = False
+    is_self: Optional[bool] = False
 
 class PartyUpdate(BaseModel):
     legal_name: Optional[str] = None
@@ -129,6 +129,7 @@ class RolePayload(BaseModel):
     role: str
 
 class PartyResolveRequest(BaseModel):
+    name: Optional[str] = None
     legal_name: Optional[str] = None
     display_name: Optional[str] = None
     gstin: Optional[str] = None
@@ -138,6 +139,7 @@ class PartyResolveRequest(BaseModel):
     address: Optional[str] = None
     entity_type: Optional[str] = None
     expected_role: Optional[str] = None
+    roles: Optional[List[str]] = None
 
 class VesselCreate(BaseModel):
     account_type: str
@@ -520,6 +522,71 @@ def create_party(workbench_id: str, payload: PartyCreate, user = Depends(get_cur
         print("Create party error:", e)
         raise HTTPException(status_code=400, detail=f"Database error: {str(e)}")
 
+@router.post("/{workbench_id}/parties/resolve")
+def resolve_party_identity(workbench_id: str, payload: PartyResolveRequest, user = Depends(get_current_user)):
+    try:
+        parties_res = supabase.table("parties").select("*, party_roles(*)").eq("workbench_id", workbench_id).execute()
+        workbench_parties = parties_res.data or []
+
+        input_gstin = (payload.gstin or "").strip().upper()
+        input_pan = (payload.pan or "").strip().upper()
+        input_name = (payload.legal_name or payload.display_name or payload.name or "").strip().lower()
+        input_phone = (payload.phone or "").strip()
+        input_email = (payload.email or "").strip().lower()
+
+        def normalize_name(s: str) -> str:
+            if not s: return ""
+            low = s.lower().strip()
+            for suffix in ["pvt ltd", "private limited", "ltd", "limited", "inc", "corp", "llp", "co"]:
+                low = low.replace(suffix, "")
+            return "".join(ch for ch in low if ch.isalnum()).strip()
+
+        norm_input_name = normalize_name(input_name)
+
+        exact_matches = []
+        high_conf_matches = []
+        ambiguous_matches = []
+
+        for p in workbench_parties:
+            p_gstin = (p.get("gstin") or "").strip().upper()
+            p_pan = (p.get("pan") or "").strip().upper()
+            p_legal = (p.get("legal_name") or p.get("name") or "").strip().lower()
+            p_phone = (p.get("phone") or "").strip()
+            p_email = (p.get("email") or "").strip().lower()
+            norm_p_legal = normalize_name(p_legal)
+
+            is_gstin_exact = input_gstin and p_gstin and (input_gstin == p_gstin)
+            is_pan_exact = input_pan and p_pan and (input_pan == p_pan)
+            is_name_phone_exact = norm_input_name and norm_p_legal and (norm_input_name == norm_p_legal) and input_phone and (input_phone == p_phone)
+            is_name_email_exact = norm_input_name and norm_p_legal and (norm_input_name == norm_p_legal) and input_email and (input_email == p_email)
+
+            if is_gstin_exact or is_pan_exact or is_name_phone_exact or is_name_email_exact:
+                exact_matches.append(p)
+                continue
+
+            is_exact_name = norm_input_name and norm_p_legal and (norm_input_name == norm_p_legal)
+            is_contact_match = (input_phone and p_phone and input_phone == p_phone) or (input_email and p_email and input_email == p_email)
+            
+            if is_exact_name or is_contact_match:
+                high_conf_matches.append(p)
+                continue
+
+            if norm_input_name and norm_p_legal:
+                if norm_input_name in norm_p_legal or norm_p_legal in norm_input_name:
+                    ambiguous_matches.append(p)
+
+        if exact_matches:
+            return {"resolution": "EXACT", "candidates": exact_matches}
+        elif high_conf_matches:
+            return {"resolution": "HIGH_CONFIDENCE", "candidates": high_conf_matches}
+        elif ambiguous_matches:
+            return {"resolution": "AMBIGUOUS", "candidates": ambiguous_matches}
+        else:
+            return {"resolution": "NEW", "candidates": []}
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Resolution error: {str(e)}")
+
 @router.patch("/{workbench_id}/parties/{party_id}")
 def update_party(workbench_id: str, party_id: str, payload: PartyUpdate, user = Depends(get_current_user)):
     try:
@@ -599,71 +666,6 @@ def remove_party_role(workbench_id: str, party_id: str, role: str, user = Depend
         return {"success": True, "removed_role": clean_role}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Database error: {str(e)}")
-
-@router.post("/{workbench_id}/parties/resolve")
-def resolve_party_identity(workbench_id: str, payload: PartyResolveRequest, user = Depends(get_current_user)):
-    try:
-        parties_res = supabase.table("parties").select("*, party_roles(*)").eq("workbench_id", workbench_id).execute()
-        workbench_parties = parties_res.data or []
-
-        input_gstin = (payload.gstin or "").strip().upper()
-        input_pan = (payload.pan or "").strip().upper()
-        input_name = (payload.legal_name or payload.display_name or "").strip().lower()
-        input_phone = (payload.phone or "").strip()
-        input_email = (payload.email or "").strip().lower()
-
-        def normalize_name(s: str) -> str:
-            if not s: return ""
-            low = s.lower().strip()
-            for suffix in ["pvt ltd", "private limited", "ltd", "limited", "inc", "corp", "llp", "co"]:
-                low = low.replace(suffix, "")
-            return "".join(ch for ch in low if ch.isalnum()).strip()
-
-        norm_input_name = normalize_name(input_name)
-
-        exact_matches = []
-        high_conf_matches = []
-        ambiguous_matches = []
-
-        for p in workbench_parties:
-            p_gstin = (p.get("gstin") or "").strip().upper()
-            p_pan = (p.get("pan") or "").strip().upper()
-            p_legal = (p.get("legal_name") or p.get("name") or "").strip().lower()
-            p_phone = (p.get("phone") or "").strip()
-            p_email = (p.get("email") or "").strip().lower()
-            norm_p_legal = normalize_name(p_legal)
-
-            is_gstin_exact = input_gstin and p_gstin and (input_gstin == p_gstin)
-            is_pan_exact = input_pan and p_pan and (input_pan == p_pan)
-            is_name_phone_exact = norm_input_name and norm_p_legal and (norm_input_name == norm_p_legal) and input_phone and (input_phone == p_phone)
-            is_name_email_exact = norm_input_name and norm_p_legal and (norm_input_name == norm_p_legal) and input_email and (input_email == p_email)
-
-            if is_gstin_exact or is_pan_exact or is_name_phone_exact or is_name_email_exact:
-                exact_matches.append(p)
-                continue
-
-            is_exact_name = norm_input_name and norm_p_legal and (norm_input_name == norm_p_legal)
-            is_contact_match = (input_phone and p_phone and input_phone == p_phone) or (input_email and p_email and input_email == p_email)
-            
-            if is_exact_name or is_contact_match:
-                high_conf_matches.append(p)
-                continue
-
-            if norm_input_name and norm_p_legal:
-                if norm_input_name in norm_p_legal or norm_p_legal in norm_input_name:
-                    ambiguous_matches.append(p)
-
-        if exact_matches:
-            return {"resolution": "EXACT", "candidates": exact_matches}
-        elif high_conf_matches:
-            return {"resolution": "HIGH_CONFIDENCE", "candidates": high_conf_matches}
-        elif ambiguous_matches:
-            return {"resolution": "AMBIGUOUS", "candidates": ambiguous_matches}
-        else:
-            return {"resolution": "NEW", "candidates": []}
-
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Resolution error: {str(e)}")
 
 @router.post("/{workbench_id}/parties/{party_id}/vessels")
 def add_trade_vessel(workbench_id: str, party_id: str, payload: VesselCreate, user = Depends(get_current_user)):
