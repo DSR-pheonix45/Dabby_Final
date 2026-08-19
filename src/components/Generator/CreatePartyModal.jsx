@@ -31,12 +31,16 @@ export default function CreatePartyModal({ isOpen, onClose, workbenchId, onParty
 
     setLoading(true);
     try {
+      const gstinVal = formData.gstin.trim() ? formData.gstin.trim().toUpperCase() : null;
+      const derivedPan = (gstinVal && gstinVal.length === 15) ? gstinVal.substring(2, 12) : null;
+
       const partyData = {
         name: formData.name.trim(),
         party_type: formData.party_type || "customer",
         email: formData.email.trim() || null,
         phone: formData.phone.trim() || null,
-        gstin: formData.gstin.trim() ? formData.gstin.trim().toUpperCase() : null,
+        gstin: gstinVal,
+        pan: derivedPan,
         address: formData.address.trim() || null,
         notes: formData.notes.trim() || null
       };

@@ -165,12 +165,14 @@ export default function PartyAnalyticsModal({ isOpen, onClose, party, onRefresh 
                 </div>
                 <div>
                   <div className="text-gray-500 font-semibold text-[10px] uppercase">GSTIN</div>
-                  <div className="text-white font-mono font-bold mt-0.5">{party.gstin || "—"}</div>
+                  <div className="text-white font-mono font-bold mt-0.5">{party.gstin || "Unregistered"}</div>
                 </div>
-                <div>
-                  <div className="text-gray-500 font-semibold text-[10px] uppercase">PAN</div>
-                  <div className="text-white font-mono font-bold mt-0.5">{party.pan || "—"}</div>
-                </div>
+                {party.pan && (
+                  <div>
+                    <div className="text-gray-500 font-semibold text-[10px] uppercase">PAN</div>
+                    <div className="text-white font-mono font-bold mt-0.5">{party.pan}</div>
+                  </div>
+                )}
                 <div>
                   <div className="text-gray-500 font-semibold text-[10px] uppercase">Phone</div>
                   <div className="text-white font-bold mt-0.5">{party.phone || "—"}</div>

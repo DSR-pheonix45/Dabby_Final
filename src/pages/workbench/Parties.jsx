@@ -268,16 +268,18 @@ export default function Parties() {
                     )}
                   </div>
 
-                  {/* Identifiers Row (GSTIN / PAN) */}
+                  {/* Identifiers Row (GSTIN / Tax ID) */}
                   <div className="bg-[#141416] border border-white/5 rounded-xl p-3 mb-4 space-y-1 text-xs">
                     <div className="flex justify-between text-gray-400 font-mono text-[11px]">
                       <span>GSTIN:</span>
-                      <span className="text-white font-semibold">{party.gstin || "—"}</span>
+                      <span className="text-white font-semibold">{party.gstin || "Unregistered"}</span>
                     </div>
-                    <div className="flex justify-between text-gray-400 font-mono text-[11px]">
-                      <span>PAN:</span>
-                      <span className="text-white font-semibold">{party.pan || "—"}</span>
-                    </div>
+                    {party.pan && party.pan !== party.gstin?.substring(2, 12) && (
+                      <div className="flex justify-between text-gray-400 font-mono text-[11px]">
+                        <span>PAN:</span>
+                        <span className="text-white font-semibold">{party.pan}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Settlement Vessels / Financial Accounts */}

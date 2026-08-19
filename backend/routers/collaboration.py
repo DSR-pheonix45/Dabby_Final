@@ -480,8 +480,13 @@ def create_party(workbench_id: str, payload: PartyCreate, user = Depends(get_cur
             "phone": payload.phone,
             "notes": payload.notes
         }
-        if payload.gstin: data_dict["gstin"] = payload.gstin.strip().upper()
-        if payload.pan: data_dict["pan"] = payload.pan.strip().upper()
+        if payload.gstin:
+            clean_gstin = payload.gstin.strip().upper()
+            data_dict["gstin"] = clean_gstin
+            if not payload.pan and len(clean_gstin) == 15:
+                data_dict["pan"] = clean_gstin[2:12]
+        if payload.pan:
+            data_dict["pan"] = payload.pan.strip().upper()
         if payload.address: data_dict["address"] = payload.address.strip()
 
         res = supabase.table("parties").insert(data_dict).execute()
@@ -537,8 +542,11 @@ def update_party(workbench_id: str, party_id: str, payload: PartyUpdate, user = 
             if clean_st in ["ACTIVE", "INACTIVE", "ARCHIVED"]:
                 update_dict["status"] = clean_st
         if payload.gstin is not None:
-            update_dict["gstin"] = payload.gstin.strip().upper()
-        if payload.pan is not None:
+            clean_gstin = payload.gstin.strip().upper()
+            update_dict["gstin"] = clean_gstin
+            if not payload.pan and len(clean_gstin) == 15:
+                update_dict["pan"] = clean_gstin[2:12]
+        if payload.pan is not None and payload.pan.strip():
             update_dict["pan"] = payload.pan.strip().upper()
         if payload.email is not None:
             update_dict["email"] = payload.email

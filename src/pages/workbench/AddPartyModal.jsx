@@ -301,27 +301,21 @@ export default function AddPartyModal({ isOpen, onClose, workbenchId, onSuccess 
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">GSTIN</label>
-                  <input
-                    type="text"
-                    value={formData.gstin}
-                    onChange={(e) => setFormData({ ...formData, gstin: e.target.value.toUpperCase() })}
-                    className="w-full bg-[#18181A] border border-white/10 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-teal-500 font-mono"
-                    placeholder="27AAAAA0000A1Z5"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">PAN</label>
-                  <input
-                    type="text"
-                    value={formData.pan}
-                    onChange={(e) => setFormData({ ...formData, pan: e.target.value.toUpperCase() })}
-                    className="w-full bg-[#18181A] border border-white/10 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-teal-500 font-mono"
-                    placeholder="AAAAA0000A"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
+                  GSTIN <span className="text-gray-500 font-normal lowercase">(optional — 15 digit tax ID)</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.gstin}
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase();
+                    const derivedPan = val.length === 15 ? val.substring(2, 12) : (formData.pan || "");
+                    setFormData({ ...formData, gstin: val, pan: derivedPan });
+                  }}
+                  className="w-full bg-[#18181A] border border-white/10 rounded-lg px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500 font-mono"
+                  placeholder="e.g. 27AAAAA0000A1Z5"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
