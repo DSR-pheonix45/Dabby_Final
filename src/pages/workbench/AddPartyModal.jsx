@@ -205,9 +205,9 @@ export default function AddPartyModal({ isOpen, onClose, workbenchId, onSuccess 
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="px-5 py-2.5 bg-teal-500 hover:bg-teal-400 text-black font-bold text-sm rounded-lg transition-colors"
+                  className="px-5 py-2.5 bg-teal-500 hover:bg-teal-400 text-black font-bold text-sm rounded-lg transition-colors cursor-pointer"
                 >
-                  Continue to Roles &rarr;
+                  Continue to Roles →
                 </button>
               </div>
             </div>
@@ -256,16 +256,16 @@ export default function AddPartyModal({ isOpen, onClose, workbenchId, onSuccess 
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="px-4 py-2 text-xs font-semibold text-gray-400 hover:text-white"
+                  className="px-4 py-2 text-xs font-semibold text-gray-400 hover:text-white cursor-pointer"
                 >
-                  &larr; Back
+                  ← Back
                 </button>
                 <button
                   type="button"
                   onClick={() => setStep(3)}
-                  className="px-5 py-2.5 bg-teal-500 hover:bg-teal-400 text-black font-bold text-sm rounded-lg transition-colors"
+                  className="px-5 py-2.5 bg-teal-500 hover:bg-teal-400 text-black font-bold text-sm rounded-lg transition-colors cursor-pointer"
                 >
-                  Continue to Identity &rarr;
+                  Continue to Identity →
                 </button>
               </div>
             </div>
@@ -353,16 +353,16 @@ export default function AddPartyModal({ isOpen, onClose, workbenchId, onSuccess 
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="px-4 py-2 text-xs font-semibold text-gray-400 hover:text-white"
+                  className="px-4 py-2 text-xs font-semibold text-gray-400 hover:text-white cursor-pointer"
                 >
-                  &larr; Back
+                  ← Back
                 </button>
                 <button
                   type="submit"
                   disabled={isResolving}
-                  className="px-5 py-2.5 bg-teal-500 hover:bg-teal-400 text-black font-bold text-sm rounded-lg transition-colors disabled:opacity-50"
+                  className="px-5 py-2.5 bg-teal-500 hover:bg-teal-400 text-black font-bold text-sm rounded-lg transition-colors cursor-pointer disabled:opacity-50"
                 >
-                  {isResolving ? "Checking Duplicates..." : "Run Duplicate Check &rarr;"}
+                  {isResolving ? "Checking Duplicates..." : "Run Duplicate Check →"}
                 </button>
               </div>
             </form>
