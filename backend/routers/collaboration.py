@@ -99,14 +99,45 @@ class RoleUpdate(BaseModel):
     role: str
 
 class PartyCreate(BaseModel):
-    name: str
-    party_type: str
+    name: Optional[str] = None
+    legal_name: Optional[str] = None
+    display_name: Optional[str] = None
+    entity_type: str = "CORPORATION" # INDIVIDUAL, CORPORATION, OTHER
+    roles: List[str] = ["CUSTOMER"] # CUSTOMER, VENDOR, PARTNER, INVESTOR, BANK, OTHER
+    party_type: Optional[str] = None # Legacy support fallback
     email: Optional[str] = None
     phone: Optional[str] = None
     gstin: Optional[str] = None
     pan: Optional[str] = None
     address: Optional[str] = None
     notes: Optional[str] = None
+    is_self: bool = False
+
+class PartyUpdate(BaseModel):
+    legal_name: Optional[str] = None
+    display_name: Optional[str] = None
+    entity_type: Optional[str] = None
+    status: Optional[str] = None # ACTIVE, INACTIVE, ARCHIVED
+    gstin: Optional[str] = None
+    pan: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    notes: Optional[str] = None
+
+class RolePayload(BaseModel):
+    role: str
+
+class PartyResolveRequest(BaseModel):
+    legal_name: Optional[str] = None
+    display_name: Optional[str] = None
+    gstin: Optional[str] = None
+    pan: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    entity_type: Optional[str] = None
+    expected_role: Optional[str] = None
 
 class VesselCreate(BaseModel):
     account_type: str
@@ -378,49 +409,260 @@ def update_member_role(workbench_id: str, target_user_id: str, payload: RoleUpda
 @router.get("/{workbench_id}/parties")
 def get_parties(workbench_id: str, user = Depends(get_current_user)):
     try:
-        # Fetch parties and their nested trade vessels (financial_accounts)
         res = supabase.table("parties").select("*, party_profiles(*), financial_accounts(*)").eq("workbench_id", workbench_id).execute()
-        return res.data
+        parties_list = res.data or []
+        
+        party_ids = [p["id"] for p in parties_list if "id" in p]
+        roles_by_party = {}
+        if party_ids:
+            try:
+                roles_res = supabase.table("party_roles").select("*").in_("party_id", party_ids).execute()
+                for r in (roles_res.data or []):
+                    pid = r["party_id"]
+                    if pid not in roles_by_party:
+                        roles_by_party[pid] = []
+                    roles_by_party[pid].append(r["role"])
+            except Exception as r_err:
+                print("Notice: party_roles query info:", r_err)
+
+        for party in parties_list:
+            pid = party["id"]
+            party["roles"] = roles_by_party.get(pid, [])
+            if not party["roles"] and party.get("party_type"):
+                legacy_type = party.get("party_type", "").upper()
+                if legacy_type in ["CUSTOMER", "VENDOR", "PARTNER", "INVESTOR", "BANK", "OTHER"]:
+                    party["roles"] = [legacy_type]
+                elif legacy_type == "INTERNAL":
+                    party["is_self"] = True
+                    party["roles"] = ["INTERNAL"]
+                else:
+                    party["roles"] = ["OTHER"]
+
+        return parties_list
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Database error: {str(e)}")
 
 @router.post("/{workbench_id}/parties")
 def create_party(workbench_id: str, payload: PartyCreate, user = Depends(get_current_user)):
     try:
+        legal_name = payload.legal_name or payload.name or "Unnamed Party"
+        display_name = payload.display_name or legal_name
+        
+        valid_entity_types = ["INDIVIDUAL", "CORPORATION", "OTHER"]
+        entity_type = (payload.entity_type or "CORPORATION").upper()
+        if entity_type not in valid_entity_types:
+            entity_type = "CORPORATION"
+
+        if payload.is_self:
+            existing_self = supabase.table("parties").select("id").eq("workbench_id", workbench_id).eq("is_self", True).execute()
+            if existing_self.data:
+                raise HTTPException(status_code=400, detail="Workbench already has a Self / Owner Party.")
+
+        roles_input = [r.upper() for r in (payload.roles or [])]
+        if not roles_input:
+            if payload.party_type:
+                roles_input = [payload.party_type.upper()]
+            else:
+                roles_input = ["CUSTOMER"]
+
+        primary_legacy_type = roles_input[0].lower() if roles_input else "customer"
+
         data_dict = {
             "workbench_id": workbench_id,
-            "name": payload.name,
-            "party_type": payload.party_type,
+            "name": legal_name,
+            "legal_name": legal_name,
+            "display_name": display_name,
+            "entity_type": entity_type,
+            "party_type": primary_legacy_type,
+            "is_self": payload.is_self,
+            "status": "ACTIVE",
             "email": payload.email,
             "phone": payload.phone,
             "notes": payload.notes
         }
-        if payload.gstin: data_dict["gstin"] = payload.gstin.upper()
-        if payload.pan: data_dict["pan"] = payload.pan.upper()
-        if payload.address: data_dict["address"] = payload.address
+        if payload.gstin: data_dict["gstin"] = payload.gstin.strip().upper()
+        if payload.pan: data_dict["pan"] = payload.pan.strip().upper()
+        if payload.address: data_dict["address"] = payload.address.strip()
 
         res = supabase.table("parties").insert(data_dict).execute()
-        return res.data[0] if res.data else None
+        if not res.data:
+            raise HTTPException(status_code=400, detail="Failed to insert party")
+        
+        new_party = res.data[0]
+        party_id = new_party["id"]
+
+        valid_roles = ["CUSTOMER", "VENDOR", "PARTNER", "INVESTOR", "BANK", "OTHER"]
+        added_roles = []
+        for role_name in roles_input:
+            clean_role = role_name.upper()
+            if clean_role in valid_roles:
+                try:
+                    supabase.table("party_roles").insert({
+                        "party_id": party_id,
+                        "role": clean_role
+                    }).execute()
+                    added_roles.append(clean_role)
+                except Exception as r_err:
+                    print(f"Role insert info for {clean_role}:", r_err)
+
+        new_party["roles"] = added_roles or roles_input
+        new_party["financial_accounts"] = []
+        return new_party
+
+    except HTTPException:
+        raise
     except Exception as e:
         print("Create party error:", e)
-        # Retry with minimal fields if table schema does not have gstin/pan/address columns
-        try:
-            fallback = {
-                "workbench_id": workbench_id,
-                "name": payload.name,
-                "party_type": payload.party_type,
-                "email": payload.email,
-                "phone": payload.phone,
-                "notes": payload.notes
-            }
-            res = supabase.table("parties").insert(fallback).execute()
-            return res.data[0] if res.data else None
-        except Exception as fallbackErr:
-            raise HTTPException(status_code=400, detail=f"Database error: {str(fallbackErr)}")
+        raise HTTPException(status_code=400, detail=f"Database error: {str(e)}")
+
+@router.patch("/{workbench_id}/parties/{party_id}")
+def update_party(workbench_id: str, party_id: str, payload: PartyUpdate, user = Depends(get_current_user)):
+    try:
+        existing = supabase.table("parties").select("*").eq("id", party_id).eq("workbench_id", workbench_id).execute()
+        if not existing.data:
+            raise HTTPException(status_code=404, detail="Party not found in this Workbench")
+
+        update_dict = {}
+        if payload.legal_name is not None:
+            update_dict["legal_name"] = payload.legal_name
+            update_dict["name"] = payload.legal_name
+        if payload.display_name is not None:
+            update_dict["display_name"] = payload.display_name
+        if payload.entity_type is not None:
+            clean_et = payload.entity_type.upper()
+            if clean_et in ["INDIVIDUAL", "CORPORATION", "OTHER"]:
+                update_dict["entity_type"] = clean_et
+        if payload.status is not None:
+            clean_st = payload.status.upper()
+            if clean_st in ["ACTIVE", "INACTIVE", "ARCHIVED"]:
+                update_dict["status"] = clean_st
+        if payload.gstin is not None:
+            update_dict["gstin"] = payload.gstin.strip().upper()
+        if payload.pan is not None:
+            update_dict["pan"] = payload.pan.strip().upper()
+        if payload.email is not None:
+            update_dict["email"] = payload.email
+        if payload.phone is not None:
+            update_dict["phone"] = payload.phone
+        if payload.address is not None:
+            update_dict["address"] = payload.address
+        if payload.notes is not None:
+            update_dict["notes"] = payload.notes
+
+        if not update_dict:
+            return existing.data[0]
+
+        res = supabase.table("parties").update(update_dict).eq("id", party_id).eq("workbench_id", workbench_id).execute()
+        return res.data[0] if res.data else existing.data[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Database error: {str(e)}")
+
+@router.post("/{workbench_id}/parties/{party_id}/roles")
+def add_party_role(workbench_id: str, party_id: str, payload: RolePayload, user = Depends(get_current_user)):
+    try:
+        party_res = supabase.table("parties").select("id").eq("id", party_id).eq("workbench_id", workbench_id).execute()
+        if not party_res.data:
+            raise HTTPException(status_code=404, detail="Party not found in this Workbench")
+
+        clean_role = payload.role.strip().upper()
+        valid_roles = ["CUSTOMER", "VENDOR", "PARTNER", "INVESTOR", "BANK", "OTHER"]
+        if clean_role not in valid_roles:
+            raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of {valid_roles}")
+
+        res = supabase.table("party_roles").insert({
+            "party_id": party_id,
+            "role": clean_role
+        }).execute()
+        return res.data[0] if res.data else {"party_id": party_id, "role": clean_role}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Database error: {str(e)}")
+
+@router.delete("/{workbench_id}/parties/{party_id}/roles/{role}")
+def remove_party_role(workbench_id: str, party_id: str, role: str, user = Depends(get_current_user)):
+    try:
+        party_res = supabase.table("parties").select("id, is_self").eq("id", party_id).eq("workbench_id", workbench_id).execute()
+        if not party_res.data:
+            raise HTTPException(status_code=404, detail="Party not found in this Workbench")
+
+        clean_role = role.strip().upper()
+        res = supabase.table("party_roles").delete().eq("party_id", party_id).eq("role", clean_role).execute()
+        return {"success": True, "removed_role": clean_role}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Database error: {str(e)}")
+
+@router.post("/{workbench_id}/parties/resolve")
+def resolve_party_identity(workbench_id: str, payload: PartyResolveRequest, user = Depends(get_current_user)):
+    try:
+        parties_res = supabase.table("parties").select("*, party_roles(*)").eq("workbench_id", workbench_id).execute()
+        workbench_parties = parties_res.data or []
+
+        input_gstin = (payload.gstin or "").strip().upper()
+        input_pan = (payload.pan or "").strip().upper()
+        input_name = (payload.legal_name or payload.display_name or "").strip().lower()
+        input_phone = (payload.phone or "").strip()
+        input_email = (payload.email or "").strip().lower()
+
+        def normalize_name(s: str) -> str:
+            if not s: return ""
+            low = s.lower().strip()
+            for suffix in ["pvt ltd", "private limited", "ltd", "limited", "inc", "corp", "llp", "co"]:
+                low = low.replace(suffix, "")
+            return "".join(ch for ch in low if ch.isalnum()).strip()
+
+        norm_input_name = normalize_name(input_name)
+
+        exact_matches = []
+        high_conf_matches = []
+        ambiguous_matches = []
+
+        for p in workbench_parties:
+            p_gstin = (p.get("gstin") or "").strip().upper()
+            p_pan = (p.get("pan") or "").strip().upper()
+            p_legal = (p.get("legal_name") or p.get("name") or "").strip().lower()
+            p_phone = (p.get("phone") or "").strip()
+            p_email = (p.get("email") or "").strip().lower()
+            norm_p_legal = normalize_name(p_legal)
+
+            is_gstin_exact = input_gstin and p_gstin and (input_gstin == p_gstin)
+            is_pan_exact = input_pan and p_pan and (input_pan == p_pan)
+            is_name_phone_exact = norm_input_name and norm_p_legal and (norm_input_name == norm_p_legal) and input_phone and (input_phone == p_phone)
+            is_name_email_exact = norm_input_name and norm_p_legal and (norm_input_name == norm_p_legal) and input_email and (input_email == p_email)
+
+            if is_gstin_exact or is_pan_exact or is_name_phone_exact or is_name_email_exact:
+                exact_matches.append(p)
+                continue
+
+            is_exact_name = norm_input_name and norm_p_legal and (norm_input_name == norm_p_legal)
+            is_contact_match = (input_phone and p_phone and input_phone == p_phone) or (input_email and p_email and input_email == p_email)
+            
+            if is_exact_name or is_contact_match:
+                high_conf_matches.append(p)
+                continue
+
+            if norm_input_name and norm_p_legal:
+                if norm_input_name in norm_p_legal or norm_p_legal in norm_input_name:
+                    ambiguous_matches.append(p)
+
+        if exact_matches:
+            return {"resolution": "EXACT", "candidates": exact_matches}
+        elif high_conf_matches:
+            return {"resolution": "HIGH_CONFIDENCE", "candidates": high_conf_matches}
+        elif ambiguous_matches:
+            return {"resolution": "AMBIGUOUS", "candidates": ambiguous_matches}
+        else:
+            return {"resolution": "NEW", "candidates": []}
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Resolution error: {str(e)}")
 
 @router.post("/{workbench_id}/parties/{party_id}/vessels")
 def add_trade_vessel(workbench_id: str, party_id: str, payload: VesselCreate, user = Depends(get_current_user)):
-    # Create a new financial account for the party
+    party_res = supabase.table("parties").select("id").eq("id", party_id).eq("workbench_id", workbench_id).execute()
+    if not party_res.data:
+        raise HTTPException(status_code=404, detail="Party not found in this Workbench")
+
     res = supabase.table("financial_accounts").insert({
         "party_id": party_id,
         "account_type": payload.account_type,

@@ -27,8 +27,48 @@ export const collaborationService = {
       method: "POST",
       body: JSON.stringify(partyData),
     });
-    if (!res.ok) throw new Error("Failed to create party");
-    return res.json();
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to create party");
+    return data;
+  },
+
+  async updateParty(workbenchId, partyId, patchData) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/parties/${partyId}`, {
+      method: "PATCH",
+      body: JSON.stringify(patchData),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to update party");
+    return data;
+  },
+
+  async addPartyRole(workbenchId, partyId, role) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/parties/${partyId}/roles`, {
+      method: "POST",
+      body: JSON.stringify({ role }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to add party role");
+    return data;
+  },
+
+  async removePartyRole(workbenchId, partyId, role) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/parties/${partyId}/roles/${role}`, {
+      method: "DELETE",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to remove party role");
+    return data;
+  },
+
+  async resolveParty(workbenchId, queryData) {
+    const res = await apiFetch(`/api/collaboration/${workbenchId}/parties/resolve`, {
+      method: "POST",
+      body: JSON.stringify(queryData),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to resolve party identity");
+    return data;
   },
 
   async generateInviteLink(workbenchId, role) {

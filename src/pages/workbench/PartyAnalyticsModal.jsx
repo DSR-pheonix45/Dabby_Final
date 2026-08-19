@@ -1,40 +1,89 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
-  BsXLg, BsGraphUpArrow, BsArrowDownRight, BsArrowUpRight, 
-  BsCashCoin, BsFileEarmarkText, BsReceipt, BsBuilding, BsShieldCheck,
-  BsPeopleFill, BsClockHistory, BsLightningCharge, BsDiagram3
+  BsXLg, BsBuilding, BsShieldCheck, BsPerson, 
+  BsBriefcase, BsPlus, BsCheck2, BsTrash, BsInfoCircle
 } from 'react-icons/bs';
 import { useWorkbench } from '../../context/WorkbenchContext';
-import { formatCurrency } from '../../utils/currency';
+import { collaborationService } from '../../services/collaborationService';
+import { toast } from 'react-hot-toast';
 
-export default function PartyAnalyticsModal({ isOpen, onClose, party }) {
+export default function PartyAnalyticsModal({ isOpen, onClose, party, onRefresh }) {
   const { activeWorkbench } = useWorkbench();
+  const [newRoleInput, setNewRoleInput] = useState("VENDOR");
+  const [isAddingRole, setIsAddingRole] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
   if (!isOpen || !party) return null;
 
-  const isOwner = party.party_type === 'internal';
+  const isOwner = party.is_self || party.party_type === 'internal';
+  const entityType = (party.entity_type || "CORPORATION").toUpperCase();
+  const currentRoles = party.roles || [];
+  const vessels = party.financial_accounts || [];
+  const status = (party.status || "ACTIVE").toUpperCase();
 
-  const avgDSO = 0;
-  const avgDPO = 0;
-  const retentionRate = 0;
-  const totalTrades = 0;
-  const totalRevenue = 0;
-  const receivables = 0;
-  
-  const settlements = [
-    { type: 'Payment Receipt', count: Math.floor(totalTrades * 0.4) },
-    { type: 'Bank Statement Snippet', count: Math.floor(totalTrades * 0.45) },
-    { type: 'Pending', count: Math.floor(totalTrades * 0.15) }
-  ];
+  const handleAddRole = async () => {
+    if (currentRoles.includes(newRoleInput)) {
+      toast.error(`Party already has role ${newRoleInput}`);
+      return;
+    }
+
+    setIsAddingRole(true);
+    try {
+      await collaborationService.addPartyRole(activeWorkbench.id, party.id, newRoleInput);
+      toast.success(`Role ${newRoleInput} added successfully`);
+      if (onRefresh) onRefresh();
+      onClose();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to add role");
+    } finally {
+      setIsAddingRole(false);
+    }
+  };
+
+  const handleRemoveRole = async (roleToRemove) => {
+    if (currentRoles.length === 1) {
+      toast.error("Party must maintain at least one relationship role.");
+      return;
+    }
+
+    try {
+      await collaborationService.removePartyRole(activeWorkbench.id, party.id, roleToRemove);
+      toast.success(`Role ${roleToRemove} removed`);
+      if (onRefresh) onRefresh();
+      onClose();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to remove role");
+    }
+  };
+
+  const handleStatusToggle = async (newStatus) => {
+    setIsUpdatingStatus(true);
+    try {
+      await collaborationService.updateParty(activeWorkbench.id, party.id, { status: newStatus });
+      toast.success(`Party status set to ${newStatus}`);
+      if (onRefresh) onRefresh();
+      onClose();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to update status");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const AVAILABLE_ROLES = ["CUSTOMER", "VENDOR", "PARTNER", "INVESTOR", "BANK", "OTHER"];
 
   return (
     <>
       <div 
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity"
+        className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 transition-opacity"
         onClick={onClose}
       />
       
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 pointer-events-none">
-        <div className="w-full max-w-5xl bg-[#0F0F11] border border-white/10 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] pointer-events-auto transform transition-all">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 pointer-events-none font-dm-sans">
+        <div className="w-full max-w-3xl bg-[#0F0F11] border border-white/10 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] pointer-events-auto transform transition-all">
           
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-white/5 bg-[#141416] rounded-t-2xl shrink-0">
@@ -42,18 +91,28 @@ export default function PartyAnalyticsModal({ isOpen, onClose, party }) {
               <div className={`w-12 h-12 rounded-xl border flex items-center justify-center
                 ${isOwner ? 'border-yellow-500/30 text-yellow-500 bg-yellow-500/10' : 'border-teal-500/30 text-teal-400 bg-teal-500/10'}
               `}>
-                {isOwner ? <BsShieldCheck size={24} /> : <BsBuilding size={24} />}
+                {isOwner ? (
+                  <BsShieldCheck size={24} />
+                ) : entityType === 'INDIVIDUAL' ? (
+                  <BsPerson size={24} />
+                ) : (
+                  <BsBuilding size={24} />
+                )}
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-white tracking-tight">{party.name}</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold text-white tracking-tight">
+                    {party.legal_name || party.name}
+                  </h2>
+                  {isOwner && (
+                    <span className="text-[9px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                      SELF / OWNER ENTITY
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className={`text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full border
-                    ${isOwner ? 'border-yellow-500/30 text-yellow-500' : 'border-teal-500/30 text-teal-400'}
-                  `}>
-                    {isOwner ? "Self (Owner)" : "Business Relations"}
-                  </span>
                   <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider">
-                    Analytics Dashboard
+                    Party Profile & Relationship Identity
                   </span>
                 </div>
               </div>
@@ -61,166 +120,165 @@ export default function PartyAnalyticsModal({ isOpen, onClose, party }) {
             
             <button 
               onClick={onClose}
-              className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+              className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
             >
-              <BsXLg size={16} />
+              <BsXLg size={15} />
             </button>
           </div>
 
           {/* Body */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
             
-            {/* Top Metrics Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* DSO */}
-              <div className="bg-[#18181A] border border-white/5 rounded-2xl p-5 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <BsClockHistory size={48} className="text-amber-500" />
-                </div>
-                <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1 flex items-center gap-1">
-                  Avg DSO (Days)
-                </div>
-                <div className="text-3xl font-bold text-white mb-2">{avgDSO} <span className="text-sm font-normal text-gray-500">Days</span></div>
-                <div className="flex items-center gap-1 text-xs font-bold text-green-500">
-                  <BsArrowDownRight /> 12% vs last year
-                </div>
-              </div>
-
-              {/* DPO */}
-              <div className="bg-[#18181A] border border-white/5 rounded-2xl p-5 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <BsLightningCharge size={48} className="text-indigo-500" />
-                </div>
-                <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1 flex items-center gap-1">
-                  Avg DPO (Days)
-                </div>
-                <div className="text-3xl font-bold text-white mb-2">{avgDPO} <span className="text-sm font-normal text-gray-500">Days</span></div>
-                <div className="flex items-center gap-1 text-xs font-bold text-rose-500">
-                  <BsArrowUpRight /> 5% vs last year
-                </div>
-              </div>
-
-              {/* Retention */}
-              <div className="bg-[#18181A] border border-white/5 rounded-2xl p-5 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <BsPeopleFill size={48} className="text-teal-500" />
-                </div>
-                <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1 flex items-center gap-1">
-                  Retention Rate
-                </div>
-                <div className="text-3xl font-bold text-white mb-2">{retentionRate}%</div>
-                <div className="flex items-center gap-1 text-xs font-bold text-green-500">
-                  <BsArrowUpRight /> High Loyalty
-                </div>
-              </div>
-
-              {/* Receivables Contribution */}
-              <div className="bg-gradient-to-br from-teal-900/40 to-emerald-900/20 border border-teal-500/20 rounded-2xl p-5 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:opacity-30 transition-opacity">
-                  <BsCashCoin size={48} className="text-teal-400" />
-                </div>
-                <div className="text-[10px] text-teal-300/70 font-bold uppercase tracking-widest mb-1 flex items-center gap-1">
-                  Receivables Liability
-                </div>
-                <div className="text-3xl font-bold text-white mb-2">{formatCurrency(receivables, activeWorkbench?.country)}</div>
-                <div className="text-xs font-medium text-teal-400/80">
-                  Total outstanding amounts
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              
-              {/* Left Column: Trade & Settlements */}
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-                    <BsDiagram3 className="text-teal-400" />
-                    Trade Connections
-                  </h3>
-                  <div className="bg-[#18181A] border border-white/5 rounded-2xl p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <div>
-                        <div className="text-3xl font-bold text-white">{totalTrades}</div>
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-widest mt-1">Total Linked Trades</div>
-                      </div>
-                      <div className="w-12 h-12 rounded-full bg-teal-500/10 flex items-center justify-center">
-                        <BsGraphUpArrow className="text-teal-400 text-xl" />
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <div className="text-xs font-bold text-gray-400 uppercase tracking-widest pb-2 border-b border-white/5">Settlement Proofs</div>
-                      
-                      {settlements.map((s, idx) => (
-                        <div key={idx} className="flex items-center justify-between group">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10
-                              ${s.type === 'Bank Statement Snippet' ? 'text-indigo-400' : s.type === 'Payment Receipt' ? 'text-teal-400' : 'text-amber-400'}
-                            `}>
-                              {s.type === 'Bank Statement Snippet' ? <BsFileEarmarkText /> : s.type === 'Payment Receipt' ? <BsReceipt /> : <BsClockHistory />}
-                            </div>
-                            <span className="text-sm font-semibold text-gray-300 group-hover:text-white transition-colors">{s.type}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm font-bold text-white">{s.count} Trades</span>
-                            <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full ${s.type === 'Bank Statement Snippet' ? 'bg-indigo-500' : s.type === 'Payment Receipt' ? 'bg-teal-500' : 'bg-amber-500'}`}
-                                style={{ width: `${(s.count / totalTrades) * 100}%` }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: Revenue Contribution */}
-              <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-                  <BsCashCoin className="text-yellow-500" />
-                  Revenue Contribution
+            {/* Identity Overview Card */}
+            <div className="bg-[#18181A] border border-white/5 rounded-2xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-extrabold text-gray-400 uppercase tracking-wider">
+                  Identity Master Data
                 </h3>
-                <div className="bg-[#18181A] border border-white/5 rounded-2xl p-6 h-full flex flex-col">
-                  <div className="mb-8">
-                    <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">Total Lifetime Revenue</div>
-                    <div className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-500 to-amber-300">
-                      {formatCurrency(totalRevenue, activeWorkbench?.country)}
-                    </div>
-                  </div>
-
-                  <div className="flex-1 flex flex-col justify-end space-y-4">
-                    <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Revenue over time</div>
-                    <div className="flex items-end gap-2 h-32 w-full border-b border-white/5 pb-2">
-                      {[0, 0, 0, 0, 0, 0, 0, 0].map((height, i) => (
-                        <div key={i} className="flex-1 flex flex-col justify-end group">
-                          <div 
-                            className="w-full bg-yellow-500/20 group-hover:bg-yellow-500/40 border border-yellow-500/30 rounded-t-sm transition-all duration-300 relative"
-                            style={{ height: `${height}%` }}
-                          >
-                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                              {height}k
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex justify-between text-[10px] font-bold text-gray-600 uppercase">
-                      <span>Jan</span>
-                      <span>Apr</span>
-                      <span>Jul</span>
-                      <span>Oct</span>
-                    </div>
-                  </div>
-                  
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-gray-500">Status:</span>
+                  <select
+                    value={status}
+                    disabled={isUpdatingStatus}
+                    onChange={(e) => handleStatusToggle(e.target.value)}
+                    className="bg-[#141416] border border-white/10 text-white text-xs rounded px-2.5 py-1 focus:outline-none focus:border-teal-500 font-bold"
+                  >
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="INACTIVE">INACTIVE</option>
+                    <option value="ARCHIVED">ARCHIVED</option>
+                  </select>
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
+                <div>
+                  <div className="text-gray-500 font-semibold text-[10px] uppercase">Legal Name</div>
+                  <div className="text-white font-bold mt-0.5">{party.legal_name || party.name}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 font-semibold text-[10px] uppercase">Display Name</div>
+                  <div className="text-white font-bold mt-0.5">{party.display_name || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 font-semibold text-[10px] uppercase">Entity Type</div>
+                  <div className="text-white font-bold mt-0.5">{entityType}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 font-semibold text-[10px] uppercase">GSTIN</div>
+                  <div className="text-white font-mono font-bold mt-0.5">{party.gstin || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 font-semibold text-[10px] uppercase">PAN</div>
+                  <div className="text-white font-mono font-bold mt-0.5">{party.pan || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 font-semibold text-[10px] uppercase">Phone</div>
+                  <div className="text-white font-bold mt-0.5">{party.phone || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500 font-semibold text-[10px] uppercase">Email</div>
+                  <div className="text-white font-bold mt-0.5">{party.email || "—"}</div>
+                </div>
+                <div className="col-span-2">
+                  <div className="text-gray-500 font-semibold text-[10px] uppercase">Address</div>
+                  <div className="text-white font-bold mt-0.5">{party.address || "—"}</div>
+                </div>
+              </div>
             </div>
+
+            {/* Relationship Roles Section */}
+            <div className="bg-[#18181A] border border-white/5 rounded-2xl p-5 space-y-4">
+              <h3 className="text-xs font-extrabold text-gray-400 uppercase tracking-wider">
+                Relationship Roles
+              </h3>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {currentRoles.map(role => (
+                  <div 
+                    key={role}
+                    className="flex items-center space-x-2 px-3 py-1 bg-teal-500/10 border border-teal-500/30 text-teal-400 rounded-lg text-xs font-bold uppercase"
+                  >
+                    <span>{role}</span>
+                    <button
+                      onClick={() => handleRemoveRole(role)}
+                      className="text-teal-400 hover:text-rose-400 transition-colors ml-1"
+                      title="Remove Role"
+                    >
+                      <BsTrash size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add Role Control */}
+              <div className="pt-2 border-t border-white/5 flex items-center space-x-2">
+                <select
+                  value={newRoleInput}
+                  onChange={(e) => setNewRoleInput(e.target.value)}
+                  className="bg-[#141416] border border-white/10 text-white text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-teal-500 font-semibold"
+                >
+                  {AVAILABLE_ROLES.map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={handleAddRole}
+                  disabled={isAddingRole}
+                  className="flex items-center space-x-1 px-3 py-1.5 bg-teal-500 hover:bg-teal-400 text-black font-bold text-xs rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <BsPlus size={16} />
+                  <span>Add Role</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Settlement Vessels Section */}
+            <div className="bg-[#18181A] border border-white/5 rounded-2xl p-5 space-y-3">
+              <h3 className="text-xs font-extrabold text-gray-400 uppercase tracking-wider">
+                Settlement Vessels / Financial Accounts ({vessels.length})
+              </h3>
+
+              {vessels.length === 0 ? (
+                <div className="text-xs text-gray-500 italic py-2">
+                  No settlement vessels attached. Financial accounts specify payment channels for this party.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {vessels.map(v => (
+                    <div key={v.id} className="bg-[#141416] border border-white/5 rounded-xl p-3 flex items-center justify-between text-xs">
+                      <div className="flex items-center space-x-3">
+                        <BsBriefcase size={16} className="text-teal-400" />
+                        <div>
+                          <div className="font-bold text-white">{v.display_name}</div>
+                          <div className="text-[10px] text-gray-500 font-mono">
+                            {v.bank_name || v.upi_id || v.account_number || "Settlement Channel"}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-[9px] font-extrabold text-gray-400 bg-white/5 px-2.5 py-1 rounded border border-white/5 uppercase">
+                        {(v.account_type || "").replace('_', ' ')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Financial Activity Banner */}
+            <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center space-x-3 text-xs text-gray-400">
+              <BsInfoCircle size={18} className="text-teal-400 shrink-0" />
+              <div>
+                <div className="font-bold text-gray-300">Financial Activity Status</div>
+                <div className="text-[11px] text-gray-500 mt-0.5">
+                  No financial activity recorded yet. Accounting metrics (AR/AP, DSO/DPO, Vouchers) will appear after Business Event & Voucher Engine integration.
+                </div>
+              </div>
+            </div>
+
           </div>
+
         </div>
       </div>
     </>
