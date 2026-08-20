@@ -18,7 +18,6 @@ const TABS = [
   { id: 'trial', label: 'Trial Balance', icon: BsJournalText },
   { id: 'pnl', label: 'P&L', icon: BsGraphUpArrow },
   { id: 'bs', label: 'Balance Sheet', icon: BsBank2 },
-  { id: 'transactions', label: 'Transactions', icon: BsListColumnsReverse },
 ];
 
 const money = (v, c) => (v ? formatCurrency(v, c) : '—');
@@ -126,10 +125,8 @@ export default function LedgerView() {
             <TrialBalance tb={tb} country={country} />
           ) : tab === 'pnl' ? (
             <ProfitLoss pnl={pnl} country={country} />
-          ) : tab === 'bs' ? (
-            <BalanceSheet bs={bs} country={country} />
           ) : (
-            <Transactions txs={txs} country={country} />
+            <BalanceSheet bs={bs} country={country} />
           )}
         </div>
       </div>

@@ -13,6 +13,7 @@ import {
   BsFileEarmarkBarGraph, 
   BsCartCheck, 
   BsBagCheck,
+  BsCreditCard,
   BsChevronUp,
   BsChevronDown
 } from "react-icons/bs";
@@ -52,6 +53,7 @@ export default function WorkbenchLayout() {
     { label: "Doc Vault", path: "/dashboard/workbench/doc-vault", icon: BsFileEarmarkText },
     { label: "Sales", path: "/dashboard/workbench/sales", icon: BsCartCheck },
     { label: "Purchases & Expenses", path: "/dashboard/workbench/purchases", icon: BsBagCheck },
+    { label: "Payments", path: "/dashboard/workbench/payments", icon: BsCreditCard },
     { label: "OPS", path: "/dashboard/workbench/ops", icon: BsGraphUp },
     { label: "Financials", path: "/dashboard/workbench/ledger", icon: BsJournalText },
     { label: "COA", path: "/dashboard/workbench/coa", icon: BsDiagram3 },
