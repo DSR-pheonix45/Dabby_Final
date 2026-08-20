@@ -5,9 +5,11 @@ import { useDataCache } from "../../hooks/useDataCache";
 import { 
   BsPersonPlus, BsSearch, BsBuilding, BsPeople, BsLink45Deg, 
   BsPlusLg, BsCashCoin, BsBuildingCheck, BsCheck2, BsBriefcase,
-  BsPencilSquare, BsPersonBadge, BsDiagram3, BsXCircle
+  BsPencilSquare, BsPersonBadge, BsDiagram3, BsXCircle,
+  BsBank, BsShieldCheck
 } from "react-icons/bs";
 import { collaborationService } from "../../services/collaborationService";
+import { budgetService } from "../../services/budgetService";
 import AddMemberModal from "./AddMemberModal";
 import MemberDetail from "./MemberDetail";
 import RoleChangeModal from "./RoleChangeModal";
@@ -27,8 +29,9 @@ export default function Members() {
   );
   const members = membersData || [];
 
-  // Departments
+  // Departments & Budgets
   const [departments, setDepartments] = useState([]);
+  const [budgets, setBudgets] = useState([]);
   const [isLoadingDepts, setIsLoadingDepts] = useState(false);
 
   // Employees
@@ -78,7 +81,13 @@ export default function Members() {
     }
   }, [activeWorkbench]);
 
-
+  useEffect(() => {
+    const handleBudgetUpdate = () => {
+      if (activeWorkbench) fetchDeptsAndEmployees();
+    };
+    window.addEventListener("budget:updated", handleBudgetUpdate);
+    return () => window.removeEventListener("budget:updated", handleBudgetUpdate);
+  }, [activeWorkbench]);
 
   const fetchDeptsAndEmployees = async () => {
     if (!activeWorkbench) return;
@@ -89,8 +98,10 @@ export default function Members() {
       setDepartments(depts || []);
       const emps = await collaborationService.getEmployees(activeWorkbench.id);
       setEmployees(emps || []);
+      const bgts = await budgetService.getBudgets(activeWorkbench.id);
+      setBudgets(bgts || []);
     } catch (err) {
-      console.warn("Notice loading depts/employees:", err);
+      console.warn("Notice loading depts/employees/budgets:", err);
     } finally {
       setIsLoadingDepts(false);
       setIsLoadingEmps(false);
@@ -519,17 +530,80 @@ export default function Members() {
                       </div>
                     </div>
 
-                    {/* Budgets Footer */}
-                    <div className="pt-3 border-t border-white/5 space-y-1.5 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-400">Monthly Budget Cap:</span>
-                        <span className="font-extrabold text-teal-400">₹{(d.monthly_budget || 0).toLocaleString()}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-gray-500">Annual Budget:</span>
-                        <span className="font-semibold text-gray-300">₹{(d.annual_budget || ((d.monthly_budget || 0) * 12)).toLocaleString()}</span>
-                      </div>
-                    </div>
+                    {/* Live Cash-Allocated Budget Section */}
+                    {(() => {
+                      const matchingBudget = budgets.find(b => 
+                        b.department?.toLowerCase() === d.name?.toLowerCase() ||
+                        b.name?.toLowerCase().includes(d.name?.toLowerCase())
+                      );
+
+                      if (matchingBudget) {
+                        const alloc = Number(matchingBudget.allocated_amount || 0);
+                        const uti = Number(matchingBudget.utilized_amount || 0);
+                        const pct = alloc > 0 ? Math.min(100, Math.round((uti / alloc) * 100)) : 0;
+                        const rem = Math.max(0, alloc - uti);
+
+                        return (
+                          <div className="pt-3 border-t border-teal-500/20 space-y-2 text-xs bg-black/30 p-3 rounded-xl border border-white/5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-300 font-bold flex items-center gap-1.5">
+                                <BsShieldCheck className="text-teal-400" /> Cash Asset Budget:
+                              </span>
+                              <span className="font-extrabold text-teal-400">
+                                ₹{alloc.toLocaleString()}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center space-x-1 text-[11px] text-gray-400">
+                              <BsBank className="text-teal-400 text-xs shrink-0" />
+                              <span className="truncate font-mono">{matchingBudget.source_cash_account}</span>
+                            </div>
+
+                            <div className="space-y-1 pt-1">
+                              <div className="flex justify-between text-[11px]">
+                                <span className="text-gray-400">Utilized Spend</span>
+                                <span className="font-bold text-white">₹{uti.toLocaleString()} / ₹{alloc.toLocaleString()}</span>
+                              </div>
+                              <div className="w-full bg-black/50 h-2 rounded-full overflow-hidden border border-white/5">
+                                <div 
+                                  className={`h-full transition-all duration-500 ${
+                                    pct > 90 ? 'bg-rose-500' : pct > 75 ? 'bg-amber-500' : 'bg-teal-400'
+                                  }`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 pt-0.5">
+                                <span>Remaining: <strong className="text-emerald-400">₹{rem.toLocaleString()}</strong></span>
+                                <span className="font-bold text-teal-400">{pct}% Used</span>
+                              </div>
+                            </div>
+
+                            {matchingBudget.categories_plan && matchingBudget.categories_plan.length > 0 && (
+                              <div className="flex flex-wrap gap-1 pt-1 border-t border-white/5">
+                                {matchingBudget.categories_plan.map((cp, idx) => (
+                                  <span key={idx} className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[10px] text-gray-300 truncate max-w-full">
+                                    {cp.category}: ₹{Number(cp.allocated || 0).toLocaleString()}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="pt-3 border-t border-white/5 space-y-1.5 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-400">Monthly Budget Cap:</span>
+                            <span className="font-extrabold text-teal-400">₹{(d.monthly_budget || 0).toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-gray-500">Annual Budget:</span>
+                            <span className="font-semibold text-gray-300">₹{(d.annual_budget || ((d.monthly_budget || 0) * 12)).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
