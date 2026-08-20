@@ -63,7 +63,7 @@ export default function WorkbenchLayout() {
   return (
     <div className="h-full flex flex-col bg-[#111111] font-dm-sans">
       {/* Workbench Navigation Header */}
-      <div className={`border-b border-white/10 bg-[#181818] px-6 lg:px-10 transition-all duration-200 ${isHeaderCollapsed ? "pt-3 pb-0" : "pt-6"}`}>
+      <div className={`border-b border-white/10 bg-[#181818] px-4 lg:px-6 xl:px-8 transition-all duration-200 ${isHeaderCollapsed ? "pt-3 pb-0" : "pt-6"}`}>
         <div className={`w-full flex flex-col ${isHeaderCollapsed ? "space-y-1" : "space-y-5"}`}>
           
           {/* Foldable Company Info Row */}
@@ -80,9 +80,11 @@ export default function WorkbenchLayout() {
                 <div>
                   <h2 className="text-2xl font-bold text-white tracking-tight">{activeWorkbench.name}</h2>
                   <div className="flex items-center space-x-2 mt-1">
-                    <span className="text-xs text-gray-400 uppercase tracking-wider font-semibold">{activeWorkbench.business_type}</span>
-                    <span className="text-gray-600">•</span>
-                    <span className="text-xs text-gray-400 font-medium">{activeWorkbench.country}</span>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-gray-400 uppercase tracking-wider">
+                      {activeWorkbench.entity_type || "Private Limited"}
+                    </span>
+                    <span className="text-xs text-gray-500">•</span>
+                    <span className="text-xs text-gray-400 font-medium">{activeWorkbench.country || "India"}</span>
                   </div>
                 </div>
               </div>
@@ -100,8 +102,8 @@ export default function WorkbenchLayout() {
           )}
 
           {/* Navigation Bar Row */}
-          <div className="flex items-center justify-between gap-4 w-full">
-            <div className="flex items-center space-x-4 min-w-0 flex-1 overflow-hidden">
+          <div className="flex items-center justify-between gap-3 w-full">
+            <div className="flex items-center space-x-3 min-w-0 flex-1 overflow-hidden">
               {/* Unfold Header Toggle Button */}
               {isHeaderCollapsed && (
                 <button
@@ -115,7 +117,7 @@ export default function WorkbenchLayout() {
               )}
 
               <div 
-                className="flex space-x-5 lg:space-x-6 overflow-x-auto min-w-0 flex-1" 
+                className="flex space-x-2 sm:space-x-3 md:space-x-3.5 lg:space-x-4 xl:space-x-5 overflow-x-auto min-w-0 flex-1" 
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
               >
                 <style dangerouslySetInnerHTML={{__html: `
@@ -130,23 +132,23 @@ export default function WorkbenchLayout() {
                     <button
                       key={item.path}
                       onClick={() => navigate(item.path)}
-                      className={`pb-3 flex items-center space-x-2 border-b-2 transition-colors -mb-[1px] whitespace-nowrap ${
+                      className={`pb-3 flex items-center space-x-1.5 border-b-2 transition-colors -mb-[1px] whitespace-nowrap text-xs xl:text-sm font-semibold ${
                         isActive ? "border-teal-500 text-teal-400" : "border-transparent text-gray-400 hover:text-white"
                       }`}
                     >
-                      <Icon />
-                      <span className="font-semibold text-sm">{item.label}</span>
+                      <Icon className="text-xs xl:text-sm" />
+                      <span>{item.label}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
             
-            <div className="flex items-center space-x-2 lg:space-x-3 pb-3 shrink-0 pl-2">
-              <div className="h-6 w-[1px] bg-white/10 hidden md:block"></div>
+            <div className="flex items-center space-x-2 pb-3 shrink-0 pl-1">
+              <div className="h-5 w-[1px] bg-white/10 hidden md:block"></div>
               <button 
                 onClick={() => setIsGeneratorModalOpen(true)}
-                className="flex items-center space-x-2 px-3 py-1.5 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap shrink-0"
+                className="flex items-center space-x-1.5 px-2.5 py-1.5 xl:px-3 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 rounded-lg text-xs xl:text-sm font-semibold transition-colors whitespace-nowrap shrink-0"
                 title="Generators"
               >
                 <BsLightningCharge />
@@ -154,7 +156,7 @@ export default function WorkbenchLayout() {
               </button>
               <button 
                 onClick={() => setIsReportsModalOpen(true)}
-                className="flex items-center space-x-2 px-3 py-1.5 bg-[#222] hover:bg-[#333] text-gray-300 hover:text-white border border-white/10 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap shrink-0"
+                className="flex items-center space-x-1.5 px-2.5 py-1.5 xl:px-3 bg-[#222] hover:bg-[#333] text-gray-300 hover:text-white border border-white/10 rounded-lg text-xs xl:text-sm font-semibold transition-colors whitespace-nowrap shrink-0"
                 title="Reports"
               >
                 <BsFileEarmarkBarGraph />
