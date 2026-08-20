@@ -1,31 +1,34 @@
-import React, { useState } from 'react';
-import { BsXLg, BsCheckCircleFill, BsCreditCard, BsArrowLeftRight, BsBagCheck, BsCartCheck } from 'react-icons/bs';
+import React, { useState, useEffect } from 'react';
+import { BsXLg, BsCheckCircleFill, BsCreditCard, BsBagCheck, BsCartCheck } from 'react-icons/bs';
 import { paymentsService } from '../../../services/paymentsService';
 import { toast } from 'react-hot-toast';
 
-export default function RecordPaymentModal({ isOpen, onClose, workbenchId, onPaymentRecorded }) {
+export default function RecordPaymentModal({ isOpen, onClose, workbenchId, initialType = 'Payment Received', onPaymentRecorded }) {
   if (!isOpen) return null;
 
-  const [type, setType] = useState('Payment Received'); // Payment Received | Payment Sent | Transfer
+  const [type, setType] = useState(initialType === 'Payment Sent' ? 'Payment Sent' : 'Payment Received');
   const [party, setParty] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentMode, setPaymentMode] = useState('Bank Transfer');
   const [referenceNumber, setReferenceNumber] = useState('');
-  const [tradeContainer, setTradeContainer] = useState('Sales'); // Sales | Purchases | Transfers
+  const [tradeContainer, setTradeContainer] = useState(initialType === 'Payment Sent' ? 'Purchases' : 'Sales');
   const [linkedDocRef, setLinkedDocRef] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const t = initialType === 'Payment Sent' ? 'Payment Sent' : 'Payment Received';
+    setType(t);
+    setTradeContainer(t === 'Payment Sent' ? 'Purchases' : 'Sales');
+  }, [initialType, isOpen]);
 
   const handleTypeChange = (newType) => {
     setType(newType);
     if (newType === 'Payment Received') {
       setTradeContainer('Sales');
-    } else if (newType === 'Payment Sent') {
-      setTradeContainer('Purchases');
     } else {
-      setTradeContainer('Transfers');
-      setParty('Internal Transfer (Bank / Cash)');
+      setTradeContainer('Purchases');
     }
   };
 
@@ -35,7 +38,7 @@ export default function RecordPaymentModal({ isOpen, onClose, workbenchId, onPay
       toast.error('Please enter a valid amount');
       return;
     }
-    if (!party.trim() && type !== 'Transfer') {
+    if (!party.trim()) {
       toast.error('Please enter party name or counterparty');
       return;
     }
@@ -44,7 +47,7 @@ export default function RecordPaymentModal({ isOpen, onClose, workbenchId, onPay
     try {
       await paymentsService.recordPayment(workbenchId, {
         type,
-        party: party.trim() || 'Internal Transfer',
+        party: party.trim(),
         amount: Number(amount),
         date,
         payment_mode: paymentMode,
@@ -75,8 +78,10 @@ export default function RecordPaymentModal({ isOpen, onClose, workbenchId, onPay
               <BsCreditCard />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white tracking-tight">Record Payment / Voucher</h3>
-              <p className="text-xs text-gray-400">Add payment received, sent, or transfer mapped to trade container</p>
+              <h3 className="text-lg font-bold text-white tracking-tight">
+                {type === 'Payment Received' ? 'Record Receipt Voucher' : 'Record Payment Voucher'}
+              </h3>
+              <p className="text-xs text-gray-400">Add payment received or sent mapped to Sales or Purchase trade containers</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
@@ -89,39 +94,28 @@ export default function RecordPaymentModal({ isOpen, onClose, workbenchId, onPay
           {/* Payment Type Selector */}
           <div>
             <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Voucher Type</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => handleTypeChange('Payment Received')}
-                className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all ${
+                className={`py-2.5 px-4 rounded-xl border text-xs font-bold transition-all flex items-center justify-center space-x-2 ${
                   type === 'Payment Received'
                     ? 'bg-teal-500/15 border-teal-500 text-teal-400 shadow-sm'
                     : 'bg-[#111111] border-white/10 text-gray-400 hover:text-white'
                 }`}
               >
-                📥 Payment Received
+                <span>📥 Payment Received (Receipt)</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleTypeChange('Payment Sent')}
-                className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all ${
+                className={`py-2.5 px-4 rounded-xl border text-xs font-bold transition-all flex items-center justify-center space-x-2 ${
                   type === 'Payment Sent'
                     ? 'bg-rose-500/15 border-rose-500 text-rose-400 shadow-sm'
                     : 'bg-[#111111] border-white/10 text-gray-400 hover:text-white'
                 }`}
               >
-                📤 Payment Sent
-              </button>
-              <button
-                type="button"
-                onClick={() => handleTypeChange('Transfer')}
-                className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all ${
-                  type === 'Transfer'
-                    ? 'bg-purple-500/15 border-purple-500 text-purple-400 shadow-sm'
-                    : 'bg-[#111111] border-white/10 text-gray-400 hover:text-white'
-                }`}
-              >
-                🔄 Contra Transfer
+                <span>📤 Payment Sent (Payment)</span>
               </button>
             </div>
           </div>
@@ -129,7 +123,7 @@ export default function RecordPaymentModal({ isOpen, onClose, workbenchId, onPay
           {/* Amount & Date */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Amount (₹)</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Amount (₹) *</label>
               <input
                 type="number"
                 step="0.01"
@@ -137,11 +131,11 @@ export default function RecordPaymentModal({ isOpen, onClose, workbenchId, onPay
                 placeholder="0.00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#111111] border border-white/10 rounded-xl text-white font-medium focus:outline-none focus:border-teal-500 transition-colors"
+                className="w-full px-4 py-2.5 bg-[#111111] border border-white/10 rounded-xl text-white font-medium focus:outline-none focus:border-teal-500 transition-colors font-bold"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Payment Date</label>
+              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Payment Date *</label>
               <input
                 type="date"
                 required
@@ -155,12 +149,12 @@ export default function RecordPaymentModal({ isOpen, onClose, workbenchId, onPay
           {/* Counterparty / Party */}
           <div>
             <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
-              {type === 'Payment Received' ? 'Customer / Payer Name' : type === 'Payment Sent' ? 'Vendor / Payee Name' : 'Transfer Details'}
+              {type === 'Payment Received' ? 'Customer / Payer Name *' : 'Vendor / Payee Name *'}
             </label>
             <input
               type="text"
               required
-              placeholder={type === 'Payment Received' ? 'e.g. Acme Tech Corp' : type === 'Payment Sent' ? 'e.g. Vendor Logistics Pvt Ltd' : 'e.g. HDFC Main -> Petty Cash'}
+              placeholder={type === 'Payment Received' ? 'e.g. Acme Tech Corp' : 'e.g. Vendor Logistics Pvt Ltd'}
               value={party}
               onChange={(e) => setParty(e.target.value)}
               className="w-full px-4 py-2.5 bg-[#111111] border border-white/10 rounded-xl text-white font-medium focus:outline-none focus:border-teal-500 transition-colors"
@@ -199,7 +193,7 @@ export default function RecordPaymentModal({ isOpen, onClose, workbenchId, onPay
           {/* Trade Container Mapping */}
           <div className="p-4 bg-[#111111] border border-white/10 rounded-xl space-y-3">
             <label className="block text-xs font-bold text-teal-400 uppercase tracking-wider">Map to Trade Container</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setTradeContainer('Sales')}
@@ -208,7 +202,7 @@ export default function RecordPaymentModal({ isOpen, onClose, workbenchId, onPay
                 }`}
               >
                 <BsCartCheck />
-                <span>Sales</span>
+                <span>Sales Container</span>
               </button>
               <button
                 type="button"
@@ -218,17 +212,7 @@ export default function RecordPaymentModal({ isOpen, onClose, workbenchId, onPay
                 }`}
               >
                 <BsBagCheck />
-                <span>Purchases</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setTradeContainer('Transfers')}
-                className={`py-2 px-3 rounded-lg border text-xs font-medium flex items-center justify-center space-x-1.5 transition-all ${
-                  tradeContainer === 'Transfers' ? 'bg-teal-500/20 border-teal-500 text-teal-400' : 'bg-[#181818] border-white/10 text-gray-400 hover:text-white'
-                }`}
-              >
-                <BsArrowLeftRight />
-                <span>Transfers</span>
+                <span>Purchases Container</span>
               </button>
             </div>
             <div>

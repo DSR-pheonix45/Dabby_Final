@@ -10,6 +10,8 @@ import {
 import { diService } from '../../../../services/diService';
 import { toast } from 'react-hot-toast';
 
+import RecordTransferModal from '../components/RecordTransferModal';
+
 export default function Transfers({ workbenchId }) {
   const {
     data,
@@ -23,16 +25,6 @@ export default function Transfers({ workbenchId }) {
   } = useTransfers(workbenchId);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  // Form State
-  const [transferType, setTransferType] = useState('bank_to_bank');
-  const [fromAccount, setFromAccount] = useState('HDFC Primary Current Acc');
-  const [toAccount, setToAccount] = useState('ICICI Operations Acc');
-  const [amount, setAmount] = useState('');
-  const [transferDate, setTransferDate] = useState(new Date().toISOString().split('T')[0]);
-  const [referenceNumber, setReferenceNumber] = useState('');
-  const [narration, setNarration] = useState('');
 
   const filtersConfig = [
     {
@@ -225,133 +217,12 @@ export default function Transfers({ workbenchId }) {
       />
 
       {/* Record Transfer Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl p-6 space-y-4">
-            <div className="border-b border-white/10 pb-3">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                <BsArrowLeftRight className="text-teal-400" /> Record Business Transfer
-              </h2>
-              <p className="text-xs text-gray-400 mt-0.5">Contra bank transfers, petty cash, or founder equity movements</p>
-            </div>
-
-            <form onSubmit={handleCreateTransfer} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-gray-300 font-semibold mb-1">Transfer Type *</label>
-                <select
-                  value={transferType}
-                  onChange={(e) => {
-                    const t = e.target.value;
-                    setTransferType(t);
-                    if (t === 'bank_to_bank') { setFromAccount('HDFC Primary Current Acc'); setToAccount('ICICI Operations Acc'); }
-                    else if (t === 'petty_cash_withdrawal') { setFromAccount('HDFC Primary Current Acc'); setToAccount('Petty Cash Box'); }
-                    else if (t === 'petty_cash_deposit') { setFromAccount('Petty Cash Box'); setToAccount('HDFC Primary Current Acc'); }
-                    else if (t === 'founder_capital_infusion') { setFromAccount('Founder Personal Acc / Equity'); setToAccount('HDFC Primary Current Acc'); }
-                    else if (t === 'founder_drawings') { setFromAccount('HDFC Primary Current Acc'); setToAccount('Founder Personal Drawings'); }
-                  }}
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-teal-500"
-                >
-                  <option value="bank_to_bank">Bank-to-Bank Contra Transfer</option>
-                  <option value="petty_cash_withdrawal">Petty Cash Withdrawal (Bank → Petty Cash)</option>
-                  <option value="petty_cash_deposit">Petty Cash Deposit (Petty Cash → Bank)</option>
-                  <option value="founder_capital_infusion">Founder Capital Infusion (Equity In)</option>
-                  <option value="initial_funding">Initial Funding / Investment</option>
-                  <option value="founder_drawings">Founder Drawings / Stakeholder Withdrawal</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-gray-300 font-semibold mb-1">Source Account (From) *</label>
-                  <input
-                    type="text"
-                    required
-                    value={fromAccount}
-                    onChange={(e) => setFromAccount(e.target.value)}
-                    placeholder="e.g. HDFC Current Acc"
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-300 font-semibold mb-1">Destination Account (To) *</label>
-                  <input
-                    type="text"
-                    required
-                    value={toAccount}
-                    onChange={(e) => setToAccount(e.target.value)}
-                    placeholder="e.g. ICICI Operations Acc"
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-gray-300 font-semibold mb-1">Amount (₹) *</label>
-                  <input
-                    type="number"
-                    required
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="50000"
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500 font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-300 font-semibold mb-1">Transfer Date</label>
-                  <input
-                    type="date"
-                    value={transferDate}
-                    onChange={(e) => setTransferDate(e.target.value)}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-gray-300 font-semibold mb-1">Reference / Cheque / UTR #</label>
-                <input
-                  type="text"
-                  value={referenceNumber}
-                  onChange={(e) => setReferenceNumber(e.target.value)}
-                  placeholder="e.g. UTR-9002158"
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-300 font-semibold mb-1">Day Book Narration / Remarks</label>
-                <textarea
-                  rows={2}
-                  value={narration}
-                  onChange={(e) => setNarration(e.target.value)}
-                  placeholder="Optional custom narration (e.g. Inter-bank contra transfer for payroll reserve)"
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-teal-500 resize-none"
-                />
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-gray-400 hover:text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-5 py-2 bg-teal-500 hover:bg-teal-400 text-black font-bold rounded-xl flex items-center gap-1.5"
-                >
-                  {submitting ? 'Posting...' : 'Post Transfer'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <RecordTransferModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        workbenchId={workbenchId}
+        onTransferCreated={refetch}
+      />
 
     </div>
   );

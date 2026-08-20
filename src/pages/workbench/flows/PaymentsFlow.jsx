@@ -17,6 +17,7 @@ import {
 import { paymentsService } from '../../../services/paymentsService';
 import { formatCurrency } from '../../../utils/currency';
 import RecordPaymentModal from '../payments/RecordPaymentModal';
+import RecordTransferModal from '../ops/components/RecordTransferModal';
 import { toast } from 'react-hot-toast';
 
 export default function PaymentsFlow() {
@@ -28,7 +29,9 @@ export default function PaymentsFlow() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('all'); // all | received | sent | transfers | mapped
   const [search, setSearch] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentModalType, setPaymentModalType] = useState('Payment Received');
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
 
   const loadPayments = useCallback(async () => {
     if (!workbenchId) return;
@@ -110,12 +113,24 @@ export default function PaymentsFlow() {
           >
             <BsArrowRepeat className={loading ? 'animate-spin' : ''} />
           </button>
+
           <button
-            onClick={() => setIsModalOpen(true)}
-            className="px-5 py-2.5 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-sm rounded-xl flex items-center space-x-2 transition-all shadow-lg shadow-teal-500/20"
+            onClick={() => {
+              setPaymentModalType('Payment Received');
+              setIsPaymentModalOpen(true);
+            }}
+            className="px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs rounded-xl flex items-center space-x-1.5 transition-all shadow-lg shadow-teal-500/20"
           >
             <BsPlusLg />
-            <span>Record Payment / Voucher</span>
+            <span>+ Record Payment / Voucher</span>
+          </button>
+
+          <button
+            onClick={() => setIsTransferModalOpen(true)}
+            className="px-4 py-2.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 font-bold text-xs rounded-xl flex items-center space-x-1.5 transition-all"
+          >
+            <BsArrowLeftRight />
+            <span>Record Business Transfer</span>
           </button>
         </div>
       </div>
@@ -247,12 +262,23 @@ export default function PaymentsFlow() {
               <p className="text-xs text-gray-400 mt-1 max-w-md mx-auto">
                 Record your first payment received, payment sent, or internal bank transfer to map them to your trade containers.
               </p>
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="mt-4 px-4 py-2 bg-teal-500 text-slate-950 font-bold text-xs rounded-xl hover:bg-teal-400 transition-colors inline-flex items-center gap-1.5"
-              >
-                <BsPlusLg /> Record Voucher
-              </button>
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <button
+                  onClick={() => {
+                    setPaymentModalType('Payment Received');
+                    setIsPaymentModalOpen(true);
+                  }}
+                  className="px-4 py-2 bg-teal-500 text-slate-950 font-bold text-xs rounded-xl hover:bg-teal-400 transition-colors inline-flex items-center gap-1.5"
+                >
+                  <BsPlusLg /> Record Payment
+                </button>
+                <button
+                  onClick={() => setIsTransferModalOpen(true)}
+                  className="px-4 py-2 bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold text-xs rounded-xl hover:bg-purple-500/30 transition-colors inline-flex items-center gap-1.5"
+                >
+                  <BsArrowLeftRight /> Business Transfer
+                </button>
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -358,10 +384,19 @@ export default function PaymentsFlow() {
 
       {/* Record Payment Modal */}
       <RecordPaymentModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
         workbenchId={workbenchId}
+        initialType={paymentModalType}
         onPaymentRecorded={loadPayments}
+      />
+
+      {/* Official Business Transfer (Contra) Modal */}
+      <RecordTransferModal
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        workbenchId={workbenchId}
+        onTransferCreated={loadPayments}
       />
     </div>
   );
