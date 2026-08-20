@@ -17,11 +17,13 @@ import OpsFilterBar from '../components/OpsFilterBar';
 import OpsDataTable from '../components/OpsDataTable';
 import CreateBudgetModal from '../components/CreateBudgetModal';
 import { budgetService } from '../../../../services/budgetService';
+import { collaborationService } from '../../../../services/collaborationService';
 import { formatCurrency } from '../../../../utils/currency';
 import { toast } from 'react-hot-toast';
 
 export default function Budgeting({ workbenchId }) {
   const [budgets, setBudgets] = useState([]);
+  const [activeDepts, setActiveDepts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
@@ -33,6 +35,9 @@ export default function Budgeting({ workbenchId }) {
     try {
       const list = await budgetService.getBudgets(workbenchId);
       setBudgets(list || []);
+      const depts = await collaborationService.getDepartments(workbenchId);
+      const activeOnly = (depts || []).filter(d => (d.status || 'active').toLowerCase() === 'active');
+      setActiveDepts(activeOnly);
     } catch (err) {
       console.error('[Budgeting] Failed to load budgets:', err);
       toast.error('Failed to load budget allocations');
@@ -85,15 +90,8 @@ export default function Budgeting({ workbenchId }) {
   const filtersConfig = [
     {
       id: 'department',
-      label: 'Department Dimension',
-      options: [
-        { value: 'Engineering & Tech', label: 'Engineering & Tech' },
-        { value: 'Marketing & Growth', label: 'Marketing & Growth' },
-        { value: 'Sales & Business Dev', label: 'Sales & Business Dev' },
-        { value: 'Operations & Logistics', label: 'Operations & Logistics' },
-        { value: 'HR & Admin', label: 'HR & Admin' },
-        { value: 'Product & Design', label: 'Product & Design' }
-      ]
+      label: 'Active Department Dimension',
+      options: activeDepts.map(d => ({ value: d.name, label: d.name }))
     }
   ];
 

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { BsXLg, BsCheckCircleFill, BsShieldCheck, BsPlusLg, BsTrash } from 'react-icons/bs';
+import React, { useState, useEffect } from 'react';
+import { BsXLg, BsCheckCircleFill, BsShieldCheck, BsPlusLg, BsTrash, BsExclamationTriangle, BsArrowRepeat } from 'react-icons/bs';
 import { budgetService } from '../../../../services/budgetService';
+import { collaborationService } from '../../../../services/collaborationService';
 import { toast } from 'react-hot-toast';
 
 const CASH_ASSET_ACCOUNTS = [
@@ -8,16 +9,6 @@ const CASH_ASSET_ACCOUNTS = [
   { code: 'A-ACO-02', name: 'HDFC Operating Current Acc' },
   { code: 'A-ACO-03', name: 'ICICI Operations Acc' },
   { code: 'A-ACO-04', name: 'Petty Cash Box / Chest' },
-];
-
-const DEPARTMENTS = [
-  'Engineering & Tech',
-  'Marketing & Growth',
-  'Sales & Business Dev',
-  'Operations & Logistics',
-  'HR & Admin',
-  'Product & Design',
-  'Finance & Legal',
 ];
 
 const PERIODS = [
@@ -32,8 +23,11 @@ const PERIODS = [
 export default function CreateBudgetModal({ isOpen, onClose, workbenchId, onBudgetCreated }) {
   if (!isOpen) return null;
 
+  const [activeDepts, setActiveDepts] = useState([]);
+  const [loadingDepts, setLoadingDepts] = useState(true);
+
   const [name, setName] = useState('');
-  const [department, setDepartment] = useState('Engineering & Tech');
+  const [department, setDepartment] = useState('');
   const [sourceCashAccount, setSourceCashAccount] = useState('A-ACO-01 — Cash / Bank Main Account');
   const [period, setPeriod] = useState('Q3 2026');
   const [allocatedAmount, setAllocatedAmount] = useState('');
@@ -44,6 +38,28 @@ export default function CreateBudgetModal({ isOpen, onClose, workbenchId, onBudg
     { category: 'Primary Operational Spend', allocated: '' }
   ]);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && workbenchId) {
+      setLoadingDepts(true);
+      collaborationService.getDepartments(workbenchId)
+        .then(depts => {
+          const activeOnly = (depts || []).filter(d => (d.status || 'active').toLowerCase() === 'active');
+          setActiveDepts(activeOnly);
+          if (activeOnly.length > 0) {
+            setDepartment(activeOnly[0].name);
+          } else {
+            setDepartment('');
+          }
+        })
+        .catch(err => {
+          console.warn("[CreateBudgetModal] Notice loading active depts:", err);
+          setActiveDepts([]);
+          setDepartment('');
+        })
+        .finally(() => setLoadingDepts(false));
+    }
+  }, [isOpen, workbenchId]);
 
   const handleAddCategory = () => {
     setCategoriesPlan(prev => [...prev, { category: '', allocated: '' }]);
@@ -63,6 +79,10 @@ export default function CreateBudgetModal({ isOpen, onClose, workbenchId, onBudg
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!department) {
+      toast.error('Please select an active department');
+      return;
+    }
     if (!allocatedAmount || Number(allocatedAmount) <= 0) {
       toast.error('Please enter a valid total budget allocation amount');
       return;
@@ -88,7 +108,7 @@ export default function CreateBudgetModal({ isOpen, onClose, workbenchId, onBudg
         categories_plan: cleanCategories
       });
 
-      toast.success('Budget allocated successfully from Cash Asset!');
+      toast.success(`Budget allocated to ${department} successfully!`);
       if (onBudgetCreated) onBudgetCreated();
       onClose();
     } catch (err) {
@@ -109,8 +129,8 @@ export default function CreateBudgetModal({ isOpen, onClose, workbenchId, onBudg
               <BsShieldCheck />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white tracking-tight">Create & Allocate Department Budget</h3>
-              <p className="text-xs text-gray-400">Allocate budget from cash-related asset accounts to department dimensions</p>
+              <h3 className="text-lg font-bold text-white tracking-tight">Create & Allocate Budget</h3>
+              <p className="text-xs text-gray-400">Allocate budget from cash asset accounts to active workbench departments</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-white rounded-lg transition-colors">
@@ -120,37 +140,49 @@ export default function CreateBudgetModal({ isOpen, onClose, workbenchId, onBudg
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
-          {/* Budget Name & Department */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1">
-                Department Dimension *
-              </label>
+          {/* Active Department Selection */}
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+              Active Department Dimension *
+            </label>
+            {loadingDepts ? (
+              <div className="flex items-center text-xs text-gray-400 py-2">
+                <BsArrowRepeat className="animate-spin mr-2" /> Loading active departments…
+              </div>
+            ) : activeDepts.length === 0 ? (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-xs flex items-center gap-2">
+                <BsExclamationTriangle className="text-sm shrink-0" />
+                <span>No active departments found. Please add an active department in <strong>Members → Departments</strong> first.</span>
+              </div>
+            ) : (
               <select
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-teal-500"
+                className="w-full px-3 py-2.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white font-medium focus:outline-none focus:border-teal-500"
               >
-                {DEPARTMENTS.map(d => (
-                  <option key={d} value={d}>{d}</option>
+                {activeDepts.map(d => (
+                  <option key={d.id} value={d.name}>
+                    {d.name} {d.code ? `(${d.code})` : ''} — ACTIVE
+                  </option>
                 ))}
               </select>
-            </div>
+            )}
+          </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1">
-                Financial Period *
-              </label>
-              <select
-                value={period}
-                onChange={(e) => setPeriod(e.target.value)}
-                className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-teal-500"
-              >
-                {PERIODS.map(p => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </div>
+          {/* Financial Period */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1">
+              Financial Period *
+            </label>
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-teal-500"
+            >
+              {PERIODS.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
           </div>
 
           {/* Budget Title / Name */}
@@ -160,7 +192,7 @@ export default function CreateBudgetModal({ isOpen, onClose, workbenchId, onBudg
             </label>
             <input
               type="text"
-              placeholder={`e.g. ${department} Growth Initiative`}
+              placeholder={department ? `e.g. ${department} Growth & Ops Budget` : 'e.g. Q3 Growth Initiative'}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-teal-500"
@@ -197,7 +229,7 @@ export default function CreateBudgetModal({ isOpen, onClose, workbenchId, onBudg
               type="number"
               step="0.01"
               required
-              placeholder="e.g. 1000000"
+              placeholder="e.g. 50000"
               value={allocatedAmount}
               onChange={(e) => setAllocatedAmount(e.target.value)}
               className="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-sm text-teal-400 font-extrabold focus:outline-none focus:border-teal-500"
@@ -224,7 +256,7 @@ export default function CreateBudgetModal({ isOpen, onClose, workbenchId, onBudg
                 <div key={i} className="flex items-center gap-2">
                   <input
                     type="text"
-                    placeholder="e.g. Cloud Hosting / Marketing Ads"
+                    placeholder="e.g. Digital Ads / Software Licenses"
                     value={c.category}
                     onChange={(e) => handleCategoryChange(i, 'category', e.target.value)}
                     className="flex-1 px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-teal-500"
@@ -257,7 +289,7 @@ export default function CreateBudgetModal({ isOpen, onClose, workbenchId, onBudg
             </label>
             <textarea
               rows={2}
-              placeholder="e.g. Priority allocation for Q3 customer acquisition campaign and core infrastructure upgrade"
+              placeholder="e.g. Budget allocation for active department operations"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-teal-500 resize-none"
@@ -275,7 +307,7 @@ export default function CreateBudgetModal({ isOpen, onClose, workbenchId, onBudg
             </button>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || activeDepts.length === 0}
               className="px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs flex items-center space-x-2 transition-all shadow-lg shadow-teal-500/20 disabled:opacity-50"
             >
               <BsCheckCircleFill />
