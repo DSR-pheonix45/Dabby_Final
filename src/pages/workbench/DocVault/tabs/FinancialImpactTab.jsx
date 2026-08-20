@@ -13,14 +13,35 @@ export default function FinancialImpactTab({ doc, onUpdate }) {
     return <div className="p-8 text-center text-gray-500 text-sm">No analysis available. Run the document through analysis first.</div>;
   }
 
-  // Canonical UFO (flattened columns) with legacy extracted_data fallback
+  // Canonical UFO with legacy extracted_data fallback
   const legacy = note.extracted_data || {};
-  
   const money = note.money || {};
   const taxes = note.taxes || {};
-  const total = Number(money.total_amount ?? money.subtotal ?? legacy.total_amount ?? 0);
-  const tax = Number(taxes.total_tax ?? legacy.tax_amount ?? 0);
-  const net = Number(money.subtotal ?? legacy.subtotal ?? (total > tax ? total - tax : total));
+
+  const getNum = (v) => {
+    if (v === null || v === undefined) return 0;
+    if (typeof v === 'object') return Number(v.value ?? v.amount ?? v.total ?? 0);
+    return Number(v) || 0;
+  };
+
+  const rawTotal = 
+    money.total_amount ?? money.grand_total ?? money.total ??
+    legacy.financials?.total_amount ?? legacy.financials?.grand_total ??
+    legacy.money?.total_amount ?? legacy.total_amount ?? legacy.invoice_total ?? 0;
+
+  const total = getNum(rawTotal);
+
+  const rawTax = 
+    taxes.total_tax ?? taxes.tax_amount ??
+    legacy.financials?.tax_amount ?? legacy.taxes?.total_tax ?? legacy.tax_amount ?? 0;
+
+  const tax = getNum(rawTax);
+
+  const rawSubtotal = 
+    money.subtotal ?? legacy.financials?.subtotal ?? legacy.money?.subtotal ?? legacy.subtotal ?? 0;
+
+  const subtotal = getNum(rawSubtotal);
+  const net = subtotal > 0 ? subtotal : (total > tax ? total - tax : total);
   
   // Enforce Letterhead vs Billed-To Party Classification Rule
   const partyInfo = classifyDocumentParties(doc, activeWorkbench);

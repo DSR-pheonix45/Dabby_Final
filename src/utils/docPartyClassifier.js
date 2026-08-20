@@ -26,7 +26,7 @@ export const classifyDocumentParties = (documentObj, activeWorkbench, savedParti
   const extData = notes.extracted_data || {};
   const extractedParties = notes.parties || extData.parties || documentObj.parties || {};
 
-  const rawTypeHint = notes.document_type || extData.document_type || documentObj.document_type || "";
+  const rawTypeHint = notes.classification_type || notes.document_type || extData.document_type || documentObj.document_type || documentObj.original_filename || "";
   const docTypeHint = (typeof rawTypeHint === 'object' ? (rawTypeHint.value || "") : String(rawTypeHint)).toLowerCase();
 
   // 1. Seller / Issuer details (LETTERHEAD ENTITY)
@@ -93,7 +93,9 @@ export const classifyDocumentParties = (documentObj, activeWorkbench, savedParti
   else {
     const isExplicitSalesType = (
       docTypeHint.includes("sales") || 
-      docTypeHint.includes("customer_billed")
+      docTypeHint.includes("customer_billed") ||
+      docTypeHint.includes("inv-") ||
+      docTypeHint.startsWith("inv")
     );
     if (isExplicitSalesType) {
       classification = "sales_invoice";

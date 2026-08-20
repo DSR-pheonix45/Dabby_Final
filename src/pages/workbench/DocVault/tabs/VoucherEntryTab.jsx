@@ -44,9 +44,30 @@ export default function VoucherEntryTab({ doc }) {
   // Money & Amounts
   const money = note.money || {};
   const taxes = note.taxes || {};
-  const grandTotal = Number(money.total_amount || ext.total_amount || ext.invoice_total || 0);
-  const subtotal = Number(money.subtotal || ext.subtotal || (grandTotal > 0 ? grandTotal / 1.18 : 0));
-  const taxTotal = Number(taxes.total_tax || ext.tax_amount || (grandTotal - subtotal));
+
+  const getNum = (v) => {
+    if (v === null || v === undefined) return 0;
+    if (typeof v === 'object') return Number(v.value ?? v.amount ?? v.total ?? 0);
+    return Number(v) || 0;
+  };
+
+  const rawTotal = 
+    money.total_amount ?? money.grand_total ?? money.total ??
+    ext.financials?.total_amount ?? ext.financials?.grand_total ??
+    ext.money?.total_amount ?? ext.total_amount ?? ext.invoice_total ?? 0;
+
+  const grandTotal = getNum(rawTotal);
+
+  const rawTax = 
+    taxes.total_tax ?? taxes.tax_amount ??
+    ext.financials?.tax_amount ?? ext.taxes?.total_tax ?? ext.tax_amount ?? 0;
+
+  const taxTotal = getNum(rawTax) || (grandTotal > 0 ? grandTotal - (grandTotal / 1.18) : 0);
+
+  const rawSubtotal = 
+    money.subtotal ?? ext.financials?.subtotal ?? ext.money?.subtotal ?? ext.subtotal ?? 0;
+
+  const subtotal = getNum(rawSubtotal) || (grandTotal > 0 ? grandTotal - taxTotal : 0);
   const cgst = Number(taxes.cgst || taxTotal / 2);
   const sgst = Number(taxes.sgst || taxTotal / 2);
   const igst = Number(taxes.igst || 0);
