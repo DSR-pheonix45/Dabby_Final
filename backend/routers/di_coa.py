@@ -34,35 +34,40 @@ class CreateLabelPayload(BaseModel):
 
 # ALERX Group Code to Sub-account Taxonomy mapping
 GROUP_SUBACCOUNT_MAP = {
-    "ACO": ("1000-SUB", "Cash & Cash Equivalents", "AST"),
-    "AAR": ("1100-SUB", "Accounts Receivable (AR)", "AST"),
-    "AIN": ("1200-SUB", "Inventory", "AST"),
-    "ATX": ("1300-SUB", "Tax & Operational Advances", "AST"),
-    "AFA": ("1400-SUB", "Fixed & Intangible Assets", "AST"),
-    "LAP": ("2000-SUB", "Accounts Payable (AP)", "LIA"),
-    "LDE": ("2100-SUB", "Debt & Credit Lines", "LIA"),
-    "LST": ("2200-SUB", "Statutory & Tax Liabilities", "LIA"),
-    "LPR": ("2300-SUB", "Payroll Liabilities", "LIA"),
-    "LOT": ("2400-SUB", "Accrued Expenses & Other Liabilities", "LIA"),
-    "ESC": ("3000-SUB", "Share Capital", "EQU"),
-    "EOU": ("3100-SUB", "Securities Premium & Surplus", "EQU"),
-    "ERE": ("3200-SUB", "Retained Earnings & Reserves", "EQU"),
-    "ROP": ("4000-SUB", "Operating Revenue", "REV"),
-    "RCR": ("4100-SUB", "Contra-Revenue & Other Income", "REV"),
-    "XDC": ("5000-SUB", "Direct Costs (COGS)", "EXP"),
-    "XPE": ("5100-SUB", "Personnel Costs (OPEX)", "EXP"),
-    "XMK": ("5200-SUB", "Marketing & Growth (OPEX)", "EXP"),
-    "XTE": ("5300-SUB", "Technology & Internal Tools (OPEX)", "EXP"),
-    "XAD": ("5400-SUB", "Administrative & Statutory Expenses", "EXP"),
+    "ACO": ("A-ACO", "Cash & Cash Equivalents", "A"),
+    "AAR": ("A-AAR", "Accounts Receivable (AR)", "A"),
+    "AIN": ("A-AIN", "Inventory", "A"),
+    "ATX": ("A-ATX", "Tax & Operational Advances", "A"),
+    "AFA": ("A-AFA", "Fixed & Intangible Assets", "A"),
+    "LAP": ("L-LAP", "Accounts Payable (AP)", "L"),
+    "LDE": ("L-LDE", "Debt & Credit Lines", "L"),
+    "LST": ("L-LST", "Statutory & Tax Liabilities", "L"),
+    "LPR": ("L-LPR", "Payroll Liabilities", "L"),
+    "LOT": ("L-LOT", "Accrued Expenses & Other Liabilities", "L"),
+    "ESC": ("E-ESC", "Share Capital", "E"),
+    "EOU": ("E-EOU", "Securities Premium & Surplus", "E"),
+    "ERE": ("E-ERE", "Retained Earnings & Reserves", "E"),
+    "ROP": ("R-ROP", "Operating Revenue", "R"),
+    "RCR": ("R-RCR", "Contra-Revenue & Other Income", "R"),
+    "XDC": ("X-XDC", "Direct Costs (COGS)", "X"),
+    "XPE": ("X-XPE", "Personnel Costs (OPEX)", "X"),
+    "XMK": ("X-XMK", "Marketing & Growth (OPEX)", "X"),
+    "XTE": ("X-XTE", "Technology & Internal Tools (OPEX)", "X"),
+    "XAD": ("X-XAD", "Administrative & Statutory Expenses", "X"),
 }
 
 CLASS_TO_CATEGORY = {
-    "Assets": "AST", "Liabilities": "LIA", "Equity": "EQU", "Revenue": "REV", "Expenses": "EXP",
-    "Asset": "AST", "Liability": "LIA", "Income": "REV", "Expense": "EXP"
+    "Assets": "A", "Liabilities": "L", "Equity": "E", "Revenue": "R", "Expenses": "X",
+    "Asset": "A", "Liability": "L", "Income": "R", "Expense": "X",
+    "AST": "A", "LIA": "L", "EQU": "E", "REV": "R", "EXP": "X"
 }
 
 CATEGORY_TO_CLASS = {
-    "AST": "Assets", "LIA": "Liabilities", "EQU": "Equity", "REV": "Revenue", "EXP": "Expenses"
+    "A": "Assets", "AST": "Assets",
+    "L": "Liabilities", "LIA": "Liabilities",
+    "E": "Equity", "EQU": "Equity",
+    "R": "Revenue", "REV": "Revenue",
+    "X": "Expenses", "EXP": "Expenses"
 }
 
 # --- GET Canonical Structured Accounts ---

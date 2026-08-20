@@ -10,6 +10,13 @@ from supabase_client import supabase
 
 router = APIRouter()
 
+CATEGORY_MAP = {
+    "A": "AST", "AST": "AST",
+    "L": "LIA", "LIA": "LIA",
+    "E": "EQU", "EQU": "EQU",
+    "R": "REV", "REV": "REV",
+    "X": "EXP", "EXP": "EXP"
+}
 CATEGORY_NAMES = {"AST": "Assets", "LIA": "Liabilities", "EQU": "Equity", "REV": "Revenue", "EXP": "Expenses"}
 CATEGORY_ORDER = ["AST", "LIA", "EQU", "REV", "EXP"]
 
@@ -29,9 +36,9 @@ def _entries_for_workbench(workbench_id: str):
 
 
 def _balances(workbench_id: str):
-    """Per-account net balance signed on its normal side (only accounts with activity)."""
+    """Per-account net balance signed on its normal side (only postable accounts)."""
     accts = supabase.table("di_accounts").select("id, code, name, category_code, normal_balance") \
-        .eq("workbench_id", workbench_id).execute().data or []
+        .eq("workbench_id", workbench_id).eq("is_postable", True).execute().data or []
     _, entries = _entries_for_workbench(workbench_id)
     agg = {a["id"]: {"debit": 0.0, "credit": 0.0} for a in accts}
     for e in entries:
@@ -42,21 +49,23 @@ def _balances(workbench_id: str):
         d, c = _r2(agg[a["id"]]["debit"]), _r2(agg[a["id"]]["credit"])
         nb = a["normal_balance"]
         net = _r2(d - c) if nb == "debit" else _r2(c - d)
+        norm_cat = CATEGORY_MAP.get(a["category_code"], a["category_code"])
         rows.append({"account_id": a["id"], "code": a["code"], "name": a["name"],
-                     "category": a["category_code"], "normal_balance": nb, "balance": net})
+                     "category": norm_cat, "normal_balance": nb, "balance": net})
     return rows
 
 
 def _cat(rows, cat):
+    target = CATEGORY_MAP.get(cat, cat)
     return sorted([{"code": r["code"], "name": r["name"], "amount": r["balance"]}
-                   for r in rows if r["category"] == cat], key=lambda r: r["code"])
+                   for r in rows if CATEGORY_MAP.get(r["category"], r["category"]) == target], key=lambda r: r["code"])
 
 
 @router.get("/trial-balance/{workbench_id}")
 async def trial_balance(workbench_id: str):
     try:
         accts = supabase.table("di_accounts").select("id, code, name, category_code, normal_balance") \
-            .eq("workbench_id", workbench_id).execute().data or []
+            .eq("workbench_id", workbench_id).eq("is_postable", True).execute().data or []
         tx_ids, entries = _entries_for_workbench(workbench_id)
 
         agg = {a["id"]: {"debit": 0.0, "credit": 0.0} for a in accts}
@@ -74,16 +83,17 @@ async def trial_balance(workbench_id: str):
                 tb_debit, tb_credit = (net, 0.0) if net >= 0 else (0.0, -net)
             else:
                 tb_credit, tb_debit = (net, 0.0) if net >= 0 else (0.0, -net)
+            norm_cat = CATEGORY_MAP.get(a["category_code"], a["category_code"])
             rows.append({
                 "account_id": a["id"], "code": a["code"], "name": a["name"],
-                "category": a["category_code"], "normal_balance": nb,
+                "category": norm_cat, "normal_balance": nb,
                 "debit": _r2(tb_debit), "credit": _r2(tb_credit),
                 "raw_debit": d, "raw_credit": c, "balance": net,
             })
 
         groups = []
         for cat in CATEGORY_ORDER:
-            cat_rows = sorted([r for r in rows if r["category"] == cat], key=lambda r: r["code"])
+            cat_rows = sorted([r for r in rows if CATEGORY_MAP.get(r["category"], r["category"]) == cat], key=lambda r: r["code"])
             if cat_rows:
                 groups.append({
                     "category": cat, "name": CATEGORY_NAMES.get(cat, cat),

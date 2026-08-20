@@ -118,16 +118,16 @@ export default function COA() {
 
   // Derived Financial Statement totals from canonical backend trial balance
   const groups = trialBalance?.groups || [];
-  const getCatTotal = (catCode) => {
-    const grp = groups.find(g => g.category === catCode);
+  const getCatTotal = (...catCodes) => {
+    const grp = groups.find(g => catCodes.includes(g.category));
     return Number(grp?.total || 0);
   };
 
-  const totalAsset = getCatTotal("AST");
-  const totalLiability = getCatTotal("LIA");
-  const totalEquity = getCatTotal("EQU");
-  const totalRevenue = getCatTotal("REV");
-  const totalExpense = getCatTotal("EXP");
+  const totalAsset = getCatTotal("A", "AST");
+  const totalLiability = getCatTotal("L", "LIA");
+  const totalEquity = getCatTotal("E", "EQU");
+  const totalRevenue = getCatTotal("R", "REV");
+  const totalExpense = getCatTotal("X", "EXP");
 
   const kpis = [
     { type: 'Asset', net: Math.max(0, totalAsset), gross: Math.max(0, totalAsset), color: { textTitle: 'text-emerald-400' } },

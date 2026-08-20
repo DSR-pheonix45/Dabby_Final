@@ -9,12 +9,17 @@ import uuid
 router = APIRouter()
 
 CLASS_TO_CATEGORY = {
-    "Assets": "AST", "Liabilities": "LIA", "Equity": "EQU", "Revenue": "REV", "Expenses": "EXP",
-    "Asset": "AST", "Liability": "LIA", "Income": "REV", "Expense": "EXP"
+    "Assets": "A", "Liabilities": "L", "Equity": "E", "Revenue": "R", "Expenses": "X",
+    "Asset": "A", "Liability": "L", "Income": "R", "Expense": "X",
+    "AST": "A", "LIA": "L", "EQU": "E", "REV": "R", "EXP": "X"
 }
 
 CATEGORY_TO_CLASS = {
-    "AST": "Assets", "LIA": "Liabilities", "EQU": "Equity", "REV": "Revenue", "EXP": "Expenses"
+    "A": "Assets", "AST": "Assets",
+    "L": "Liabilities", "LIA": "Liabilities",
+    "E": "Equity", "EQU": "Equity",
+    "R": "Revenue", "REV": "Revenue",
+    "X": "Expenses", "EXP": "Expenses"
 }
 
 class AccountCreate(BaseModel):

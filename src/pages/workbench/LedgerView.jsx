@@ -10,6 +10,8 @@ import { formatCurrency } from '../../utils/currency';
 const CAT_COLOR = {
   Assets: 'text-blue-400', Liabilities: 'text-amber-400', Equity: 'text-purple-400',
   Revenue: 'text-teal-400', Expenses: 'text-rose-400',
+  A: 'text-blue-400', L: 'text-amber-400', E: 'text-purple-400', R: 'text-teal-400', X: 'text-rose-400',
+  AST: 'text-blue-400', LIA: 'text-amber-400', EQU: 'text-purple-400', REV: 'text-teal-400', EXP: 'text-rose-400',
 };
 
 const TABS = [
