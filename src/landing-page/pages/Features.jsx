@@ -3,59 +3,46 @@ import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext";
 
-// Feature data
+// Feature data aligned with Launch, Growth, and Scale plans
 const featuresData = [
     {
         id: 1,
-        forWho: "For Individual Consultants & Freelancers",
-        title: "Dabby Consultant AI",
-        theNeed: "You need a simple way to track your income and expenses without learning complex accounting software.",
-        theValue: "Dabby acts as your personal AI consultant, automatically parsing your receipts, invoices, and bank statements. It organizes your finances instantly, giving you a clear picture of your cash flow and tax deductibles without manual data entry.",
+        forWho: "01 — LAUNCH (₹30,000 / yr)",
+        title: "For Small Businesses Getting Finance Organized",
+        theNeed: "You want to move away from spreadsheets, WhatsApp groups, and scattered paper receipts into one central system.",
+        theValue: "Dabby Launch provides 1 Workbench for your entire finance operation. Upload up to 500 documents/year with automated AI OCR extraction, sales & expense tracking, payment & receipt vouchers, Chart of Accounts, P&L, and Balance Sheet.",
         details: [
-            "Instant receipt & invoice parsing",
-            "Automated expense categorization",
-            "Real-time cash flow insights"
+            "500 processed documents / year & 5 team members",
+            "Doc Vault AI OCR & Party Management",
+            "Sales, Purchases, Payments & Financial Statements"
         ],
         workflowType: "grid-output"
     },
     {
         id: 2,
-        forWho: "For Startups & Growing Businesses",
-        title: "Collaborative Finance Workbench",
-        theNeed: "You need a structured financial environment to manage members, chart of accounts (COA), and track Accounts Receivable (AR) & Accounts Payable (AP).",
-        theValue: "Dabby provides a shared workspace for your team. It deterministically transforms unstructured documents into a universal ledger, automatically managing your COA, reconciling AR/AP, and keeping your team aligned on business health.",
+        forWho: "02 — GROWTH ⭐ (₹60,000 / yr — RECOMMENDED)",
+        title: "For Companies with an Active Finance Operation",
+        theNeed: "You need multiple people creating, approving, and managing financial activity with department-level controls.",
+        theValue: "Dabby Growth empowers growing teams with 1,500 documents/year, 15 team members, 10 department dimensions, approval workflows, invoice-payment linking, cash-flow visibility, budgeting, anomaly insights, and Tally/Zoho data sync.",
         details: [
-            "Multi-member workbench collaboration",
-            "Automated AR/AP tracking & reconciliation",
-            "Customizable Chart of Accounts (COA)"
+            "1,500 processed documents / year & 15 team members",
+            "Approval workflows & Department-wise accounting",
+            "Budgeting, Cash-flow KPIs & Tally/Zoho integrations"
         ],
         workflowType: "branching-right"
     },
     {
         id: 3,
-        forWho: "For Finance Teams & Fractional CFOs",
-        title: "AI-Native Financial Intelligence",
-        theNeed: "You need deep insights, anomaly detection, and runway forecasting across multiple client portfolios without spending hours in Excel.",
-        theValue: "Query your general ledgers using natural language with our secure RAG engine. Instantly calculate runways, perform variance analysis, and identify cost-leakage across any structured dataset.",
+        forWho: "03 — SCALE (₹90,000 / yr)",
+        title: "For Teams & CFO-Led Finance Systems",
+        theNeed: "You need enterprise controls, multi-level approvals, audit trails, FP&A forecasting, and investor dashboards.",
+        theValue: "Dabby Scale delivers full enterprise finance operations with 3,000 documents/year, 30 team members, unlimited departments, custom financial dimensions, cash forecasting, investor views, and priority support.",
         details: [
-            "Natural language ledger queries (RAG)",
-            "Automated anomaly & expense leakage flags",
-            "Live cash burn & runway forecasting"
+            "3,000 processed documents / year & 30 team members",
+            "Multi-level approvals, FP&A & Cash forecasting",
+            "Investor View, Audit trails & Priority Support"
         ],
         workflowType: "converging"
-    },
-    {
-        id: 4,
-        forWho: "For Agencies & Service Providers",
-        title: "Automated Document Instantiation",
-        theNeed: "You need to quickly generate models, invoices, and trackers in one click, without starting from scratch every time.",
-        theValue: "Generate ready-to-use professional templates directly from the workbench. Quickly spawn structured Financial Models, Quotation cards, Receivable trackers, and professional Invoices.",
-        details: [
-            "Ready-to-use interactive template worksheets",
-            "Auto-filled data rows derived from prompts",
-            "Clean CSV and PDF exports for instant sharing"
-        ],
-        workflowType: "horizontal-flow"
     }
 ];
 
