@@ -251,15 +251,28 @@ export default function SaleDetailModal({ isOpen, onClose, workbenchId, sale, on
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {sale.items.map((item, i) => (
-                      <tr key={i} className="hover:bg-white/[0.02]">
-                        <td className="p-3 font-semibold text-white">{item.name}</td>
-                        <td className="p-3 text-center text-gray-300">{item.quantity}</td>
-                        <td className="p-3 text-right text-gray-300">₹{(item.rate || 0).toLocaleString()}</td>
-                        <td className="p-3 text-right text-gray-400">₹{(item.tax || 0).toLocaleString()}</td>
-                        <td className="p-3 text-right font-bold text-teal-400">₹{(item.total || 0).toLocaleString()}</td>
-                      </tr>
-                    ))}
+                    {sale.items.map((item, i) => {
+                      let displayName = item.name;
+                      if (displayName && (displayName.includes('Doc Vault Voucher') || displayName.includes('Sales Voucher'))) {
+                        const match = displayName.match(/\(([^)]+)\)/);
+                        const filename = match ? match[1] : displayName;
+                        const sanitized = filename
+                          .replace(/\.[^/.]+$/, '')
+                          .replace(/^(INV|BILL|REC|SO|PO|DV)[_\-\s\d]+/i, '')
+                          .replace(/[_]/g, ' ')
+                          .trim();
+                        displayName = sanitized ? `${sanitized} (Product / Service)` : 'Commercial Product / Service Item';
+                      }
+                      return (
+                        <tr key={i} className="hover:bg-white/[0.02]">
+                          <td className="p-3 font-semibold text-white">{displayName}</td>
+                          <td className="p-3 text-center text-gray-300">{item.quantity}</td>
+                          <td className="p-3 text-right text-gray-300">₹{(item.rate || 0).toLocaleString()}</td>
+                          <td className="p-3 text-right text-gray-400">₹{(item.tax || 0).toLocaleString()}</td>
+                          <td className="p-3 text-right font-bold text-teal-400">₹{(item.total || 0).toLocaleString()}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

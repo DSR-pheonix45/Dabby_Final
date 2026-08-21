@@ -27,6 +27,91 @@ export const SALE_STATUSES = [
   'Returned'
 ];
 
+// Helper to extract clean service/product line items from AI analysis notes & UFO data
+export function extractDocLineItems(docObj) {
+  if (!docObj) return [];
+  const note = docObj.di_analysis_notes?.[0] || {};
+  const data = note.extracted_data || {};
+
+  const rawLineItems = (note.line_items && note.line_items.length > 0)
+    ? note.line_items
+    : (data.line_items || note.extracted_data?.line_items || data.items || note.items || []);
+
+  const totalAmt = note.money?.total_amount !== undefined ? Number(note.money?.total_amount) : (Number(data.financials?.total_amount?.value) || 0);
+  const taxAmt = note.taxes?.total_tax !== undefined ? Number(note.taxes?.total_tax) : (Number(data.financials?.total_tax?.value) || 0);
+  const subtotalAmt = Math.max(0, totalAmt - taxAmt);
+
+  if (Array.isArray(rawLineItems) && rawLineItems.length > 0) {
+    const mapped = rawLineItems.map((item, idx) => {
+      let rawName = item.description || item.name || item.item_name || item.product_name || item.title || item.item || '';
+      if (typeof rawName === 'object' && rawName !== null) {
+        rawName = rawName.value || rawName.description || rawName.name || rawName.text || '';
+      }
+      let nameStr = String(rawName || '').trim();
+
+      let quantity = Number(item.quantity?.value ?? item.quantity ?? item.qty?.value ?? item.qty ?? 1);
+      if (isNaN(quantity) || quantity <= 0) quantity = 1;
+
+      let rate = Number(item.unit_price?.value ?? item.unit_price ?? item.rate?.value ?? item.rate ?? item.price?.value ?? item.price ?? 0);
+      let tax = Number(item.tax?.value ?? item.tax ?? item.tax_amount?.value ?? item.tax_amount ?? 0);
+      let total = Number(item.total?.value ?? item.total ?? item.amount?.value ?? item.amount ?? 0);
+
+      if (total === 0 && rate > 0) {
+        total = (quantity * rate) + tax;
+      } else if (rate === 0 && total > 0) {
+        rate = Math.max(0, (total - tax) / quantity);
+      }
+
+      if (!nameStr) {
+        nameStr = `Service / Product Item #${idx + 1}`;
+      }
+
+      return {
+        name: nameStr,
+        quantity: quantity,
+        rate: rate || (total > 0 ? total / quantity : subtotalAmt),
+        discount: 0,
+        tax: tax,
+        total: total || ((quantity * (rate || subtotalAmt)) + tax)
+      };
+    });
+
+    if (mapped.length > 0) return mapped;
+  }
+
+  // Fallback: Derive clean service/product description if no line items array exists
+  let cleanDesc = note.summary || data.summary || data.document_metadata?.subject || data.subject || data.description || '';
+  if (typeof cleanDesc === 'object' && cleanDesc !== null) {
+    cleanDesc = cleanDesc.value || cleanDesc.text || '';
+  }
+
+  if (!cleanDesc || cleanDesc.length < 3) {
+    const filename = (docObj.original_filename || '').replace(/\.[^/.]+$/, '');
+    const sanitized = filename
+      .replace(/^(INV|BILL|REC|SO|PO|DV)[_\-\s\d]+/i, '')
+      .replace(/[_]/g, ' ')
+      .trim();
+
+    if (sanitized && !sanitized.toLowerCase().includes('voucher')) {
+      cleanDesc = `${sanitized} (Product / Service)`;
+    } else {
+      const docType = (note.document_type || data.document_type || 'Commercial Invoice').replace(/_/g, ' ');
+      cleanDesc = `${docType} - Product & Service Items`;
+    }
+  }
+
+  return [
+    {
+      name: cleanDesc,
+      quantity: 1,
+      rate: subtotalAmt,
+      discount: 0,
+      tax: taxAmt,
+      total: totalAmt
+    }
+  ];
+}
+
 const getStorageKey = (workbenchId) => `dabby_sales_${workbenchId}`;
 const getArStorageKey = (workbenchId) => `dabby_ar_items_${workbenchId}`;
 
@@ -49,9 +134,31 @@ export const salesService = {
     
     try {
       const parsed = JSON.parse(stored) || [];
-      // Clean out any legacy hardcoded demo entries
-      const cleaned = parsed.filter(s => !DEMO_IDS_TO_PURGE.includes(s.id));
-      if (cleaned.length !== parsed.length) {
+      // Clean out any legacy hardcoded demo entries & replace legacy voucher item names
+      const cleaned = parsed.filter(s => !DEMO_IDS_TO_PURGE.includes(s.id)).map(sale => {
+        if (sale.items && Array.isArray(sale.items)) {
+          const updatedItems = sale.items.map(item => {
+            if (item.name && (item.name.includes('Doc Vault Voucher') || item.name.includes('Sales Voucher'))) {
+              const rawName = item.name;
+              const match = rawName.match(/\(([^)]+)\)/);
+              const filename = match ? match[1] : rawName;
+              const sanitized = filename
+                .replace(/\.[^/.]+$/, '')
+                .replace(/^(INV|BILL|REC|SO|PO|DV)[_\-\s\d]+/i, '')
+                .replace(/[_]/g, ' ')
+                .trim();
+              return {
+                ...item,
+                name: sanitized ? `${sanitized} (Product / Service)` : 'Commercial Product / Service Item'
+              };
+            }
+            return item;
+          });
+          return { ...sale, items: updatedItems };
+        }
+        return sale;
+      });
+      if (cleaned.length !== parsed.length || JSON.stringify(cleaned) !== stored) {
         localStorage.setItem(key, JSON.stringify(cleaned));
       }
       return cleaned;
@@ -106,7 +213,7 @@ export const salesService = {
         const refNo = data.document?.reference_number?.value || doc.original_filename;
         const totalAmt = note.money?.total_amount !== undefined ? Number(note.money?.total_amount) : (Number(data.financials?.total_amount?.value) || 0);
         const taxAmt = note.taxes?.total_tax !== undefined ? Number(note.taxes?.total_tax) : (Number(data.financials?.total_tax?.value) || 0);
-        const subtotalAmt = totalAmt - taxAmt;
+        const subtotalAmt = Math.max(0, totalAmt - taxAmt);
 
         const logs = doc.di_document_processing_logs || [];
         const isSettled = logs.some(l => l.stage === 'post' && l.status === 'success');
@@ -115,6 +222,8 @@ export const salesService = {
         const derivedPaymentStatus = isSettled ? 'Paid' : 'Unpaid';
         const amountPaid = isSettled ? totalAmt : 0;
         const amountDue = isSettled ? 0 : totalAmt;
+
+        const items = extractDocLineItems(doc);
 
         return {
           id: `DV-${doc.id.slice(0, 8)}`,
@@ -128,9 +237,7 @@ export const salesService = {
           date: doc.created_at ? doc.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
           due_date: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
           reference_number: refNo,
-          items: [
-            { name: `Doc Vault Voucher (${doc.original_filename})`, quantity: 1, rate: subtotalAmt, discount: 0, tax: taxAmt, total: totalAmt }
-          ],
+          items: items,
           subtotal: subtotalAmt,
           discount_total: 0,
           tax_total: taxAmt,
@@ -430,9 +537,7 @@ export const salesService = {
       customer: { id: `cust_${Date.now()}`, name: partyName },
       reference_number: refNo,
       date: docObj.created_at ? docObj.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
-      items: [
-        { name: `Sales Voucher (${docObj.original_filename})`, quantity: 1, rate: totalAmt - taxAmt, discount: 0, tax: taxAmt, total: totalAmt }
-      ],
+      items: extractDocLineItems(docObj),
       grand_total: totalAmt,
       documents: [{ id: docObj.id, original_filename: docObj.original_filename, storage_path: docObj.storage_path }]
     });
