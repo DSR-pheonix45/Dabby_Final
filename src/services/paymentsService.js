@@ -7,7 +7,26 @@ export const paymentsService = {
    * Fetch all payments and vouchers for a workbench
    */
   async getPayments(workbenchId) {
+    if (!workbenchId) return [];
     let remotePayments = [];
+
+    // Helper to read local sales and purchases settlement statuses
+    let salesMap = new Map();
+    let purchasesMap = new Map();
+
+    if (typeof window !== 'undefined') {
+      try {
+        const storedSales = localStorage.getItem(`dabby_sales_${workbenchId}`);
+        if (storedSales) {
+          const parsedSales = JSON.parse(storedSales);
+          parsedSales.forEach(s => {
+            if (s.reference_number) salesMap.set(s.reference_number, s);
+            if (s.customer?.name) salesMap.set(s.customer.name, s);
+          });
+        }
+      } catch (e) {}
+    }
+
     try {
       // 1. Fetch transactions / events from backend
       const res = await apiFetch(`/api/di/ledger/transactions/${workbenchId}?limit=100`);
@@ -30,6 +49,26 @@ export const paymentsService = {
             partyName = 'Internal Transfer (Bank/Cash)';
           }
 
+          const refNo = tx.metadata?.reference_number || tx.business_events?.settlement_key || `REF-${tx.id.substring(0, 6)}`;
+          
+          // Harmonize status with Sales and Purchases lifecycle
+          let derivedStatus = tx.metadata?.status;
+          if (!derivedStatus) {
+            if (tx.metadata?.is_settled || tx.metadata?.payment_status === 'Paid') {
+              derivedStatus = 'Settled';
+            } else {
+              // Cross check sales status
+              const matchedSale = salesMap.get(refNo) || salesMap.get(partyName);
+              if (matchedSale) {
+                derivedStatus = (matchedSale.payment_status === 'Paid' || matchedSale.status === 'Completed' || matchedSale.amount_due === 0) 
+                  ? 'Settled' 
+                  : 'Pending Settlement';
+              } else {
+                derivedStatus = 'Pending Settlement';
+              }
+            }
+          }
+
           return {
             id: tx.id,
             workbench_id: workbenchId,
@@ -39,10 +78,10 @@ export const paymentsService = {
             amount: tx.total_amount || 0,
             date: tx.transaction_date || (tx.created_at ? tx.created_at.split('T')[0] : new Date().toISOString().split('T')[0]),
             payment_mode: tx.metadata?.payment_mode || 'Bank Transfer',
-            reference_number: tx.metadata?.reference_number || tx.business_events?.settlement_key || `REF-${tx.id.substring(0, 6)}`,
+            reference_number: refNo,
             trade_container: tx.metadata?.trade_container || container,
             linked_doc_ref: tx.metadata?.linked_doc_ref || 'Unmapped',
-            status: tx.metadata?.status || 'Settled',
+            status: derivedStatus,
             notes: tx.description || '',
             entries: tx.entries || []
           };
@@ -120,7 +159,18 @@ export const paymentsService = {
       }
     }
 
-    const merged = Array.from(map.values()).sort((a, b) => new Date(b.date) - new Date(a.date));
+    // Dynamic cross-check of statuses against sales and purchases
+    const merged = Array.from(map.values()).map(p => {
+      if (p.trade_container === 'Sales' || p.type === 'Payment Received') {
+        const matched = salesMap.get(p.reference_number) || salesMap.get(p.party);
+        if (matched) {
+          const isPaid = matched.payment_status === 'Paid' || matched.status === 'Completed' || matched.amount_due === 0;
+          return { ...p, status: isPaid ? 'Settled' : 'Pending Settlement' };
+        }
+      }
+      return p;
+    }).sort((a, b) => new Date(b.date) - new Date(a.date));
+
     return merged;
   },
 

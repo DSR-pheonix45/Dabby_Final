@@ -12,7 +12,8 @@ import {
   BsArrowRepeat,
   BsCartCheck,
   BsBagCheck,
-  BsReceipt
+  BsReceipt,
+  BsClockHistory
 } from 'react-icons/bs';
 import { paymentsService } from '../../../services/paymentsService';
 import { formatCurrency } from '../../../utils/currency';
@@ -368,8 +369,13 @@ export default function PaymentsFlow() {
 
                         {/* Status */}
                         <td className="px-6 py-4 text-right">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-[10px] font-bold">
-                            <BsCheckCircleFill className="text-[9px]" /> {p.status || 'Settled'}
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-extrabold uppercase tracking-wider ${
+                            p.status === 'Settled'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                              : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                          }`}>
+                            {p.status === 'Settled' ? <BsCheckCircleFill className="text-[9px]" /> : <BsClockHistory className="text-[9px]" />}
+                            {p.status || 'Pending Settlement'}
                           </span>
                         </td>
                       </tr>
