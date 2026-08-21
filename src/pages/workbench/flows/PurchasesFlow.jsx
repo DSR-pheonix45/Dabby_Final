@@ -17,6 +17,7 @@ import {
   BsShop
 } from 'react-icons/bs';
 import { toast } from 'react-hot-toast';
+import PurchaseDetailModal from './components/PurchaseDetailModal';
 
 export default function PurchasesFlow() {
   const { activeWorkbench } = useWorkbench();
@@ -25,6 +26,7 @@ export default function PurchasesFlow() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState('all');
+  const [selectedDocForDetail, setSelectedDocForDetail] = useState(null);
 
   const loadPurchasesData = async () => {
     if (!activeWorkbench) return;
@@ -218,12 +220,17 @@ export default function PurchasesFlow() {
               <BsFileEarmarkText className="text-indigo-400" />
               Purchases & Expenses Documents ({filteredDocs.length})
             </h3>
-            <button
-              onClick={() => navigate('/dashboard/workbench/doc-vault')}
-              className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold"
-            >
-              Go to Doc Vault →
-            </button>
+            <div className="flex items-center space-x-4">
+              <span className="text-[10px] text-gray-500 font-mono hidden sm:inline">
+                Click any transaction entry to inspect line items & details
+              </span>
+              <button
+                onClick={() => navigate('/dashboard/workbench/doc-vault')}
+                className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold"
+              >
+                Go to Doc Vault →
+              </button>
+            </div>
           </div>
 
           {loading ? (
@@ -248,18 +255,19 @@ export default function PurchasesFlow() {
                 return (
                   <div 
                     key={doc.id}
-                    className="p-4 hover:bg-white/[0.02] transition-colors flex items-center justify-between gap-4"
+                    onClick={() => setSelectedDocForDetail(doc)}
+                    className="p-4 hover:bg-white/[0.02] cursor-pointer transition-colors flex items-center justify-between gap-4 group"
                   >
                     <div className="flex items-center space-x-4 min-w-0">
-                      <div className="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
+                      <div className="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0 group-hover:scale-105 transition-transform">
                         <BsShop className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-sm font-bold text-white truncate">
+                        <div className="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors truncate">
                           {vendorName}
                         </div>
                         <div className="flex items-center space-x-2 text-xs text-gray-400 mt-0.5">
-                          <span className="font-mono">{refNo}</span>
+                          <span className="font-mono text-indigo-400/90 font-semibold">{refNo}</span>
                           <span>•</span>
                           <span>{new Date(doc.created_at).toLocaleDateString()}</span>
                         </div>
@@ -291,6 +299,17 @@ export default function PurchasesFlow() {
           )}
         </div>
       </div>
+
+      <PurchaseDetailModal
+        isOpen={!!selectedDocForDetail}
+        onClose={() => setSelectedDocForDetail(null)}
+        workbenchId={activeWorkbench?.id}
+        activeWorkbench={activeWorkbench}
+        doc={selectedDocForDetail}
+        onUpdate={() => {
+          loadPurchasesData();
+        }}
+      />
     </div>
   );
 }
