@@ -12,7 +12,7 @@ const featuresData = [
         theNeed: "You want to move away from spreadsheets, WhatsApp groups, and scattered paper receipts into one central system.",
         theValue: "Dabby Launch provides 1 Workbench for your entire finance operation. Upload up to 500 documents/year with automated AI OCR extraction, sales & expense tracking, payment & receipt vouchers, Chart of Accounts, P&L, and Balance Sheet.",
         details: [
-            "500 processed documents / year & 5 team members",
+            "500 processed documents / year & 2 team members",
             "Doc Vault AI OCR & Party Management",
             "Sales, Purchases, Payments & Financial Statements"
         ],
@@ -23,9 +23,9 @@ const featuresData = [
         forWho: "02 — GROWTH ⭐ (₹60,000 / yr — RECOMMENDED)",
         title: "For Companies with an Active Finance Operation",
         theNeed: "You need multiple people creating, approving, and managing financial activity with department-level controls.",
-        theValue: "Dabby Growth empowers growing teams with 1,500 documents/year, 15 team members, 10 department dimensions, approval workflows, invoice-payment linking, cash-flow visibility, budgeting, anomaly insights, and Tally/Zoho data sync.",
+        theValue: "Dabby Growth empowers growing teams with 1,500 documents/year, 5 team members, 5 department dimensions, approval workflows, invoice-payment linking, cash-flow visibility, budgeting, anomaly insights, and Tally/Zoho data sync.",
         details: [
-            "1,500 processed documents / year & 15 team members",
+            "1,500 processed documents / year & 5 team members",
             "Approval workflows & Department-wise accounting",
             "Budgeting, Cash-flow KPIs & Tally/Zoho integrations"
         ],
@@ -33,12 +33,12 @@ const featuresData = [
     },
     {
         id: 3,
-        forWho: "03 — SCALE (₹90,000 / yr)",
+        forWho: "03 — SCALE (₹99,000 / yr)",
         title: "For Teams & CFO-Led Finance Systems",
         theNeed: "You need enterprise controls, multi-level approvals, audit trails, FP&A forecasting, and investor dashboards.",
-        theValue: "Dabby Scale delivers full enterprise finance operations with 3,000 documents/year, 30 team members, unlimited departments, custom financial dimensions, cash forecasting, investor views, and priority support.",
+        theValue: "Dabby Scale delivers full enterprise finance operations with 3,000 documents/year, 10 team members, 25 departments, custom financial dimensions, cash forecasting, investor views, and priority support.",
         details: [
-            "3,000 processed documents / year & 30 team members",
+            "3,000 processed documents / year & 10 team members",
             "Multi-level approvals, FP&A & Cash forecasting",
             "Investor View, Audit trails & Priority Support"
         ],

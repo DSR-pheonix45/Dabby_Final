@@ -13,9 +13,9 @@ const plans = [
     monthlyEquiv: "2,500",
     description: "For businesses getting their finance organized.",
     documentsLimit: "500 documents / year",
-    membersLimit: "5 team members",
+    membersLimit: "2 team members",
     workbenchLimit: "1 Workbench",
-    deptLimit: "3 departments",
+    deptLimit: "1 department",
     highlights: [
       "Doc Vault & AI OCR extraction",
       "Sales & Purchase / Expense",
@@ -39,9 +39,9 @@ const plans = [
     monthlyEquiv: "5,000",
     description: "For businesses with an active finance operation.",
     documentsLimit: "1,500 documents / year",
-    membersLimit: "15 team members",
+    membersLimit: "5 team members",
     workbenchLimit: "1 Workbench",
-    deptLimit: "10 departments",
+    deptLimit: "5 departments",
     highlights: [
       "Everything in Launch, plus:",
       "Approval Workflows & Advanced Expenses",
@@ -63,13 +63,13 @@ const plans = [
   {
     key: "scale",
     name: "03 — Scale",
-    price: "90,000",
-    monthlyEquiv: "7,500",
+    price: "99,000",
+    monthlyEquiv: "8,250",
     description: "For companies running finance as a team.",
     documentsLimit: "3,000 documents / year",
-    membersLimit: "30 team members",
+    membersLimit: "10 team members",
     workbenchLimit: "1 Workbench",
-    deptLimit: "Unlimited departments",
+    deptLimit: "25 departments",
     highlights: [
       "Everything in Growth, plus:",
       "Multi-Level Approvals & Workflow Controls",
@@ -91,12 +91,12 @@ const plans = [
 ];
 
 const featureMatrix = [
-  { feature: "Annual Investment (₹)", launch: "₹30,000", growth: "₹60,000", scale: "₹90,000" },
-  { feature: "Monthly Equivalent", launch: "₹2,500/mo", growth: "₹5,000/mo", scale: "₹7,500/mo" },
+  { feature: "Annual Investment (₹)", launch: "₹30,000", growth: "₹60,000", scale: "₹99,000" },
+  { feature: "Monthly Equivalent", launch: "₹2,500/mo", growth: "₹5,000/mo", scale: "₹8,250/mo" },
   { feature: "Workbench Count", launch: "1", growth: "1", scale: "1" },
-  { feature: "Team Members", launch: "5", growth: "15", scale: "30" },
+  { feature: "Team Members", launch: "2", growth: "5", scale: "10" },
   { feature: "Processed Documents / year", launch: "500", growth: "1,500", scale: "3,000" },
-  { feature: "Department Dimensions", launch: "3", growth: "10", scale: "Unlimited" },
+  { feature: "Department Dimensions", launch: "1", growth: "5", scale: "25" },
   { feature: "Doc Vault & AI OCR", launch: true, growth: true, scale: true },
   { feature: "Parties & Ledger COA", launch: true, growth: true, scale: true },
   { feature: "Sales & Purchase Modules", launch: true, growth: true, scale: true },
@@ -174,7 +174,7 @@ export default function Pricing({ showDetails = true }) {
                 <span>→</span>
                 <span>Real Documents & Workflow</span>
                 <span>→</span>
-                <span className="font-bold text-white">Launch (₹30K) / Growth (₹60K) / Scale (₹90K)</span>
+                <span className="font-bold text-white">Launch (₹30K) / Growth (₹60K) / Scale (₹99K)</span>
               </div>
             </div>
             <Link
@@ -340,7 +340,7 @@ export default function Pricing({ showDetails = true }) {
                     <th className="p-4 font-bold text-gray-300">Feature Capability</th>
                     <th className="p-4 font-bold text-teal-400 text-center">Launch (₹30K)</th>
                     <th className="p-4 font-bold text-teal-300 text-center bg-teal-500/10">Growth ⭐ (₹60K)</th>
-                    <th className="p-4 font-bold text-purple-400 text-center">Scale (₹90K)</th>
+                    <th className="p-4 font-bold text-purple-400 text-center">Scale (₹99K)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">

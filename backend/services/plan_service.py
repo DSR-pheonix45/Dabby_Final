@@ -48,7 +48,7 @@ PLAN_LIMITS: Dict[str, Dict] = {
     "enterprise": {
         "label": "Enterprise",
         "uploads_per_month": None,
-        "seats": None,
+        "seats": 10,
         "ai_messages_per_day": None,
         "custom_rulesets": True,
         "auto_approvals": True,
