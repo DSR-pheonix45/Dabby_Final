@@ -127,6 +127,7 @@ async def ledger_transactions(workbench_id: str, limit: int = 50):
             ent = supabase.table("di_ledger_entries").select("account_id, direction, amount, memo") \
                 .eq("transaction_id", t["id"]).execute().data or []
             t["entries"] = [{
+                "account_id": e["account_id"],
                 "code": accts.get(e["account_id"], {}).get("code"),
                 "account": accts.get(e["account_id"], {}).get("name"),
                 "direction": e["direction"],

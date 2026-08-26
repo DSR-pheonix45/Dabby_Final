@@ -59,7 +59,7 @@ export default function COA() {
       const [tb, txs, accts] = await Promise.all([
         diService.getTrialBalance(activeWorkbench.id).catch(() => null),
         diService.getLedgerTransactions(activeWorkbench.id).catch(() => []),
-        accountService.getAccounts(activeWorkbench.id).catch(() => [])
+        diService.getAccounts(activeWorkbench.id).catch(() => [])
       ]);
 
       setTrialBalance(tb);
@@ -71,15 +71,23 @@ export default function COA() {
       const tbAccountsMap = {};
       (tb?.groups || []).forEach(g => {
         (g.accounts || []).forEach(a => {
-          tbAccountsMap[a.account_id || a.code] = a.balance;
+          if (a.account_id) tbAccountsMap[a.account_id] = a.balance;
+          if (a.code) tbAccountsMap[a.code] = a.balance;
         });
       });
 
       const processedAccounts = accountsList.map(acc => {
         const linkedTxs = safeTxs.filter(tx => 
-          (tx.entries || []).some(e => e.account_id === acc.id || e.account === acc.ledger || e.account === acc.full_code)
+          (tx.entries || []).some(e => 
+            e.account_id === acc.id || 
+            e.code === acc.full_code || 
+            (e.code && acc.full_code && e.code.toLowerCase() === acc.full_code.toLowerCase()) ||
+            (e.account && acc.ledger && e.account.toLowerCase() === acc.ledger.toLowerCase())
+          )
         );
-        const derivedBal = tbAccountsMap[acc.id] !== undefined ? tbAccountsMap[acc.id] : (acc.current_balance || 0);
+        const derivedBal = tbAccountsMap[acc.id] !== undefined 
+          ? tbAccountsMap[acc.id] 
+          : (tbAccountsMap[acc.full_code] !== undefined ? tbAccountsMap[acc.full_code] : (acc.current_balance || 0));
 
         return {
           ...acc,
