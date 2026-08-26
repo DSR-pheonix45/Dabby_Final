@@ -154,7 +154,7 @@ class GroqPool:
         automatically falls back to secondary models.
         """
         if not models:
-            models = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile", "llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768", "gemma2-9b-it"]
+            models = ["groq/compound", "openai/gpt-oss-120b", "qwen/qwen3.6-27b", "groq/compound-mini", "openai/gpt-oss-20b"]
             
         last_error = None
         for m in models:

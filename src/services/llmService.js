@@ -33,18 +33,20 @@ function getTruncatedContext(context, provider) {
   return context;
 }
 
-// FREE Models on Groq (super fast!)
+// Active Models on Groq
 // Reference: https://console.groq.com/docs/models
 const FREE_MODELS = [
-  "llama-3.3-70b-versatile", // Flagship (Current recommended model)
-  "mixtral-8x7b-32768",      // Reliable Mixtral
-  "mistral-saba-24b",        // New high-performance
-  "llama-3.1-8b-instant",    // Super fast
+  "groq/compound",
+  "openai/gpt-oss-120b",
+  "qwen/qwen3.6-27b",
+  "groq/compound-mini",
+  "openai/gpt-oss-20b",
 ];
 
 const GEMINI_MODELS = [
-  "gemini-1.5-pro",
-  "gemini-1.5-flash"
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-1.5-pro"
 ];
 
 // Helper to get today's formatted date for system prompt

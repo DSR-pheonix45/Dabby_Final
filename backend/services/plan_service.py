@@ -112,16 +112,20 @@ def check_and_increment_upload(user_id: str) -> Dict:
     used = _upload_count(user_id, period)
 
     try:
-        supabase.table("user_usage").upsert(
-            {
+        existing = supabase.table("user_usage").select("id").eq("user_id", user_id).eq("period", period).eq("metric", "uploads").limit(1).execute()
+        if existing.data:
+            supabase.table("user_usage").update({
+                "count": used + 1,
+                "updated_at": datetime.utcnow().isoformat()
+            }).eq("id", existing.data[0]["id"]).execute()
+        else:
+            supabase.table("user_usage").insert({
                 "user_id": user_id,
                 "period": period,
                 "metric": "uploads",
                 "count": used + 1,
-                "updated_at": datetime.utcnow().isoformat(),
-            },
-            on_conflict="user_id,period,metric",
-        ).execute()
+                "updated_at": datetime.utcnow().isoformat()
+            }).execute()
     except Exception as e:
         print(f"[PLAN] failed to record upload usage: {e}")
 
@@ -141,29 +145,36 @@ def _ai_count(user_id: str, day: str) -> int:
     return 0
 
 
-def consume_ai_message(user_id: str) -> Dict:
+def consume_ai_message(user_id: Optional[str] = None, caller_id: Optional[str] = None) -> Dict:
     """
     Meter one AI consultant message. Returns {allowed, used, limit, remaining}.
     Does NOT raise — the caller (chat) decides how to surface a soft block.
     Increments only when allowed.
     """
-    plan = get_plan(user_id)
+    target_id = user_id or caller_id
+    if not target_id:
+        return {"allowed": True, "used": 0, "limit": None, "remaining": None, "plan": "free"}
+
+    plan = get_plan(target_id)
     limit = limits_for(plan)["ai_messages_per_day"]
     day = date.today().isoformat()
-    used = _ai_count(user_id, day)
+    used = _ai_count(target_id, day)
 
     if limit is not None and used >= limit:
         return {"allowed": False, "used": used, "limit": limit, "remaining": 0, "plan": plan}
 
     try:
-        supabase.table("ai_usage").upsert(
-            {
-                "user_id": user_id,
+        existing = supabase.table("ai_usage").select("id").eq("user_id", target_id).eq("usage_date", day).limit(1).execute()
+        if existing.data:
+            supabase.table("ai_usage").update({
+                "message_count": used + 1
+            }).eq("id", existing.data[0]["id"]).execute()
+        else:
+            supabase.table("ai_usage").insert({
+                "user_id": target_id,
                 "usage_date": day,
-                "message_count": used + 1,
-            },
-            on_conflict="user_id,usage_date",
-        ).execute()
+                "message_count": used + 1
+            }).execute()
     except Exception as e:
         print(f"[PLAN] failed to record ai usage: {e}")
 
@@ -210,9 +221,10 @@ def require_feature(user_id: str, feature: str, label: str) -> None:
         )
 
 
-def usage_summary(user_id: str) -> Dict:
+def usage_summary(user_id: str, caller_id: Optional[str] = None) -> Dict:
     """Everything the frontend needs to render plan + usage."""
-    plan = get_plan(user_id)
+    target_id = user_id or caller_id
+    plan = get_plan(target_id)
     lim = limits_for(plan)
     period = _current_month()
     out = {
@@ -220,9 +232,9 @@ def usage_summary(user_id: str) -> Dict:
         "label": lim["label"],
         "limits": {k: v for k, v in lim.items() if k != "label"},
         "usage": {
-            "uploads_this_month": _upload_count(user_id, period),
-            "seats_used": seats_used(user_id),
+            "uploads_this_month": _upload_count(target_id, period),
+            "seats_used": seats_used(target_id),
         },
     }
-    out["usage"]["ai_messages_today"] = _ai_count(user_id, date.today().isoformat())
+    out["usage"]["ai_messages_today"] = _ai_count(target_id, date.today().isoformat())
     return out

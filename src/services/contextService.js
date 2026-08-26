@@ -28,6 +28,13 @@ export const contextService = {
   },
 
   /**
+   * Alias method for fetching intelligence for user/workbench
+   */
+  async getUserIntelligence(userId) {
+    return this.getWorkbenchIntelligence(userId);
+  },
+
+  /**
    * Formats raw intelligence into a highly dense but readable context for LLMs
    */
   formatForLLM(intel) {

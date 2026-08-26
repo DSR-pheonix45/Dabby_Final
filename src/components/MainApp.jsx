@@ -531,7 +531,8 @@ Based on the Profit & Loss statement provided, the business shows stable operati
       } else {
         try {
           console.log(`[DEBUG] Building real-time intelligence for user`);
-          const intel = await contextService.getUserIntelligence();
+          const targetId = activeWorkbench?.id || user?.id;
+          const intel = await contextService.getUserIntelligence(targetId);
           userContextStr = contextService.formatForLLM(intel);
         } catch (ctxError) {
           console.error("[DEBUG] Error building user intelligence:", ctxError);
