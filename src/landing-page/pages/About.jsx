@@ -4,31 +4,41 @@ import { useTheme } from "../../context/ThemeContext";
 
 const teamMembers = [
     {
-        name: "Chirayu",
-        role: "Frontend Developer & UI/UX Lead",
-        description: "Crafting beautiful user interfaces and ensuring seamless user experiences.",
-        initials: "C",
-        linkedin: "https://www.linkedin.com/in/chirayu-marathe69/"
-    },
-    {
-        name: "Medhansh",
-        role: "Founder and CEO, Backend Dev",
-        description: "Building scalable, secure backend systems and optimizing data processing pipelines.",
-        initials: "M",
+        name: "Medhansh Khedekar",
+        role: "Founder & CEO",
+        description: "Spearheading company vision, strategic growth, and core engineering architecture.",
+        initials: "MK",
+        image: "/team/medhansh.jpg",
         linkedin: "https://www.linkedin.com/in/medhansh-khedekar45/"
     },
     {
+        name: "Yagna Namburi",
+        role: "Co-Founder & CTO",
+        badge: "Ex-Goldman Sachs VP",
+        description: "Ex-Goldman Sachs VP driving AI strategy, scalable systems architecture, and engineering excellence.",
+        initials: "YN",
+        image: "/team/yagna.jpg",
+        linkedin: "https://www.linkedin.com/in/yagnanamburi/"
+    },
+    {
+        name: "Chirayu Marathe",
+        role: "Frontend Developer & UI/UX Lead",
+        description: "Crafting beautiful user interfaces and ensuring seamless user experiences.",
+        initials: "CM",
+        linkedin: "https://www.linkedin.com/in/chirayu-marathe69/"
+    },
+    {
         name: "Roshan Ajith",
-        role: "Cyber Security",
-        description: "Managing cloud infrastructure and ensuring reliable, secure deployment pipelines.",
+        role: "Cyber Security Lead",
+        description: "Managing cloud infrastructure, security protocols, and reliable deployment pipelines.",
         initials: "RA",
         linkedin: "https://www.linkedin.com/in/roshanajith/"
     },
     {
-        name: "Parth",
+        name: "Parth Parmar",
         role: "AI/ML Engineer",
         description: "Developing and implementing cutting-edge AI models for data analysis and insights.",
-        initials: "P",
+        initials: "PP",
         linkedin: "https://www.linkedin.com/in/parthparmar04/"
     }
 ];
@@ -269,46 +279,64 @@ export default function About() {
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
                         {teamMembers.map((member, index) => (
                             <motion.div
                                 key={index}
                                 initial={{ opacity: 0, y: 30 }}
                                 animate={teamInView ? { opacity: 1, y: 0 } : {}}
                                 transition={{ delay: index * 0.1 }}
-                                className={`p-6 rounded-2xl border text-center ${isDark ? "bg-[#111111] border-white/5" : "bg-white border-[#1a1a1a]/10"
+                                className={`p-6 rounded-2xl border text-center flex flex-col items-center justify-between transition-all duration-300 hover:border-[#81E6D9]/40 ${isDark ? "bg-[#111111] border-white/5 hover:bg-[#161616]" : "bg-white border-[#1a1a1a]/10 hover:shadow-lg"
                                     }`}
                             >
-                                {/* Avatar */}
-                                <div className={`w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center text-xl font-bold ${isDark ? "bg-[#81E6D9]/20 text-[#81E6D9]" : "bg-[#81E6D9]/20 text-[#0D9488]"
-                                    }`}>
-                                    {member.initials}
+                                <div className="w-full flex flex-col items-center">
+                                    {/* Avatar / Photo */}
+                                    {member.image ? (
+                                        <img
+                                            src={member.image}
+                                            alt={member.name}
+                                            className="w-24 h-24 rounded-full mb-4 object-cover border-2 border-[#81E6D9]/40 shadow-md"
+                                        />
+                                    ) : (
+                                        <div className={`w-24 h-24 rounded-full mb-4 flex items-center justify-center text-xl font-bold border-2 border-[#81E6D9]/20 ${isDark ? "bg-[#81E6D9]/10 text-[#81E6D9]" : "bg-[#81E6D9]/15 text-[#0D9488]"
+                                            }`}>
+                                            {member.initials}
+                                        </div>
+                                    )}
+
+                                    {/* Name */}
+                                    <h3 className={`text-xl font-bold mb-1 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>
+                                        {member.name}
+                                    </h3>
+
+                                    {/* Role */}
+                                    <p className="text-sm font-semibold text-[#81E6D9] mb-2">
+                                        {member.role}
+                                    </p>
+
+                                    {/* Highlight Badge */}
+                                    {member.badge && (
+                                        <span className="inline-block px-3 py-0.5 text-xs font-semibold rounded-full bg-[#81E6D9]/15 text-[#81E6D9] border border-[#81E6D9]/30 mb-3">
+                                            {member.badge}
+                                        </span>
+                                    )}
+
+                                    {/* Description */}
+                                    <p className={`text-sm leading-relaxed mb-6 ${isDark ? "text-[#787878]" : "text-gray-600"}`}>
+                                        {member.description}
+                                    </p>
                                 </div>
-
-                                {/* Name */}
-                                <h3 className={`text-lg font-bold mb-1 ${isDark ? "text-white" : "text-[#1a1a1a]"}`}>
-                                    {member.name}
-                                </h3>
-
-                                {/* Role */}
-                                <p className="text-sm text-[#81E6D9] mb-3">
-                                    {member.role}
-                                </p>
-
-                                {/* Description */}
-                                <p className={`text-sm leading-relaxed mb-4 ${isDark ? "text-[#787878]" : "text-gray-600"}`}>
-                                    {member.description}
-                                </p>
 
                                 {/* LinkedIn Icon */}
                                 <a
                                     href={member.linkedin}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className={`inline-flex items-center justify-center w-10 h-10 rounded-full transition-colors ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"
+                                    className={`inline-flex items-center justify-center w-10 h-10 rounded-full transition-colors ${isDark ? "bg-white/5 hover:bg-white/10 text-white" : "bg-gray-100 hover:bg-gray-200 text-[#1a1a1a]"
                                         }`}
+                                    title={`${member.name}'s LinkedIn profile`}
                                 >
-                                    <svg className={`w-5 h-5 ${isDark ? "text-white" : "text-[#1a1a1a]"}`} fill="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
                                         <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
                                     </svg>
                                 </a>
