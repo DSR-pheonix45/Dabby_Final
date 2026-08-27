@@ -21,24 +21,11 @@ const teamMembers = [
         linkedin: "https://www.linkedin.com/in/yagnanamburi/"
     },
     {
-        name: "Chirayu Marathe",
-        role: "Frontend Developer & UI/UX Lead",
-        description: "Crafting beautiful user interfaces and ensuring seamless user experiences.",
-        initials: "CM",
-        linkedin: "https://www.linkedin.com/in/chirayu-marathe69/"
-    },
-    {
-        name: "Roshan Ajith",
-        role: "Cyber Security Lead",
-        description: "Managing cloud infrastructure, security protocols, and reliable deployment pipelines.",
-        initials: "RA",
-        linkedin: "https://www.linkedin.com/in/roshanajith/"
-    },
-    {
         name: "Parth Parmar",
-        role: "AI/ML Engineer",
-        description: "Developing and implementing cutting-edge AI models for data analysis and insights.",
+        role: "Head of AI",
+        description: "Spearheading AI/ML research, generative AI models, and intelligent data decision engines.",
         initials: "PP",
+        image: "/team/parth.png",
         linkedin: "https://www.linkedin.com/in/parthparmar04/"
     }
 ];
