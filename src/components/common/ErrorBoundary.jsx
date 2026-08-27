@@ -13,8 +13,23 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    // You can also log the error to an error reporting service
     console.error("Uncaught error:", error, errorInfo);
+    // If error is caused by stale chunk hashes after a new deployment, auto-reload once to fetch fresh assets
+    if (
+      error &&
+      (error.name === "ChunkLoadError" ||
+        (error.message &&
+          (error.message.includes("Failed to fetch dynamically imported module") ||
+            error.message.includes("Expected a JavaScript-or-Wasm module script") ||
+            error.message.includes("Importing a module script failed"))))
+    ) {
+      const lastReload = window.sessionStorage.getItem("chunk_err_reload");
+      const now = Date.now();
+      if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+        window.sessionStorage.setItem("chunk_err_reload", now.toString());
+        window.location.reload();
+      }
+    }
   }
 
   render() {
