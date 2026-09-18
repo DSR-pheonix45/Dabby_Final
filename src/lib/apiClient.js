@@ -10,7 +10,8 @@ import { supabase } from "./supabase";
  * existing `res.ok` / `res.json()` call sites keep working unchanged.
  */
 const rawUrl = import.meta.env.VITE_API_URL;
-const BACKEND_BASE = (rawUrl && rawUrl.trim() !== "" ? rawUrl : "https://dabby-final.onrender.com").replace(/\/$/, "");
+const isStaleRailway = rawUrl && rawUrl.includes("railway.app");
+const BACKEND_BASE = (rawUrl && rawUrl.trim() !== "" && !isStaleRailway ? rawUrl : "https://dabby-final.onrender.com").replace(/\/$/, "");
 
 export async function apiFetch(path, options = {}) {
   let token;
