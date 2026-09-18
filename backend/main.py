@@ -67,6 +67,10 @@ app.include_router(ops.router, prefix="/api/ops", tags=["Operations"])
 app.include_router(workbench_accounts.router, prefix="/api/workbench-accounts", tags=["Workbench Accounts"])
 app.include_router(petty_cash.router, prefix="/api/petty-cash", tags=["Petty Cash"])
 
+@app.get("/")
+def root():
+    return {"status": "online", "message": "Dabby Financial Platform API", "docs": "/docs", "health": "/health"}
+
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
