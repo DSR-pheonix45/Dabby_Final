@@ -89,21 +89,6 @@ export default function Navbar() {
               <span className={`absolute bottom-0 left-0 w-full h-0.5 bg-[#81E6D9] transition-transform duration-200 origin-left ${isActive("/security") ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`} />
             </Link>
 
-            {/* Pricing Link */}
-            <Link
-              to="/pricing"
-              className={`relative group text-[14.4px] font-mono font-medium px-4 py-2 transition-all duration-200 ${theme === "dark" ? "text-white " : "text-[#292929] "
-                }`}
-            >
-              Pricing
-              <span
-                className={`absolute bottom-0 left-0 w-full h-0.5 bg-[#81E6D9] transition-transform duration-200 origin-left ${isActive("/pricing")
-                  ? "scale-x-100"
-                  : "scale-x-0 group-hover:scale-x-100"
-                  }`}
-              ></span>
-            </Link>
-
             {/* Documentation Link */}
             <Link
               to="/docs"
@@ -251,15 +236,6 @@ export default function Navbar() {
                   className={`text-[14.4px] font-mono font-medium px-4 py-3 text-left transition-colors duration-200 ${theme === "dark" ? "text-white hover:text-[#81E6D9]" : "text-[#292929] hover:text-[#0D9488]"}`}
                 >
                   Security
-                </Link>
-                <Link
-                  to="/pricing"
-                  className={`text-[14.4px] font-mono font-medium px-4 py-3 text-left transition-colors duration-200 ${theme === "dark"
-                    ? "text-white hover:text-[#81E6D9]"
-                    : "text-[#292929] hover:text-[#0D9488]"
-                    }`}
-                >
-                  Pricing
                 </Link>
                 <Link
                   to="/docs"

@@ -596,8 +596,7 @@ const PLANS = [
 ];
 
 export function PricingSection() {
-    const { theme } = useTheme();
-    const isDark = theme === "dark";
+    return null;
 
     return (
         <section className={`py-20 md:py-28 px-4 sm:px-6 md:px-12 ${isDark ? "bg-white/[0.02]" : "bg-transparent"}`}>

@@ -5,17 +5,16 @@ import { apiFetch, apiJson } from "./apiClient";
  * Display + soft-gating only; the backend independently enforces every limit.
  */
 export const PLAN_LIMITS = {
-  free: { label: "Free", uploads_per_month: 0, seats: 1, ai_messages_per_day: 10, custom_rulesets: false, auto_approvals: false, multibank: false, multi_currency: false },
-  go: { label: "Go", uploads_per_month: 50, seats: 2, ai_messages_per_day: 100, custom_rulesets: false, auto_approvals: false, multibank: false, multi_currency: false },
-  pro: { label: "Pro", uploads_per_month: 500, seats: 5, ai_messages_per_day: 500, custom_rulesets: true, auto_approvals: true, multibank: true, multi_currency: false },
-  enterprise: { label: "Enterprise", uploads_per_month: null, seats: null, ai_messages_per_day: null, custom_rulesets: true, auto_approvals: true, multibank: true, multi_currency: true },
+  free: { label: "Unlimited Standard Workspace", uploads_per_month: null, seats: null, ai_messages_per_day: null, custom_rulesets: true, auto_approvals: true, multibank: true, multi_currency: true },
+  go: { label: "Unlimited Standard Workspace", uploads_per_month: null, seats: null, ai_messages_per_day: null, custom_rulesets: true, auto_approvals: true, multibank: true, multi_currency: true },
+  pro: { label: "Unlimited Standard Workspace", uploads_per_month: null, seats: null, ai_messages_per_day: null, custom_rulesets: true, auto_approvals: true, multibank: true, multi_currency: true },
+  enterprise: { label: "Unlimited Standard Workspace", uploads_per_month: null, seats: null, ai_messages_per_day: null, custom_rulesets: true, auto_approvals: true, multibank: true, multi_currency: true },
 };
 
-export const PLAN_ORDER = ["free", "go", "pro", "enterprise"];
+export const PLAN_ORDER = ["free"];
 
-export function nextPlan(plan) {
-  const i = PLAN_ORDER.indexOf((plan || "free").toLowerCase());
-  return i >= 0 && i < PLAN_ORDER.length - 1 ? PLAN_ORDER[i + 1] : null;
+export function nextPlan() {
+  return null;
 }
 
 /** Meter one AI message for the current user. Returns {allowed, used, limit, remaining, plan}. */

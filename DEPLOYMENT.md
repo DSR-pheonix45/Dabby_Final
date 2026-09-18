@@ -1,42 +1,44 @@
-# Deployment — Frontend (Vercel) + Backend (Railway)
+# Deployment — Frontend (Vercel) + Backend (Render / Railway)
 
-The app is **two services**: a Vite frontend on Vercel and a FastAPI backend on
-Railway. The frontend calls `/api/*` on its own origin; Vercel rewrites those
-requests server-side to the Railway backend (so there's no CORS to configure).
+The app consists of **two main services**: a Vite frontend on Vercel and a FastAPI backend on **Render** (or Railway). The frontend calls `/api/*` on its own origin; Vercel rewrites those requests server-side to your live backend service (so there's no CORS to configure).
 
 ```
-Browser ──> Vercel (frontend + /api rewrite) ──> Railway (FastAPI backend) ──> Supabase / Groq / Gemini
+Browser ──> Vercel (frontend + /api rewrite) ──> Render (FastAPI backend) ──> Supabase / Groq / Gemini
 ```
 
-Why not the Python backend on Vercel: it runs a long-lived background queue
-worker and doesn't fit Vercel's ephemeral serverless model.
+Why not the Python backend on Vercel: it runs long-lived task processing / WebSocket logic and doesn't fit Vercel's ephemeral serverless model.
 
 ---
 
-## 1. Deploy the backend on Railway
+## 1. Deploy the backend on Render
 
-1. Create a new project on [railway.app](https://railway.app) → **Deploy from GitHub repo** → pick `DSR-pheonix45/Dabby_Final`, branch `final_main_v1`.
+1. Log into **[dashboard.render.com](https://dashboard.render.com)**.
+2. Click **New +** → **Web Service** (or Blueprint).
+3. Connect your GitHub repository `DSR-pheonix45/Dabby_Final`.
+4. Configure the Web Service settings:
+   - **Name**: `dabby-backend`
+   - **Language / Runtime**: `Docker` (or Python 3)
+   - **Root Directory**: `backend`
+   - **Dockerfile Path**: `Dockerfile` (or `Dockerfile`)
+   - **Instance Type**: Free / Starter tier
+   - **Health Check Path**: `/health`
+5. Under **Environment Variables**, add the required keys (same as `.env`):
+   - `VITE_SUPABASE_URL` / `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `GROQ_API_KEY`
+   - `GEMINI_API_KEY`
+   - `SARVAM_API_KEY` (optional)
+6. Click **Create Web Service**.
+7. Once deployed, Render gives you a public URL like `https://dabby-backend.onrender.com`.
+
+---
+
+## Alternative: Deploy the backend on Railway
+
+1. Create a new project on [railway.app](https://railway.app) → **Deploy from GitHub repo** → pick `DSR-pheonix45/Dabby_Final`.
 2. In the service **Settings → Root Directory**, set it to **`backend`**.
-   (Railway then finds `backend/requirements.txt`, `backend/railway.json`, and starts with `uvicorn main:app --host 0.0.0.0 --port $PORT`.)
-3. **Settings → Networking → Generate Domain** to get a public URL like
-   `https://dabbyfinal-production-95b5.up.railway.app`.
-4. Add the environment **Variables** (Settings → Variables) — same values as your `.env.local`:
-
-   | Variable | Value |
-   |----------|-------|
-   | `VITE_SUPABASE_URL` | your Supabase URL |
-   | `SUPABASE_SERVICE_ROLE_KEY` | your service-role key |
-   | `GROQ_API_KEY` | your Groq key |
-   | `GEMINI_API_KEY` | your Gemini key (optional; enables vision OCR) |
-   | `VITE_TAVILY_API_KEY` | Tavily key (optional) |
-   | `FRONTEND_ORIGIN` | your Vercel URL, e.g. `https://dabby.vercel.app` (optional) |
-
-5. Deploy. Check the logs show `Application startup complete` and hit
-   `https://<your-railway-url>/health` → should return `{"status":"healthy"}`.
-
-> Redis is optional — without it the queue uses an in-memory fallback (fine on a
-> single always-on Railway instance). To enable Redis later, add a Railway Redis
-> plugin and set `REDIS_HOST` / `REDIS_PORT`.
+3. **Settings → Networking → Generate Domain** to get a public URL like `https://dabbyfinal-production-95b5.up.railway.app`.
+4. Add Environment Variables (`SUPABASE_SERVICE_ROLE_KEY`, `GROQ_API_KEY`, `GEMINI_API_KEY`, etc.).
 
 ---
 

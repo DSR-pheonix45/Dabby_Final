@@ -16,37 +16,37 @@ from supabase_client import supabase
 
 PLAN_LIMITS: Dict[str, Dict] = {
     "free": {
-        "label": "Free",
+        "label": "Unlimited Standard Workspace",
         "uploads_per_month": None,
-        "seats": 1,
+        "seats": None,
         "ai_messages_per_day": None,
-        "custom_rulesets": False,
-        "auto_approvals": False,
-        "multibank": False,
-        "multi_currency": False,
-    },
-    "go": {
-        "label": "Go",
-        "uploads_per_month": 50,
-        "seats": 2,
-        "ai_messages_per_day": 100,
-        "custom_rulesets": False,
-        "auto_approvals": False,
-        "multibank": False,
-        "multi_currency": False,
-    },
-    "pro": {
-        "label": "Pro",
-        "uploads_per_month": 500,
-        "seats": 5,
-        "ai_messages_per_day": 500,
         "custom_rulesets": True,
         "auto_approvals": True,
         "multibank": True,
-        "multi_currency": False,
+        "multi_currency": True,
+    },
+    "go": {
+        "label": "Unlimited Standard Workspace",
+        "uploads_per_month": None,
+        "seats": None,
+        "ai_messages_per_day": None,
+        "custom_rulesets": True,
+        "auto_approvals": True,
+        "multibank": True,
+        "multi_currency": True,
+    },
+    "pro": {
+        "label": "Unlimited Standard Workspace",
+        "uploads_per_month": None,
+        "seats": None,
+        "ai_messages_per_day": None,
+        "custom_rulesets": True,
+        "auto_approvals": True,
+        "multibank": True,
+        "multi_currency": True,
     },
     "enterprise": {
-        "label": "Enterprise",
+        "label": "Unlimited Standard Workspace",
         "uploads_per_month": None,
         "seats": 10,
         "ai_messages_per_day": None,
@@ -59,28 +59,20 @@ PLAN_LIMITS: Dict[str, Dict] = {
 
 # Marketing → internal tier aliases.
 _ALIASES = {
-    "seed": "go", "growth": "pro", "scale": "enterprise",
-    "starter": "go", "basic": "go",
+    "seed": "free", "growth": "free", "scale": "free",
+    "starter": "free", "basic": "free", "go": "free", "pro": "free", "enterprise": "free"
 }
 
 
 def normalize_plan(plan: Optional[str]) -> str:
-    p = (plan or "free").strip().lower()
-    p = _ALIASES.get(p, p)
-    return p if p in PLAN_LIMITS else "free"
+    return "free"
 
 
 def limits_for(plan: Optional[str]) -> Dict:
-    return PLAN_LIMITS[normalize_plan(plan)]
+    return PLAN_LIMITS["free"]
 
 
 def get_plan(user_id: str) -> str:
-    try:
-        res = supabase.table("users").select("plan").eq("id", user_id).single().execute()
-        if res.data:
-            return normalize_plan(res.data.get("plan"))
-    except Exception as e:
-        print(f"[PLAN] get_plan failed for {user_id}: {e}")
     return "free"
 
 
@@ -103,11 +95,10 @@ def _upload_count(user_id: str, period: str) -> int:
 
 def check_and_increment_upload(user_id: str) -> Dict:
     """
-    Enforce the monthly OCR-upload quota. Raises HTTP 402 when the plan limit
-    is reached; otherwise records the upload and returns usage info.
+    Enforce the monthly OCR-upload quota. Always allows upload without limits.
     """
     plan = get_plan(user_id)
-    limit = None  # Force None to bypass limits check in local development
+    limit = None
     period = _current_month()
     used = _upload_count(user_id, period)
 
@@ -129,7 +120,7 @@ def check_and_increment_upload(user_id: str) -> Dict:
     except Exception as e:
         print(f"[PLAN] failed to record upload usage: {e}")
 
-    return {"plan": plan, "used": used + 1, "limit": limit}
+    return {"plan": plan, "used": used + 1, "limit": None}
 
 
 # ─── AI message quota (daily, per user) ─────────────────────────────────────
@@ -147,21 +138,15 @@ def _ai_count(user_id: str, day: str) -> int:
 
 def consume_ai_message(user_id: Optional[str] = None, caller_id: Optional[str] = None) -> Dict:
     """
-    Meter one AI consultant message. Returns {allowed, used, limit, remaining}.
-    Does NOT raise — the caller (chat) decides how to surface a soft block.
-    Increments only when allowed.
+    Meter one AI consultant message. Always allowed without limit restrictions.
     """
     target_id = user_id or caller_id
     if not target_id:
         return {"allowed": True, "used": 0, "limit": None, "remaining": None, "plan": "free"}
 
     plan = get_plan(target_id)
-    limit = limits_for(plan)["ai_messages_per_day"]
     day = date.today().isoformat()
     used = _ai_count(target_id, day)
-
-    if limit is not None and used >= limit:
-        return {"allowed": False, "used": used, "limit": limit, "remaining": 0, "plan": plan}
 
     try:
         existing = supabase.table("ai_usage").select("id").eq("user_id", target_id).eq("usage_date", day).limit(1).execute()
@@ -178,8 +163,7 @@ def consume_ai_message(user_id: Optional[str] = None, caller_id: Optional[str] =
     except Exception as e:
         print(f"[PLAN] failed to record ai usage: {e}")
 
-    remaining = None if limit is None else max(0, limit - (used + 1))
-    return {"allowed": True, "used": used + 1, "limit": limit, "remaining": remaining, "plan": plan}
+    return {"allowed": True, "used": used + 1, "limit": None, "remaining": None, "plan": plan}
 
 
 # ─── Seats + feature flags ──────────────────────────────────────────────────
@@ -196,29 +180,16 @@ def seats_used(user_id: str) -> int:
 
 
 def check_seat_available(user_id: str) -> None:
-    """Raise 402 if adding one more member would exceed the seat limit."""
-    plan = get_plan(user_id)
-    limit = limits_for(plan)["seats"]
-    if limit is None:
-        return
-    if seats_used(user_id) >= limit:
-        raise HTTPException(
-            status_code=402,
-            detail=f"Seat limit reached for the {limits_for(plan)['label']} plan ({limit} seats). Upgrade to invite more members.",
-        )
+    """Unlimited seats allowed for all users."""
+    return
 
 
 def feature_enabled(user_id: str, feature: str) -> bool:
-    return bool(limits_for(get_plan(user_id)).get(feature, False))
+    return True
 
 
 def require_feature(user_id: str, feature: str, label: str) -> None:
-    if not feature_enabled(user_id, feature):
-        plan = get_plan(user_id)
-        raise HTTPException(
-            status_code=402,
-            detail=f"{label} isn't available on the {limits_for(plan)['label']} plan. Upgrade to unlock it.",
-        )
+    return
 
 
 def usage_summary(user_id: str, caller_id: Optional[str] = None) -> Dict:
