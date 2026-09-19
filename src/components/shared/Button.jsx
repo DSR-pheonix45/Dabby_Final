@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 
 const variants = {
   // Note: For light mode, use dark:hover classes or handle in component
-  primary: "bg-[#66ACB7] text-black border border-[#66ACB7] hover:bg-transparent dark:hover:text-white dark:hover:border-white hover:text-[#1a1a1a] hover:border-[#1a1a1a]",
+  primary: "bg-[#81E6D9] text-black border border-[#81E6D9] hover:bg-transparent dark:hover:text-white dark:hover:border-white hover:text-[#1a1a1a] hover:border-[#1a1a1a]",
   secondary:
     "bg-transparent text-gray-900 border border-gray-300 hover:border-gray-400 hover:bg-gray-100",
   yellow: "bg-primary-400 text-black hover:bg-primary-500",

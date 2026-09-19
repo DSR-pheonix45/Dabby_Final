@@ -239,7 +239,7 @@ export default function Sidebar({
 
   return (
     <div
-      className={`h-full dark:bg-[#373F51] bg-[#E8EAED] dark:border-white/10 border-r border-[#BDCCDB] dark:text-white text-[#373F51] flex flex-col transition-all duration-500 ease-in-out ${isCollapsed ? "w-16" : "w-full"}`}
+      className={`h-full bg-[#0A0A0A] border-r border-white/5 text-white flex flex-col transition-all duration-500 ease-in-out ${isCollapsed ? "w-16" : "w-full"}`}
       data-tour="sidebar"
     >
       <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar px-3 py-6 space-y-8">

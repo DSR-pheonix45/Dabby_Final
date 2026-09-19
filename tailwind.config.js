@@ -23,21 +23,6 @@ export default {
         charcoal: '#373F51',
         onyx: '#121317',
 
-        // Override standard teal to Pacific Blue (#66ACB7) across all components
-        teal: {
-          50: '#F0F7F8',
-          100: '#DDEEEE',
-          200: '#BDCCDB',
-          300: '#8BC4CC',
-          400: '#66ACB7',
-          500: '#66ACB7',
-          600: '#5298A3',
-          700: '#3D7A84',
-          800: '#373F51',
-          900: '#121317',
-          DEFAULT: '#66ACB7',
-        },
-
         // Primary Brand Colors (Pacific Blue #66ACB7 as main accent)
         primary: {
           DEFAULT: '#66ACB7',
