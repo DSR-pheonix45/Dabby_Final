@@ -29,11 +29,14 @@
   */
 
   /* Light Mode Palette Tokens:
-     Base Primary Background: White (#FFFFFF)
-     4 colors from left: Platinum, Pale Sky, Pacific Blue, Charcoal Blue
+     4 colors from left:
+     1. #E8EAED (Platinum)  -> Background & Surface
+     2. #BDCCDB (Pale Sky)   -> Borders & Dividers
+     3. #66ACB7 (Pacific Blue)-> Primary Accent
+     4. #373F51 (Charcoal Blue)-> Primary Text & Headings
   */
-  --bg-primary: #ffffff;
-  --bg-secondary: #e8eaed;
+  --bg-primary: #e8eaed;
+  --bg-secondary: #ffffff;
   --bg-card: #ffffff;
   --bg-surface: #e8eaed;
   --border-color: #bdccdb;
@@ -48,13 +51,16 @@
   color-scheme: dark;
 
   /* Dark Mode Palette Tokens:
-     Base Primary Background: Onyx (#121317)
-     4 colors from right: Onyx, Charcoal Blue, Pacific Blue, Pale Sky
+     4 colors from right:
+     2. #BDCCDB (Pale Sky)   -> Secondary Text & Muted Borders
+     3. #66ACB7 (Pacific Blue)-> Primary Accent
+     4. #373F51 (Charcoal Blue)-> Card & Elevated Surface Background
+     5. #121317 (Onyx)       -> Deep Primary Background
   */
   --bg-primary: #121317;
   --bg-secondary: #373f51;
   --bg-card: #373f51;
-  --bg-surface: #222937;
+  --bg-surface: #121317;
   --border-color: #373f51;
   --accent-primary: #66acb7;
   --accent-hover: #7fc3cc;
@@ -76,7 +82,7 @@ body {
 }
 
 html:not(.dark) body {
-  background-color: #ffffff;
+  background-color: #e8eaed;
   color: #373f51;
   background-image: linear-gradient(to right, rgba(55, 63, 81, 0.035) 1px, transparent 1px);
   background-size: 120px 100%;
