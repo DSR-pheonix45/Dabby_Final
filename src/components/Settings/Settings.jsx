@@ -379,8 +379,10 @@ export default function Settings() {
                   </div>
                 </div>
               )}
+                </div>
+              )}
             </div>
-          </div>
+          </div >
         );
       }
 

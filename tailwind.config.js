@@ -16,71 +16,58 @@ export default {
     },
     extend: {
       colors: {
-        // Core Palette Swatches
-        platinum: '#E8EAED',
-        palesky: '#BDCCDB',
-        pacific: '#66ACB7',
-        charcoal: '#373F51',
-        onyx: '#121317',
-
-        // Primary Brand Colors (Pacific Blue #66ACB7 as main accent)
         primary: {
-          DEFAULT: '#66ACB7',
-          light: '#66ACB7',
-          dark: '#66ACB7',
-          50: '#F0F7F8',
-          100: '#DDEEEE',
-          200: '#BDCCDB',
-          300: '#94C1C8',
-          400: '#66ACB7',
-          500: '#4A929E',
-          600: '#373F51',
-          700: '#2A303F',
-          800: '#1E232E',
-          900: '#121317',
-        },
-        brand: {
-          DEFAULT: '#66ACB7',
-          light: '#66ACB7',
-          dark: '#66ACB7',
+          DEFAULT: '#00FFD1', // Landing page primary color
+          light: '#3B82F6',   // App light mode primary
+          dark: '#10B981',    // App dark mode primary
+          50: '#E6FFFA',
+          100: '#B2F5EA',
+          200: '#81E6D9',
+          300: '#4FD1C5',
+          400: '#38B2AC',
+          500: '#319795',
+          600: '#2C7A7B',
+          700: '#285E61',
+          800: '#234E52',
+          900: '#1D4044',
         },
         sidebar: {
-          light: '#E8EAED',
-          dark: '#373F51'
+          light: '#f5f7fa',
+          dark: '#0f172a'
         },
         chat: {
-          light: '#FFFFFF',
-          dark: '#121317'
+          light: '#ffffff',
+          dark: '#131122'
         },
         message: {
-          light: '#E8EAED',
-          dark: '#373F51'
+          light: '#f8fafc',
+          dark: '#334155'
         },
         border: {
-          light: '#BDCCDB',
-          dark: '#373F51'
+          light: '#e2e8f0',
+          dark: '#334155'
         },
         text: {
           light: {
-            primary: '#373F51',
-            secondary: '#66ACB7'
+            primary: '#1e293b',
+            secondary: '#64748b'
           },
           dark: {
-            primary: '#E8EAED',
-            secondary: '#BDCCDB'
+            primary: '#f8fafc',
+            secondary: '#94a3b8'
           },
           settings: {
             light: {
-              bg: '#FFFFFF',
-              card: '#E8EAED',
-              text: '#373F51',
-              border: '#BDCCDB'
+              bg: '#ffffff',
+              card: '#f8fafc',
+              text: '#1e293b',
+              border: '#e2e8f0'
             },
             dark: {
-              bg: '#121317',
-              card: '#373F51',
-              text: '#E8EAED',
-              border: '#BDCCDB'
+              bg: '#0f172a',
+              card: '#1e293b',
+              text: '#f8fafc',
+              border: '#334155'
             }
           }
         }
