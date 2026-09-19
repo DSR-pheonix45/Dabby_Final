@@ -236,10 +236,10 @@ const ChatInput = forwardRef(function ChatInput(
           {/* Main Input Container */}
           <div
             className={`
-                relative flex items-center gap-1 sm:gap-2 bg-[#0D1117] rounded-xl sm:rounded-2xl border transition-all duration-300
+                relative flex items-center gap-1 sm:gap-2 rounded-xl sm:rounded-2xl border transition-all duration-300
                 ${isFocused || isTyping || message.length > 0
-                ? "border-teal-500/30 shadow-[0_0_20px_rgba(20,184,166,0.1)] bg-[#0D1117]"
-                : "border-white/10 hover:border-white/20 bg-white/5"
+                ? "border-[#66ACB7]/50 shadow-[0_0_20px_rgba(102,172,183,0.15)] dark:bg-[#121317] bg-white"
+                : "dark:border-white/10 border-[#BDCCDB] hover:border-[#66ACB7]/40 dark:bg-[#373F51]/30 bg-white"
               }
             `}
           >

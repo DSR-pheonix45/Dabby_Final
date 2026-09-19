@@ -82,7 +82,7 @@ export default function ActionCards({
             <button
               key={idx}
               onClick={card.onClick}
-              className="group bg-[#0a0a0a] hover:bg-white/5 border border-white/5 hover:border-teal-500/30 rounded-xl p-3 sm:p-4 lg:p-5 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-teal-500/5 hover:-translate-y-0.5 text-left w-full overflow-hidden active:scale-[0.98]"
+              className="group dark:bg-[#373F51] bg-[#ffffff] hover:bg-white/5 border dark:border-white/10 border-[#BDCCDB] hover:border-[#66ACB7]/50 rounded-xl p-3 sm:p-4 lg:p-5 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-[#66ACB7]/10 hover:-translate-y-0.5 text-left w-full overflow-hidden active:scale-[0.98]"
             >
               <div className="flex items-start gap-2 sm:gap-3">
                 <div className="mt-0.5 w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0 group-hover:border-teal-500/30 group-hover:bg-teal-500/10 transition-colors duration-300">
