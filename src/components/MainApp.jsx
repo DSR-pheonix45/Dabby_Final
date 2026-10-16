@@ -33,6 +33,11 @@ import { apiFetch } from "../lib/apiClient";
 import { consumeAiMessage } from "../lib/plans";
 import { toast } from "react-hot-toast";
 import { useWorkbench } from "../context/WorkbenchContext";
+import BusinessHealthDashboard from "./BusinessHealth/BusinessHealthDashboard";
+import BusinessHealthSidebar from "./BusinessHealth/BusinessHealthSidebar";
+import { DEFAULT_ACTIVE_KPI_IDS, MIN_CARDS, MAX_CARDS } from "./BusinessHealth/kpiRegistry";
+import { getWorkbenchMetrics } from "./BusinessHealth/workbenchMetricsHelper";
+import { BsSliders2 } from "react-icons/bs";
 
 export default function MainApp() {
   useTheme(); // Theme context is used for side effects
@@ -52,6 +57,80 @@ export default function MainApp() {
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const chatInputRef = useRef(null);
   const chatContainerRef = useRef(null);
+
+  // Business Health Dashboard and Right Sidebar state
+  const isWorkbenchContextOn = Boolean(activeWorkbench && isWorkbenchContextEnabled);
+  const [isKpiSidebarOpen, setIsKpiSidebarOpen] = useState(false);
+  const [isSavedLayout, setIsSavedLayout] = useState(false);
+
+  const [activeKpiIds, setActiveKpiIds] = useState(() => {
+    if (!activeWorkbench?.id) return DEFAULT_ACTIVE_KPI_IDS;
+    try {
+      const saved = localStorage.getItem(`dabby_wb_health_layout_${activeWorkbench.id}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length >= MIN_CARDS && parsed.length <= MAX_CARDS) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return DEFAULT_ACTIVE_KPI_IDS;
+  });
+
+  // Load workbench-specific saved layout on activeWorkbench switch
+  useEffect(() => {
+    if (!activeWorkbench?.id) return;
+    try {
+      const saved = localStorage.getItem(`dabby_wb_health_layout_${activeWorkbench.id}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length >= MIN_CARDS && parsed.length <= MAX_CARDS) {
+          setActiveKpiIds(parsed);
+          return;
+        }
+      }
+    } catch (e) {}
+    setActiveKpiIds(DEFAULT_ACTIVE_KPI_IDS);
+  }, [activeWorkbench?.id]);
+
+  const handleSaveLayout = () => {
+    if (!activeWorkbench?.id) return;
+    try {
+      localStorage.setItem(`dabby_wb_health_layout_${activeWorkbench.id}`, JSON.stringify(activeKpiIds));
+      setIsSavedLayout(true);
+      toast.success(`Layout saved for ${activeWorkbench.name}!`, { icon: "💾" });
+      setTimeout(() => setIsSavedLayout(false), 2500);
+    } catch (e) {
+      toast.error("Failed to save layout");
+    }
+  };
+
+  const handleResetLayout = () => {
+    setActiveKpiIds(DEFAULT_ACTIVE_KPI_IDS);
+    if (activeWorkbench?.id) {
+      localStorage.setItem(`dabby_wb_health_layout_${activeWorkbench.id}`, JSON.stringify(DEFAULT_ACTIVE_KPI_IDS));
+    }
+    toast.success("Reset to 7 default key KPI cards");
+  };
+
+  const handleAddKpi = (kpiId) => {
+    if (activeKpiIds.length >= MAX_CARDS) {
+      toast.error(`Maximum ${MAX_CARDS} cards allowed in layout`);
+      return;
+    }
+    if (activeKpiIds.includes(kpiId)) return;
+    setActiveKpiIds((prev) => [...prev, kpiId]);
+    toast.success("Card added to layout");
+  };
+
+  const handleRemoveKpi = (kpiId) => {
+    if (activeKpiIds.length <= MIN_CARDS) {
+      toast.error(`Minimum ${MIN_CARDS} cards required in layout`);
+      return;
+    }
+    setActiveKpiIds((prev) => prev.filter((id) => id !== kpiId));
+    toast("Card removed", { icon: "🗑️" });
+  };
 
   // Auto-show onboarding tour for new users who just completed the onboarding form
   useEffect(() => {
@@ -694,10 +773,23 @@ Based on the Profit & Loss statement provided, the business shows stable operati
                 ) : (
                   <>
                     <WelcomeSection />
-                    {activeWorkbench && (
-                      <ActionCards
-                        onQuestionCardClick={handleQuestionCardClick}
+                    {isWorkbenchContextOn ? (
+                      <BusinessHealthDashboard
+                        workbench={activeWorkbench}
+                        onQuestionClick={handleQuestionCardClick}
+                        isSidebarOpen={isKpiSidebarOpen}
+                        onToggleSidebar={() => setIsKpiSidebarOpen((prev) => !prev)}
+                        activeKpiIds={activeKpiIds}
+                        setActiveKpiIds={setActiveKpiIds}
+                        onSaveLayout={handleSaveLayout}
+                        isSaved={isSavedLayout}
                       />
+                    ) : (
+                      activeWorkbench && (
+                        <ActionCards
+                          onQuestionCardClick={handleQuestionCardClick}
+                        />
+                      )
                     )}
                   </>
                 )
@@ -708,10 +800,23 @@ Based on the Profit & Loss statement provided, the business shows stable operati
               element={
                 <>
                   <WelcomeSection />
-                  {activeWorkbench && (
-                    <ActionCards
-                      onQuestionCardClick={handleQuestionCardClick}
+                  {isWorkbenchContextOn ? (
+                    <BusinessHealthDashboard
+                      workbench={activeWorkbench}
+                      onQuestionClick={handleQuestionCardClick}
+                      isSidebarOpen={isKpiSidebarOpen}
+                      onToggleSidebar={() => setIsKpiSidebarOpen((prev) => !prev)}
+                      activeKpiIds={activeKpiIds}
+                      setActiveKpiIds={setActiveKpiIds}
+                      onSaveLayout={handleSaveLayout}
+                      isSaved={isSavedLayout}
                     />
+                  ) : (
+                    activeWorkbench && (
+                      <ActionCards
+                        onQuestionCardClick={handleQuestionCardClick}
+                      />
+                    )
                   )}
                 </>
               }
@@ -759,6 +864,49 @@ Based on the Profit & Loss statement provided, the business shows stable operati
         onClose={() => setShowTour(false)}
         onComplete={handleTourComplete}
       />
+
+      {/* Mobile backdrop for Right Sidebar */}
+      {isWorkbenchContextOn && isKpiSidebarOpen && (
+        <div
+          className="sm:hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-40 transition-opacity"
+          onClick={() => setIsKpiSidebarOpen(false)}
+        />
+      )}
+
+      {/* Right Collapsible Sidebar for Business Health KPIs */}
+      {isWorkbenchContextOn && (
+        <BusinessHealthSidebar
+          isOpen={isKpiSidebarOpen}
+          onClose={() => setIsKpiSidebarOpen(false)}
+          activeKpiIds={activeKpiIds}
+          workbench={activeWorkbench}
+          metricsData={getWorkbenchMetrics(activeWorkbench)}
+          onAddKpi={handleAddKpi}
+          onRemoveKpi={handleRemoveKpi}
+          onResetLayout={handleResetLayout}
+          onSaveLayout={handleSaveLayout}
+          onDragStart={(e, kpiId) => {
+            e.dataTransfer.setData("text/plain", kpiId);
+            e.dataTransfer.effectAllowed = "copyMove";
+          }}
+          isSaved={isSavedLayout}
+        />
+      )}
+
+      {/* Floating edge toggle tab when Right Sidebar is collapsed */}
+      {isWorkbenchContextOn && !isKpiSidebarOpen && !isInConversation && !location.pathname.includes('/workbench/') && (
+        <button
+          type="button"
+          onClick={() => setIsKpiSidebarOpen(true)}
+          title="Open KPI Library (Customize 3-9 Cards)"
+          className="fixed right-0 top-1/2 -translate-y-1/2 z-40 bg-[#0e1626]/95 hover:bg-[#131e33] border-l-2 border-y border-teal-400 text-teal-300 py-3.5 px-2 rounded-l-xl shadow-[-5px_0_25px_rgba(20,184,166,0.25)] flex flex-col items-center gap-2 group transition-all cursor-pointer hover:pl-2.5 active:scale-95"
+        >
+          <BsSliders2 className="text-sm group-hover:scale-110 transition-transform" />
+          <span className="text-[10px] font-bold tracking-widest uppercase [writing-mode:vertical-lr] rotate-180 font-mono">
+            KPIs ({activeKpiIds.length}/9)
+          </span>
+        </button>
+      )}
     </div>
   );
 }
